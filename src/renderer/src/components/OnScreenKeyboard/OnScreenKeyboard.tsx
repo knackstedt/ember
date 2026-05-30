@@ -1,10 +1,11 @@
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 
 interface OnScreenKeyboardProps {
   value: string
   onChange: (value: string) => void
   onClose: () => void
+  onSubmit?: (value: string) => void
   label?: string
 }
 
@@ -28,9 +29,11 @@ export const OnScreenKeyboard: React.FC<OnScreenKeyboardProps> = ({
   value,
   onChange,
   onClose,
+  onSubmit,
   label
 }) => {
   const [shift, setShift] = useState(false)
+  const [focusedKey, setFocusedKey] = useState<[number, number]>([0, 0])
   const rows = shift ? ROWS_SHIFT : ROWS
 
   const handleKey = useCallback(
@@ -48,6 +51,58 @@ export const OnScreenKeyboard: React.FC<OnScreenKeyboardProps> = ({
     },
     [value, onChange, onClose, shift]
   )
+
+  const focusedKeyRef = useRef<[number, number]>(focusedKey)
+  focusedKeyRef.current = focusedKey
+  const rowsRef = useRef(rows)
+  rowsRef.current = rows
+  const handleKeyRef = useRef(handleKey)
+  handleKeyRef.current = handleKey
+  const onSubmitRef = useRef(onSubmit)
+  onSubmitRef.current = onSubmit
+  const valueRef = useRef(value)
+  valueRef.current = value
+
+  useEffect(() => {
+    const unsub = window.htpc.input.onEvent((ev) => {
+      if (ev.type !== 'button_press') return
+      const r = rowsRef.current
+      const [row, col] = focusedKeyRef.current
+      const getRowLen = (ri: number): number => r[ri].length + (ri === r.length - 1 ? 1 : 0)
+
+      if (ev.action === 'dpad_up') {
+        const newRow = Math.max(0, row - 1)
+        const next: [number, number] = [newRow, Math.min(col, getRowLen(newRow) - 1)]
+        focusedKeyRef.current = next
+        setFocusedKey(next)
+      } else if (ev.action === 'dpad_down') {
+        const newRow = Math.min(r.length - 1, row + 1)
+        const next: [number, number] = [newRow, Math.min(col, getRowLen(newRow) - 1)]
+        focusedKeyRef.current = next
+        setFocusedKey(next)
+      } else if (ev.action === 'dpad_left') {
+        const next: [number, number] = [row, Math.max(0, col - 1)]
+        focusedKeyRef.current = next
+        setFocusedKey(next)
+      } else if (ev.action === 'dpad_right') {
+        const next: [number, number] = [row, Math.min(getRowLen(row) - 1, col + 1)]
+        focusedKeyRef.current = next
+        setFocusedKey(next)
+      } else if (ev.action === 'south') {
+        if (row === r.length - 1 && col === 0) {
+          setShift((s) => !s)
+        } else {
+          const keyCol = row === r.length - 1 ? col - 1 : col
+          handleKeyRef.current(r[row][keyCol])
+        }
+      } else if (ev.action === 'east') {
+        handleKeyRef.current('⌫')
+      } else if (ev.action === 'start') {
+        onSubmitRef.current?.(valueRef.current)
+      }
+    })
+    return unsub
+  }, [])
 
   return (
     <motion.div
@@ -88,7 +143,7 @@ export const OnScreenKeyboard: React.FC<OnScreenKeyboardProps> = ({
           <div key={ri} className="flex gap-1.5 justify-center">
             {ri === rows.length - 1 && (
               <motion.button
-                className="px-4 py-2.5 rounded text-sm font-bold"
+                className={`px-4 py-2.5 rounded text-sm font-bold transition-transform${focusedKey[0] === rows.length - 1 && focusedKey[1] === 0 ? ' ring-2 ring-[var(--color-accent)] scale-110' : ''}`}
                 style={{
                   background: shift ? 'var(--color-accent)' : 'var(--color-surface-raised)',
                   color: shift ? 'var(--color-bg)' : 'var(--color-text)',
@@ -101,24 +156,29 @@ export const OnScreenKeyboard: React.FC<OnScreenKeyboardProps> = ({
                 ⇧
               </motion.button>
             )}
-            {row.map((key) => (
-              <motion.button
-                key={key}
-                className="px-3 py-2.5 rounded text-sm font-medium"
-                style={{
-                  background: key === '✓'
-                    ? 'var(--color-accent)'
-                    : 'var(--color-surface-raised)',
-                  color: key === '✓' ? 'var(--color-bg)' : 'var(--color-text)',
-                  border: '1px solid var(--color-border)',
-                  minWidth: key === ' ' ? '8rem' : '2.5rem'
-                }}
-                onClick={() => handleKey(key)}
-                whileTap={{ scale: 0.92 }}
-              >
-                {key === ' ' ? 'SPACE' : key}
-              </motion.button>
-            ))}
+            {row.map((key, ki) => {
+              const isFocused =
+                focusedKey[0] === ri &&
+                focusedKey[1] === (ri === rows.length - 1 ? ki + 1 : ki)
+              return (
+                <motion.button
+                  key={key}
+                  className={`px-3 py-2.5 rounded text-sm font-medium transition-transform${isFocused ? ' ring-2 ring-[var(--color-accent)] scale-110' : ''}`}
+                  style={{
+                    background: key === '✓'
+                      ? 'var(--color-accent)'
+                      : 'var(--color-surface-raised)',
+                    color: key === '✓' ? 'var(--color-bg)' : 'var(--color-text)',
+                    border: '1px solid var(--color-border)',
+                    minWidth: key === ' ' ? '8rem' : '2.5rem'
+                  }}
+                  onClick={() => handleKey(key)}
+                  whileTap={{ scale: 0.92 }}
+                >
+                  {key === ' ' ? 'SPACE' : key}
+                </motion.button>
+              )
+            })}
           </div>
         ))}
       </div>
@@ -175,6 +235,7 @@ export const OskInput: React.FC<OskInputProps> = ({
             value={value}
             onChange={onChange}
             onClose={() => setShowOsk(false)}
+            onSubmit={onSubmit}
             label={placeholder}
           />
         )}
