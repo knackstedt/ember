@@ -113,6 +113,7 @@ export const MoviesTab: React.FC = () => {
                       subtitle={movie.releaseYear ? String(movie.releaseYear) : undefined}
                       coverUrl={movie.coverUrl}
                       isFavorite={movie.isFavorite}
+                      progress={movie.watchProgress}
                       onSelect={() => setSelected(movie)}
                       onFavorite={() => toggleFavorite(movie.id)}
                     />

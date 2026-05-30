@@ -13,6 +13,7 @@ export interface MediaCardProps {
   onSelect?: () => void
   onFavorite?: () => void
   aspectRatio?: '2/3' | '16/9' | '1/1'
+  progress?: number
 }
 
 const PLACEHOLDER_COLORS = [
@@ -44,7 +45,8 @@ export const MediaCard: React.FC<MediaCardProps> = ({
   isSelected,
   onSelect,
   onFavorite,
-  aspectRatio = '2/3'
+  aspectRatio = '2/3',
+  progress
 }) => {
   const [imgError, setImgError] = useState(false)
   const showPlaceholder = !coverUrl || imgError
@@ -105,6 +107,12 @@ export const MediaCard: React.FC<MediaCardProps> = ({
           >
             {badge}
           </span>
+        )}
+
+        {progress !== undefined && progress > 0 && (
+          <div className="absolute bottom-0 left-0 right-0 h-1" style={{ background: 'rgba(0,0,0,0.4)' }}>
+            <div className="h-full" style={{ width: `${progress * 100}%`, background: 'var(--color-accent)' }} />
+          </div>
         )}
 
         {onFavorite && (

@@ -61,6 +61,7 @@ export interface Movie {
   tags?: string[]
   lastPlayed?: number
   rating?: number
+  watchProgress?: number
 }
 
 export interface MusicTrack {
@@ -109,6 +110,7 @@ export interface TVEpisode {
   airDate?: string
   description?: string
   stillUrl?: string
+  watchProgress?: number
 }
 
 export type InputEventType =
