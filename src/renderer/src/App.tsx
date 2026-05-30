@@ -10,6 +10,8 @@ import { TVShowsTab } from './tabs/TVShows'
 import { SettingsTab } from './tabs/Settings'
 import { ControllersTab } from './tabs/Controllers'
 import { TabId } from '../../shared/types'
+import { ToastContainer } from './components/Toast/Toast'
+import { useToastStore } from './store/toast.store'
 
 interface TabDef {
   id: TabId
@@ -43,6 +45,33 @@ export default function App(): React.ReactElement {
   useEffect(() => {
     if (settings?.defaultTab) setActiveTab(settings.defaultTab)
   }, [settings?.defaultTab])
+
+  useEffect(() => {
+    const scanToastIds = new Map<string, string>()
+    const unsubScan = window.htpc.onScanProgress((p) => {
+      const { push, update, dismiss } = useToastStore.getState()
+      const pct = p.total > 0 ? Math.round((p.current / p.total) * 100) : 0
+      const label = p.message ?? `${p.current} / ${p.total}`
+      if (!scanToastIds.has(p.scanner)) {
+        const id = push({ type: 'progress', message: `${p.scanner}: ${label}`, progress: pct })
+        scanToastIds.set(p.scanner, id)
+      } else {
+        const id = scanToastIds.get(p.scanner)!
+        if (p.status === 'done') {
+          update(id, { type: 'success', message: `${p.scanner}: Done`, progress: 100 })
+          setTimeout(() => dismiss(id), 3000)
+          scanToastIds.delete(p.scanner)
+        } else if (p.status === 'error') {
+          update(id, { type: 'error', message: `${p.scanner}: ${p.message ?? 'Error'}` })
+          setTimeout(() => dismiss(id), 8000)
+          scanToastIds.delete(p.scanner)
+        } else {
+          update(id, { message: `${p.scanner}: ${label}`, progress: pct })
+        }
+      }
+    })
+    return unsubScan
+  }, [])
 
   useEffect(() => {
     const unsubConnect = window.htpc.input.onDeviceConnected(addDevice)
@@ -79,6 +108,7 @@ export default function App(): React.ReactElement {
       className="h-screen w-screen flex flex-col overflow-hidden relative"
       style={{ background: 'var(--color-bg)' }}
     >
+      <ToastContainer />
       <ThemeBackground />
 
       <div className="relative z-10 flex flex-col h-full">
