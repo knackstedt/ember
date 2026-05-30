@@ -1,0 +1,161 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Theme: Dark OLED ─────────────────────────────────────── */
+[data-theme="dark-oled"] {
+  --color-bg: #000000;
+  --color-surface: #0a0a0a;
+  --color-surface-raised: #141414;
+  --color-surface-overlay: rgba(20, 20, 20, 0.95);
+  --color-accent: #e2e2e2;
+  --color-accent-dim: #666666;
+  --color-text: #f0f0f0;
+  --color-text-dim: #888888;
+  --color-border: rgba(255, 255, 255, 0.08);
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --radius-card: 12px;
+  --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.8);
+  --shadow-glow: 0 0 20px rgba(226, 226, 226, 0.15);
+  --blur-panel: 0px;
+}
+
+/* ─── Theme: Glassmorphism ──────────────────────────────────── */
+[data-theme="glassmorphism"] {
+  --color-bg: #0d1117;
+  --color-surface: rgba(255, 255, 255, 0.05);
+  --color-surface-raised: rgba(255, 255, 255, 0.09);
+  --color-surface-overlay: rgba(13, 17, 23, 0.85);
+  --color-accent: #7dd3fc;
+  --color-accent-dim: #38bdf8;
+  --color-text: #f0f6ff;
+  --color-text-dim: #8ba3c7;
+  --color-border: rgba(125, 211, 252, 0.15);
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --radius-card: 16px;
+  --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.5);
+  --shadow-glow: 0 0 30px rgba(125, 211, 252, 0.2);
+  --blur-panel: 20px;
+}
+
+/* ─── Theme: Neon Cyberpunk ─────────────────────────────────── */
+[data-theme="neon-cyberpunk"] {
+  --color-bg: #07070f;
+  --color-surface: #0e0e1a;
+  --color-surface-raised: #16162a;
+  --color-surface-overlay: rgba(14, 14, 26, 0.95);
+  --color-accent: #ff2d78;
+  --color-accent-dim: #a020f0;
+  --color-text: #e8e8ff;
+  --color-text-dim: #7878aa;
+  --color-border: rgba(255, 45, 120, 0.2);
+  --font-sans: 'Rajdhani', 'Orbitron', system-ui, sans-serif;
+  --font-mono: 'Share Tech Mono', monospace;
+  --radius-card: 4px;
+  --shadow-card: 0 0 0 1px rgba(255, 45, 120, 0.3), 0 4px 20px rgba(255, 45, 120, 0.1);
+  --shadow-glow: 0 0 25px rgba(255, 45, 120, 0.4), 0 0 60px rgba(160, 32, 240, 0.2);
+  --blur-panel: 0px;
+}
+
+/* ─── Theme: Terminal TUI ───────────────────────────────────── */
+[data-theme="terminal-tui"] {
+  --color-bg: #0c0c0c;
+  --color-surface: #121212;
+  --color-surface-raised: #1a1a1a;
+  --color-surface-overlay: rgba(12, 12, 12, 0.98);
+  --color-accent: #00ff41;
+  --color-accent-dim: #00aa2b;
+  --color-text: #ccffcc;
+  --color-text-dim: #557755;
+  --color-border: rgba(0, 255, 65, 0.2);
+  --font-sans: 'VT323', 'Courier New', monospace;
+  --font-mono: 'VT323', 'Courier New', monospace;
+  --radius-card: 0px;
+  --shadow-card: 0 0 0 1px rgba(0, 255, 65, 0.3);
+  --shadow-glow: 0 0 15px rgba(0, 255, 65, 0.5);
+  --blur-panel: 0px;
+}
+
+/* ─── Base styles ───────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* GPU-accelerated scrollable containers */
+.gpu-scroll {
+  transform: translateZ(0);
+  will-change: transform;
+  contain: layout style paint;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Glassmorphism panel utility */
+.glass-panel {
+  background: var(--color-surface);
+  backdrop-filter: blur(var(--blur-panel));
+  -webkit-backdrop-filter: blur(var(--blur-panel));
+  border: 1px solid var(--color-border);
+}
+
+/* Neon cyberpunk scanlines overlay */
+[data-theme="neon-cyberpunk"] #root::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.03) 2px,
+    rgba(0, 0, 0, 0.03) 4px
+  );
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* Terminal cursor blink */
+[data-theme="terminal-tui"] .cursor::after {
+  content: '█';
+  animation: blink 1s step-end infinite;
+  color: var(--color-accent);
+}
+
+@keyframes blink {
+  50% { opacity: 0; }
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-accent-dim);
+}

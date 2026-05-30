@@ -1,0 +1,38 @@
+{
+  "name": "htpc",
+  "version": "0.1.0",
+  "description": "Home Theater PC Application",
+  "main": "out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "lint": "eslint src"
+  },
+  "dependencies": {
+    "@surrealdb/node": "^3.0.0",
+    "castv2": "^0.1.10",
+    "esbuild": "^0.21.5",
+    "framer-motion": "^11.3.0",
+    "music-metadata": "^10.6.0",
+    "source-map": "^0.7.4",
+    "virtua": "^0.38.0",
+    "zustand": "^4.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@types/source-map": "^0.5.7",
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.19",
+    "electron": "^31.0.2",
+    "electron-vite": "^5.0.0",
+    "postcss": "^8.4.38",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tailwindcss": "^3.4.4",
+    "typescript": "^5.5.2",
+    "vite": "^5.3.1"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "id": "example-plugin",
+  "name": "Example Plugin",
+  "version": "0.1.0",
+  "description": "A minimal example plugin demonstrating the HTPC plugin API.",
+  "author": "HTPC",
+  "entryPoint": "index.ts",
+  "permissions": ["ipc", "settings"]
+}
