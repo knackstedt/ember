@@ -7,6 +7,7 @@ import { MediaCard } from '../../components/MediaCard/MediaCard'
 import { DetailPanel } from '../../components/DetailPanel/DetailPanel'
 import { OskInput } from '../../components/OnScreenKeyboard/OnScreenKeyboard'
 import { Movie } from '../../../../shared/types'
+import { useVideoPlayerStore } from '../../store/videoPlayer.store'
 
 const STREAMING_SERVICES = [
   { name: 'Netflix', url: 'https://netflix.com', color: '#E50914' },
@@ -26,6 +27,7 @@ export const MoviesTab: React.FC = () => {
     movies, loading, searchQuery, activeGenre, load, scan, toggleFavorite,
     setSearch, setGenre, filtered
   } = useMoviesStore()
+  const openVideo = useVideoPlayerStore((s) => s.open)
   const [selected, setSelected] = useState<Movie | null>(null)
   const [subTab, setSubTab] = useState<SubTab>('local')
 
@@ -151,7 +153,7 @@ export const MoviesTab: React.FC = () => {
           <motion.button
             className="px-6 py-2.5 rounded-[var(--radius-card)] font-semibold text-sm"
             style={{ background: 'var(--color-accent)', color: 'var(--color-bg)' }}
-            onClick={() => { window.htpc.movies.launch(selected!); setSelected(null) }}
+            onClick={() => { openVideo(`file://${selected!.filePath}`, selected!.title); setSelected(null) }}
             whileTap={{ scale: 0.96 }}
           >
             ▶ Play

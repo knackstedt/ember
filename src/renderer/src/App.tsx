@@ -16,6 +16,8 @@ import { ToastContainer } from './components/Toast/Toast'
 import { useToastStore } from './store/toast.store'
 import { MusicPlayer } from './components/MusicPlayer/MusicPlayer'
 import { useMusicPlayerStore } from './store/musicPlayer.store'
+import { VideoPlayer } from './components/VideoPlayer/VideoPlayer'
+import { useVideoPlayerStore } from './store/videoPlayer.store'
 
 interface TabDef {
   id: TabId
@@ -39,6 +41,7 @@ export default function App(): React.ReactElement {
   const { settings, loading, load } = useSettingsStore()
   const { addDevice, removeDevice } = useInputStore()
   const hasPlayer = useMusicPlayerStore((s) => s.queue.length > 0)
+  const videoOpen = useVideoPlayerStore((s) => !!s.src)
   const [activeTab, setActiveTab] = useState<TabId>('gaming')
   const activeTabRef = useRef<TabId>(activeTab)
   activeTabRef.current = activeTab
@@ -122,6 +125,10 @@ export default function App(): React.ReactElement {
     >
       <ToastContainer />
       <ThemeBackground />
+
+      <AnimatePresence>
+        {videoOpen && <VideoPlayer />}
+      </AnimatePresence>
 
       <div className="relative z-10 flex flex-col h-full">
         {/* Tab bar */}

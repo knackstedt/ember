@@ -6,11 +6,13 @@ import { MediaCard } from '../../components/MediaCard/MediaCard'
 import { DetailPanel } from '../../components/DetailPanel/DetailPanel'
 import { OskInput } from '../../components/OnScreenKeyboard/OnScreenKeyboard'
 import { TVShow } from '../../../../shared/types'
+import { useVideoPlayerStore } from '../../store/videoPlayer.store'
 
 const COLUMN_COUNT = 5
 
 export const TVShowsTab: React.FC = () => {
   const { shows, loading, searchQuery, load, scan, toggleFavorite, setSearch, filtered } = useTvStore()
+  const openVideo = useVideoPlayerStore((s) => s.open)
   const [selected, setSelected] = useState<TVShow | null>(null)
 
   useEffect(() => { load() }, [])
@@ -96,7 +98,7 @@ export const TVShowsTab: React.FC = () => {
                   <div
                     key={ep.episodeNumber}
                     className="flex items-center gap-2 py-1.5 px-2 rounded cursor-pointer hover:bg-white/5 text-sm"
-                    onClick={() => window.htpc.tv.launch(ep.filePath)}
+                    onClick={() => openVideo(`file://${ep.filePath}`, ep.title ?? `Episode ${ep.episodeNumber}`)}
                   >
                     <span style={{ color: 'var(--color-text-dim)', minWidth: '1.5rem' }}>
                       {ep.episodeNumber}
