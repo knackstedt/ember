@@ -37,6 +37,7 @@ const htpc = {
     list: (): Promise<Movie[]> => ipcRenderer.invoke('movies:list'),
     launch: (movie: Movie): Promise<void> => ipcRenderer.invoke('movies:launch', movie),
     favorite: (id: string, value: boolean): Promise<void> => ipcRenderer.invoke('movies:favorite', id, value),
+    tag: (id: string, tags: string[]): Promise<void> => ipcRenderer.invoke('movies:tag', id, tags),
     fetchMetadata: (title: string): Promise<unknown> => ipcRenderer.invoke('movies:metadata', title)
   },
 
@@ -44,7 +45,8 @@ const htpc = {
     scan: (extraPaths?: string[]): Promise<MusicTrack[]> => ipcRenderer.invoke('music:scan', extraPaths),
     list: (): Promise<MusicTrack[]> => ipcRenderer.invoke('music:list'),
     launch: (track: MusicTrack): Promise<void> => ipcRenderer.invoke('music:launch', track),
-    favorite: (id: string, value: boolean): Promise<void> => ipcRenderer.invoke('music:favorite', id, value)
+    favorite: (id: string, value: boolean): Promise<void> => ipcRenderer.invoke('music:favorite', id, value),
+    tag: (id: string, tags: string[]): Promise<void> => ipcRenderer.invoke('music:tag', id, tags)
   },
 
   tv: {
@@ -52,6 +54,7 @@ const htpc = {
     list: (): Promise<TVShow[]> => ipcRenderer.invoke('tv:list'),
     launch: (filePath: string): Promise<void> => ipcRenderer.invoke('tv:launch', filePath),
     favorite: (id: string, value: boolean): Promise<void> => ipcRenderer.invoke('tv:favorite', id, value),
+    tag: (id: string, tags: string[]): Promise<void> => ipcRenderer.invoke('tv:tag', id, tags),
     fetchMetadata: (title: string): Promise<unknown> => ipcRenderer.invoke('tv:metadata', title)
   },
 
@@ -61,6 +64,8 @@ const htpc = {
       ipcRenderer.invoke('input:mappings:get', deviceId),
     setMapping: (deviceId: string, inputCode: string, action: string): Promise<void> =>
       ipcRenderer.invoke('input:mappings:set', deviceId, inputCode, action),
+    resetMappings: (deviceId: string): Promise<void> =>
+      ipcRenderer.invoke('input:mappings:reset', deviceId),
     onEvent: (cb: (event: NormalizedInputEvent) => void) => {
       const handler = (_: Electron.IpcRendererEvent, ev: NormalizedInputEvent) => cb(ev)
       ipcRenderer.on('input:event', handler)

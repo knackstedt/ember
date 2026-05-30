@@ -8,13 +8,7 @@ import { DetailPanel } from '../../components/DetailPanel/DetailPanel'
 import { OskInput } from '../../components/OnScreenKeyboard/OnScreenKeyboard'
 import { MusicTrack } from '../../../../shared/types'
 import { useMusicPlayerStore } from '../../store/musicPlayer.store'
-
-const STREAMING_SERVICES = [
-  { name: 'Spotify', url: 'https://open.spotify.com', color: '#1DB954' },
-  { name: 'Apple Music', url: 'https://music.apple.com', color: '#fc3c44' },
-  { name: 'YouTube Music', url: 'https://music.youtube.com', color: '#FF0000' },
-  { name: 'Tidal', url: 'https://tidal.com', color: '#000000' }
-]
+import { StreamingTile, MUSIC_STREAMING_SERVICES } from '../../components/StreamingTile/StreamingTile'
 
 type SubTab = 'local' | 'streaming'
 const COLUMN_COUNT = 6
@@ -22,7 +16,7 @@ const COLUMN_COUNT = 6
 export const MusicTab: React.FC = () => {
   const {
     tracks, loading, searchQuery, activeArtist, activeAlbum, activeGenre, activeYear,
-    load, scan, toggleFavorite, setSearch, setArtist, setAlbum, setGenre, setYear, filtered
+    load, scan, toggleFavorite, setTags, setSearch, setArtist, setAlbum, setGenre, setYear, filtered
   } = useMusicStore()
   const play = useMusicPlayerStore((s) => s.play)
   const [selected, setSelected] = useState<MusicTrack | null>(null)
@@ -142,19 +136,8 @@ export const MusicTab: React.FC = () => {
       )}
 
       {subTab === 'streaming' && (
-        <div className="flex-1 grid grid-cols-2 gap-4 content-start pt-2">
-          {STREAMING_SERVICES.map((svc) => (
-            <motion.button
-              key={svc.name}
-              className="flex items-center justify-center rounded-[var(--radius-card)] h-28 text-lg font-bold text-white"
-              style={{ background: svc.color, boxShadow: 'var(--shadow-card)' }}
-              whileHover={{ scale: 1.04 }}
-              whileTap={{ scale: 0.97 }}
-              onClick={() => window.open(svc.url, '_blank')}
-            >
-              {svc.name}
-            </motion.button>
-          ))}
+        <div className="pt-2">
+          <StreamingTile services={MUSIC_STREAMING_SERVICES} />
         </div>
       )}
 
@@ -170,6 +153,8 @@ export const MusicTab: React.FC = () => {
           selected.genre ? { label: 'Genre', value: selected.genre } : null,
           selected.duration ? { label: 'Duration', value: `${Math.floor(selected.duration / 60)}:${String(Math.round(selected.duration % 60)).padStart(2, '0')}` } : null
         ].filter(Boolean) as { label: string; value: string }[] : []}
+        tags={selected?.tags ?? []}
+        onTagsChange={selected ? (newTags) => setTags(selected.id, newTags) : undefined}
         actions={selected && (
           <>
             <motion.button

@@ -117,6 +117,11 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     await db.query(`UPDATE movie:⟨${id}⟩ SET isFavorite = $value`, { value })
   })
 
+  ipcMain.handle('movies:tag', async (_e, id: string, tags: string[]) => {
+    const db = getDb()
+    await db.query(`UPDATE movie:⟨${id}⟩ SET tags = $tags`, { tags })
+  })
+
   ipcMain.handle('movies:metadata', async (_e, title: string) => {
     const settings = await getSettings()
     return await searchMovie(title, settings.tmdbApiKey)
@@ -148,6 +153,11 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     await db.query(`UPDATE music_track:⟨${id}⟩ SET isFavorite = $value`, { value })
   })
 
+  ipcMain.handle('music:tag', async (_e, id: string, tags: string[]) => {
+    const db = getDb()
+    await db.query(`UPDATE music_track:⟨${id}⟩ SET tags = $tags`, { tags })
+  })
+
   ipcMain.handle('tv:scan', async (_e, extraPaths?: string[]) => {
     window.webContents.send('scan:progress', { scanner: 'tv', current: 0, total: 0, status: 'scanning' })
     const shows = await scanTvShows(extraPaths)
@@ -174,6 +184,11 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     await db.query(`UPDATE tv_show:⟨${id}⟩ SET isFavorite = $value`, { value })
   })
 
+  ipcMain.handle('tv:tag', async (_e, id: string, tags: string[]) => {
+    const db = getDb()
+    await db.query(`UPDATE tv_show:⟨${id}⟩ SET tags = $tags`, { tags })
+  })
+
   ipcMain.handle('tv:metadata', async (_e, title: string) => {
     const settings = await getSettings()
     return await searchShow(title, settings.tmdbApiKey)
@@ -198,6 +213,14 @@ export function registerIpcHandlers(window: BrowserWindow): void {
       `INSERT INTO controller_mapping (deviceId, inputCode, action) VALUES ($deviceId, $inputCode, $action)
        ON DUPLICATE KEY UPDATE action = $action`,
       { deviceId, inputCode, action }
+    )
+  })
+
+  ipcMain.handle('input:mappings:reset', async (_e, deviceId: string) => {
+    const db = getDb()
+    await db.query(
+      'DELETE controller_mapping WHERE deviceId = $deviceId',
+      { deviceId }
     )
   })
 

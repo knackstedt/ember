@@ -11,6 +11,7 @@ interface MoviesState {
   load: () => Promise<void>
   scan: () => Promise<void>
   toggleFavorite: (id: string) => Promise<void>
+  setTags: (id: string, tags: string[]) => Promise<void>
   setSearch: (q: string) => void
   setGenre: (g: string | null) => void
   setYear: (y: number | null) => void
@@ -46,6 +47,11 @@ export const useMoviesStore = create<MoviesState>((set, get) => ({
     set((s) => ({ movies: s.movies.map((m) => (m.id === id ? { ...m, isFavorite: next } : m)) }))
   },
 
+  setTags: async (id, tags) => {
+    await window.htpc.movies.tag(id, tags)
+    set((s) => ({ movies: s.movies.map((m) => (m.id === id ? { ...m, tags } : m)) }))
+  },
+
   setSearch: (searchQuery) => set({ searchQuery }),
   setGenre: (activeGenre) => set({ activeGenre }),
   setYear: (activeYear) => set({ activeYear }),
@@ -76,6 +82,7 @@ interface MusicState {
   load: () => Promise<void>
   scan: () => Promise<void>
   toggleFavorite: (id: string) => Promise<void>
+  setTags: (id: string, tags: string[]) => Promise<void>
   setSearch: (q: string) => void
   setArtist: (a: string | null) => void
   setAlbum: (a: string | null) => void
@@ -113,6 +120,11 @@ export const useMusicStore = create<MusicState>((set, get) => ({
     set((s) => ({ tracks: s.tracks.map((t) => (t.id === id ? { ...t, isFavorite: next } : t)) }))
   },
 
+  setTags: async (id, tags) => {
+    await window.htpc.music.tag(id, tags)
+    set((s) => ({ tracks: s.tracks.map((t) => (t.id === id ? { ...t, tags } : t)) }))
+  },
+
   setSearch: (searchQuery) => set({ searchQuery }),
   setArtist: (activeArtist) => set({ activeArtist }),
   setAlbum: (activeAlbum) => set({ activeAlbum }),
@@ -146,6 +158,7 @@ interface TvState {
   load: () => Promise<void>
   scan: () => Promise<void>
   toggleFavorite: (id: string) => Promise<void>
+  setTags: (id: string, tags: string[]) => Promise<void>
   setSearch: (q: string) => void
   filtered: () => TVShow[]
 }
@@ -173,6 +186,11 @@ export const useTvStore = create<TvState>((set, get) => ({
     const next = !show.isFavorite
     await window.htpc.tv.favorite(id, next)
     set((s) => ({ shows: s.shows.map((sh) => (sh.id === id ? { ...sh, isFavorite: next } : sh)) }))
+  },
+
+  setTags: async (id, tags) => {
+    await window.htpc.tv.tag(id, tags)
+    set((s) => ({ shows: s.shows.map((sh) => (sh.id === id ? { ...sh, tags } : sh)) }))
   },
 
   setSearch: (searchQuery) => set({ searchQuery }),

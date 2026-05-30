@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState, useRef, KeyboardEvent } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 
 interface DetailPanelProps {
@@ -9,6 +9,8 @@ interface DetailPanelProps {
   backdropUrl?: string
   description?: string
   metadata?: { label: string; value: string }[]
+  tags?: string[]
+  onTagsChange?: (tags: string[]) => void
   actions?: React.ReactNode
   children?: React.ReactNode
 }
@@ -21,9 +23,32 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
   backdropUrl,
   description,
   metadata,
+  tags,
+  onTagsChange,
   actions,
   children
 }) => {
+  const [tagInput, setTagInput] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const handleAddTag = () => {
+    const trimmed = tagInput.trim()
+    if (!trimmed || tags?.includes(trimmed)) return
+    onTagsChange?.([...(tags ?? []), trimmed])
+    setTagInput('')
+  }
+
+  const handleRemoveTag = (tag: string) => {
+    onTagsChange?.((tags ?? []).filter((t) => t !== tag))
+  }
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      handleAddTag()
+    }
+  }
+
   return (
     <AnimatePresence>
       {open && (
@@ -105,6 +130,53 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                       <span style={{ color: 'var(--color-text)' }}>{m.value}</span>
                     </React.Fragment>
                   ))}
+                </div>
+              )}
+              {onTagsChange !== undefined && (
+                <div className="mb-4">
+                  <div
+                    className="text-xs font-semibold uppercase tracking-wide mb-2"
+                    style={{ color: 'var(--color-text-dim)' }}
+                  >
+                    Tags
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {(tags ?? []).map((tag) => (
+                      <span
+                        key={tag}
+                        className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium"
+                        style={{
+                          background: 'color-mix(in srgb, var(--color-accent) 18%, transparent)',
+                          border: '1px solid color-mix(in srgb, var(--color-accent) 40%, transparent)',
+                          color: 'var(--color-text)'
+                        }}
+                      >
+                        {tag}
+                        <button
+                          className="flex items-center opacity-60 hover:opacity-100 transition-opacity leading-none"
+                          style={{ color: 'var(--color-text)' }}
+                          onClick={() => handleRemoveTag(tag)}
+                          aria-label={`Remove tag ${tag}`}
+                        >
+                          ✕
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                  <input
+                    ref={inputRef}
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder="Add tag…"
+                    className="w-full text-xs px-2.5 py-1 rounded outline-none"
+                    style={{
+                      background: 'var(--color-surface-raised)',
+                      border: '1px solid var(--color-border)',
+                      color: 'var(--color-text)',
+                      caretColor: 'var(--color-accent)'
+                    }}
+                  />
                 </div>
               )}
               {children}

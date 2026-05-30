@@ -6,6 +6,7 @@ import { VirtualGrid } from '../../components/VirtualGrid/VirtualGrid'
 import { MediaCard } from '../../components/MediaCard/MediaCard'
 import { DetailPanel } from '../../components/DetailPanel/DetailPanel'
 import { OskInput } from '../../components/OnScreenKeyboard/OnScreenKeyboard'
+import { RecentlyPlayedRow } from '../../components/RecentlyPlayedRow/RecentlyPlayedRow'
 import { Game, GamePlatform } from '../../../../shared/types'
 
 const PLATFORM_FILTERS: ChipFilter<GamePlatform | 'all' | 'couch-coop' | 'favorites'>[] = [
@@ -44,7 +45,7 @@ function gameBadge(game: Game): { label: string; color: string } | undefined {
 const COLUMN_COUNT = 6
 
 export const GamingTab: React.FC = () => {
-  const { games, loading, scanning, activeFilter, searchQuery, load, scan, setFilter, setSearch, filtered, toggleFavorite } = useGamesStore()
+  const { games, loading, scanning, activeFilter, searchQuery, load, scan, setFilter, setSearch, filtered, toggleFavorite, setTags } = useGamesStore()
   const [selected, setSelected] = useState<Game | null>(null)
 
   useEffect(() => {
@@ -57,6 +58,11 @@ export const GamingTab: React.FC = () => {
   const launch = (game: Game): void => {
     window.htpc.games.launch(game)
   }
+
+  const recentlyPlayed = [...games]
+    .filter((g) => g.lastPlayed !== undefined)
+    .sort((a, b) => (b.lastPlayed ?? 0) - (a.lastPlayed ?? 0))
+    .slice(0, 8)
 
   return (
     <div className="flex flex-col h-full gap-3 p-4">
@@ -85,6 +91,14 @@ export const GamingTab: React.FC = () => {
           {items.length} games
         </span>
       </div>
+
+      <RecentlyPlayedRow
+        items={recentlyPlayed.map((g) => ({ id: g.id, title: g.title, coverUrl: g.coverUrl, subtitle: g.developer }))}
+        onLaunch={(id) => {
+          const game = games.find((g) => g.id === id)
+          if (game) launch(game)
+        }}
+      />
 
       <ChipFilters
         filters={PLATFORM_FILTERS}
@@ -153,6 +167,8 @@ export const GamingTab: React.FC = () => {
           selected.playerCount ? { label: 'Players', value: `${selected.playerCount.min}–${selected.playerCount.max}` } : null,
           { label: 'Platform', value: selected.platform }
         ].filter(Boolean) as { label: string; value: string }[] : []}
+        tags={selected?.tags ?? []}
+        onTagsChange={selected ? (newTags) => setTags(selected.id, newTags) : undefined}
         actions={selected && (
           <motion.button
             className="px-6 py-2.5 rounded-[var(--radius-card)] font-semibold text-sm"

@@ -6,17 +6,10 @@ import { VirtualGrid } from '../../components/VirtualGrid/VirtualGrid'
 import { MediaCard } from '../../components/MediaCard/MediaCard'
 import { DetailPanel } from '../../components/DetailPanel/DetailPanel'
 import { OskInput } from '../../components/OnScreenKeyboard/OnScreenKeyboard'
+import { RecentlyPlayedRow } from '../../components/RecentlyPlayedRow/RecentlyPlayedRow'
 import { Movie } from '../../../../shared/types'
 import { useVideoPlayerStore } from '../../store/videoPlayer.store'
-
-const STREAMING_SERVICES = [
-  { name: 'Netflix', url: 'https://netflix.com', color: '#E50914' },
-  { name: 'Prime Video', url: 'https://primevideo.com', color: '#00A8E1' },
-  { name: 'Disney+', url: 'https://disneyplus.com', color: '#113CCF' },
-  { name: 'Hulu', url: 'https://hulu.com', color: '#1CE783' },
-  { name: 'HBO Max', url: 'https://max.com', color: '#8B5CF6' },
-  { name: 'Apple TV+', url: 'https://tv.apple.com', color: '#555555' }
-]
+import { StreamingTile, MOVIE_STREAMING_SERVICES } from '../../components/StreamingTile/StreamingTile'
 
 type SubTab = 'local' | 'streaming'
 
@@ -25,7 +18,7 @@ const COLUMN_COUNT = 5
 export const MoviesTab: React.FC = () => {
   const {
     movies, loading, searchQuery, activeGenre, load, scan, toggleFavorite,
-    setSearch, setGenre, filtered
+    setSearch, setGenre, setTags, filtered
   } = useMoviesStore()
   const openVideo = useVideoPlayerStore((s) => s.open)
   const [selected, setSelected] = useState<Movie | null>(null)
@@ -35,6 +28,11 @@ export const MoviesTab: React.FC = () => {
 
   const allGenres = [...new Set(movies.flatMap((m) => m.genres ?? []))].sort()
   const items = filtered()
+
+  const recentlyPlayed = [...movies]
+    .filter((m) => m.lastPlayed !== undefined)
+    .sort((a, b) => (b.lastPlayed ?? 0) - (a.lastPlayed ?? 0))
+    .slice(0, 8)
 
   return (
     <div className="flex flex-col h-full gap-3 p-4">
@@ -78,6 +76,14 @@ export const MoviesTab: React.FC = () => {
 
       {subTab === 'local' && (
         <>
+          <RecentlyPlayedRow
+            items={recentlyPlayed.map((m) => ({ id: m.id, title: m.title, coverUrl: m.coverUrl, subtitle: m.releaseYear ? String(m.releaseYear) : undefined }))}
+            onLaunch={(id) => {
+              const movie = movies.find((m) => m.id === id)
+              if (movie) openVideo(`file://${movie.filePath}`, movie.title)
+            }}
+          />
+
           <ChipFilters
             filters={[
               { id: '', label: 'All Genres' },
@@ -119,19 +125,8 @@ export const MoviesTab: React.FC = () => {
       )}
 
       {subTab === 'streaming' && (
-        <div className="flex-1 grid grid-cols-3 gap-4 content-start pt-2">
-          {STREAMING_SERVICES.map((svc) => (
-            <motion.button
-              key={svc.name}
-              className="flex items-center justify-center rounded-[var(--radius-card)] h-28 text-lg font-bold text-white"
-              style={{ background: svc.color, boxShadow: 'var(--shadow-card)' }}
-              whileHover={{ scale: 1.04 }}
-              whileTap={{ scale: 0.97 }}
-              onClick={() => window.open(svc.url, '_blank')}
-            >
-              {svc.name}
-            </motion.button>
-          ))}
+        <div className="pt-2">
+          <StreamingTile services={MOVIE_STREAMING_SERVICES} />
         </div>
       )}
 
@@ -149,6 +144,8 @@ export const MoviesTab: React.FC = () => {
           selected.resolution ? { label: 'Resolution', value: selected.resolution } : null,
           selected.codec ? { label: 'Codec', value: selected.codec } : null
         ].filter(Boolean) as { label: string; value: string }[] : []}
+        tags={selected?.tags ?? []}
+        onTagsChange={selected ? (newTags) => setTags(selected.id, newTags) : undefined}
         actions={selected && (
           <>
             <motion.button

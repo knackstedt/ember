@@ -59,6 +59,7 @@ export interface Movie {
   tmdbId?: number
   isFavorite?: boolean
   tags?: string[]
+  lastPlayed?: number
   rating?: number
 }
 
@@ -206,17 +207,21 @@ export type IpcChannel =
   | 'movies:list'
   | 'movies:launch'
   | 'movies:favorite'
+  | 'movies:tag'
   | 'music:scan'
   | 'music:list'
   | 'music:launch'
   | 'music:favorite'
+  | 'music:tag'
   | 'tv:scan'
   | 'tv:list'
   | 'tv:launch'
   | 'tv:favorite'
+  | 'tv:tag'
   | 'input:devices'
   | 'input:mappings:get'
   | 'input:mappings:set'
+  | 'input:mappings:reset'
   | 'plugins:list'
   | 'plugins:reload'
   | 'scan:progress'

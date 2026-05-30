@@ -11,7 +11,7 @@ import { useVideoPlayerStore } from '../../store/videoPlayer.store'
 const COLUMN_COUNT = 5
 
 export const TVShowsTab: React.FC = () => {
-  const { shows, loading, searchQuery, load, scan, toggleFavorite, setSearch, filtered } = useTvStore()
+  const { shows, loading, searchQuery, load, scan, toggleFavorite, setTags, setSearch, filtered } = useTvStore()
   const openVideo = useVideoPlayerStore((s) => s.open)
   const [selected, setSelected] = useState<TVShow | null>(null)
   const [selectedSeason, setSelectedSeason] = useState<number>(1)
@@ -97,6 +97,8 @@ export const TVShowsTab: React.FC = () => {
           selected.seasons ? { label: 'Seasons', value: String(selected.seasons.length) } : null,
           selected.genres?.length ? { label: 'Genres', value: selected.genres.join(', ') } : null
         ].filter(Boolean) as { label: string; value: string }[] : []}
+        tags={selected?.tags ?? []}
+        onTagsChange={selected ? (newTags) => setTags(selected.id, newTags) : undefined}
       >
         {selected?.seasons && (
           <div className="flex flex-col gap-3">
