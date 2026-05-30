@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useMusicStore } from '../../store/media.store'
 import { ChipFilters } from '../../components/ChipFilters/ChipFilters'
@@ -28,6 +28,13 @@ export const MusicTab: React.FC = () => {
   const [selected, setSelected] = useState<MusicTrack | null>(null)
   const [subTab, setSubTab] = useState<SubTab>('local')
   const [activeFilterType, setActiveFilterType] = useState<'artist' | 'album' | 'genre' | 'year'>('artist')
+
+  const albumTracks = useMemo(() => {
+    if (!selected?.album) return []
+    return tracks
+      .filter((t) => t.album === selected.album)
+      .sort((a, b) => (a.trackNumber ?? 0) - (b.trackNumber ?? 0))
+  }, [selected?.album, tracks])
 
   useEffect(() => { load() }, [])
 
@@ -164,16 +171,60 @@ export const MusicTab: React.FC = () => {
           selected.duration ? { label: 'Duration', value: `${Math.floor(selected.duration / 60)}:${String(Math.round(selected.duration % 60)).padStart(2, '0')}` } : null
         ].filter(Boolean) as { label: string; value: string }[] : []}
         actions={selected && (
-          <motion.button
-            className="px-6 py-2.5 rounded-[var(--radius-card)] font-semibold text-sm"
-            style={{ background: 'var(--color-accent)', color: 'var(--color-bg)' }}
-            onClick={() => { play(items, items.findIndex((t) => t.id === selected!.id)); setSelected(null) }}
-            whileTap={{ scale: 0.96 }}
-          >
-            ▶ Play
-          </motion.button>
+          <>
+            <motion.button
+              className="px-6 py-2.5 rounded-[var(--radius-card)] font-semibold text-sm"
+              style={{ background: 'var(--color-accent)', color: 'var(--color-bg)' }}
+              onClick={() => { play(items, items.findIndex((t) => t.id === selected!.id)); setSelected(null) }}
+              whileTap={{ scale: 0.96 }}
+            >
+              ▶ Play
+            </motion.button>
+            {albumTracks.length > 1 && (
+              <motion.button
+                className="px-6 py-2.5 rounded-[var(--radius-card)] font-semibold text-sm"
+                style={{ background: 'var(--color-surface-raised)', color: 'var(--color-text)', border: '1px solid var(--color-border)' }}
+                onClick={() => { play(albumTracks, 0); setSelected(null) }}
+                whileTap={{ scale: 0.96 }}
+              >
+                ▶ Play Album
+              </motion.button>
+            )}
+          </>
         )}
-      />
+      >
+        {selected?.album && albumTracks.length > 0 && (
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--color-text-dim)' }}>
+              {selected.album}
+            </div>
+            <div className="flex flex-col gap-0.5">
+              {albumTracks.map((track, i) => (
+                <div
+                  key={track.id}
+                  className="flex items-center gap-2 py-1.5 px-2 rounded text-sm cursor-pointer hover:bg-white/5"
+                  style={{
+                    background: track.id === selected.id ? 'color-mix(in srgb, var(--color-accent) 15%, transparent)' : 'transparent'
+                  }}
+                  onClick={() => { play(albumTracks, i); setSelected(track) }}
+                >
+                  <span style={{ color: 'var(--color-text-dim)', minWidth: '1.5rem', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                    {track.trackNumber ?? i + 1}
+                  </span>
+                  <span className="flex-1 truncate" style={{ color: track.id === selected.id ? 'var(--color-accent)' : 'var(--color-text)' }}>
+                    {track.title}
+                  </span>
+                  {track.duration && (
+                    <span style={{ color: 'var(--color-text-dim)', fontVariantNumeric: 'tabular-nums' }}>
+                      {Math.floor(track.duration / 60)}:{String(Math.round(track.duration % 60)).padStart(2, '0')}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </DetailPanel>
     </div>
   )
 }

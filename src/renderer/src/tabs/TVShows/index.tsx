@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useTvStore } from '../../store/media.store'
 import { VirtualGrid } from '../../components/VirtualGrid/VirtualGrid'
@@ -14,8 +14,20 @@ export const TVShowsTab: React.FC = () => {
   const { shows, loading, searchQuery, load, scan, toggleFavorite, setSearch, filtered } = useTvStore()
   const openVideo = useVideoPlayerStore((s) => s.open)
   const [selected, setSelected] = useState<TVShow | null>(null)
+  const [selectedSeason, setSelectedSeason] = useState<number>(1)
 
   useEffect(() => { load() }, [])
+
+  useEffect(() => {
+    if (selected?.seasons?.length) {
+      setSelectedSeason(selected.seasons[0].seasonNumber)
+    }
+  }, [selected?.id])
+
+  const currentSeasonEpisodes = useMemo(() => {
+    if (!selected?.seasons) return []
+    return selected.seasons.find((s) => s.seasonNumber === selectedSeason)?.episodes ?? []
+  }, [selected, selectedSeason])
 
   const items = filtered()
 
@@ -87,29 +99,53 @@ export const TVShowsTab: React.FC = () => {
         ].filter(Boolean) as { label: string; value: string }[] : []}
       >
         {selected?.seasons && (
-          <div className="flex flex-col gap-2">
-            <h3 className="text-sm font-semibold" style={{ color: 'var(--color-text)' }}>Episodes</h3>
-            {selected.seasons.map((season) => (
-              <div key={season.seasonNumber}>
-                <div className="text-xs font-medium mb-1 uppercase tracking-wide" style={{ color: 'var(--color-accent)' }}>
+          <div className="flex flex-col gap-3">
+            <div className="flex gap-1 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+              {selected.seasons.map((season) => (
+                <button
+                  key={season.seasonNumber}
+                  className="px-3 py-1 rounded-full text-xs font-semibold flex-shrink-0 transition-colors"
+                  style={{
+                    background: selectedSeason === season.seasonNumber ? 'var(--color-accent)' : 'var(--color-surface-raised)',
+                    color: selectedSeason === season.seasonNumber ? 'var(--color-bg)' : 'var(--color-text-dim)',
+                    border: '1px solid var(--color-border)'
+                  }}
+                  onClick={() => setSelectedSeason(season.seasonNumber)}
+                >
                   Season {season.seasonNumber}
-                </div>
-                {season.episodes.map((ep) => (
-                  <div
-                    key={ep.episodeNumber}
-                    className="flex items-center gap-2 py-1.5 px-2 rounded cursor-pointer hover:bg-white/5 text-sm"
-                    onClick={() => openVideo(`file://${ep.filePath}`, ep.title ?? `Episode ${ep.episodeNumber}`)}
-                  >
-                    <span style={{ color: 'var(--color-text-dim)', minWidth: '1.5rem' }}>
-                      {ep.episodeNumber}
-                    </span>
-                    <span style={{ color: 'var(--color-text)' }}>
+                </button>
+              ))}
+            </div>
+            <div className="flex flex-col gap-0.5">
+              {currentSeasonEpisodes.map((ep) => (
+                <div
+                  key={ep.episodeNumber}
+                  className="flex items-center gap-2 py-2 px-2 rounded text-sm hover:bg-white/5"
+                >
+                  <span style={{ color: 'var(--color-text-dim)', minWidth: '1.75rem', fontVariantNumeric: 'tabular-nums' }}>
+                    {ep.episodeNumber}
+                  </span>
+                  <div className="flex flex-col flex-1 min-w-0">
+                    <span className="truncate" style={{ color: 'var(--color-text)' }}>
                       {ep.title ?? `Episode ${ep.episodeNumber}`}
                     </span>
+                    <div className="flex gap-2 text-xs" style={{ color: 'var(--color-text-dim)' }}>
+                      {ep.duration && (
+                        <span>{Math.floor(ep.duration / 60)}:{String(Math.round(ep.duration % 60)).padStart(2, '0')}</span>
+                      )}
+                      {ep.airDate && <span>{ep.airDate}</span>}
+                    </div>
                   </div>
-                ))}
-              </div>
-            ))}
+                  <button
+                    className="px-2.5 py-1 rounded text-xs font-semibold flex-shrink-0"
+                    style={{ background: 'var(--color-accent)', color: 'var(--color-bg)' }}
+                    onClick={() => openVideo(`file://${ep.filePath}`, ep.title ?? `Episode ${ep.episodeNumber}`)}
+                  >
+                    ▶ Play
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </DetailPanel>

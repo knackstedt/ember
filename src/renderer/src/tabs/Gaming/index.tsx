@@ -163,7 +163,40 @@ export const GamingTab: React.FC = () => {
             ▶ Launch
           </motion.button>
         )}
-      />
+      >
+        {selected && (
+          <div className="flex flex-col gap-4">
+            {(selected.bannerUrl || selected.coverUrl) && (
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--color-text-dim)' }}>
+                  Screenshots
+                </div>
+                <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'thin' }}>
+                  {[selected.bannerUrl, selected.coverUrl].filter((u): u is string => !!u).map((url, i) => (
+                    <img
+                      key={i}
+                      src={url}
+                      alt=""
+                      className="h-28 flex-shrink-0 rounded-[var(--radius-card)] object-cover"
+                      style={{ maxWidth: 220 }}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+            {selected.playTime !== undefined && (
+              <div className="flex items-center gap-2 text-sm">
+                <span style={{ color: 'var(--color-text-dim)' }}>Play Time</span>
+                <span style={{ color: 'var(--color-text)', fontWeight: 600 }}>
+                  {selected.playTime >= 60
+                    ? `${Math.floor(selected.playTime / 60)}h ${selected.playTime % 60}m`
+                    : `${selected.playTime}m`}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+      </DetailPanel>
     </div>
   )
 }

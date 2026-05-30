@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, shell } from 'electron'
 import {
   AppSettings,
   Game,
@@ -85,6 +85,10 @@ const htpc = {
 
   openDirectory: (): Promise<string | null> => ipcRenderer.invoke('dialog:open-directory'),
 
+  shell: {
+    openExternal: (url: string): Promise<void> => shell.openExternal(url)
+  },
+
   onScanProgress: (cb: (progress: ScanProgress) => void) => {
     const handler = (_: Electron.IpcRendererEvent, p: ScanProgress) => cb(p)
     ipcRenderer.on('scan:progress', handler)
@@ -93,6 +97,7 @@ const htpc = {
 }
 
 contextBridge.exposeInMainWorld('htpc', htpc)
+
 
 declare global {
   interface Window {
