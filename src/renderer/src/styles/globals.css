@@ -59,6 +59,25 @@
   --blur-panel: 0px;
 }
 
+/* ─── Theme: Custom ─────────────────────────────────────────── */
+[data-theme="custom"] {
+  --color-bg: #000000;
+  --color-surface: #0a0a0a;
+  --color-surface-raised: #141414;
+  --color-surface-overlay: rgba(20, 20, 20, 0.95);
+  --color-accent: #e2e2e2;
+  --color-accent-dim: #666666;
+  --color-text: #f0f0f0;
+  --color-text-dim: #888888;
+  --color-border: rgba(255, 255, 255, 0.08);
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --radius-card: 12px;
+  --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.8);
+  --shadow-glow: 0 0 20px rgba(226, 226, 226, 0.15);
+  --blur-panel: 0px;
+}
+
 /* ─── Theme: Terminal TUI ───────────────────────────────────── */
 [data-theme="terminal-tui"] {
   --color-bg: #0c0c0c;

@@ -55,6 +55,8 @@ export default function App(): React.ReactElement {
     useMusicStore.getState().load()
     useTvStore.getState().load()
 
+    useGamesStore.getState().scan()
+
     const scanToastIds = new Map<string, string>()
     const unsubScan = window.htpc.onScanProgress((p: ScanProgress) => {
       const { push, update, dismiss } = useToastStore.getState()
@@ -105,6 +107,14 @@ export default function App(): React.ReactElement {
 
   useEffect(() => {
     const handler = (e: KeyboardEvent): void => {
+      const target = e.target as HTMLElement | null
+      const isTyping = target != null && (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.tagName === 'SELECT' ||
+        target.isContentEditable
+      )
+
       if (e.key === 'F11') {
         e.preventDefault()
         isFullscreenRef.current = !isFullscreenRef.current
@@ -112,6 +122,27 @@ export default function App(): React.ReactElement {
       } else if (e.key === 'Escape') {
         useVideoPlayerStore.getState().close()
         window.dispatchEvent(new CustomEvent('htpc:escape'))
+      } else if (!isTyping && e.key === 'q') {
+        e.preventDefault()
+        const idx = TAB_IDS.indexOf(activeTabRef.current)
+        setActiveTab(TAB_IDS[(idx - 1 + TAB_IDS.length) % TAB_IDS.length])
+      } else if (!isTyping && e.key === 'e') {
+        e.preventDefault()
+        const idx = TAB_IDS.indexOf(activeTabRef.current)
+        setActiveTab(TAB_IDS[(idx + 1) % TAB_IDS.length])
+      } else if (!isTyping && ['w','a','s','d','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Enter'].includes(e.key)) {
+        e.preventDefault()
+        const actionMap: Record<string, string> = {
+          w: 'up', ArrowUp: 'up',
+          s: 'down', ArrowDown: 'down',
+          a: 'left', ArrowLeft: 'left',
+          d: 'right', ArrowRight: 'right',
+          Enter: 'confirm'
+        }
+        const action = actionMap[e.key]
+        if (action) {
+          window.dispatchEvent(new CustomEvent('htpc:nav', { detail: { action } }))
+        }
       } else if (e.key === 'Tab' && !e.shiftKey) {
         e.preventDefault()
         const idx = TAB_IDS.indexOf(activeTabRef.current)
@@ -212,18 +243,15 @@ export default function App(): React.ReactElement {
 
         {/* Tab content */}
         <div className="flex-1 min-h-0 relative">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeTab}
-              className="absolute inset-0"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.15, ease: 'easeOut' }}
-            >
-              <ActiveComponent />
-            </motion.div>
-          </AnimatePresence>
+          <motion.div
+            key={activeTab}
+            className="absolute inset-0"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.15, ease: 'easeOut' }}
+          >
+            <ActiveComponent />
+          </motion.div>
         </div>
 
         {/* Music mini-player */}

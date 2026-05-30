@@ -34,11 +34,14 @@ export const useGamesStore = create<GamesState>((set, get) => ({
   },
 
   scan: async () => {
+    if (get().scanning) return
     set({ scanning: true })
     try {
-      const games = await window.htpc.games.scan()
-      set({ games, scanning: false })
+      await window.htpc.games.scan()
+      await get().load()
     } catch {
+      /* scan errors already logged in main */
+    } finally {
       set({ scanning: false })
     }
   },

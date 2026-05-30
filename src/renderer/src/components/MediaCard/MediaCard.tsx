@@ -9,7 +9,7 @@ export interface MediaCardProps {
   badge?: string
   badgeColor?: string
   isFavorite?: boolean
-  isSelected?: boolean
+  isFocused?: boolean
   onSelect?: () => void
   onFavorite?: () => void
   aspectRatio?: '2/3' | '16/9' | '1/1'
@@ -42,7 +42,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({
   badge,
   badgeColor,
   isFavorite,
-  isSelected,
+  isFocused,
   onSelect,
   onFavorite,
   aspectRatio = '2/3',
@@ -63,7 +63,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({
       className={`
         relative flex flex-col cursor-pointer select-none rounded-[var(--radius-card)]
         overflow-hidden transition-all duration-150
-        ${isSelected
+        ${isFocused
           ? 'ring-2 ring-[var(--color-accent)] shadow-[var(--shadow-glow)]'
           : 'ring-1 ring-[var(--color-border)]'
         }

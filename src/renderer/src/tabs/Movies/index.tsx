@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useMoviesStore } from '../../store/media.store'
 import { ChipFilters } from '../../components/ChipFilters/ChipFilters'
-import { VirtualGrid } from '../../components/VirtualGrid/VirtualGrid'
+import { VirtualGrid, VirtualGridHandle } from '../../components/VirtualGrid/VirtualGrid'
 import { MediaCard } from '../../components/MediaCard/MediaCard'
 import { DetailPanel } from '../../components/DetailPanel/DetailPanel'
 import { OskInput } from '../../components/OnScreenKeyboard/OnScreenKeyboard'
@@ -10,6 +10,7 @@ import { RecentlyPlayedRow } from '../../components/RecentlyPlayedRow/RecentlyPl
 import { Movie } from '../../../../shared/types'
 import { useVideoPlayerStore } from '../../store/videoPlayer.store'
 import { StreamingTile, MOVIE_STREAMING_SERVICES } from '../../components/StreamingTile/StreamingTile'
+import { useGridFocus } from '../../hooks/useGridFocus'
 
 type SubTab = 'local' | 'streaming'
 
@@ -23,6 +24,7 @@ export const MoviesTab: React.FC = () => {
   const openVideo = useVideoPlayerStore((s) => s.open)
   const [selected, setSelected] = useState<Movie | null>(null)
   const [subTab, setSubTab] = useState<SubTab>('local')
+  const gridRef = useRef<VirtualGridHandle>(null)
 
   useEffect(() => { load() }, [])
 
@@ -34,6 +36,13 @@ export const MoviesTab: React.FC = () => {
 
   const allGenres = [...new Set(movies.flatMap((m) => m.genres ?? []))].sort()
   const items = filtered()
+  const { focusedIndex } = useGridFocus({
+    items,
+    columnCount: COLUMN_COUNT,
+    gridRef,
+    onConfirm: (movie) => setSelected(movie),
+    enabled: subTab === 'local' && !selected
+  })
 
   const recentlyPlayed = [...movies]
     .filter((m) => m.lastPlayed !== undefined)
@@ -107,10 +116,11 @@ export const MoviesTab: React.FC = () => {
           ) : (
             <div className="flex-1 min-h-0">
               <VirtualGrid
+                ref={gridRef}
                 items={items}
                 columnCount={COLUMN_COUNT}
                 rowHeight={300}
-                renderItem={(movie) => (
+                renderItem={(movie, index) => (
                   <div className="p-1.5">
                     <MediaCard
                       key={movie.id}
@@ -119,6 +129,7 @@ export const MoviesTab: React.FC = () => {
                       subtitle={movie.releaseYear ? String(movie.releaseYear) : undefined}
                       coverUrl={movie.coverUrl}
                       isFavorite={movie.isFavorite}
+                      isFocused={index === focusedIndex}
                       progress={movie.watchProgress}
                       onSelect={() => setSelected(movie)}
                       onFavorite={() => toggleFavorite(movie.id)}

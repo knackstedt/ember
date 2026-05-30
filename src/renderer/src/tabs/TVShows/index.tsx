@@ -1,12 +1,13 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useTvStore } from '../../store/media.store'
-import { VirtualGrid } from '../../components/VirtualGrid/VirtualGrid'
+import { VirtualGrid, VirtualGridHandle } from '../../components/VirtualGrid/VirtualGrid'
 import { MediaCard } from '../../components/MediaCard/MediaCard'
 import { DetailPanel } from '../../components/DetailPanel/DetailPanel'
 import { OskInput } from '../../components/OnScreenKeyboard/OnScreenKeyboard'
 import { TVShow } from '../../../../shared/types'
 import { useVideoPlayerStore } from '../../store/videoPlayer.store'
+import { useGridFocus } from '../../hooks/useGridFocus'
 
 const COLUMN_COUNT = 5
 
@@ -15,6 +16,7 @@ export const TVShowsTab: React.FC = () => {
   const openVideo = useVideoPlayerStore((s) => s.open)
   const [selected, setSelected] = useState<TVShow | null>(null)
   const [selectedSeason, setSelectedSeason] = useState<number>(1)
+  const gridRef = useRef<VirtualGridHandle>(null)
 
   useEffect(() => { load() }, [])
 
@@ -36,6 +38,13 @@ export const TVShowsTab: React.FC = () => {
   }, [selected, selectedSeason])
 
   const items = filtered()
+  const { focusedIndex } = useGridFocus({
+    items,
+    columnCount: COLUMN_COUNT,
+    gridRef,
+    onConfirm: (show) => setSelected(show),
+    enabled: !selected
+  })
 
   return (
     <div className="flex flex-col h-full gap-3 p-4">
@@ -69,10 +78,11 @@ export const TVShowsTab: React.FC = () => {
       ) : (
         <div className="flex-1 min-h-0">
           <VirtualGrid
+            ref={gridRef}
             items={items}
             columnCount={COLUMN_COUNT}
             rowHeight={300}
-            renderItem={(show) => (
+            renderItem={(show, index) => (
               <div className="p-1.5">
                 <MediaCard
                   key={show.id}
@@ -81,6 +91,7 @@ export const TVShowsTab: React.FC = () => {
                   subtitle={show.seasons ? `${show.seasons.length} season${show.seasons.length !== 1 ? 's' : ''}` : undefined}
                   coverUrl={show.coverUrl}
                   isFavorite={show.isFavorite}
+                  isFocused={index === focusedIndex}
                   onSelect={() => setSelected(show)}
                   onFavorite={() => toggleFavorite(show.id)}
                 />

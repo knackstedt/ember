@@ -32,6 +32,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       document.documentElement.setAttribute('data-theme', s.theme)
       set({ settings: s, loading: false })
     } catch {
+      document.documentElement.setAttribute('data-theme', defaults.theme)
       set({ settings: defaults, loading: false })
     }
   },

@@ -1,14 +1,11 @@
 import { BrowserWindow, ipcMain, app, dialog } from 'electron'
 import { getSettings, setSettings, setSetting } from '../services/settings.service'
 import { launchGame, launchMovie, launchTrack } from '../services/launcher.service'
-import { scanSteamGames } from '../scanners/steam.scanner'
-import { scanDolphinGames } from '../scanners/dolphin.scanner'
-import { scanDesktopGames } from '../scanners/desktop.scanner'
-import { scanHeroicGames, scanLutrisGames } from '../scanners/heroic.scanner'
 import { scanMusicFiles } from '../scanners/music.scanner'
 import { scanMovieFiles, scanTvShows } from '../scanners/video.scanner'
 import { getDb } from '../db'
 import { getProtonRating } from '../services/protondb.service'
+import { performGameScan } from '../services/game-scan.service'
 import { searchGame } from '../services/rawg.service'
 import { searchMovie, searchShow } from '../services/tmdb.service'
 import { listPlugins, reloadPlugins } from '../plugins/loader'
@@ -37,29 +34,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
   })
 
   ipcMain.handle('games:scan', async (_e, extraPaths?: string[]) => {
-    window.webContents.send('scan:progress', { scanner: 'steam', current: 0, total: 0, status: 'scanning' })
-    const steam = scanSteamGames()
-    window.webContents.send('scan:progress', { scanner: 'steam', current: steam.length, total: steam.length, status: 'done' })
-
-    window.webContents.send('scan:progress', { scanner: 'dolphin', current: 0, total: 0, status: 'scanning' })
-    const dolphin = scanDolphinGames(extraPaths)
-    window.webContents.send('scan:progress', { scanner: 'dolphin', current: dolphin.length, total: dolphin.length, status: 'done' })
-
-    const heroic = scanHeroicGames()
-    const lutris = scanLutrisGames()
-    const desktop = scanDesktopGames()
-
-    const all = [...steam, ...dolphin, ...heroic, ...lutris, ...desktop]
-
-    const db = getDb()
-    for (const game of all) {
-      await db.query(
-        `UPSERT game:⟨${game.id}⟩ CONTENT $game`,
-        { game }
-      )
-    }
-
-    return all
+    return performGameScan(window, extraPaths)
   })
 
   ipcMain.handle('games:list', async () => {

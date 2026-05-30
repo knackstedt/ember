@@ -5,6 +5,17 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   main: {
     plugins: [externalizeDepsPlugin()],
+    build: {
+      rollupOptions: {
+        input: {
+          index: resolve('src/main/index.ts'),
+          'workers/game-scan.worker': resolve('src/main/workers/game-scan.worker.ts')
+        },
+        output: {
+          entryFileNames: '[name].js'
+        }
+      }
+    },
     resolve: {
       alias: {
         '@main': resolve('src/main'),

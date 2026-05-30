@@ -1,13 +1,14 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useGamesStore } from '../../store/games.store'
 import { ChipFilters, ChipFilter } from '../../components/ChipFilters/ChipFilters'
-import { VirtualGrid } from '../../components/VirtualGrid/VirtualGrid'
+import { VirtualGrid, VirtualGridHandle } from '../../components/VirtualGrid/VirtualGrid'
 import { MediaCard } from '../../components/MediaCard/MediaCard'
 import { DetailPanel } from '../../components/DetailPanel/DetailPanel'
 import { OskInput } from '../../components/OnScreenKeyboard/OnScreenKeyboard'
 import { RecentlyPlayedRow } from '../../components/RecentlyPlayedRow/RecentlyPlayedRow'
 import { Game, GamePlatform } from '../../../../shared/types'
+import { useGridFocus } from '../../hooks/useGridFocus'
 
 const PLATFORM_FILTERS: ChipFilter<GamePlatform | 'all' | 'couch-coop' | 'favorites'>[] = [
   { id: 'all', label: 'All' },
@@ -47,6 +48,7 @@ const COLUMN_COUNT = 6
 export const GamingTab: React.FC = () => {
   const { games, loading, scanning, activeFilter, searchQuery, load, scan, setFilter, setSearch, filtered, toggleFavorite, setTags } = useGamesStore()
   const [selected, setSelected] = useState<Game | null>(null)
+  const gridRef = useRef<VirtualGridHandle>(null)
 
   useEffect(() => {
     load()
@@ -59,6 +61,13 @@ export const GamingTab: React.FC = () => {
   }, [])
 
   const items = filtered()
+  const { focusedIndex } = useGridFocus({
+    items,
+    columnCount: COLUMN_COUNT,
+    gridRef,
+    onConfirm: (game) => setSelected(game),
+    enabled: !selected
+  })
   const badge = selected ? gameBadge(selected) : undefined
 
   const launch = (game: Game): void => {
@@ -132,10 +141,11 @@ export const GamingTab: React.FC = () => {
       ) : (
         <div className="flex-1 min-h-0">
           <VirtualGrid
+            ref={gridRef}
             items={items}
             columnCount={COLUMN_COUNT}
             rowHeight={260}
-            renderItem={(game) => {
+            renderItem={(game, index) => {
               const b = gameBadge(game)
               return (
                 <div className="p-1.5" style={{ contain: 'layout style paint' }}>
@@ -148,6 +158,7 @@ export const GamingTab: React.FC = () => {
                     badge={b?.label}
                     badgeColor={b?.color}
                     isFavorite={game.isFavorite}
+                    isFocused={index === focusedIndex}
                     onSelect={() => setSelected(game)}
                     onFavorite={() => toggleFavorite(game.id)}
                   />

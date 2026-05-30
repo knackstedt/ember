@@ -1,6 +1,10 @@
 import React, { useRef, CSSProperties } from 'react'
 import { experimental_VGrid as VGrid, VGridHandle } from 'virtua'
 
+export interface VirtualGridHandle {
+  scrollToItem(index: number): void
+}
+
 interface VirtualGridProps<T> {
   items: T[]
   columnCount: number
@@ -11,16 +15,27 @@ interface VirtualGridProps<T> {
   overscan?: number
 }
 
-export function VirtualGrid<T>({
-  items,
-  columnCount,
-  rowHeight,
-  renderItem,
-  className,
-  style,
-  overscan = 4
-}: VirtualGridProps<T>): React.ReactElement {
+export const VirtualGrid = React.forwardRef(function VirtualGridInner<T>(
+  {
+    items,
+    columnCount,
+    rowHeight,
+    renderItem,
+    className,
+    style,
+    overscan = 4
+  }: VirtualGridProps<T>,
+  forwardedRef: React.Ref<VirtualGridHandle>
+): React.ReactElement {
   const ref = useRef<VGridHandle>(null)
+
+  React.useImperativeHandle(forwardedRef, () => ({
+    scrollToItem(index: number) {
+      const row = Math.floor(index / columnCount)
+      const col = index % columnCount
+      ref.current?.scrollToIndex(col, row)
+    }
+  }), [columnCount])
 
   return (
     <VGrid
@@ -39,4 +54,4 @@ export function VirtualGrid<T>({
       }}
     </VGrid>
   )
-}
+}) as <T>(props: VirtualGridProps<T> & { ref?: React.Ref<VirtualGridHandle> }) => React.ReactElement

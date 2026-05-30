@@ -50,16 +50,17 @@ function findGridDir(steamRoot: string): string | null {
 }
 
 function findCover(gridDir: string | null, appId: string): string | undefined {
-  if (!gridDir) return undefined
-  const exts = ['jpg', 'jpeg', 'png', 'webp']
-  const suffixes = ['p', '_p', '']
-  for (const sfx of suffixes) {
-    for (const ext of exts) {
-      const candidate = join(gridDir, `${appId}${sfx}.${ext}`)
-      if (existsSync(candidate)) return `file://${candidate}`
+  if (gridDir) {
+    const exts = ['jpg', 'jpeg', 'png', 'webp']
+    const suffixes = ['p', '_p', '']
+    for (const sfx of suffixes) {
+      for (const ext of exts) {
+        const candidate = join(gridDir, `${appId}${sfx}.${ext}`)
+        if (existsSync(candidate)) return `file://${candidate}`
+      }
     }
   }
-  return undefined
+  return `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/library_600x900.jpg`
 }
 
 export function scanSteamGames(): Game[] {

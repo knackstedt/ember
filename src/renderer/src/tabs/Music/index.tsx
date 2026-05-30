@@ -1,14 +1,15 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useMusicStore } from '../../store/media.store'
 import { ChipFilters } from '../../components/ChipFilters/ChipFilters'
-import { VirtualGrid } from '../../components/VirtualGrid/VirtualGrid'
+import { VirtualGrid, VirtualGridHandle } from '../../components/VirtualGrid/VirtualGrid'
 import { MediaCard } from '../../components/MediaCard/MediaCard'
 import { DetailPanel } from '../../components/DetailPanel/DetailPanel'
 import { OskInput } from '../../components/OnScreenKeyboard/OnScreenKeyboard'
 import { MusicTrack } from '../../../../shared/types'
 import { useMusicPlayerStore } from '../../store/musicPlayer.store'
 import { StreamingTile, MUSIC_STREAMING_SERVICES } from '../../components/StreamingTile/StreamingTile'
+import { useGridFocus } from '../../hooks/useGridFocus'
 
 type SubTab = 'local' | 'streaming'
 const COLUMN_COUNT = 6
@@ -22,6 +23,7 @@ export const MusicTab: React.FC = () => {
   const [selected, setSelected] = useState<MusicTrack | null>(null)
   const [subTab, setSubTab] = useState<SubTab>('local')
   const [activeFilterType, setActiveFilterType] = useState<'artist' | 'album' | 'genre' | 'year'>('artist')
+  const gridRef = useRef<VirtualGridHandle>(null)
 
   useEffect(() => {
     const handler = () => setSelected(null)
@@ -39,6 +41,13 @@ export const MusicTab: React.FC = () => {
   useEffect(() => { load() }, [])
 
   const items = filtered()
+  const { focusedIndex } = useGridFocus({
+    items,
+    columnCount: COLUMN_COUNT,
+    gridRef,
+    onConfirm: (track, index) => { play(items, index); setSelected(track) },
+    enabled: subTab === 'local' && !selected
+  })
   const artists = [...new Set(tracks.map((t) => t.artist).filter(Boolean) as string[])].sort()
   const albums = [...new Set(tracks.map((t) => t.album).filter(Boolean) as string[])].sort()
   const genres = [...new Set(tracks.map((t) => t.genre).filter(Boolean) as string[])].sort()
@@ -117,6 +126,7 @@ export const MusicTab: React.FC = () => {
           ) : (
             <div className="flex-1 min-h-0">
               <VirtualGrid
+                ref={gridRef}
                 items={items}
                 columnCount={COLUMN_COUNT}
                 rowHeight={240}
@@ -130,6 +140,7 @@ export const MusicTab: React.FC = () => {
                       coverUrl={track.albumArtUrl}
                       aspectRatio="1/1"
                       isFavorite={track.isFavorite}
+                      isFocused={index === focusedIndex}
                       onSelect={() => { play(items, index); setSelected(track) }}
                       onFavorite={() => toggleFavorite(track.id)}
                     />
