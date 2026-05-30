@@ -44,6 +44,17 @@ function PathList({ label, paths, onChange }: { label: string; paths: string[]; 
         >
           Add
         </motion.button>
+        <motion.button
+          className="px-3 py-1.5 rounded text-sm"
+          style={{ background: 'var(--color-surface-raised)', color: 'var(--color-text)', border: '1px solid var(--color-border)' }}
+          onClick={async () => {
+            const dir = await window.htpc.openDirectory()
+            if (dir) onChange([...paths, dir])
+          }}
+          whileTap={{ scale: 0.96 }}
+        >
+          Browse…
+        </motion.button>
       </div>
     </div>
   )

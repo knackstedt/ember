@@ -9,9 +9,13 @@ import { MusicTab } from './tabs/Music'
 import { TVShowsTab } from './tabs/TVShows'
 import { SettingsTab } from './tabs/Settings'
 import { ControllersTab } from './tabs/Controllers'
-import { TabId } from '../../shared/types'
+import { TabId, ScanProgress } from '../../shared/types'
+import { useGamesStore } from './store/games.store'
+import { useMoviesStore, useMusicStore, useTvStore } from './store/media.store'
 import { ToastContainer } from './components/Toast/Toast'
 import { useToastStore } from './store/toast.store'
+import { MusicPlayer } from './components/MusicPlayer/MusicPlayer'
+import { useMusicPlayerStore } from './store/musicPlayer.store'
 
 interface TabDef {
   id: TabId
@@ -34,21 +38,21 @@ const TAB_IDS = TABS.map((t) => t.id)
 export default function App(): React.ReactElement {
   const { settings, loading, load } = useSettingsStore()
   const { addDevice, removeDevice } = useInputStore()
+  const hasPlayer = useMusicPlayerStore((s) => s.queue.length > 0)
   const [activeTab, setActiveTab] = useState<TabId>('gaming')
   const activeTabRef = useRef<TabId>(activeTab)
   activeTabRef.current = activeTab
 
   useEffect(() => {
     load()
-  }, [])
 
-  useEffect(() => {
-    if (settings?.defaultTab) setActiveTab(settings.defaultTab)
-  }, [settings?.defaultTab])
+    useGamesStore.getState().load()
+    useMoviesStore.getState().load()
+    useMusicStore.getState().load()
+    useTvStore.getState().load()
 
-  useEffect(() => {
     const scanToastIds = new Map<string, string>()
-    const unsubScan = window.htpc.onScanProgress((p) => {
+    const unsubScan = window.htpc.onScanProgress((p: ScanProgress) => {
       const { push, update, dismiss } = useToastStore.getState()
       const pct = p.total > 0 ? Math.round((p.current / p.total) * 100) : 0
       const label = p.message ?? `${p.current} / ${p.total}`
@@ -59,7 +63,7 @@ export default function App(): React.ReactElement {
         const id = scanToastIds.get(p.scanner)!
         if (p.status === 'done') {
           update(id, { type: 'success', message: `${p.scanner}: Done`, progress: 100 })
-          setTimeout(() => dismiss(id), 3000)
+          setTimeout(() => dismiss(id), 1000)
           scanToastIds.delete(p.scanner)
         } else if (p.status === 'error') {
           update(id, { type: 'error', message: `${p.scanner}: ${p.message ?? 'Error'}` })
@@ -70,8 +74,13 @@ export default function App(): React.ReactElement {
         }
       }
     })
+
     return unsubScan
   }, [])
+
+  useEffect(() => {
+    if (settings?.defaultTab) setActiveTab(settings.defaultTab)
+  }, [settings?.defaultTab])
 
   useEffect(() => {
     const unsubConnect = window.htpc.input.onDeviceConnected(addDevice)
@@ -106,7 +115,10 @@ export default function App(): React.ReactElement {
   return (
     <div
       className="h-screen w-screen flex flex-col overflow-hidden relative"
-      style={{ background: 'var(--color-bg)' }}
+      style={{
+        background: 'var(--color-bg)',
+        '--player-bar-height': hasPlayer ? '72px' : '0px'
+      } as React.CSSProperties}
     >
       <ToastContainer />
       <ThemeBackground />
@@ -170,6 +182,11 @@ export default function App(): React.ReactElement {
             </motion.div>
           </AnimatePresence>
         </div>
+
+        {/* Music mini-player */}
+        <AnimatePresence>
+          {hasPlayer && <MusicPlayer />}
+        </AnimatePresence>
       </div>
     </div>
   )

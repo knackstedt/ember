@@ -1,4 +1,4 @@
-import { BrowserWindow, ipcMain, app } from 'electron'
+import { BrowserWindow, ipcMain, app, dialog } from 'electron'
 import { getSettings, setSettings, setSetting } from '../services/settings.service'
 import { launchGame, launchMovie, launchTrack } from '../services/launcher.service'
 import { scanSteamGames } from '../scanners/steam.scanner'
@@ -207,5 +207,10 @@ export function registerIpcHandlers(window: BrowserWindow): void {
 
   ipcMain.handle('plugins:reload', async () => {
     return await reloadPlugins()
+  })
+
+  ipcMain.handle('dialog:open-directory', async () => {
+    const { canceled, filePaths } = await dialog.showOpenDialog({ properties: ['openDirectory'] })
+    return canceled ? null : filePaths[0]
   })
 }

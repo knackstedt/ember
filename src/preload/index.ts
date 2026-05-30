@@ -83,6 +83,8 @@ const htpc = {
     reload: (): Promise<unknown[]> => ipcRenderer.invoke('plugins:reload')
   },
 
+  openDirectory: (): Promise<string | null> => ipcRenderer.invoke('dialog:open-directory'),
+
   onScanProgress: (cb: (progress: ScanProgress) => void) => {
     const handler = (_: Electron.IpcRendererEvent, p: ScanProgress) => cb(p)
     ipcRenderer.on('scan:progress', handler)

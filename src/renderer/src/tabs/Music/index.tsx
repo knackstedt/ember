@@ -7,6 +7,7 @@ import { MediaCard } from '../../components/MediaCard/MediaCard'
 import { DetailPanel } from '../../components/DetailPanel/DetailPanel'
 import { OskInput } from '../../components/OnScreenKeyboard/OnScreenKeyboard'
 import { MusicTrack } from '../../../../shared/types'
+import { useMusicPlayerStore } from '../../store/musicPlayer.store'
 
 const STREAMING_SERVICES = [
   { name: 'Spotify', url: 'https://open.spotify.com', color: '#1DB954' },
@@ -23,6 +24,7 @@ export const MusicTab: React.FC = () => {
     tracks, loading, searchQuery, activeArtist, activeAlbum, activeGenre, activeYear,
     load, scan, toggleFavorite, setSearch, setArtist, setAlbum, setGenre, setYear, filtered
   } = useMusicStore()
+  const play = useMusicPlayerStore((s) => s.play)
   const [selected, setSelected] = useState<MusicTrack | null>(null)
   const [subTab, setSubTab] = useState<SubTab>('local')
   const [activeFilterType, setActiveFilterType] = useState<'artist' | 'album' | 'genre' | 'year'>('artist')
@@ -111,7 +113,7 @@ export const MusicTab: React.FC = () => {
                 items={items}
                 columnCount={COLUMN_COUNT}
                 rowHeight={240}
-                renderItem={(track) => (
+                renderItem={(track, index) => (
                   <div className="p-1.5">
                     <MediaCard
                       key={track.id}
@@ -121,7 +123,7 @@ export const MusicTab: React.FC = () => {
                       coverUrl={track.albumArtUrl}
                       aspectRatio="1/1"
                       isFavorite={track.isFavorite}
-                      onSelect={() => setSelected(track)}
+                      onSelect={() => { play(items, index); setSelected(track) }}
                       onFavorite={() => toggleFavorite(track.id)}
                     />
                   </div>
@@ -165,7 +167,7 @@ export const MusicTab: React.FC = () => {
           <motion.button
             className="px-6 py-2.5 rounded-[var(--radius-card)] font-semibold text-sm"
             style={{ background: 'var(--color-accent)', color: 'var(--color-bg)' }}
-            onClick={() => { window.htpc.music.launch(selected!); setSelected(null) }}
+            onClick={() => { play(items, items.findIndex((t) => t.id === selected!.id)); setSelected(null) }}
             whileTap={{ scale: 0.96 }}
           >
             ▶ Play
