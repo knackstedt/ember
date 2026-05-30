@@ -26,6 +26,12 @@ export const MoviesTab: React.FC = () => {
 
   useEffect(() => { load() }, [])
 
+  useEffect(() => {
+    const handler = () => setSelected(null)
+    window.addEventListener('htpc:escape', handler)
+    return () => window.removeEventListener('htpc:escape', handler)
+  }, [])
+
   const allGenres = [...new Set(movies.flatMap((m) => m.genres ?? []))].sort()
   const items = filtered()
 

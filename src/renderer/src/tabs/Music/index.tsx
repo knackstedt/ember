@@ -23,6 +23,12 @@ export const MusicTab: React.FC = () => {
   const [subTab, setSubTab] = useState<SubTab>('local')
   const [activeFilterType, setActiveFilterType] = useState<'artist' | 'album' | 'genre' | 'year'>('artist')
 
+  useEffect(() => {
+    const handler = () => setSelected(null)
+    window.addEventListener('htpc:escape', handler)
+    return () => window.removeEventListener('htpc:escape', handler)
+  }, [])
+
   const albumTracks = useMemo(() => {
     if (!selected?.album) return []
     return tracks

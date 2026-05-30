@@ -45,6 +45,7 @@ export default function App(): React.ReactElement {
   const [activeTab, setActiveTab] = useState<TabId>('gaming')
   const activeTabRef = useRef<TabId>(activeTab)
   activeTabRef.current = activeTab
+  const isFullscreenRef = useRef(false)
 
   useEffect(() => {
     load()
@@ -100,6 +101,41 @@ export default function App(): React.ReactElement {
       unsubDisconnect()
       unsubEvent()
     }
+  }, [])
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent): void => {
+      if (e.key === 'F11') {
+        e.preventDefault()
+        isFullscreenRef.current = !isFullscreenRef.current
+        window.htpc.app.setFullscreen(isFullscreenRef.current)
+      } else if (e.key === 'Escape') {
+        useVideoPlayerStore.getState().close()
+        window.dispatchEvent(new CustomEvent('htpc:escape'))
+      } else if (e.key === 'Tab' && !e.shiftKey) {
+        e.preventDefault()
+        const idx = TAB_IDS.indexOf(activeTabRef.current)
+        setActiveTab(TAB_IDS[(idx + 1) % TAB_IDS.length])
+      } else if (e.key === 'Tab' && e.shiftKey) {
+        e.preventDefault()
+        const idx = TAB_IDS.indexOf(activeTabRef.current)
+        setActiveTab(TAB_IDS[(idx - 1 + TAB_IDS.length) % TAB_IDS.length])
+      } else if (e.key === 'F5') {
+        e.preventDefault()
+        const scanMap: Partial<Record<TabId, () => void>> = {
+          gaming: () => useGamesStore.getState().scan(),
+          movies: () => useMoviesStore.getState().scan(),
+          music: () => useMusicStore.getState().scan(),
+          'tv-shows': () => useTvStore.getState().scan()
+        }
+        scanMap[activeTabRef.current]?.()
+      } else if (e.key === 'f' && e.ctrlKey) {
+        e.preventDefault()
+        document.querySelector<HTMLInputElement>('input[placeholder^="Search"]')?.focus()
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
   }, [])
 
   if (loading) {

@@ -19,6 +19,12 @@ export const TVShowsTab: React.FC = () => {
   useEffect(() => { load() }, [])
 
   useEffect(() => {
+    const handler = () => setSelected(null)
+    window.addEventListener('htpc:escape', handler)
+    return () => window.removeEventListener('htpc:escape', handler)
+  }, [])
+
+  useEffect(() => {
     if (selected?.seasons?.length) {
       setSelectedSeason(selected.seasons[0].seasonNumber)
     }

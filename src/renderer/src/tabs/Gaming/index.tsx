@@ -52,6 +52,12 @@ export const GamingTab: React.FC = () => {
     load()
   }, [])
 
+  useEffect(() => {
+    const handler = () => setSelected(null)
+    window.addEventListener('htpc:escape', handler)
+    return () => window.removeEventListener('htpc:escape', handler)
+  }, [])
+
   const items = filtered()
   const badge = selected ? gameBadge(selected) : undefined
 
