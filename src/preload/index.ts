@@ -51,7 +51,8 @@ const htpc = {
     favorite: (id: string, value: boolean): Promise<void> => ipcRenderer.invoke('music:favorite', id, value),
     tag: (id: string, tags: string[]): Promise<void> => ipcRenderer.invoke('music:tag', id, tags),
     searchCoverArt: (track: MusicTrack): Promise<string | null> => ipcRenderer.invoke('music:searchCoverArt', track),
-    pickCoverImage: (track: MusicTrack): Promise<string | null> => ipcRenderer.invoke('music:pickCoverImage', track)
+    pickCoverImage: (track: MusicTrack): Promise<string | null> => ipcRenderer.invoke('music:pickCoverImage', track),
+    loadThumbnail: (track: MusicTrack): Promise<string | null> => ipcRenderer.invoke('music:loadThumbnail', track)
   },
 
   tv: {

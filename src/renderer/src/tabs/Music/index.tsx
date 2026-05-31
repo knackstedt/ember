@@ -10,6 +10,40 @@ import { MusicTrack } from '../../../../shared/types'
 import { useMusicPlayerStore } from '../../store/musicPlayer.store'
 import { StreamingTile, MUSIC_STREAMING_SERVICES } from '../../components/StreamingTile/StreamingTile'
 import { useGridFocus } from '../../hooks/useGridFocus'
+import { useCoverCacheStore } from '../../store/coverCache.store'
+
+const LazyMusicCard: React.FC<{
+  track: MusicTrack
+  index: number
+  focusedIndex: number
+  onSelect: () => void
+  onFavorite: () => void
+}> = ({ track, index, focusedIndex, onSelect, onFavorite }) => {
+  const loadThumbnail = useMusicStore((s) => s.loadThumbnail)
+  const cachedUrl = useCoverCacheStore((s) => s.urls[track.id])
+  const coverUrl = track.albumArtUrl ?? cachedUrl
+
+  useEffect(() => {
+    if (!coverUrl) {
+      loadThumbnail(track.id)
+    }
+  }, [track.id, coverUrl, loadThumbnail])
+
+  return (
+    <MediaCard
+      key={track.id}
+      id={track.id}
+      title={track.title}
+      subtitle={track.artist ?? track.album}
+      coverUrl={coverUrl}
+      aspectRatio="1/1"
+      isFavorite={track.isFavorite}
+      isFocused={index === focusedIndex}
+      onSelect={onSelect}
+      onFavorite={onFavorite}
+    />
+  )
+}
 
 type SubTab = 'local' | 'streaming'
 const COLUMN_COUNT = 6
@@ -41,7 +75,10 @@ export const MusicTab: React.FC = () => {
 
   useEffect(() => { load() }, [])
 
-  const items = filtered()
+  const items = useMemo(
+    () => filtered(),
+    [filtered, tracks, searchQuery, activeArtist, activeAlbum, activeGenre, activeYear]
+  )
   const { focusedIndex } = useGridFocus({
     items,
     columnCount: COLUMN_COUNT,
@@ -49,7 +86,13 @@ export const MusicTab: React.FC = () => {
     onConfirm: (track, index) => { play(items, index); setSelected(track) },
     enabled: subTab === 'local' && !selected
   })
-  const artists = [...new Set(tracks.map((t) => t.artist).filter(Boolean) as string[])].sort()
+  const artists = [...tracks.reduce((map, t) => {
+    const a = t.artist
+    if (!a) return map
+    const key = a.toLowerCase()
+    if (!map.has(key)) map.set(key, a)
+    return map
+  }, new Map<string, string>()).values()].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
   const albums = [...new Set(tracks.map((t) => t.album).filter(Boolean) as string[])].sort()
   const genres = [...new Set(tracks.map((t) => t.genre).filter(Boolean) as string[])].sort()
   const years = [...new Set(tracks.map((t) => t.year).filter(Boolean) as number[])].sort((a, b) => b - a)
@@ -133,15 +176,10 @@ export const MusicTab: React.FC = () => {
                 rowHeight={240}
                 renderItem={(track, index) => (
                   <div className="p-1.5 w-full h-full flex flex-col min-w-0">
-                    <MediaCard
-                      key={track.id}
-                      id={track.id}
-                      title={track.title}
-                      subtitle={track.artist ?? track.album}
-                      coverUrl={track.albumArtUrl}
-                      aspectRatio="1/1"
-                      isFavorite={track.isFavorite}
-                      isFocused={index === focusedIndex}
+                    <LazyMusicCard
+                      track={track}
+                      index={index}
+                      focusedIndex={focusedIndex}
                       onSelect={() => { play(items, index); setSelected(track) }}
                       onFavorite={() => toggleFavorite(track.id)}
                     />

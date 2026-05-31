@@ -3,7 +3,7 @@ import { BrowserWindow, ipcMain, app, dialog } from 'electron'
 import { getSettings, setSettings, setSetting } from '../services/settings.service'
 import { launchGame, launchMovie, launchTrack } from '../services/launcher.service'
 import { scanMusicFiles } from '../scanners/music.scanner'
-import { searchCoverArt, downloadImage, embedCoverArt, pickCoverImage } from '../services/music-cover.service'
+import { searchCoverArt, downloadImage, embedCoverArt, pickCoverImage, loadThumbnail } from '../services/music-cover.service'
 import { scanMovieFiles, scanTvShows } from '../scanners/video.scanner'
 import { getDb } from '../db'
 import { getProtonRating } from '../services/protondb.service'
@@ -177,11 +177,13 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     const tracks = (result[0] ?? []) as MusicTrack[]
     const coverRoot = join(app.getPath('userData'), 'covers', 'music').replace(/\\/g, '/')
     return tracks.map((t) => {
-      if (!t.albumArtUrl?.startsWith('file://')) return t
-      const pathPart = t.albumArtUrl.slice('file://'.length)
-      if (!pathPart.startsWith(coverRoot)) return t
+      const id = typeof t.id === 'string' ? t.id : (t.id as any)?.id ?? String(t.id)
+      const normalized = { ...t, id }
+      if (!normalized.albumArtUrl?.startsWith('file://')) return normalized
+      const pathPart = normalized.albumArtUrl.slice('file://'.length)
+      if (!pathPart.startsWith(coverRoot)) return normalized
       const rel = pathPart.slice(coverRoot.length + 1).replace(/\\/g, '/')
-      return { ...t, albumArtUrl: `htpc-thumb://covers/music/${rel}` }
+      return { ...normalized, albumArtUrl: `htpc-thumb://covers/music/${rel}` }
     })
   })
 
@@ -211,6 +213,11 @@ export function registerIpcHandlers(window: BrowserWindow): void {
   ipcMain.handle('music:pickCoverImage', async (_e, track: MusicTrack) => {
     const result = await pickCoverImage(track)
     return result ?? null
+  })
+
+  ipcMain.handle('music:loadThumbnail', async (_e, track: MusicTrack) => {
+    const url = await loadThumbnail(track)
+    return url ?? null
   })
 
   ipcMain.handle('tv:scan', async (_e, extraPaths?: string[]) => {

@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { Movie, MusicTrack, TVShow } from '../../../shared/types'
 import { useMusicPlayerStore } from './musicPlayer.store'
+import { useCoverCacheStore } from './coverCache.store'
 
 interface MoviesState {
   movies: Movie[]
@@ -36,9 +37,16 @@ export const useMoviesStore = create<MoviesState>((set, get) => ({
   },
 
   scan: async () => {
+    if (get().loading) return
     set({ loading: true })
-    const movies = await window.htpc.movies.scan().catch(() => [])
-    set({ movies, loading: false })
+    try {
+      await window.htpc.movies.scan().catch(() => [])
+      await get().load()
+    } catch {
+      /* scan errors already logged in main */
+    } finally {
+      set({ loading: false })
+    }
   },
 
   toggleFavorite: async (id) => {
@@ -102,6 +110,7 @@ interface MusicState {
   setYear: (y: number | null) => void
   searchCoverArt: (id: string) => Promise<void>
   pickCoverImage: (id: string) => Promise<void>
+  loadThumbnail: (id: string) => Promise<void>
   filtered: () => MusicTrack[]
 }
 
@@ -121,9 +130,16 @@ export const useMusicStore = create<MusicState>((set, get) => ({
   },
 
   scan: async () => {
+    if (get().loading) return
     set({ loading: true })
-    const tracks = await window.htpc.music.scan().catch(() => [])
-    set({ tracks, loading: false })
+    try {
+      await window.htpc.music.scan().catch(() => [])
+      await get().load()
+    } catch {
+      /* scan errors already logged in main */
+    } finally {
+      set({ loading: false })
+    }
   },
 
   toggleFavorite: async (id) => {
@@ -163,10 +179,19 @@ export const useMusicStore = create<MusicState>((set, get) => ({
     useMusicPlayerStore.getState().updateTrackCover(id, url)
   },
 
+  loadThumbnail: async (id) => {
+    const track = get().tracks.find((t) => t.id === id)
+    if (!track || track.albumArtUrl) return
+    const url = await window.htpc.music.loadThumbnail(track)
+    if (!url) return
+    useCoverCacheStore.getState().setUrl(id, url)
+    useMusicPlayerStore.getState().updateTrackCover(id, url)
+  },
+
   filtered: () => {
     const { tracks, searchQuery, activeArtist, activeAlbum, activeGenre, activeYear } = get()
     let r = tracks
-    if (activeArtist) r = r.filter((t) => t.artist === activeArtist)
+    if (activeArtist) r = r.filter((t) => t.artist?.toLowerCase() === activeArtist.toLowerCase())
     if (activeAlbum) r = r.filter((t) => t.album === activeAlbum)
     if (activeGenre) r = r.filter((t) => t.genre === activeGenre)
     if (activeYear) r = r.filter((t) => t.year === activeYear)
@@ -207,9 +232,16 @@ export const useTvStore = create<TvState>((set, get) => ({
   },
 
   scan: async () => {
+    if (get().loading) return
     set({ loading: true })
-    const shows = await window.htpc.tv.scan().catch(() => [])
-    set({ shows, loading: false })
+    try {
+      await window.htpc.tv.scan().catch(() => [])
+      await get().load()
+    } catch {
+      /* scan errors already logged in main */
+    } finally {
+      set({ loading: false })
+    }
   },
 
   toggleFavorite: async (id) => {

@@ -2,12 +2,25 @@ import { createHash } from 'crypto'
 import { readFileSync, writeFileSync, existsSync, mkdirSync, openSync, closeSync, readSync } from 'fs'
 import { join, extname, dirname, basename } from 'path'
 import { app, dialog } from 'electron'
+import { loadMusicMetadata } from 'music-metadata'
 import { MusicTrack } from '../../shared/types'
 import { getDb } from '../db'
 
 const coverCache = join(app.getPath('userData'), 'covers', 'music')
 const generatedCache = join(coverCache, 'generated')
 mkdirSync(generatedCache, { recursive: true })
+
+let musicMetadata: any = null
+
+async function getMusicMetadata() {
+  if (!musicMetadata) musicMetadata = await loadMusicMetadata()
+  return musicMetadata
+}
+
+const FOLDER_ART_NAMES = [
+  'cover.jpg', 'folder.jpg', 'album.jpg', 'front.jpg', 'art.jpg', 'thumbnail.jpg',
+  'cover.png', 'folder.png', 'album.png', 'front.png', 'art.png', 'thumbnail.png'
+]
 
 /* ------------------------------------------------------------------ */
 /*  Procedural cover-art generator (deterministic SVG)                */
@@ -141,6 +154,69 @@ export async function generateProceduralCover(
     console.error('[generateProceduralCover]', err)
     return undefined
   }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Lazy thumbnail loading                                            */
+/* ------------------------------------------------------------------ */
+
+export async function extractCover(filePath: string, id: string): Promise<string | undefined> {
+  try {
+    const mm = await getMusicMetadata()
+    const meta = await mm.parseFile(filePath, { skipCovers: false })
+    const picture = mm.selectCover(meta.common.picture)
+    if (!picture) return undefined
+    const dest = join(coverCache, `${id}.jpg`)
+    if (!existsSync(dest)) {
+      writeFileSync(dest, picture.data)
+    }
+    return `htpc-thumb://covers/music/${id}.jpg`
+  } catch {
+    return undefined
+  }
+}
+
+export function findFolderArt(filePath: string, id: string): string | undefined {
+  try {
+    const dir = dirname(filePath)
+    for (const name of FOLDER_ART_NAMES) {
+      const full = join(dir, name)
+      if (existsSync(full)) {
+        const dest = join(coverCache, `${id}.jpg`)
+        if (!existsSync(dest)) {
+          const data = readFileSync(full)
+          writeFileSync(dest, data)
+        }
+        return `htpc-thumb://covers/music/${id}.jpg`
+      }
+    }
+    return undefined
+  } catch {
+    return undefined
+  }
+}
+
+function normalizeId(raw: unknown): string {
+  if (typeof raw === 'string') return raw
+  if (raw && typeof (raw as any).id === 'string') return (raw as any).id
+  return String(raw)
+}
+
+export async function loadThumbnail(track: MusicTrack): Promise<string | undefined> {
+  const { filePath } = track
+  const id = normalizeId(track.id)
+  const url = await extractCover(filePath, id)
+    ?? findFolderArt(filePath, id)
+    ?? await generateProceduralCover(filePath, id)
+  if (url) {
+    try {
+      const db = getDb()
+      await db.query(`UPDATE music_track:⟨${id}⟩ SET albumArtUrl = $url`, { url })
+    } catch (err) {
+      console.error('[loadThumbnail] DB update failed', err)
+    }
+  }
+  return url
 }
 
 /* ------------------------------------------------------------------ */

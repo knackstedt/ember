@@ -126,6 +126,7 @@ html, body, #root {
   contain: layout style paint;
   overflow-y: auto;
   overflow-x: hidden;
+  scrollbar-gutter: stable;
 }
 
 /* Glassmorphism panel utility */

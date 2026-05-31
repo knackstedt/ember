@@ -1,63 +1,17 @@
-import { existsSync, readdirSync, statSync, readFileSync, writeFileSync, mkdirSync } from 'fs'
-import { join, extname, dirname } from 'path'
+import { existsSync, readdirSync, statSync } from 'fs'
+import { join, extname } from 'path'
 import { createHash } from 'crypto'
 import { loadMusicMetadata } from 'music-metadata'
 import { getXdgMusicDir } from './xdg'
 import { MusicTrack } from '../../shared/types'
-import { app } from 'electron'
-import { generateProceduralCover } from '../services/music-cover.service'
 
 const AUDIO_EXTS = new Set(['.mp3', '.flac', '.ogg', '.m4a', '.aac', '.wav', '.opus', '.wma'])
-
-const coverCache = join(app.getPath('userData'), 'covers', 'music')
-mkdirSync(coverCache, { recursive: true })
 
 let musicMetadata: any = null
 
 async function getMusicMetadata() {
   if (!musicMetadata) musicMetadata = await loadMusicMetadata()
   return musicMetadata
-}
-
-async function extractCover(filePath: string, id: string, pictures?: any[]): Promise<string | undefined> {
-  try {
-    const mm = await getMusicMetadata()
-    const meta = pictures ? { common: { picture: pictures } } : await mm.parseFile(filePath, { skipCovers: false })
-    const picture = mm.selectCover(meta.common.picture)
-    if (!picture) return undefined
-    const dest = join(coverCache, `${id}.jpg`)
-    if (!existsSync(dest)) {
-      writeFileSync(dest, picture.data)
-    }
-    return `htpc-thumb://covers/music/${id}.jpg`
-  } catch {
-    return undefined
-  }
-}
-
-const FOLDER_ART_NAMES = [
-  'cover.jpg', 'folder.jpg', 'album.jpg', 'front.jpg', 'art.jpg', 'thumbnail.jpg',
-  'cover.png', 'folder.png', 'album.png', 'front.png', 'art.png', 'thumbnail.png'
-]
-
-function findFolderArt(filePath: string, id: string): string | undefined {
-  try {
-    const dir = dirname(filePath)
-    for (const name of FOLDER_ART_NAMES) {
-      const full = join(dir, name)
-      if (existsSync(full)) {
-        const dest = join(coverCache, `${id}.jpg`)
-        if (!existsSync(dest)) {
-          const data = readFileSync(full)
-          writeFileSync(dest, data)
-        }
-        return `htpc-thumb://covers/music/${id}.jpg`
-      }
-    }
-    return undefined
-  } catch {
-    return undefined
-  }
 }
 
 function walkDir(dir: string, results: string[]): void {
@@ -96,17 +50,9 @@ export async function scanMusicFiles(extraPaths: string[] = []): Promise<MusicTr
     if (i % 100 === 0) console.log(`[music:scan] parsing ${i + 1}/${allFiles.length} ${filePath}`)
     try {
       const mm = await getMusicMetadata()
-      const meta = await mm.parseFile(filePath, { skipCovers: false })
+      const meta = await mm.parseFile(filePath, { skipCovers: true })
       const { title, artist, album, genre, year, track } = meta.common
       const id = createHash('md5').update(filePath).digest('hex').slice(0, 16)
-
-      let albumArtUrl = await extractCover(filePath, id, meta.common.picture)
-      if (!albumArtUrl) {
-        albumArtUrl = findFolderArt(filePath, id)
-      }
-      if (!albumArtUrl) {
-        albumArtUrl = await generateProceduralCover(filePath, id, artist, album)
-      }
 
       tracks.push({
         id,
@@ -114,7 +60,7 @@ export async function scanMusicFiles(extraPaths: string[] = []): Promise<MusicTr
         filePath,
         artist,
         album,
-        albumArtUrl,
+        albumArtUrl: undefined,
         genre: Array.isArray(genre) ? genre[0] : genre,
         year,
         trackNumber: track?.no ?? undefined,

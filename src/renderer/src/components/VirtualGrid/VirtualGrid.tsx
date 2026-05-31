@@ -56,7 +56,8 @@ export const VirtualGrid = React.forwardRef(function VirtualGridInner<T>(
       for (const entry of entries) {
         const w = entry.contentRect.width
         if (w > 0) {
-          setCellWidth(Math.floor(w / columnCount))
+          const next = Math.floor(w / columnCount)
+          setCellWidth((prev) => (Math.abs(prev - next) > 2 ? next : prev))
         }
       }
     })
@@ -75,7 +76,7 @@ export const VirtualGrid = React.forwardRef(function VirtualGridInner<T>(
   return (
     <div ref={containerRef} className="w-full h-full">
       <VGrid
-        key={`${columnCount}-${cellWidth}`}
+        key={columnCount}
         ref={ref}
         className={`gpu-scroll ${className ?? ''}`}
         style={{ height: '100%', width: '100%', ...style }}
