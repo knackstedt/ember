@@ -19,6 +19,7 @@ interface MoviesState {
   setYear: (y: number | null) => void;
   toggleFavoritesFilter: () => void;
   updateProgress: (id: string, progress: number | null) => void;
+  hide: (id: string) => Promise<void>;
   filtered: () => Movie[];
 }
 
@@ -74,6 +75,13 @@ export const useMoviesStore = create<MoviesState>((set, get) => ({
   toggleFavoritesFilter: () =>
     set((s) => ({ showFavoritesOnly: !s.showFavoritesOnly })),
 
+  hide: async (id) => {
+    await window.htpc.movies.hide(id, true);
+    set((s) => ({
+      movies: s.movies.filter((m) => m.id !== id),
+    }));
+  },
+
   updateProgress: (id, progress) => {
     set((s) => ({
       movies: s.movies.map((m) =>
@@ -91,7 +99,7 @@ export const useMoviesStore = create<MoviesState>((set, get) => ({
   filtered: () => {
     const { movies, searchQuery, activeGenre, activeYear, showFavoritesOnly } =
       get();
-    let r = movies;
+    let r = movies.filter((m) => !m.hidden);
     if (showFavoritesOnly) r = r.filter((m) => m.isFavorite);
     if (activeGenre) r = r.filter((m) => m.genres?.includes(activeGenre));
     if (activeYear) r = r.filter((m) => m.releaseYear === activeYear);
@@ -127,6 +135,7 @@ interface MusicState {
   searchCoverArt: (id: string) => Promise<void>;
   pickCoverImage: (id: string) => Promise<void>;
   loadThumbnail: (id: string) => Promise<void>;
+  hide: (id: string) => Promise<void>;
   filtered: () => MusicTrack[];
 }
 
@@ -218,6 +227,13 @@ export const useMusicStore = create<MusicState>((set, get) => ({
     useMusicPlayerStore.getState().updateTrackCover(id, url);
   },
 
+  hide: async (id) => {
+    await window.htpc.music.hide(id, true);
+    set((s) => ({
+      tracks: s.tracks.filter((t) => t.id !== id),
+    }));
+  },
+
   filtered: () => {
     const {
       tracks,
@@ -227,7 +243,7 @@ export const useMusicStore = create<MusicState>((set, get) => ({
       activeGenre,
       activeYear,
     } = get();
-    let r = tracks;
+    let r = tracks.filter((t) => !t.hidden);
     if (activeArtist)
       r = r.filter(
         (t) => t.artist?.toLowerCase() === activeArtist.toLowerCase(),
@@ -257,6 +273,7 @@ interface TvState {
   toggleFavorite: (id: string) => Promise<void>;
   setTags: (id: string, tags: string[]) => Promise<void>;
   setSearch: (q: string) => void;
+  hide: (id: string) => Promise<void>;
   filtered: () => TVShow[];
 }
 
@@ -303,12 +320,20 @@ export const useTvStore = create<TvState>((set, get) => ({
     }));
   },
 
+  hide: async (id) => {
+    await window.htpc.tv.hide(id, true);
+    set((s) => ({
+      shows: s.shows.filter((sh) => sh.id !== id),
+    }));
+  },
+
   setSearch: (searchQuery) => set({ searchQuery }),
 
   filtered: () => {
     const { shows, searchQuery } = get();
-    if (!searchQuery.trim()) return shows;
+    let r = shows.filter((s) => !s.hidden);
+    if (!searchQuery.trim()) return r;
     const q = searchQuery.toLowerCase();
-    return shows.filter((s) => s.title.toLowerCase().includes(q));
+    return r.filter((s) => s.title.toLowerCase().includes(q));
   },
 }));

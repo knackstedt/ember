@@ -94,6 +94,7 @@ async function runMigrations(db: Surreal): Promise<void> {
     DEFINE FIELD IF NOT EXISTS lastPlayed ON game TYPE option<int>;
     DEFINE FIELD IF NOT EXISTS playTime ON game TYPE int DEFAULT 0;
     DEFINE FIELD IF NOT EXISTS rating ON game TYPE option<float>;
+    DEFINE FIELD IF NOT EXISTS hidden ON game TYPE bool DEFAULT false;
 
     DEFINE TABLE IF NOT EXISTS movie SCHEMAFULL;
     DEFINE FIELD IF NOT EXISTS id ON movie TYPE string;
@@ -114,6 +115,7 @@ async function runMigrations(db: Surreal): Promise<void> {
     DEFINE FIELD IF NOT EXISTS rating ON movie TYPE option<float>;
     DEFINE FIELD IF NOT EXISTS watchProgress ON movie TYPE option<float>;
     DEFINE FIELD IF NOT EXISTS lastPlayed ON movie TYPE option<int>;
+    DEFINE FIELD IF NOT EXISTS hidden ON movie TYPE bool DEFAULT false;
 
     DEFINE TABLE IF NOT EXISTS music_track SCHEMAFULL;
     DEFINE FIELD IF NOT EXISTS id ON music_track TYPE string;
@@ -129,6 +131,7 @@ async function runMigrations(db: Surreal): Promise<void> {
     DEFINE FIELD IF NOT EXISTS mbid ON music_track TYPE option<string>;
     DEFINE FIELD IF NOT EXISTS isFavorite ON music_track TYPE bool DEFAULT false;
     DEFINE FIELD IF NOT EXISTS tags ON music_track TYPE array<string> DEFAULT [];
+    DEFINE FIELD IF NOT EXISTS hidden ON music_track TYPE bool DEFAULT false;
 
     DEFINE TABLE IF NOT EXISTS tv_show SCHEMAFULL;
     DEFINE FIELD IF NOT EXISTS id ON tv_show TYPE string;
@@ -145,6 +148,7 @@ async function runMigrations(db: Surreal): Promise<void> {
     DEFINE FIELD IF NOT EXISTS isFavorite ON tv_show TYPE bool DEFAULT false;
     DEFINE FIELD IF NOT EXISTS tags ON tv_show TYPE array<string> DEFAULT [];
     DEFINE FIELD IF NOT EXISTS rating ON tv_show TYPE option<float>;
+    DEFINE FIELD IF NOT EXISTS hidden ON tv_show TYPE bool DEFAULT false;
 
     DEFINE TABLE IF NOT EXISTS controller_mapping SCHEMAFULL;
     DEFINE FIELD IF NOT EXISTS deviceId ON controller_mapping TYPE string;

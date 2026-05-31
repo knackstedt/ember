@@ -18,6 +18,7 @@ import { MusicPlayer } from "./components/MusicPlayer/MusicPlayer";
 import { useMusicPlayerStore } from "./store/musicPlayer.store";
 import { VideoPlayer } from "./components/VideoPlayer/VideoPlayer";
 import { useVideoPlayerStore } from "./store/videoPlayer.store";
+import { useContextMenuStore } from "./store/contextMenu.store";
 
 interface TabDef {
   id: TabId;
@@ -108,14 +109,52 @@ export default function App(): React.ReactElement {
   }, [settings?.defaultTab]);
 
   useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { tab?: TabId };
+      if (detail?.tab && TAB_IDS.includes(detail.tab)) {
+        setActiveTab(detail.tab);
+      }
+    };
+    window.addEventListener("htpc:switch-tab", handler);
+    return () => window.removeEventListener("htpc:switch-tab", handler);
+  }, []);
+
+  useEffect(() => {
     const unsubConnect = window.htpc.input.onDeviceConnected(addDevice);
     const unsubDisconnect =
       window.htpc.input.onDeviceDisconnected(removeDevice);
     const unsubEvent = window.htpc.input.onEvent((ev) => {
       useInputStore.getState().setLastEvent(ev);
-      if (ev.type === "button_press" && ev.action === "start") {
+      if (ev.type !== "button_press") return;
+
+      if (ev.action === "start") {
         const idx = TAB_IDS.indexOf(activeTabRef.current);
         setActiveTab(TAB_IDS[(idx + 1) % TAB_IDS.length]);
+      } else if (ev.action === "west") {
+        window.dispatchEvent(
+          new CustomEvent("htpc:contextmenu", { detail: { source: "gamepad" } }),
+        );
+      } else {
+        const actionMap: Record<string, string> = {
+          dpad_up: "up",
+          dpad_down: "down",
+          dpad_left: "left",
+          dpad_right: "right",
+          south: "confirm",
+          east: "cancel",
+        };
+        const action = actionMap[ev.action ?? ""];
+        if (action) {
+          if (useContextMenuStore.getState().isOpen) {
+            window.dispatchEvent(
+              new CustomEvent("htpc:menu-nav", { detail: { action } }),
+            );
+          } else {
+            window.dispatchEvent(
+              new CustomEvent("htpc:nav", { detail: { action } }),
+            );
+          }
+        }
       }
     });
     return () => {
@@ -126,6 +165,8 @@ export default function App(): React.ReactElement {
   }, []);
 
   useEffect(() => {
+    const longPressTimers = new Map<string, number>();
+
     const handler = (e: KeyboardEvent): void => {
       const target = e.target as HTMLElement | null;
       const isTyping =
@@ -142,6 +183,24 @@ export default function App(): React.ReactElement {
       } else if (e.key === "Escape") {
         useVideoPlayerStore.getState().close();
         window.dispatchEvent(new CustomEvent("htpc:escape"));
+      } else if (!isTyping && (e.key === "Enter" || e.key === " ")) {
+        if (e.type === "keydown") {
+          const timer = window.setTimeout(() => {
+            longPressTimers.delete(e.key);
+            window.dispatchEvent(
+              new CustomEvent("htpc:contextmenu", {
+                detail: { source: "keyboard" },
+              }),
+            );
+          }, 800);
+          longPressTimers.set(e.key, timer);
+        } else if (e.type === "keyup") {
+          const timer = longPressTimers.get(e.key);
+          if (timer) {
+            clearTimeout(timer);
+            longPressTimers.delete(e.key);
+          }
+        }
       } else if (!isTyping && e.key === "q") {
         e.preventDefault();
         const idx = TAB_IDS.indexOf(activeTabRef.current);
@@ -178,9 +237,15 @@ export default function App(): React.ReactElement {
         };
         const action = actionMap[e.key];
         if (action) {
-          window.dispatchEvent(
-            new CustomEvent("htpc:nav", { detail: { action } }),
-          );
+          if (useContextMenuStore.getState().isOpen) {
+            window.dispatchEvent(
+              new CustomEvent("htpc:menu-nav", { detail: { action } }),
+            );
+          } else {
+            window.dispatchEvent(
+              new CustomEvent("htpc:nav", { detail: { action } }),
+            );
+          }
         }
       } else if (e.key === "Tab" && !e.shiftKey) {
         e.preventDefault();
@@ -207,7 +272,13 @@ export default function App(): React.ReactElement {
       }
     };
     window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+    window.addEventListener("keyup", handler);
+    return () => {
+      window.removeEventListener("keydown", handler);
+      window.removeEventListener("keyup", handler);
+      longPressTimers.forEach((t) => clearTimeout(t));
+      longPressTimers.clear();
+    };
   }, []);
 
   if (loading) {

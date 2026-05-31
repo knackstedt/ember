@@ -17,6 +17,8 @@ import {
 } from "../../components/StreamingTile/StreamingTile";
 import { useGridFocus } from "../../hooks/useGridFocus";
 import { useCoverCacheStore } from "../../store/coverCache.store";
+import { useContextMenu } from "../../hooks/useContextMenu";
+import { ContextMenuOption } from "../../components/ContextMenu/ContextMenu";
 
 const LazyMusicCard: React.FC<{
   track: MusicTrack;
@@ -73,6 +75,7 @@ export const MusicTab: React.FC = () => {
     searchCoverArt,
     pickCoverImage,
     filtered,
+    hide,
   } = useMusicStore();
   const play = useMusicPlayerStore((s) => s.play);
   const [selected, setSelected] = useState<MusicTrack | null>(null);
@@ -121,6 +124,44 @@ export const MusicTab: React.FC = () => {
       setSelected(track);
     },
     enabled: subTab === "local" && !selected,
+  });
+
+  const { menu, bindItem } = useContextMenu({
+    items,
+    focusedIndex,
+    getOptions: (track): ContextMenuOption[] => [
+      {
+        id: "favorite",
+        label: track.isFavorite ? "Unfavorite" : "Favorite",
+        icon: track.isFavorite ? "★" : "☆",
+      },
+      { id: "hide", label: "Hide", icon: "🙈", destructive: true },
+      { id: "tags", label: "Update metadata / tags", icon: "🏷" },
+      {
+        id: "folder",
+        label: "Open containing folder",
+        icon: "📂",
+        disabled: !track.filePath,
+      },
+    ],
+    onAction: (track, optionId) => {
+      switch (optionId) {
+        case "favorite":
+          toggleFavorite(track.id);
+          break;
+        case "hide":
+          hide(track.id);
+          break;
+        case "tags":
+          setSelected(track);
+          break;
+        case "folder":
+          if (track.filePath) {
+            void window.htpc.shell.showItemInFolder(track.filePath);
+          }
+          break;
+      }
+    },
   });
   const artists = [
     ...tracks
@@ -268,7 +309,7 @@ export const MusicTab: React.FC = () => {
                 onColumnCountChange={setColumnCount}
                 rowHeight={240}
                 renderItem={(track, index) => (
-                  <div className="p-1.5 w-full h-full flex flex-col min-w-0">
+                  <div className="p-1.5 w-full h-full flex flex-col min-w-0" {...bindItem(track, index)}>
                     <LazyMusicCard
                       track={track}
                       index={index}
@@ -457,6 +498,7 @@ export const MusicTab: React.FC = () => {
           </div>
         )}
       </DetailPanel>
+      {subTab === "local" && menu}
     </div>
   );
 };

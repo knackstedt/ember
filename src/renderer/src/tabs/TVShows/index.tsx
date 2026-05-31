@@ -11,6 +11,8 @@ import { OskInput } from "../../components/OnScreenKeyboard/OnScreenKeyboard";
 import { TVShow } from "../../../../shared/types";
 import { useVideoPlayerStore } from "../../store/videoPlayer.store";
 import { useGridFocus } from "../../hooks/useGridFocus";
+import { useContextMenu } from "../../hooks/useContextMenu";
+import { ContextMenuOption } from "../../components/ContextMenu/ContextMenu";
 
 export const TVShowsTab: React.FC = () => {
   const {
@@ -23,6 +25,7 @@ export const TVShowsTab: React.FC = () => {
     setTags,
     setSearch,
     filtered,
+    hide,
   } = useTvStore();
   const openVideo = useVideoPlayerStore((s) => s.open);
   const [selected, setSelected] = useState<TVShow | null>(null);
@@ -61,6 +64,44 @@ export const TVShowsTab: React.FC = () => {
     gridRef,
     onConfirm: (show) => setSelected(show),
     enabled: !selected,
+  });
+
+  const { menu, bindItem } = useContextMenu({
+    items,
+    focusedIndex,
+    getOptions: (show): ContextMenuOption[] => [
+      {
+        id: "favorite",
+        label: show.isFavorite ? "Unfavorite" : "Favorite",
+        icon: show.isFavorite ? "★" : "☆",
+      },
+      { id: "hide", label: "Hide", icon: "🙈", destructive: true },
+      { id: "tags", label: "Update metadata / tags", icon: "🏷" },
+      {
+        id: "folder",
+        label: "Open containing folder",
+        icon: "📂",
+        disabled: !show.dirPath,
+      },
+    ],
+    onAction: (show, optionId) => {
+      switch (optionId) {
+        case "favorite":
+          toggleFavorite(show.id);
+          break;
+        case "hide":
+          hide(show.id);
+          break;
+        case "tags":
+          setSelected(show);
+          break;
+        case "folder":
+          if (show.dirPath) {
+            void window.htpc.shell.openPath(show.dirPath);
+          }
+          break;
+      }
+    },
   });
 
   return (
@@ -124,7 +165,7 @@ export const TVShowsTab: React.FC = () => {
             onColumnCountChange={setColumnCount}
             rowHeight={300}
             renderItem={(show, index) => (
-              <div className="p-1.5 w-full h-full flex flex-col min-w-0">
+              <div className="p-1.5 w-full h-full flex flex-col min-w-0" {...bindItem(show, index)}>
                 <MediaCard
                   key={show.id}
                   id={show.id}
@@ -265,6 +306,7 @@ export const TVShowsTab: React.FC = () => {
           </div>
         )}
       </DetailPanel>
+      {menu}
     </div>
   );
 };

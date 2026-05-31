@@ -39,6 +39,8 @@ const htpc = {
       ipcRenderer.invoke("games:tag", id, tags),
     fetchMetadata: (title: string, steamAppId?: number): Promise<unknown> =>
       ipcRenderer.invoke("games:metadata", title, steamAppId),
+    hide: (id: string, value: boolean): Promise<void> =>
+      ipcRenderer.invoke("games:hide", id, value),
   },
 
   movies: {
@@ -55,6 +57,8 @@ const htpc = {
       ipcRenderer.invoke("movies:progress:set", id, progress),
     fetchMetadata: (title: string): Promise<unknown> =>
       ipcRenderer.invoke("movies:metadata", title),
+    hide: (id: string, value: boolean): Promise<void> =>
+      ipcRenderer.invoke("movies:hide", id, value),
   },
 
   music: {
@@ -73,6 +77,8 @@ const htpc = {
       ipcRenderer.invoke("music:pickCoverImage", track),
     loadThumbnail: (track: MusicTrack): Promise<string | null> =>
       ipcRenderer.invoke("music:loadThumbnail", track),
+    hide: (id: string, value: boolean): Promise<void> =>
+      ipcRenderer.invoke("music:hide", id, value),
   },
 
   tv: {
@@ -87,6 +93,8 @@ const htpc = {
       ipcRenderer.invoke("tv:tag", id, tags),
     fetchMetadata: (title: string): Promise<unknown> =>
       ipcRenderer.invoke("tv:metadata", title),
+    hide: (id: string, value: boolean): Promise<void> =>
+      ipcRenderer.invoke("tv:hide", id, value),
   },
 
   input: {
@@ -139,6 +147,9 @@ const htpc = {
 
   shell: {
     openExternal: (url: string): Promise<void> => shell.openExternal(url),
+    openPath: (path: string): Promise<string> => shell.openPath(path),
+    showItemInFolder: (path: string): Promise<void> =>
+      Promise.resolve(shell.showItemInFolder(path)),
   },
 
   onScanProgress: (cb: (progress: ScanProgress) => void) => {

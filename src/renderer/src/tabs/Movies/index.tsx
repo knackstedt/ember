@@ -17,6 +17,8 @@ import {
   MOVIE_STREAMING_SERVICES,
 } from "../../components/StreamingTile/StreamingTile";
 import { useGridFocus } from "../../hooks/useGridFocus";
+import { useContextMenu } from "../../hooks/useContextMenu";
+import { ContextMenuOption } from "../../components/ContextMenu/ContextMenu";
 
 type SubTab = "local" | "streaming";
 
@@ -33,6 +35,7 @@ export const MoviesTab: React.FC = () => {
     setGenre,
     setTags,
     filtered,
+    hide,
   } = useMoviesStore();
   const openVideo = useVideoPlayerStore((s) => s.open);
   const [selected, setSelected] = useState<Movie | null>(null);
@@ -58,6 +61,44 @@ export const MoviesTab: React.FC = () => {
     gridRef,
     onConfirm: (movie) => setSelected(movie),
     enabled: subTab === "local" && !selected,
+  });
+
+  const { menu, bindItem } = useContextMenu({
+    items,
+    focusedIndex,
+    getOptions: (movie): ContextMenuOption[] => [
+      {
+        id: "favorite",
+        label: movie.isFavorite ? "Unfavorite" : "Favorite",
+        icon: movie.isFavorite ? "★" : "☆",
+      },
+      { id: "hide", label: "Hide", icon: "🙈", destructive: true },
+      { id: "tags", label: "Update metadata / tags", icon: "🏷" },
+      {
+        id: "folder",
+        label: "Open containing folder",
+        icon: "📂",
+        disabled: !movie.filePath,
+      },
+    ],
+    onAction: (movie, optionId) => {
+      switch (optionId) {
+        case "favorite":
+          toggleFavorite(movie.id);
+          break;
+        case "hide":
+          hide(movie.id);
+          break;
+        case "tags":
+          setSelected(movie);
+          break;
+        case "folder":
+          if (movie.filePath) {
+            void window.htpc.shell.showItemInFolder(movie.filePath);
+          }
+          break;
+      }
+    },
   });
 
   const recentlyPlayed = [...movies]
@@ -160,7 +201,7 @@ export const MoviesTab: React.FC = () => {
                 onColumnCountChange={setColumnCount}
                 rowHeight={300}
                 renderItem={(movie, index) => (
-                  <div className="p-1.5 w-full h-full flex flex-col min-w-0">
+                  <div className="p-1.5 w-full h-full flex flex-col min-w-0" {...bindItem(movie, index)}>
                     <MediaCard
                       key={movie.id}
                       id={movie.id}
@@ -300,6 +341,7 @@ export const MoviesTab: React.FC = () => {
           </div>
         )}
       </DetailPanel>
+      {subTab === "local" && menu}
     </div>
   );
 };

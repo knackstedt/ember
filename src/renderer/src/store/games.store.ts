@@ -13,6 +13,7 @@ interface GamesState {
   setSearch: (q: string) => void;
   toggleFavorite: (id: string) => Promise<void>;
   setTags: (id: string, tags: string[]) => Promise<void>;
+  hide: (id: string) => Promise<void>;
   filtered: () => Game[];
 }
 
@@ -66,9 +67,16 @@ export const useGamesStore = create<GamesState>((set, get) => ({
     }));
   },
 
+  hide: async (id) => {
+    await window.htpc.games.hide(id, true);
+    set((s) => ({
+      games: s.games.filter((g) => g.id !== id),
+    }));
+  },
+
   filtered: () => {
     const { games, activeFilter, searchQuery } = get();
-    let result = games;
+    let result = games.filter((g) => !g.hidden);
 
     switch (activeFilter) {
       case "all":

@@ -1,5 +1,5 @@
-import { join } from "path";
-import { BrowserWindow, ipcMain, app, dialog } from "electron";
+import { join, dirname } from "path";
+import { BrowserWindow, ipcMain, app, dialog, shell } from "electron";
 import {
   getSettings,
   setSettings,
@@ -101,6 +101,11 @@ export function registerIpcHandlers(window: BrowserWindow): void {
   ipcMain.handle("games:tag", async (_e, id: string, tags: string[]) => {
     const db = getDb();
     await db.query(`UPDATE game:⟨${id}⟩ SET tags = $tags`, { tags });
+  });
+
+  ipcMain.handle("games:hide", async (_e, id: string, value: boolean) => {
+    const db = getDb();
+    await db.query(`UPDATE game:⟨${id}⟩ SET hidden = $value`, { value });
   });
 
   ipcMain.handle(
@@ -251,6 +256,11 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     await db.query(`UPDATE movie:⟨${id}⟩ SET tags = $tags`, { tags });
   });
 
+  ipcMain.handle("movies:hide", async (_e, id: string, value: boolean) => {
+    const db = getDb();
+    await db.query(`UPDATE movie:⟨${id}⟩ SET hidden = $value`, { value });
+  });
+
   ipcMain.handle(
     "movies:progress:set",
     async (_e, id: string, progress: number | null) => {
@@ -350,6 +360,11 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     await db.query(`UPDATE music_track:⟨${id}⟩ SET tags = $tags`, { tags });
   });
 
+  ipcMain.handle("music:hide", async (_e, id: string, value: boolean) => {
+    const db = getDb();
+    await db.query(`UPDATE music_track:⟨${id}⟩ SET hidden = $value`, { value });
+  });
+
   ipcMain.handle("music:searchCoverArt", async (_e, track: MusicTrack) => {
     const imageUrl = await searchCoverArt(
       track.artist ?? "",
@@ -431,6 +446,11 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     await db.query(`UPDATE tv_show:⟨${id}⟩ SET tags = $tags`, { tags });
   });
 
+  ipcMain.handle("tv:hide", async (_e, id: string, value: boolean) => {
+    const db = getDb();
+    await db.query(`UPDATE tv_show:⟨${id}⟩ SET hidden = $value`, { value });
+  });
+
   ipcMain.handle("tv:metadata", async (_e, title: string) => {
     const settings = await getSettings();
     return await searchShow(title, settings.tmdbApiKey);
@@ -498,5 +518,13 @@ export function registerIpcHandlers(window: BrowserWindow): void {
       properties: ["openDirectory"],
     });
     return canceled ? null : filePaths[0];
+  });
+
+  ipcMain.handle("shell:openPath", async (_e, path: string) => {
+    return shell.openPath(path);
+  });
+
+  ipcMain.handle("shell:showItemInFolder", async (_e, path: string) => {
+    shell.showItemInFolder(path);
   });
 }

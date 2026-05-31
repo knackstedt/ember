@@ -15,6 +15,8 @@ import { OskInput } from "../../components/OnScreenKeyboard/OnScreenKeyboard";
 import { RecentlyPlayedRow } from "../../components/RecentlyPlayedRow/RecentlyPlayedRow";
 import { Game, GamePlatform } from "../../../../shared/types";
 import { useGridFocus } from "../../hooks/useGridFocus";
+import { useContextMenu } from "../../hooks/useContextMenu";
+import { ContextMenuOption } from "../../components/ContextMenu/ContextMenu";
 
 const PLATFORM_FILTERS: ChipFilter<
   GamePlatform | "all" | "couch-coop" | "favorites"
@@ -68,6 +70,7 @@ export const GamingTab: React.FC = () => {
     filtered,
     toggleFavorite,
     setTags,
+    hide,
   } = useGamesStore();
   const [selected, setSelected] = useState<Game | null>(null);
   const [columnCount, setColumnCount] = useState(6);
@@ -91,6 +94,58 @@ export const GamingTab: React.FC = () => {
     onConfirm: (game) => setSelected(game),
     enabled: !selected,
   });
+
+  const { menu, bindItem } = useContextMenu({
+    items,
+    focusedIndex,
+    getOptions: (game): ContextMenuOption[] => {
+      const opts: ContextMenuOption[] = [
+        {
+          id: "favorite",
+          label: game.isFavorite ? "Unfavorite" : "Favorite",
+          icon: game.isFavorite ? "★" : "☆",
+        },
+        { id: "hide", label: "Hide", icon: "🙈", destructive: true },
+        { id: "tags", label: "Update metadata / tags", icon: "🏷" },
+        { id: "controls", label: "Customize Input controls", icon: "🎮" },
+        {
+          id: "folder",
+          label: "Open containing folder",
+          icon: "📂",
+          disabled: !game.execPath && !game.romPath,
+        },
+      ];
+      return opts;
+    },
+    onAction: (game, optionId) => {
+      switch (optionId) {
+        case "favorite":
+          toggleFavorite(game.id);
+          break;
+        case "hide":
+          hide(game.id);
+          break;
+        case "tags":
+          setSelected(game);
+          break;
+        case "controls":
+          window.dispatchEvent(
+            new CustomEvent("htpc:switch-tab", {
+              detail: { tab: "controllers" },
+            }),
+          );
+          break;
+        case "folder": {
+          const path = game.execPath || game.romPath;
+          if (path) {
+            void window.htpc.shell.showItemInFolder(path);
+          }
+          break;
+        }
+      }
+    },
+  });
+
   const badge = selected ? gameBadge(selected) : undefined;
 
   const launch = (game: Game): void => {
@@ -186,7 +241,7 @@ export const GamingTab: React.FC = () => {
             renderItem={(game, index) => {
               const b = gameBadge(game);
               return (
-                <div className="p-1.5 w-full h-full flex flex-col min-w-0">
+                <div className="p-1.5 w-full h-full flex flex-col min-w-0" {...bindItem(game, index)}>
                   <GameCard
                     key={game.id}
                     id={game.id}
@@ -302,6 +357,7 @@ export const GamingTab: React.FC = () => {
           </div>
         )}
       </DetailPanel>
+      {menu}
     </div>
   );
 };

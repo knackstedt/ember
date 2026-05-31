@@ -58,6 +58,7 @@ export interface Game {
   lastPlayed?: number;
   playTime?: number;
   rating?: number;
+  hidden?: boolean;
 }
 
 export interface Movie {
@@ -79,6 +80,7 @@ export interface Movie {
   lastPlayed?: number;
   rating?: number;
   watchProgress?: number;
+  hidden?: boolean;
 }
 
 export interface MusicTrack {
@@ -95,6 +97,7 @@ export interface MusicTrack {
   mbid?: string;
   isFavorite?: boolean;
   tags?: string[];
+  hidden?: boolean;
 }
 
 export interface TVShow {
@@ -112,6 +115,7 @@ export interface TVShow {
   isFavorite?: boolean;
   tags?: string[];
   rating?: number;
+  hidden?: boolean;
 }
 
 export interface TVSeason {
@@ -248,4 +252,10 @@ export type IpcChannel =
   | "input:event"
   | "app:fullscreen"
   | "app:quit"
-  | "app:xdg-defaults";
+  | "app:xdg-defaults"
+  | "games:hide"
+  | "movies:hide"
+  | "music:hide"
+  | "tv:hide"
+  | "shell:openPath"
+  | "shell:showItemInFolder";
