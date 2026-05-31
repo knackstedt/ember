@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, statSync, mkdirSync } from 'fs'
+import { existsSync, readdirSync, statSync, mkdirSync, unlinkSync } from 'fs'
 import { join, extname, basename } from 'path'
 import { createHash } from 'crypto'
 import { exec } from 'child_process'
@@ -17,6 +17,21 @@ const TV_PATTERN = /[Ss](\d+)[Ee](\d+)/
 
 const movieThumbCache = join(app.getPath('userData'), 'thumbnails', 'movies')
 mkdirSync(movieThumbCache, { recursive: true })
+
+let ffmpegAvailable: boolean | undefined
+
+export async function checkFfmpeg(): Promise<boolean> {
+  if (ffmpegAvailable !== undefined) return ffmpegAvailable
+  try {
+    await execAsync('ffmpeg -version', { timeout: 5000 })
+    console.log('[video.scanner] ffmpeg is available')
+    ffmpegAvailable = true
+  } catch {
+    console.warn('[video.scanner] ffmpeg NOT found in PATH — thumbnails will not be generated')
+    ffmpegAvailable = false
+  }
+  return ffmpegAvailable
+}
 
 interface FfprobeStream {
   codec_type: string
@@ -37,9 +52,11 @@ async function probVideo(filePath: string): Promise<{
   codec?: string
   title?: string
 } | null> {
+  if (!(await checkFfmpeg())) return null
   try {
     const { stdout } = await execAsync(
-      `ffprobe -v quiet -print_format json -show_streams -show_format "${filePath.replace(/"/g, '\\"')}"`
+      `ffprobe -v quiet -print_format json -show_streams -show_format "${filePath.replace(/"/g, '\\"')}"`,
+      { timeout: 30000 }
     )
     const data: FfprobeData = JSON.parse(stdout)
     const video = data.streams?.find((s) => s.codec_type === 'video' && s.disposition?.attached_pic !== 1)
@@ -49,32 +66,40 @@ async function probVideo(filePath: string): Promise<{
       codec: video?.codec_name,
       title: data.format?.tags?.title
     }
-  } catch {
+  } catch (err) {
+    console.error('[video.scanner] ffprobe failed for', filePath, err)
     return null
   }
 }
 
 async function extractEmbeddedVideoCover(filePath: string, dest: string): Promise<boolean> {
+  if (!(await checkFfmpeg())) return false
   try {
     const { stdout } = await execAsync(
-      `ffprobe -v quiet -select_streams v -show_entries stream_disposition=attached_pic -of json "${filePath.replace(/"/g, '\\"')}"`
+      `ffprobe -v quiet -select_streams v -show_entries stream_disposition=attached_pic -of json "${filePath.replace(/"/g, '\\"')}"`,
+      { timeout: 30000 }
     )
     const data = JSON.parse(stdout)
     const streams = data.streams || []
     const picIndex = streams.findIndex((s: any) => s.disposition?.attached_pic === 1)
     if (picIndex >= 0) {
       await execAsync(
-        `ffmpeg -i "${filePath.replace(/"/g, '\\"')}" -map 0:v:${picIndex} -frames:v 1 -q:v 2 -y "${dest}"`
+        `ffmpeg -i "${filePath.replace(/"/g, '\\"')}" -map 0:v:${picIndex} -frames:v 1 -q:v 2 -y "${dest}"`,
+        { timeout: 30000 }
       )
-      return existsSync(dest)
+      if (existsSync(dest) && statSync(dest).size > 0) return true
+      try { unlinkSync(dest) } catch { /* ignore */ }
+      return false
     }
     return false
-  } catch {
+  } catch (err) {
+    console.error('[video.scanner] extractEmbeddedVideoCover failed for', filePath, err)
     return false
   }
 }
 
 async function generateFrameThumbnail(filePath: string, dest: string, duration?: number): Promise<boolean> {
+  if (!(await checkFfmpeg())) return false
   try {
     let seekSec = 30
     if (duration && duration > 0) {
@@ -85,10 +110,14 @@ async function generateFrameThumbnail(filePath: string, dest: string, duration?:
     const ss = String(seekSec % 60).padStart(2, '0')
     const seek = `${hh}:${mm}:${ss}`
     await execAsync(
-      `ffmpeg -ss ${seek} -i "${filePath.replace(/"/g, '\\"')}" -frames:v 1 -q:v 2 -vf "scale=480:-1" -y "${dest}"`
+      `ffmpeg -ss ${seek} -i "${filePath.replace(/"/g, '\\"')}" -frames:v 1 -q:v 2 -vf "scale=480:-1" -y "${dest}"`,
+      { timeout: 30000 }
     )
-    return existsSync(dest)
-  } catch {
+    if (existsSync(dest) && statSync(dest).size > 0) return true
+    try { unlinkSync(dest) } catch { /* ignore */ }
+    return false
+  } catch (err) {
+    console.error('[video.scanner] generateFrameThumbnail failed for', filePath, err)
     return false
   }
 }
@@ -96,16 +125,20 @@ async function generateFrameThumbnail(filePath: string, dest: string, duration?:
 async function generateMovieThumbnail(filePath: string, id: string, duration?: number): Promise<string | undefined> {
   const dest = join(movieThumbCache, `${id}.jpg`)
   if (existsSync(dest)) {
-    return `file://${dest}`
+    try {
+      if (statSync(dest).size > 0) return `htpc-thumb://movies/${id}.jpg`
+      unlinkSync(dest)
+    } catch { /* ignore */ }
   }
   const hasEmbedded = await extractEmbeddedVideoCover(filePath, dest)
   if (hasEmbedded) {
-    return `file://${dest}`
+    return `htpc-thumb://movies/${id}.jpg`
   }
   const generated = await generateFrameThumbnail(filePath, dest, duration)
   if (generated) {
-    return `file://${dest}`
+    return `htpc-thumb://movies/${id}.jpg`
   }
+  console.warn('[video.scanner] No thumbnail generated for', filePath)
   return undefined
 }
 
@@ -135,36 +168,48 @@ function isTvEpisode(filePath: string): boolean {
   return TV_PATTERN.test(basename(filePath))
 }
 
-export async function scanMovieFiles(extraPaths: string[] = []): Promise<Movie[]> {
+export async function scanMovieFiles(
+  extraPaths: string[] = [],
+  onProgress?: (current: number, total: number) => void
+): Promise<Movie[]> {
   const roots = [getXdgVideosDir(), ...extraPaths].filter(existsSync)
   const allFiles: string[] = []
   for (const root of roots) walkDir(root, allFiles)
 
   const movies: Movie[] = []
+  const total = allFiles.length
 
-  for (const filePath of allFiles) {
+  for (let i = 0; i < allFiles.length; i++) {
+    const filePath = allFiles[i]
+    onProgress?.(i, total)
+
     if (isTvEpisode(filePath)) continue
-    const probe = await probVideo(filePath)
-    const name = basename(filePath, extname(filePath))
-      .replace(/\.\d{4}\..*$/, '')
-      .replace(/[._]/g, ' ')
-      .trim()
+    try {
+      const probe = await probVideo(filePath)
+      const name = basename(filePath, extname(filePath))
+        .replace(/\.\d{4}\..*$/, '')
+        .replace(/[._]/g, ' ')
+        .trim()
 
-    const id = createHash('md5').update(filePath).digest('hex').slice(0, 16)
-    const coverUrl = await generateMovieThumbnail(filePath, id, probe?.duration)
+      const id = createHash('md5').update(filePath).digest('hex').slice(0, 16)
+      const coverUrl = await generateMovieThumbnail(filePath, id, probe?.duration)
 
-    movies.push({
-      id,
-      title: probe?.title ?? name,
-      filePath,
-      coverUrl,
-      runtime: probe?.duration ? Math.round(probe.duration) : undefined,
-      resolution: probe?.resolution,
-      codec: probe?.codec,
-      tags: []
-    })
+      movies.push({
+        id,
+        title: probe?.title ?? name,
+        filePath,
+        coverUrl,
+        runtime: probe?.duration ? Math.round(probe.duration) : undefined,
+        resolution: probe?.resolution,
+        codec: probe?.codec,
+        tags: []
+      })
+    } catch (err) {
+      console.error('[video.scanner] Unhandled error processing file:', filePath, err)
+    }
   }
 
+  onProgress?.(total, total)
   return movies
 }
 

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell } from 'electron'
+import { app, BrowserWindow, shell, protocol } from 'electron'
 import { join } from 'path'
 import { readFileSync, writeFileSync, existsSync, unlinkSync, readlinkSync, readdirSync } from 'fs'
 import { initDb } from './db'
@@ -238,6 +238,10 @@ async function createWindow(): Promise<void> {
   }
 }
 
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'htpc-thumb', privileges: { secure: true, standard: true, supportFetchAPI: true, corsEnabled: true } }
+])
+
 app.whenReady().then(async () => {
   if (!gotTheLock) {
     console.log('[lock] Skipping window creation (no lock)')
@@ -252,6 +256,32 @@ app.whenReady().then(async () => {
   hasLock = true
 
   app.setAppUserModelId('com.htpc.app')
+
+  protocol.handle('htpc-thumb', async (request) => {
+    const url = new URL(request.url)
+    let pathname = decodeURIComponent(url.hostname + url.pathname)
+    if (pathname.startsWith('/')) pathname = pathname.slice(1)
+    if (pathname.includes('..')) {
+      return new Response('Forbidden', { status: 403 })
+    }
+    const filePath = join(app.getPath('userData'), 'thumbnails', pathname)
+    console.log('[protocol] htpc-thumb request:', request.url, '→', filePath)
+    try {
+      const data = readFileSync(filePath)
+      const ext = pathname.toLowerCase().slice(pathname.lastIndexOf('.'))
+      let contentType = 'application/octet-stream'
+      if (ext === '.jpg' || ext === '.jpeg') contentType = 'image/jpeg'
+      else if (ext === '.png') contentType = 'image/png'
+      else if (ext === '.svg') contentType = 'image/svg+xml'
+      else if (ext === '.webp') contentType = 'image/webp'
+      console.log('[protocol] serving', filePath, 'size:', data.length, 'type:', contentType)
+      return new Response(new Uint8Array(data), { headers: { 'Content-Type': contentType } })
+    } catch {
+      console.warn('[protocol] file not found:', filePath)
+      return new Response('Not Found', { status: 404 })
+    }
+  })
+
   createWindow()
 
   app.on('activate', () => {

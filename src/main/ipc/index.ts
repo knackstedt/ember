@@ -1,3 +1,4 @@
+import { join } from 'path'
 import { BrowserWindow, ipcMain, app, dialog } from 'electron'
 import { getSettings, setSettings, setSetting } from '../services/settings.service'
 import { launchGame, launchMovie, launchTrack } from '../services/launcher.service'
@@ -78,8 +79,9 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     if (scanLocks.movies) return []
     scanLocks.movies = true
     window.webContents.send('scan:progress', { scanner: 'movies', current: 0, total: 0, status: 'scanning' })
-    const movies = await scanMovieFiles(extraPaths)
-      .finally(() => { scanLocks.movies = false })
+    const movies = await scanMovieFiles(extraPaths, (current, total) => {
+      window.webContents.send('scan:progress', { scanner: 'movies', current, total, status: 'scanning' })
+    }).finally(() => { scanLocks.movies = false })
     const db = getDb()
     for (const movie of movies) {
       // Defensive: strip any field not in the schema to prevent SCHEMAFULL rejects
@@ -109,7 +111,16 @@ export function registerIpcHandlers(window: BrowserWindow): void {
   ipcMain.handle('movies:list', async () => {
     const db = getDb()
     const result = await db.query<[Movie[]]>('SELECT * FROM movie ORDER BY title ASC')
-    return result[0] ?? []
+    const movies = (result[0] ?? []) as Movie[]
+    console.log('[movies:list] returning', movies.length, 'movies, coverUrl samples:', movies.slice(0, 3).map((m) => ({ title: m.title, coverUrl: m.coverUrl })))
+    const thumbRoot = join(app.getPath('userData'), 'thumbnails').replace(/\\/g, '/')
+    return movies.map((m) => {
+      if (!m.coverUrl?.startsWith('file://')) return m
+      const pathPart = m.coverUrl.slice('file://'.length)
+      if (!pathPart.startsWith(thumbRoot)) return m
+      const rel = pathPart.slice(thumbRoot.length + 1).replace(/\\/g, '/')
+      return { ...m, coverUrl: `htpc-thumb://${rel}` }
+    })
   })
 
   ipcMain.handle('movies:launch', (_e, movie: Movie) => {
