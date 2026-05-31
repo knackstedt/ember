@@ -17,7 +17,8 @@ const COLUMN_COUNT = 6
 export const MusicTab: React.FC = () => {
   const {
     tracks, loading, searchQuery, activeArtist, activeAlbum, activeGenre, activeYear,
-    load, scan, toggleFavorite, setTags, setSearch, setArtist, setAlbum, setGenre, setYear, filtered
+    load, scan, toggleFavorite, setTags, setSearch, setArtist, setAlbum, setGenre, setYear,
+    searchCoverArt, pickCoverImage, filtered
   } = useMusicStore()
   const play = useMusicPlayerStore((s) => s.play)
   const [selected, setSelected] = useState<MusicTrack | null>(null)
@@ -131,7 +132,7 @@ export const MusicTab: React.FC = () => {
                 columnCount={COLUMN_COUNT}
                 rowHeight={240}
                 renderItem={(track, index) => (
-                  <div className="p-1.5">
+                  <div className="p-1.5 w-full h-full flex flex-col">
                     <MediaCard
                       key={track.id}
                       id={track.id}
@@ -192,6 +193,22 @@ export const MusicTab: React.FC = () => {
                 ▶ Play Album
               </motion.button>
             )}
+            <motion.button
+              className="px-4 py-2 rounded-[var(--radius-card)] text-sm"
+              style={{ background: 'var(--color-surface-raised)', color: 'var(--color-text)', border: '1px solid var(--color-border)' }}
+              onClick={() => { if (selected) searchCoverArt(selected.id) }}
+              whileTap={{ scale: 0.96 }}
+            >
+              Search Cover
+            </motion.button>
+            <motion.button
+              className="px-4 py-2 rounded-[var(--radius-card)] text-sm"
+              style={{ background: 'var(--color-surface-raised)', color: 'var(--color-text)', border: '1px solid var(--color-border)' }}
+              onClick={() => { if (selected) pickCoverImage(selected.id) }}
+              whileTap={{ scale: 0.96 }}
+            >
+              Upload Cover
+            </motion.button>
           </>
         )}
       >

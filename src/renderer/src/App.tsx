@@ -56,6 +56,9 @@ export default function App(): React.ReactElement {
     useTvStore.getState().load()
 
     useGamesStore.getState().scan()
+    useMoviesStore.getState().scan()
+    useMusicStore.getState().scan()
+    useTvStore.getState().scan()
 
     const scanToastIds = new Map<string, string>()
     const unsubScan = window.htpc.onScanProgress((p: ScanProgress) => {
@@ -243,15 +246,18 @@ export default function App(): React.ReactElement {
 
         {/* Tab content */}
         <div className="flex-1 min-h-0 relative">
-          <motion.div
-            key={activeTab}
-            className="absolute inset-0"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.15, ease: 'easeOut' }}
-          >
-            <ActiveComponent />
-          </motion.div>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              className="absolute inset-0"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.15, ease: 'easeOut' }}
+            >
+              <ActiveComponent />
+            </motion.div>
+          </AnimatePresence>
         </div>
 
         {/* Music mini-player */}

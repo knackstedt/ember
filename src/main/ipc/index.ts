@@ -2,6 +2,7 @@ import { BrowserWindow, ipcMain, app, dialog } from 'electron'
 import { getSettings, setSettings, setSetting } from '../services/settings.service'
 import { launchGame, launchMovie, launchTrack } from '../services/launcher.service'
 import { scanMusicFiles } from '../scanners/music.scanner'
+import { searchCoverArt, downloadImage, embedCoverArt, pickCoverImage } from '../services/music-cover.service'
 import { scanMovieFiles, scanTvShows } from '../scanners/video.scanner'
 import { getDb } from '../db'
 import { getProtonRating } from '../services/protondb.service'
@@ -10,7 +11,14 @@ import { searchGame } from '../services/rawg.service'
 import { searchMovie, searchShow } from '../services/tmdb.service'
 import { listPlugins, reloadPlugins } from '../plugins/loader'
 import { getConnectedDevices } from '../input/evdev'
+import { getXdgVideosDir, getXdgMusicDir } from '../scanners/xdg'
 import { Game, Movie, MusicTrack, TVShow, AppSettings } from '../../shared/types'
+
+const scanLocks = {
+  movies: false,
+  music: false,
+  tv: false
+}
 
 export function registerIpcHandlers(window: BrowserWindow): void {
   ipcMain.handle('settings:get', async () => {
@@ -67,11 +75,23 @@ export function registerIpcHandlers(window: BrowserWindow): void {
   })
 
   ipcMain.handle('movies:scan', async (_e, extraPaths?: string[]) => {
+    if (scanLocks.movies) return []
+    scanLocks.movies = true
     window.webContents.send('scan:progress', { scanner: 'movies', current: 0, total: 0, status: 'scanning' })
     const movies = await scanMovieFiles(extraPaths)
+      .finally(() => { scanLocks.movies = false })
     const db = getDb()
     for (const movie of movies) {
-      await db.query(`UPSERT movie:⟨${movie.id}⟩ CONTENT $movie`, { movie })
+      // Defensive: strip any field not in the schema to prevent SCHEMAFULL rejects
+      const { id, title, filePath, coverUrl, backdropUrl, description, genres, releaseYear, director, runtime, resolution, codec, tmdbId, isFavorite, tags, rating } = movie as any
+      const clean = { id, title, filePath, coverUrl, backdropUrl, description, genres, releaseYear, director, runtime, resolution, codec, tmdbId, isFavorite, tags, rating }
+      const defined: any = {}
+      for (const [k, v] of Object.entries(clean)) {
+        if (v !== undefined) defined[k] = v
+      }
+      if (defined.isFavorite === undefined) defined.isFavorite = false
+      if (defined.tags === undefined) defined.tags = []
+      await db.query(`UPSERT movie:⟨${defined.id}⟩ CONTENT $movie`, { movie: defined })
     }
     window.webContents.send('scan:progress', { scanner: 'movies', current: movies.length, total: movies.length, status: 'done' })
     return movies
@@ -103,12 +123,20 @@ export function registerIpcHandlers(window: BrowserWindow): void {
   })
 
   ipcMain.handle('music:scan', async (_e, extraPaths?: string[]) => {
+    if (scanLocks.music) return []
+    scanLocks.music = true
     window.webContents.send('scan:progress', { scanner: 'music', current: 0, total: 0, status: 'scanning' })
     const tracks = await scanMusicFiles(extraPaths)
+      .finally(() => { scanLocks.music = false })
     const db = getDb()
-    for (const track of tracks) {
-      await db.query(`UPSERT music_track:⟨${track.id}⟩ CONTENT $track`, { track })
+    console.log('[music:scan] inserting', tracks.length, 'tracks into DB...')
+    for (let i = 0; i < tracks.length; i++) {
+      const track = tracks[i]
+      if (i % 100 === 0) console.log(`[music:scan] db insert ${i + 1}/${tracks.length}`)
+      const clean = { ...track, isFavorite: track.isFavorite ?? false, tags: track.tags ?? [] }
+      await db.query(`UPSERT music_track:⟨${clean.id}⟩ CONTENT $track`, { track: clean })
     }
+    console.log('[music:scan] DB insert done')
     window.webContents.send('scan:progress', { scanner: 'music', current: tracks.length, total: tracks.length, status: 'done' })
     return tracks
   })
@@ -133,12 +161,30 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     await db.query(`UPDATE music_track:⟨${id}⟩ SET tags = $tags`, { tags })
   })
 
+  ipcMain.handle('music:searchCoverArt', async (_e, track: MusicTrack) => {
+    const imageUrl = await searchCoverArt(track.artist ?? '', track.album ?? '')
+    if (!imageUrl) return null
+    const imageBuffer = await downloadImage(imageUrl)
+    if (!imageBuffer) return null
+    const result = await embedCoverArt(track, imageBuffer)
+    return result ?? null
+  })
+
+  ipcMain.handle('music:pickCoverImage', async (_e, track: MusicTrack) => {
+    const result = await pickCoverImage(track)
+    return result ?? null
+  })
+
   ipcMain.handle('tv:scan', async (_e, extraPaths?: string[]) => {
+    if (scanLocks.tv) return []
+    scanLocks.tv = true
     window.webContents.send('scan:progress', { scanner: 'tv', current: 0, total: 0, status: 'scanning' })
     const shows = await scanTvShows(extraPaths)
+      .finally(() => { scanLocks.tv = false })
     const db = getDb()
     for (const show of shows) {
-      await db.query(`UPSERT tv_show:⟨${show.id}⟩ CONTENT $show`, { show })
+      const clean = { ...show, isFavorite: show.isFavorite ?? false, tags: show.tags ?? [] }
+      await db.query(`UPSERT tv_show:⟨${clean.id}⟩ CONTENT $show`, { show: clean })
     }
     window.webContents.send('scan:progress', { scanner: 'tv', current: shows.length, total: shows.length, status: 'done' })
     return shows
@@ -206,6 +252,11 @@ export function registerIpcHandlers(window: BrowserWindow): void {
   ipcMain.handle('plugins:reload', async () => {
     return await reloadPlugins()
   })
+
+  ipcMain.handle('app:xdg-defaults', () => ({
+    videosDir: getXdgVideosDir(),
+    musicDir: getXdgMusicDir()
+  }))
 
   ipcMain.handle('dialog:open-directory', async () => {
     const { canceled, filePaths } = await dialog.showOpenDialog({ properties: ['openDirectory'] })

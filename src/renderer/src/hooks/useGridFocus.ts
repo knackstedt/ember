@@ -74,7 +74,9 @@ export function useGridFocus<T>({
       if (nextIndex >= itemCount) nextIndex = itemCount - 1
       if (nextIndex === prev) return prev
 
-      gridRef.current?.scrollToItem(nextIndex)
+      if (action === 'up' || action === 'down') {
+        gridRef.current?.scrollToItem(nextIndex)
+      }
       return nextIndex
     })
   }, [columnCount, gridRef])

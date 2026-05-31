@@ -230,3 +230,4 @@ export type IpcChannel =
   | 'input:event'
   | 'app:fullscreen'
   | 'app:quit'
+  | 'app:xdg-defaults'

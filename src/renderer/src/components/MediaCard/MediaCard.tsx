@@ -51,18 +51,11 @@ export const MediaCard: React.FC<MediaCardProps> = ({
   const [imgError, setImgError] = useState(false)
   const showPlaceholder = !coverUrl || imgError
 
-  const aspectClass = {
-    '2/3': 'aspect-[2/3]',
-    '16/9': 'aspect-video',
-    '1/1': 'aspect-square'
-  }[aspectRatio]
-
   return (
     <motion.div
-      layoutId={`card-${id}`}
       className={`
         relative flex flex-col cursor-pointer select-none rounded-[var(--radius-card)]
-        overflow-hidden transition-all duration-150
+        overflow-hidden transition-all duration-150 w-full flex-1
         ${isFocused
           ? 'ring-2 ring-[var(--color-accent)] shadow-[var(--shadow-glow)]'
           : 'ring-1 ring-[var(--color-border)]'
@@ -78,7 +71,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({
       whileTap={{ scale: 0.98 }}
       onClick={onSelect}
     >
-      <div className={`relative w-full ${aspectClass} overflow-hidden`}>
+      <div className="relative w-full flex-1 min-h-0 overflow-hidden">
         {showPlaceholder ? (
           <div
             className="w-full h-full flex items-center justify-center"
@@ -134,7 +127,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({
         )}
       </div>
 
-      <div className="p-2 flex flex-col gap-0.5">
+      <div className="p-2 flex flex-col gap-0.5 flex-shrink-0">
         <span
           className="text-sm font-medium truncate"
           style={{ color: 'var(--color-text)' }}
@@ -142,14 +135,12 @@ export const MediaCard: React.FC<MediaCardProps> = ({
         >
           {title}
         </span>
-        {subtitle && (
-          <span
-            className="text-xs truncate"
-            style={{ color: 'var(--color-text-dim)' }}
-          >
-            {subtitle}
-          </span>
-        )}
+        <span
+          className={`text-xs truncate ${subtitle ? '' : 'invisible'}`}
+          style={{ color: 'var(--color-text-dim)' }}
+        >
+          {subtitle || '\u00A0'}
+        </span>
       </div>
     </motion.div>
   )

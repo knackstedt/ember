@@ -49,8 +49,14 @@ export const VirtualGrid = React.forwardRef(function VirtualGridInner<T>(
     >
       {({ rowIndex, colIndex }) => {
         const index = rowIndex * columnCount + colIndex
-        if (index >= items.length) return <div />
-        return <>{renderItem(items[index], index)}</>
+        if (index >= items.length) {
+          return <div style={{ height: rowHeight, width: '100%' }} />
+        }
+        return (
+          <div className="w-full h-full" style={{ height: rowHeight }}>
+            {renderItem(items[index], index)}
+          </div>
+        )
       }}
     </VGrid>
   )

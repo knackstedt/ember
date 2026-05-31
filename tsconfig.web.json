@@ -1,7 +1,8 @@
 {
   "include": [
     "src/renderer/src/**/*",
-    "src/shared/**/*"
+    "src/shared/**/*",
+    "src/preload/index.ts"
   ],
   "compilerOptions": {
     "composite": true,

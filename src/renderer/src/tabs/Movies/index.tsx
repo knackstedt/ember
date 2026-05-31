@@ -121,7 +121,7 @@ export const MoviesTab: React.FC = () => {
                 columnCount={COLUMN_COUNT}
                 rowHeight={300}
                 renderItem={(movie, index) => (
-                  <div className="p-1.5">
+                  <div className="p-1.5 w-full h-full flex flex-col">
                     <MediaCard
                       key={movie.id}
                       id={movie.id}

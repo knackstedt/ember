@@ -3,10 +3,35 @@ import { join } from 'path'
 import { homedir } from 'os'
 import { Game, GamePlatform } from '../../shared/types'
 
-const HEROIC_CONFIG = join(homedir(), '.config', 'heroic')
-const HEROIC_LIBRARY_GOG = join(HEROIC_CONFIG, 'gog_store', 'library.json')
-const HEROIC_LIBRARY_EPIC = join(HEROIC_CONFIG, 'store', 'library.json')
-const HEROIC_IMAGES = join(homedir(), '.cache', 'heroic', 'images')
+const HEROIC_FLATPAK_ID = 'com.heroicgameslauncher.hgl'
+
+interface HeroicPaths {
+  libraryGog: string
+  libraryEpic: string
+  imagesDir: string
+}
+
+function getHeroicPaths(): HeroicPaths[] {
+  const paths: HeroicPaths[] = []
+
+  // Native install
+  const nativeConfig = join(homedir(), '.config', 'heroic')
+  paths.push({
+    libraryGog: join(nativeConfig, 'gog_store', 'library.json'),
+    libraryEpic: join(nativeConfig, 'store', 'library.json'),
+    imagesDir: join(homedir(), '.cache', 'heroic', 'images')
+  })
+
+  // Flatpak install
+  const flatpakConfig = join(homedir(), '.var', 'app', HEROIC_FLATPAK_ID, 'config', 'heroic')
+  paths.push({
+    libraryGog: join(flatpakConfig, 'gog_store', 'library.json'),
+    libraryEpic: join(flatpakConfig, 'store', 'library.json'),
+    imagesDir: join(homedir(), '.var', 'app', HEROIC_FLATPAK_ID, 'cache', 'heroic', 'images')
+  })
+
+  return paths
+}
 
 interface HeroicGame {
   app_name: string
@@ -20,17 +45,17 @@ interface HeroicGame {
   store?: string
 }
 
-function coverFor(game: HeroicGame): string | undefined {
+function coverFor(game: HeroicGame, imagesDir: string): string | undefined {
   const paths = [
     game.art_square,
     game.art_cover,
-    join(HEROIC_IMAGES, `${game.app_name}.jpg`),
-    join(HEROIC_IMAGES, `${game.app_name}.png`)
+    join(imagesDir, `${game.app_name}.jpg`),
+    join(imagesDir, `${game.app_name}.png`)
   ].filter((p): p is string => !!p && existsSync(p))
   return paths[0] ? `file://${paths[0]}` : undefined
 }
 
-function parseLibrary(path: string, platform: GamePlatform): Game[] {
+function parseLibrary(path: string, platform: GamePlatform, imagesDir: string): Game[] {
   if (!existsSync(path)) return []
   try {
     const data = JSON.parse(readFileSync(path, 'utf-8'))
@@ -40,7 +65,7 @@ function parseLibrary(path: string, platform: GamePlatform): Game[] {
       title: g.title,
       platform,
       execPath: g.install?.executable,
-      coverUrl: coverFor(g),
+      coverUrl: coverFor(g, imagesDir),
       developer: g.developer,
       description: g.extra?.about?.longDescription,
       tags: []
@@ -51,10 +76,25 @@ function parseLibrary(path: string, platform: GamePlatform): Game[] {
 }
 
 export function scanHeroicGames(): Game[] {
-  return [
-    ...parseLibrary(HEROIC_LIBRARY_GOG, 'gog'),
-    ...parseLibrary(HEROIC_LIBRARY_EPIC, 'desktop')
-  ]
+  const seen = new Set<string>()
+  const games: Game[] = []
+
+  for (const paths of getHeroicPaths()) {
+    for (const game of parseLibrary(paths.libraryGog, 'gog', paths.imagesDir)) {
+      if (!seen.has(game.id)) {
+        seen.add(game.id)
+        games.push(game)
+      }
+    }
+    for (const game of parseLibrary(paths.libraryEpic, 'desktop', paths.imagesDir)) {
+      if (!seen.has(game.id)) {
+        seen.add(game.id)
+        games.push(game)
+      }
+    }
+  }
+
+  return games
 }
 
 const LUTRIS_GAMES_DIR = join(homedir(), '.local', 'share', 'lutris', 'games')

@@ -1,8 +1,9 @@
-import { existsSync, readdirSync, statSync } from 'fs'
+import { existsSync, readdirSync, statSync, mkdirSync } from 'fs'
 import { join, extname, basename } from 'path'
 import { createHash } from 'crypto'
 import { exec } from 'child_process'
 import { promisify } from 'util'
+import { app } from 'electron'
 import { getXdgVideosDir } from './xdg'
 import { Movie, TVShow, TVSeason, TVEpisode } from '../../shared/types'
 
@@ -14,11 +15,15 @@ const VIDEO_EXTS = new Set([
 
 const TV_PATTERN = /[Ss](\d+)[Ee](\d+)/
 
+const movieThumbCache = join(app.getPath('userData'), 'thumbnails', 'movies')
+mkdirSync(movieThumbCache, { recursive: true })
+
 interface FfprobeStream {
   codec_type: string
   codec_name: string
   width?: number
   height?: number
+  disposition?: { attached_pic?: number }
 }
 
 interface FfprobeData {
@@ -37,7 +42,7 @@ async function probVideo(filePath: string): Promise<{
       `ffprobe -v quiet -print_format json -show_streams -show_format "${filePath.replace(/"/g, '\\"')}"`
     )
     const data: FfprobeData = JSON.parse(stdout)
-    const video = data.streams?.find((s) => s.codec_type === 'video')
+    const video = data.streams?.find((s) => s.codec_type === 'video' && s.disposition?.attached_pic !== 1)
     return {
       duration: data.format?.duration ? parseFloat(data.format.duration) : undefined,
       resolution: video ? `${video.width}x${video.height}` : undefined,
@@ -47,6 +52,61 @@ async function probVideo(filePath: string): Promise<{
   } catch {
     return null
   }
+}
+
+async function extractEmbeddedVideoCover(filePath: string, dest: string): Promise<boolean> {
+  try {
+    const { stdout } = await execAsync(
+      `ffprobe -v quiet -select_streams v -show_entries stream_disposition=attached_pic -of json "${filePath.replace(/"/g, '\\"')}"`
+    )
+    const data = JSON.parse(stdout)
+    const streams = data.streams || []
+    const picIndex = streams.findIndex((s: any) => s.disposition?.attached_pic === 1)
+    if (picIndex >= 0) {
+      await execAsync(
+        `ffmpeg -i "${filePath.replace(/"/g, '\\"')}" -map 0:v:${picIndex} -frames:v 1 -q:v 2 -y "${dest}"`
+      )
+      return existsSync(dest)
+    }
+    return false
+  } catch {
+    return false
+  }
+}
+
+async function generateFrameThumbnail(filePath: string, dest: string, duration?: number): Promise<boolean> {
+  try {
+    let seekSec = 30
+    if (duration && duration > 0) {
+      seekSec = Math.max(5, Math.min(Math.round(duration * 0.1), 300))
+    }
+    const hh = String(Math.floor(seekSec / 3600)).padStart(2, '0')
+    const mm = String(Math.floor((seekSec % 3600) / 60)).padStart(2, '0')
+    const ss = String(seekSec % 60).padStart(2, '0')
+    const seek = `${hh}:${mm}:${ss}`
+    await execAsync(
+      `ffmpeg -ss ${seek} -i "${filePath.replace(/"/g, '\\"')}" -frames:v 1 -q:v 2 -vf "scale=480:-1" -y "${dest}"`
+    )
+    return existsSync(dest)
+  } catch {
+    return false
+  }
+}
+
+async function generateMovieThumbnail(filePath: string, id: string, duration?: number): Promise<string | undefined> {
+  const dest = join(movieThumbCache, `${id}.jpg`)
+  if (existsSync(dest)) {
+    return `file://${dest}`
+  }
+  const hasEmbedded = await extractEmbeddedVideoCover(filePath, dest)
+  if (hasEmbedded) {
+    return `file://${dest}`
+  }
+  const generated = await generateFrameThumbnail(filePath, dest, duration)
+  if (generated) {
+    return `file://${dest}`
+  }
+  return undefined
 }
 
 function walkDir(dir: string, results: string[]): void {
@@ -91,12 +151,14 @@ export async function scanMovieFiles(extraPaths: string[] = []): Promise<Movie[]
       .trim()
 
     const id = createHash('md5').update(filePath).digest('hex').slice(0, 16)
+    const coverUrl = await generateMovieThumbnail(filePath, id, probe?.duration)
 
     movies.push({
       id,
       title: probe?.title ?? name,
       filePath,
-      duration: probe?.duration,
+      coverUrl,
+      runtime: probe?.duration ? Math.round(probe.duration) : undefined,
       resolution: probe?.resolution,
       codec: probe?.codec,
       tags: []

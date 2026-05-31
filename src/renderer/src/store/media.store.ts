@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { Movie, MusicTrack, TVShow } from '../../../shared/types'
+import { useMusicPlayerStore } from './musicPlayer.store'
 
 interface MoviesState {
   movies: Movie[]
@@ -88,6 +89,8 @@ interface MusicState {
   setAlbum: (a: string | null) => void
   setGenre: (g: string | null) => void
   setYear: (y: number | null) => void
+  searchCoverArt: (id: string) => Promise<void>
+  pickCoverImage: (id: string) => Promise<void>
   filtered: () => MusicTrack[]
 }
 
@@ -130,6 +133,24 @@ export const useMusicStore = create<MusicState>((set, get) => ({
   setAlbum: (activeAlbum) => set({ activeAlbum }),
   setGenre: (activeGenre) => set({ activeGenre }),
   setYear: (activeYear) => set({ activeYear }),
+
+  searchCoverArt: async (id) => {
+    const track = get().tracks.find((t) => t.id === id)
+    if (!track) return
+    const url = await window.htpc.music.searchCoverArt(track)
+    if (!url) return
+    set((s) => ({ tracks: s.tracks.map((t) => (t.id === id ? { ...t, albumArtUrl: url } : t)) }))
+    useMusicPlayerStore.getState().updateTrackCover(id, url)
+  },
+
+  pickCoverImage: async (id) => {
+    const track = get().tracks.find((t) => t.id === id)
+    if (!track) return
+    const url = await window.htpc.music.pickCoverImage(track)
+    if (!url) return
+    set((s) => ({ tracks: s.tracks.map((t) => (t.id === id ? { ...t, albumArtUrl: url } : t)) }))
+    useMusicPlayerStore.getState().updateTrackCover(id, url)
+  },
 
   filtered: () => {
     const { tracks, searchQuery, activeArtist, activeAlbum, activeGenre, activeYear } = get()

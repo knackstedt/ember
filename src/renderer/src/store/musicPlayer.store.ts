@@ -19,6 +19,7 @@ export interface MusicPlayerStore {
   setVolume(v: number): void
   toggleShuffle(): void
   toggleRepeat(): void
+  updateTrackCover(id: string, url: string): void
 }
 
 const audio = new Audio()
@@ -120,6 +121,12 @@ export const useMusicPlayerStore = create<MusicPlayerStore>((set, get) => {
     toggleRepeat() {
       set((s) => ({
         repeat: s.repeat === 'none' ? 'all' : s.repeat === 'all' ? 'one' : 'none'
+      }))
+    },
+
+    updateTrackCover(id, url) {
+      set((s) => ({
+        queue: s.queue.map((t) => (t.id === id ? { ...t, albumArtUrl: url } : t))
       }))
     }
   }

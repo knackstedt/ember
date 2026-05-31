@@ -19,7 +19,9 @@ const htpc = {
 
   app: {
     setFullscreen: (value: boolean): Promise<void> => ipcRenderer.invoke('app:fullscreen', value),
-    quit: (): Promise<void> => ipcRenderer.invoke('app:quit')
+    quit: (): Promise<void> => ipcRenderer.invoke('app:quit'),
+    getXdgDefaults: (): Promise<{ videosDir: string; musicDir: string }> =>
+      ipcRenderer.invoke('app:xdg-defaults')
   },
 
   games: {
@@ -46,7 +48,9 @@ const htpc = {
     list: (): Promise<MusicTrack[]> => ipcRenderer.invoke('music:list'),
     launch: (track: MusicTrack): Promise<void> => ipcRenderer.invoke('music:launch', track),
     favorite: (id: string, value: boolean): Promise<void> => ipcRenderer.invoke('music:favorite', id, value),
-    tag: (id: string, tags: string[]): Promise<void> => ipcRenderer.invoke('music:tag', id, tags)
+    tag: (id: string, tags: string[]): Promise<void> => ipcRenderer.invoke('music:tag', id, tags),
+    searchCoverArt: (track: MusicTrack): Promise<string | null> => ipcRenderer.invoke('music:searchCoverArt', track),
+    pickCoverImage: (track: MusicTrack): Promise<string | null> => ipcRenderer.invoke('music:pickCoverImage', track)
   },
 
   tv: {
