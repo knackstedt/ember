@@ -125,7 +125,7 @@ export const MusicTab: React.FC = () => {
           {loading ? (
             <div className="flex-1 flex items-center justify-center" style={{ color: 'var(--color-text-dim)' }}>Loading music…</div>
           ) : (
-            <div className="flex-1 min-h-0">
+            <div className="flex-1 min-h-0 min-w-0 overflow-hidden">
               <VirtualGrid
                 ref={gridRef}
                 items={items}

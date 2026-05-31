@@ -76,7 +76,7 @@ export const TVShowsTab: React.FC = () => {
           </motion.button>
         </div>
       ) : (
-        <div className="flex-1 min-h-0">
+        <div className="flex-1 min-h-0 min-w-0 overflow-hidden">
           <VirtualGrid
             ref={gridRef}
             items={items}
