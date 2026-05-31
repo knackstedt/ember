@@ -53,7 +53,7 @@ export const VirtualGrid = React.forwardRef(function VirtualGridInner<T>(
           return <div style={{ height: rowHeight, width: '100%' }} />
         }
         return (
-          <div className="w-full h-full" style={{ height: rowHeight }}>
+          <div className="w-full h-full min-w-0" style={{ height: rowHeight }}>
             {renderItem(items[index], index)}
           </div>
         )

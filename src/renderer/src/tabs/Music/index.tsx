@@ -132,7 +132,7 @@ export const MusicTab: React.FC = () => {
                 columnCount={COLUMN_COUNT}
                 rowHeight={240}
                 renderItem={(track, index) => (
-                  <div className="p-1.5 w-full h-full flex flex-col">
+                  <div className="p-1.5 w-full h-full flex flex-col min-w-0">
                     <MediaCard
                       key={track.id}
                       id={track.id}

@@ -4,7 +4,7 @@
   "description": "Home Theater PC Application",
   "main": "out/main/index.js",
   "scripts": {
-    "dev": "electron-vite dev",
+    "dev": "bun run scripts/dev.ts",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "lint": "eslint src"

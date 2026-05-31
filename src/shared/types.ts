@@ -210,6 +210,7 @@ export type IpcChannel =
   | 'movies:launch'
   | 'movies:favorite'
   | 'movies:tag'
+  | 'movies:progress:set'
   | 'music:scan'
   | 'music:list'
   | 'music:launch'

@@ -40,6 +40,7 @@ const htpc = {
     launch: (movie: Movie): Promise<void> => ipcRenderer.invoke('movies:launch', movie),
     favorite: (id: string, value: boolean): Promise<void> => ipcRenderer.invoke('movies:favorite', id, value),
     tag: (id: string, tags: string[]): Promise<void> => ipcRenderer.invoke('movies:tag', id, tags),
+    setProgress: (id: string, progress: number | null): Promise<void> => ipcRenderer.invoke('movies:progress:set', id, progress),
     fetchMetadata: (title: string): Promise<unknown> => ipcRenderer.invoke('movies:metadata', title)
   },
 

@@ -95,7 +95,7 @@ export const MoviesTab: React.FC = () => {
             items={recentlyPlayed.map((m) => ({ id: m.id, title: m.title, coverUrl: m.coverUrl, subtitle: m.releaseYear ? String(m.releaseYear) : undefined }))}
             onLaunch={(id) => {
               const movie = movies.find((m) => m.id === id)
-              if (movie) openVideo(`file://${movie.filePath}`, movie.title)
+              if (movie) openVideo(`file://${movie.filePath}`, movie.title, movie.id, movie.watchProgress)
             }}
           />
 
@@ -121,7 +121,7 @@ export const MoviesTab: React.FC = () => {
                 columnCount={COLUMN_COUNT}
                 rowHeight={300}
                 renderItem={(movie, index) => (
-                  <div className="p-1.5 w-full h-full flex flex-col">
+                  <div className="p-1.5 w-full h-full flex flex-col min-w-0">
                     <MediaCard
                       key={movie.id}
                       id={movie.id}
@@ -169,7 +169,7 @@ export const MoviesTab: React.FC = () => {
             <motion.button
               className="px-6 py-2.5 rounded-[var(--radius-card)] font-semibold text-sm"
               style={{ background: 'var(--color-accent)', color: 'var(--color-bg)' }}
-              onClick={() => { openVideo(`file://${selected!.filePath}`, selected!.title); setSelected(null) }}
+              onClick={() => { openVideo(`file://${selected!.filePath}`, selected!.title, selected!.id, selected!.watchProgress); setSelected(null) }}
               whileTap={{ scale: 0.96 }}
             >
               ▶ Play

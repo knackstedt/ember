@@ -83,7 +83,7 @@ export const TVShowsTab: React.FC = () => {
             columnCount={COLUMN_COUNT}
             rowHeight={300}
             renderItem={(show, index) => (
-              <div className="p-1.5 w-full h-full flex flex-col">
+              <div className="p-1.5 w-full h-full flex flex-col min-w-0">
                 <MediaCard
                   key={show.id}
                   id={show.id}

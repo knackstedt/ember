@@ -1,6 +1,6 @@
 import { app, BrowserWindow, shell } from 'electron'
 import { join } from 'path'
-import { readFileSync, writeFileSync, existsSync, unlinkSync, readlinkSync } from 'fs'
+import { readFileSync, writeFileSync, existsSync, unlinkSync, readlinkSync, readdirSync } from 'fs'
 import { initDb } from './db'
 import { registerIpcHandlers } from './ipc'
 import { initInputSystem, destroyInputSystem } from './input/evdev'
@@ -9,6 +9,7 @@ import { getSettings } from './services/settings.service'
 const isDev = !app.isPackaged || process.env.NODE_ENV === 'development'
 
 const LOCK_FILE = join(app.getPath('userData'), 'app.lock')
+const STARTUP_DEADLINE_MS = 20000
 
 function isElectronProcess(pid: number): boolean {
   try {
@@ -16,6 +17,59 @@ function isElectronProcess(pid: number): boolean {
     return exe === process.execPath
   } catch {
     return false
+  }
+}
+
+function getProcessCmdline(pid: number): string {
+  try {
+    return readFileSync(`/proc/${pid}/cmdline`, 'utf-8').replace(/\0/g, ' ')
+  } catch {
+    return ''
+  }
+}
+
+function killProcessTree(pid: number, signal: NodeJS.Signals | number): void {
+  try {
+    const children: number[] = []
+    const entries = readdirSync('/proc')
+    for (const entry of entries) {
+      const childPid = parseInt(entry, 10)
+      if (isNaN(childPid)) continue
+      try {
+        const stat = readFileSync(`/proc/${childPid}/stat`, 'utf-8')
+        const match = stat.match(/^\d+\s+\([^)]*\)\s+\S+\s+(\d+)/)
+        if (match && parseInt(match[1], 10) === pid) {
+          children.push(childPid)
+        }
+      } catch {
+        // ignore
+      }
+    }
+    for (const cpid of children) {
+      try { process.kill(cpid, signal) } catch { /* ignore */ }
+    }
+    try { process.kill(pid, signal) } catch { /* ignore */ }
+  } catch {
+    // ignore
+  }
+}
+
+function killAllStaleElectronProcesses(): void {
+  try {
+    const entries = readdirSync('/proc')
+    for (const entry of entries) {
+      const pid = parseInt(entry, 10)
+      if (isNaN(pid) || pid === process.pid) continue
+      if (!isElectronProcess(pid)) continue
+      const cmdline = getProcessCmdline(pid)
+      const isOurApp = cmdline.includes('htpc') || cmdline.includes('out/main') || cmdline.includes('app.lock')
+      if (isOurApp) {
+        console.log(`[lock] Killing stale Electron PID ${pid}`)
+        killProcessTree(pid, 'SIGKILL')
+      }
+    }
+  } catch {
+    // ignore
   }
 }
 
@@ -51,30 +105,18 @@ function syncCleanupStaleLock(): void {
       return
     }
 
-    // Alive and is our process - kill immediately (dev reload needs speed)
-    try {
-      process.kill(pid, 'SIGKILL')
-      console.log(`[lock] Sent SIGKILL to stale process ${pid}`)
-    } catch {
-      // ignore
-    }
-
-    // Brief busy-wait so the OS reaps the PID before requestSingleInstanceLock
-    const start = Date.now()
-    while (Date.now() - start < 500) {
-      try {
-        process.kill(pid, 0)
-        // still alive
-      } catch {
-        console.log(`[lock] Stale process ${pid} reaped`)
-        break
-      }
-    }
+    // Alive and is our process - kill entire tree immediately (dev reload needs speed)
+    console.log(`[lock] Killing stale process tree for PID ${pid}`)
+    killProcessTree(pid, 'SIGKILL')
   } catch {
     // ignore
   }
 }
 
+// Dev mode: be absolutely sure no stale processes exist before we even try locking
+if (isDev) {
+  killAllStaleElectronProcesses()
+}
 syncCleanupStaleLock()
 
 const gotTheLock = app.requestSingleInstanceLock()
@@ -112,61 +154,87 @@ process.on('SIGTERM', () => {
   process.exit(0)
 })
 
-app.commandLine.appendSwitch('enable-gpu-rasterization')
-app.commandLine.appendSwitch('enable-zero-copy')
-app.commandLine.appendSwitch('enable-accelerated-video-decode')
-app.commandLine.appendSwitch('ignore-gpu-blocklist')
-app.commandLine.appendSwitch('enable-features', 'VaapiVideoDecoder,VaapiVideoEncoder')
+if (isDev) {
+  app.disableHardwareAcceleration()
+  app.commandLine.appendSwitch('disable-gpu')
+  app.commandLine.appendSwitch('disable-software-rasterizer')
+  app.commandLine.appendSwitch('no-sandbox')
+  app.commandLine.appendSwitch('disable-setuid-sandbox')
+} else {
+  app.commandLine.appendSwitch('enable-gpu-rasterization')
+  app.commandLine.appendSwitch('enable-zero-copy')
+  app.commandLine.appendSwitch('enable-accelerated-video-decode')
+  app.commandLine.appendSwitch('ignore-gpu-blocklist')
+  app.commandLine.appendSwitch('enable-features', 'VaapiVideoDecoder,VaapiVideoEncoder')
+}
 
 let mainWindow: BrowserWindow | null = null
 
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
+    )
+  ])
+}
+
 async function createWindow(): Promise<void> {
-  await initDb()
-  const settings = await getSettings()
-
-  mainWindow = new BrowserWindow({
-    width: 1280,
-    height: 720,
-    show: false,
-    fullscreen: settings.fullscreen ?? false,
-    backgroundColor: '#000000',
-    frame: !settings.fullscreen,
-    titleBarStyle: settings.fullscreen ? 'hidden' : 'default',
-    autoHideMenuBar: true,
-    webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
-      sandbox: false,
-      webviewTag: true,
-      contextIsolation: true,
-      nodeIntegration: false
-    }
-  })
-
-  mainWindow.on('ready-to-show', () => {
-    mainWindow?.show()
-  })
-
-  mainWindow.webContents.setWindowOpenHandler((details) => {
-    shell.openExternal(details.url)
-    return { action: 'deny' }
-  })
-
-  registerIpcHandlers(mainWindow)
+  const startupDeadline = setTimeout(() => {
+    console.error(`[startup] FATAL: Window creation exceeded ${STARTUP_DEADLINE_MS}ms. Aborting.`)
+    process.exit(1)
+  }, STARTUP_DEADLINE_MS)
 
   try {
-    await initInputSystem(mainWindow)
-  } catch (err) {
-    console.warn('[input] evdev init failed (user may not be in input group):', err)
-  }
+    await withTimeout(initDb(), 8000, 'initDb')
+    const settings = await withTimeout(getSettings(), 3000, 'getSettings')
 
-  if (isDev && process.env['ELECTRON_RENDERER_URL']) {
-    mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
-  } else {
-    mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
-  }
+    mainWindow = new BrowserWindow({
+      width: 1280,
+      height: 720,
+      show: false,
+      fullscreen: settings.fullscreen ?? false,
+      backgroundColor: '#000000',
+      frame: !settings.fullscreen,
+      titleBarStyle: settings.fullscreen ? 'hidden' : 'default',
+      autoHideMenuBar: true,
+      webPreferences: {
+        preload: join(__dirname, '../preload/index.js'),
+        sandbox: false,
+        webviewTag: true,
+        contextIsolation: true,
+        nodeIntegration: false
+      }
+    })
 
-  if (isDev) {
-    mainWindow.webContents.openDevTools({ mode: 'detach' })
+    mainWindow.on('ready-to-show', () => {
+      mainWindow?.show()
+    })
+
+    mainWindow.webContents.setWindowOpenHandler((details) => {
+      shell.openExternal(details.url)
+      return { action: 'deny' }
+    })
+
+    registerIpcHandlers(mainWindow)
+
+    try {
+      await withTimeout(initInputSystem(mainWindow), 5000, 'initInputSystem')
+    } catch (err) {
+      console.warn('[input] evdev init failed (user may not be in input group):', err)
+    }
+
+    if (isDev && process.env['ELECTRON_RENDERER_URL']) {
+      mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
+    } else {
+      mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
+    }
+
+    if (isDev) {
+      mainWindow.webContents.openDevTools({ mode: 'detach' })
+    }
+  } finally {
+    clearTimeout(startupDeadline)
   }
 }
 

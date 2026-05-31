@@ -91,6 +91,15 @@ export function registerIpcHandlers(window: BrowserWindow): void {
       }
       if (defined.isFavorite === undefined) defined.isFavorite = false
       if (defined.tags === undefined) defined.tags = []
+      // Preserve existing playback progress and lastPlayed
+      const existing = await db.query(`SELECT watchProgress, lastPlayed FROM movie:⟨${defined.id}⟩`)
+      const existingRecord = existing[0]?.[0]
+      if (existingRecord?.watchProgress !== undefined && existingRecord?.watchProgress !== null) {
+        defined.watchProgress = existingRecord.watchProgress
+      }
+      if (existingRecord?.lastPlayed !== undefined && existingRecord?.lastPlayed !== null) {
+        defined.lastPlayed = existingRecord.lastPlayed
+      }
       await db.query(`UPSERT movie:⟨${defined.id}⟩ CONTENT $movie`, { movie: defined })
     }
     window.webContents.send('scan:progress', { scanner: 'movies', current: movies.length, total: movies.length, status: 'done' })
@@ -115,6 +124,16 @@ export function registerIpcHandlers(window: BrowserWindow): void {
   ipcMain.handle('movies:tag', async (_e, id: string, tags: string[]) => {
     const db = getDb()
     await db.query(`UPDATE movie:⟨${id}⟩ SET tags = $tags`, { tags })
+  })
+
+  ipcMain.handle('movies:progress:set', async (_e, id: string, progress: number | null) => {
+    const db = getDb()
+    const now = Date.now()
+    if (progress === null || progress === undefined) {
+      await db.query(`UPDATE movie:⟨${id}⟩ SET watchProgress = NONE, lastPlayed = $now`, { now })
+    } else {
+      await db.query(`UPDATE movie:⟨${id}⟩ SET watchProgress = $progress, lastPlayed = $now`, { progress, now })
+    }
   })
 
   ipcMain.handle('movies:metadata', async (_e, title: string) => {

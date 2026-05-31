@@ -17,6 +17,7 @@ interface MoviesState {
   setGenre: (g: string | null) => void
   setYear: (y: number | null) => void
   toggleFavoritesFilter: () => void
+  updateProgress: (id: string, progress: number | null) => void
   filtered: () => Movie[]
 }
 
@@ -57,6 +58,16 @@ export const useMoviesStore = create<MoviesState>((set, get) => ({
   setGenre: (activeGenre) => set({ activeGenre }),
   setYear: (activeYear) => set({ activeYear }),
   toggleFavoritesFilter: () => set((s) => ({ showFavoritesOnly: !s.showFavoritesOnly })),
+
+  updateProgress: (id, progress) => {
+    set((s) => ({
+      movies: s.movies.map((m) =>
+        m.id === id
+          ? { ...m, watchProgress: progress ?? undefined, lastPlayed: Date.now() }
+          : m
+      )
+    }))
+  },
 
   filtered: () => {
     const { movies, searchQuery, activeGenre, activeYear, showFavoritesOnly } = get()

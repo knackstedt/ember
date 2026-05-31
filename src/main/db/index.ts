@@ -6,6 +6,33 @@ import { mkdirSync } from 'fs'
 type Surreal = any
 let db: Surreal | null = null
 
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`DB operation timed out after ${ms}ms`)), ms)
+    )
+  ])
+}
+
+async function connectWithRetry(instance: Surreal, url: string, retries = 1): Promise<void> {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      await withTimeout(instance.connect(url), 6000)
+      return
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      if (attempt < retries) {
+        console.warn(`[db] Connect attempt ${attempt + 1} failed (${msg}), retrying...`)
+        // SurrealKV may hold a file lock briefly after a crash; wait before retry
+        await new Promise(r => setTimeout(r, 800))
+      } else {
+        throw err
+      }
+    }
+  }
+}
+
 export async function initDb(): Promise<Surreal> {
   if (db) return db
 
@@ -17,10 +44,10 @@ export async function initDb(): Promise<Surreal> {
     import('@surrealdb/node')
   ])
   db = new Surreal({ engines: createNodeEngines() })
-  await db.connect(`surrealkv://${join(dataDir, 'htpc.db')}`)
-  await db.use({ namespace: 'htpc', database: 'main' })
+  await connectWithRetry(db, `surrealkv://${join(dataDir, 'htpc.db')}`, 1)
+  await withTimeout(db.use({ namespace: 'htpc', database: 'main' }), 5000)
 
-  await runMigrations(db)
+  await withTimeout(runMigrations(db), 8000)
   return db
 }
 
@@ -76,6 +103,8 @@ async function runMigrations(db: Surreal): Promise<void> {
     DEFINE FIELD IF NOT EXISTS isFavorite ON movie TYPE bool DEFAULT false;
     DEFINE FIELD IF NOT EXISTS tags ON movie TYPE array<string> DEFAULT [];
     DEFINE FIELD IF NOT EXISTS rating ON movie TYPE option<float>;
+    DEFINE FIELD IF NOT EXISTS watchProgress ON movie TYPE option<float>;
+    DEFINE FIELD IF NOT EXISTS lastPlayed ON movie TYPE option<int>;
 
     DEFINE TABLE IF NOT EXISTS music_track SCHEMAFULL;
     DEFINE FIELD IF NOT EXISTS id ON music_track TYPE string;

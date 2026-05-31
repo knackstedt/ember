@@ -24,14 +24,13 @@ const activeDevices = new Map<string, { device: unknown; close: () => void }>()
 const ABS_AXIS_MAP: Record<number, string> = {
   0: 'left_x',
   1: 'left_y',
-  2: 'right_x',
+  2: 'left_trigger',
   3: 'right_z',
   4: 'right_y',
   16: 'dpad_x',
   17: 'dpad_y',
   40: 'right_z',
-  5: 'right_trigger',
-  2: 'left_trigger'
+  5: 'right_trigger'
 }
 
 const BTN_MAP: Record<number, string> = {
@@ -214,6 +213,15 @@ async function openDevice(
   }
 }
 
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
+    )
+  ])
+}
+
 export async function initInputSystem(window: BrowserWindow): Promise<void> {
   if (!existsSync(INPUT_DIR)) {
     console.warn('[evdev] /dev/input not available')
@@ -234,8 +242,12 @@ export async function initInputSystem(window: BrowserWindow): Promise<void> {
 
     for (const device of eventDevices) {
       if (!activeDevices.has(device)) {
-        const handle = await openDevice(device, window)
-        if (handle) activeDevices.set(device, handle)
+        try {
+          const handle = await withTimeout(openDevice(device, window), 2000, `openDevice(${device})`)
+          if (handle) activeDevices.set(device, handle)
+        } catch (err) {
+          console.warn(`[evdev] Skipping ${device} due to timeout/error:`, err)
+        }
       }
     }
 
@@ -247,8 +259,14 @@ export async function initInputSystem(window: BrowserWindow): Promise<void> {
     }
   }
 
-  await scanDevices()
-  watcher = setInterval(scanDevices, 3000)
+  try {
+    await withTimeout(scanDevices(), 5000, 'scanDevices')
+    watcher = setInterval(() => {
+      scanDevices().catch((err) => console.warn('[evdev] scanDevices error:', err))
+    }, 3000)
+  } catch (err) {
+    console.warn('[evdev] Initial device scan timed out:', err)
+  }
 }
 
 export async function destroyInputSystem(): Promise<void> {

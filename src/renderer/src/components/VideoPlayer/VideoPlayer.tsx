@@ -2,8 +2,11 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useVideoPlayerStore } from '../../store/videoPlayer.store'
 import { useInputStore } from '../../store/input.store'
+import { shouldClearProgress } from '../../../../shared/progress'
+import { useMoviesStore } from '../../store/media.store'
 
 const INACTIVITY_MS = 3000
+const PROGRESS_SAVE_INTERVAL_MS = 15000
 
 function fmt(s: number): string {
   if (!isFinite(s) || isNaN(s) || s < 0) return '0:00'
@@ -20,12 +23,15 @@ function deriveSubtitleUrls(videoSrc: string): string[] {
 }
 
 export const VideoPlayer: React.FC = () => {
-  const { src, title, close } = useVideoPlayerStore()
+  const { src, title, movieId, watchProgress, close } = useVideoPlayerStore()
+  const updateMovieProgress = useMoviesStore((s) => s.updateProgress)
   const lastEvent = useInputStore((s) => s.lastEvent)
 
   const videoRef = useRef<HTMLVideoElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const inactivityTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const progressSaveTimer = useRef<ReturnType<typeof setInterval> | null>(null)
+  const hasResumed = useRef(false)
 
   const [playing, setPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
@@ -63,7 +69,18 @@ export const VideoPlayer: React.FC = () => {
       setCurrentTime(v.currentTime)
       if (v.buffered.length > 0) setBuffered(v.buffered.end(v.buffered.length - 1))
     }
-    const onDuration = (): void => setDuration(isFinite(v.duration) ? v.duration : 0)
+    const onDuration = (): void => {
+      const dur = isFinite(v.duration) ? v.duration : 0
+      setDuration(dur)
+      // Resume from saved progress once when duration is known
+      if (!hasResumed.current && movieId && watchProgress != null && dur > 0) {
+        const target = watchProgress * dur
+        if (target > 0 && target < dur - 1) {
+          v.currentTime = target
+        }
+        hasResumed.current = true
+      }
+    }
     const onTracksChange = (): void => {
       const tracks = Array.from(v.textTracks)
       setSubtitleTracks(tracks)
@@ -80,7 +97,7 @@ export const VideoPlayer: React.FC = () => {
       v.removeEventListener('durationchange', onDuration)
       v.textTracks.removeEventListener('change', onTracksChange)
     }
-  }, [src])
+  }, [src, movieId, watchProgress])
 
   useEffect(() => {
     const onFs = (): void => setIsFullscreen(!!document.fullscreenElement)
@@ -90,6 +107,7 @@ export const VideoPlayer: React.FC = () => {
 
   useEffect(() => {
     if (!src) return
+    hasResumed.current = false
     const v = videoRef.current
     if (!v) return
     v.src = src
@@ -100,7 +118,36 @@ export const VideoPlayer: React.FC = () => {
     setBuffered(0)
     setPlaying(false)
     setActiveSubtitle(-1)
-  }, [src])
+    // Periodic progress save
+    if (progressSaveTimer.current) clearInterval(progressSaveTimer.current)
+    progressSaveTimer.current = setInterval(() => {
+      if (movieId && v.duration > 0 && isFinite(v.duration)) {
+        const pct = v.currentTime / v.duration
+        void window.htpc.movies.setProgress(movieId, pct)
+        updateMovieProgress(movieId, pct)
+      }
+    }, PROGRESS_SAVE_INTERVAL_MS)
+    return () => {
+      if (progressSaveTimer.current) clearInterval(progressSaveTimer.current)
+    }
+  }, [src, movieId, updateMovieProgress])
+
+  const handleClose = useCallback(async () => {
+    const v = videoRef.current
+    if (movieId && v && v.duration > 0 && isFinite(v.duration)) {
+      const current = v.currentTime
+      const dur = v.duration
+      if (shouldClearProgress(current, dur)) {
+        await window.htpc.movies.setProgress(movieId, null)
+        updateMovieProgress(movieId, null)
+      } else {
+        const pct = current / dur
+        await window.htpc.movies.setProgress(movieId, pct)
+        updateMovieProgress(movieId, pct)
+      }
+    }
+    close()
+  }, [movieId, close, updateMovieProgress])
 
   useEffect(() => {
     if (!lastEvent || !src) return
@@ -112,7 +159,7 @@ export const VideoPlayer: React.FC = () => {
     if (action === 'south') {
       playing ? v.pause() : void v.play()
     } else if (action === 'east') {
-      close()
+      handleClose()
     } else if (action === 'dpad_left') {
       v.currentTime = Math.max(0, v.currentTime - 10)
     } else if (action === 'dpad_right') {
@@ -144,7 +191,7 @@ export const VideoPlayer: React.FC = () => {
         e.preventDefault()
         v.currentTime = Math.min(v.duration || 0, v.currentTime + 10)
       } else if (e.code === 'Escape') {
-        close()
+        handleClose()
       } else if (e.code === 'KeyM') {
         v.muted = !v.muted
         setMuted(v.muted)
@@ -152,7 +199,7 @@ export const VideoPlayer: React.FC = () => {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [src, playing, close, showControls])
+  }, [src, playing, handleClose, showControls])
 
   const togglePlay = (): void => {
     const v = videoRef.current
@@ -339,7 +386,7 @@ export const VideoPlayer: React.FC = () => {
             <div className="flex items-center gap-3">
               {/* Back/close */}
               <button
-                onClick={close}
+                onClick={handleClose}
                 className="w-8 h-8 flex items-center justify-center rounded hover:bg-white/20 transition-colors text-base"
                 style={{ color: '#fff', flexShrink: 0 }}
                 aria-label="Close player"

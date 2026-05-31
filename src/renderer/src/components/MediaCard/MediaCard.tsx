@@ -55,7 +55,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({
     <motion.div
       className={`
         relative flex flex-col cursor-pointer select-none rounded-[var(--radius-card)]
-        overflow-hidden transition-all duration-150 w-full flex-1
+        overflow-hidden transition-all duration-150 w-full flex-1 min-w-0
         ${isFocused
           ? 'ring-2 ring-[var(--color-accent)] shadow-[var(--shadow-glow)]'
           : 'ring-1 ring-[var(--color-border)]'
@@ -127,7 +127,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({
         )}
       </div>
 
-      <div className="p-2 flex flex-col gap-0.5 flex-shrink-0">
+      <div className="p-2 flex flex-col gap-0.5 flex-shrink-0 min-w-0">
         <span
           className="text-sm font-medium truncate"
           style={{ color: 'var(--color-text)' }}
