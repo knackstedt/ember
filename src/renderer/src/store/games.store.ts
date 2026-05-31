@@ -14,6 +14,7 @@ interface GamesState {
   toggleFavorite: (id: string) => Promise<void>;
   setTags: (id: string, tags: string[]) => Promise<void>;
   hide: (id: string) => Promise<void>;
+  loadThumbnail: (id: string) => Promise<void>;
   filtered: () => Game[];
 }
 
@@ -71,6 +72,18 @@ export const useGamesStore = create<GamesState>((set, get) => ({
     await window.htpc.games.hide(id, true);
     set((s) => ({
       games: s.games.filter((g) => g.id !== id),
+    }));
+  },
+
+  loadThumbnail: async (id) => {
+    const game = get().games.find((g) => g.id === id);
+    if (!game || game.coverUrl || game.platform !== "flash") return;
+    const url = await window.htpc.games.loadThumbnail(game);
+    if (!url) return;
+    set((s) => ({
+      games: s.games.map((g) =>
+        g.id === id ? { ...g, coverUrl: url } : g,
+      ),
     }));
   },
 

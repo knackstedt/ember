@@ -47,6 +47,40 @@ const PROTON_COLORS: Record<string, string> = {
   borked: "#ff4444",
 };
 
+const LazyGameCard: React.FC<{
+  game: Game;
+  index: number;
+  focusedIndex: number;
+  onSelect: () => void;
+  onFavorite: () => void;
+}> = ({ game, index, focusedIndex, onSelect, onFavorite }) => {
+  const loadThumbnail = useGamesStore((s) => s.loadThumbnail);
+
+  useEffect(() => {
+    if (game.platform === "flash" && !game.coverUrl) {
+      loadThumbnail(game.id);
+    }
+  }, [game.id, game.platform, game.coverUrl, loadThumbnail]);
+
+  const b = gameBadge(game);
+  return (
+    <GameCard
+      key={game.id}
+      id={game.id}
+      title={game.title}
+      subtitle={game.developer}
+      coverUrl={game.coverUrl}
+      platform={game.platform}
+      badge={b?.label}
+      badgeColor={b?.color}
+      isFavorite={game.isFavorite}
+      isFocused={index === focusedIndex}
+      onSelect={onSelect}
+      onFavorite={onFavorite}
+    />
+  );
+};
+
 function gameBadge(game: Game): { label: string; color: string } | undefined {
   if (game.protonRating && game.protonRating !== "unknown") {
     return {
@@ -243,27 +277,17 @@ export const GamingTab: React.FC = () => {
             minItemWidth={200}
             onColumnCountChange={setColumnCount}
             rowHeight={260}
-            renderItem={(game, index) => {
-              const b = gameBadge(game);
-              return (
-                <div className="p-1.5 w-full h-full flex flex-col min-w-0" {...bindItem(game, index)}>
-                  <GameCard
-                    key={game.id}
-                    id={game.id}
-                    title={game.title}
-                    subtitle={game.developer}
-                    coverUrl={game.coverUrl}
-                    platform={game.platform}
-                    badge={b?.label}
-                    badgeColor={b?.color}
-                    isFavorite={game.isFavorite}
-                    isFocused={index === focusedIndex}
-                    onSelect={() => setSelected(game)}
-                    onFavorite={() => toggleFavorite(game.id)}
-                  />
-                </div>
-              );
-            }}
+            renderItem={(game, index) => (
+              <div className="p-1.5 w-full h-full flex flex-col min-w-0" {...bindItem(game, index)}>
+                <LazyGameCard
+                  game={game}
+                  index={index}
+                  focusedIndex={focusedIndex}
+                  onSelect={() => setSelected(game)}
+                  onFavorite={() => toggleFavorite(game.id)}
+                />
+              </div>
+            )}
           />
         </div>
       )}

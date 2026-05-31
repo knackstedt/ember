@@ -23,6 +23,7 @@ import { scanMovieFiles, scanTvShows } from "../scanners/video.scanner";
 import { getDb } from "../db";
 import { getProtonRating } from "../services/protondb.service";
 import { performGameScan } from "../services/game-scan.service";
+import { loadFlashThumbnail } from "../services/flash-thumbnail.service";
 import { searchGame } from "../services/rawg.service";
 import { searchMovie, searchShow } from "../services/tmdb.service";
 import { listPlugins, reloadPlugins } from "../plugins/loader";
@@ -107,6 +108,12 @@ export function registerIpcHandlers(window: BrowserWindow): void {
   ipcMain.handle("games:hide", async (_e, id: string, value: boolean) => {
     const db = getDb();
     await db.query(`UPDATE game:⟨${id}⟩ SET hidden = $value`, { value });
+  });
+
+  ipcMain.handle("games:loadThumbnail", async (_e, game: Game) => {
+    if (game.platform !== "flash" || !game.romPath) return null;
+    const url = await loadFlashThumbnail(game);
+    return url ?? null;
   });
 
   ipcMain.handle(

@@ -41,6 +41,8 @@ const htpc = {
       ipcRenderer.invoke("games:metadata", title, steamAppId),
     hide: (id: string, value: boolean): Promise<void> =>
       ipcRenderer.invoke("games:hide", id, value),
+    loadThumbnail: (game: Game): Promise<string | null> =>
+      ipcRenderer.invoke("games:loadThumbnail", game),
   },
 
   movies: {
