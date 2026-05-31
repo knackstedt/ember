@@ -129,6 +129,10 @@ html, body, #root {
   scrollbar-gutter: stable;
 }
 
+.gpu-scroll>div {
+  transform: translateX(var(--scroll-x, 0));
+}
+
 /* Glassmorphism panel utility */
 .glass-panel {
   background: var(--color-surface);

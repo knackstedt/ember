@@ -107,45 +107,37 @@ export const VirtualGrid = React.forwardRef(function VirtualGridInner<T>(
 
   return (
     <div ref={containerRef} className="w-full h-full relative overflow-hidden">
-      <div
+      <VGrid
+        key={effectiveColCount}
+        ref={ref}
+        className={`gpu-scroll ${className ?? ""}`}
         style={{
-          position: "absolute",
-          top: 0,
-          bottom: 0,
-          left: offset,
-          right: offset,
+          height: "100%",
+          width: "100%",
+          overflowX: "hidden",
+          // @ts-expect-error - CSS variable
+          "--scroll-x": `${offset}px`,
+          ...style,
         }}
+        item={GridCell}
+        row={Math.ceil(items.length / effectiveColCount)}
+        col={effectiveColCount}
+        cellHeight={rowHeight}
+        cellWidth={cellWidth}
+        overscan={overscan}
       >
-        <VGrid
-          key={effectiveColCount}
-          ref={ref}
-          className={`gpu-scroll ${className ?? ""}`}
-          style={{
-            height: "100%",
-            width: "100%",
-            overflowX: "hidden",
-            ...style,
-          }}
-          item={GridCell}
-          row={Math.ceil(items.length / effectiveColCount)}
-          col={effectiveColCount}
-          cellHeight={rowHeight}
-          cellWidth={cellWidth}
-          overscan={overscan}
-        >
-          {({ rowIndex, colIndex }) => {
-            const index = rowIndex * effectiveColCount + colIndex;
-            if (index >= items.length) {
-              return <div className="w-full h-full" />;
-            }
-            return (
-              <div className="w-full h-full min-w-0 overflow-hidden">
-                {renderItem(items[index], index)}
-              </div>
-            );
-          }}
-        </VGrid>
-      </div>
+        {({ rowIndex, colIndex }) => {
+          const index = rowIndex * effectiveColCount + colIndex;
+          if (index >= items.length) {
+            return <div className="w-full h-full" />;
+          }
+          return (
+            <div className="w-full h-full min-w-0 overflow-hidden">
+              {renderItem(items[index], index)}
+            </div>
+          );
+        }}
+      </VGrid>
     </div>
   );
 }) as <T>(
