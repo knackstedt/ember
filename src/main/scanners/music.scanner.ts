@@ -105,7 +105,7 @@ export async function scanMusicFiles(extraPaths: string[] = []): Promise<MusicTr
         albumArtUrl = findFolderArt(filePath, id)
       }
       if (!albumArtUrl) {
-        albumArtUrl = await generateProceduralCover(filePath, id)
+        albumArtUrl = await generateProceduralCover(filePath, id, artist, album)
       }
 
       tracks.push({

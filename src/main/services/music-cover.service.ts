@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from 'crypto'
+import { createHash } from 'crypto'
 import { readFileSync, writeFileSync, existsSync, mkdirSync, openSync, closeSync, readSync } from 'fs'
 import { join, extname, dirname, basename } from 'path'
 import { app, dialog } from 'electron'
@@ -33,7 +33,7 @@ function bytePct(b: number, min: number, max: number): number {
   return min + (b / 255) * (max - min)
 }
 
-function buildVisualizerSVG(hash: Buffer): string {
+function buildProceduralSVG(hash: Buffer): string {
   const bytes = Array.from(hash)
   const w = 512
   const h = 512
@@ -44,56 +44,56 @@ function buildVisualizerSVG(hash: Buffer): string {
   const light1 = Math.round(bytePct(bytes[3], 10, 18))
   const light2 = Math.round(bytePct(bytes[4], 14, 24))
 
-  const hueAccent1 = byteHue(bytes[5])
-  const hueAccent2 = byteHue(bytes[6])
-  const hueAccent3 = byteHue(bytes[7])
+  const hueAccent = byteHue(bytes[5])
 
   // Background gradient
   const bg = `hsl(${hueBg1}, ${sat}%, ${light1}%)`
   const bg2 = `hsl(${hueBg2}, ${sat}%, ${light2}%)`
 
-  // Central glow circle
-  const glowCx = Math.round(bytePct(bytes[8], 150, 362))
-  const glowCy = Math.round(bytePct(bytes[9], 150, 362))
-  const glowR = Math.round(bytePct(bytes[10], 120, 220))
-  const glowHue = byteHue(bytes[11])
-  const glowColor = `hsl(${glowHue}, ${sat + 10}%, ${light1 + 15}%)`
+  // Low-contrast editorial block behind everything
+  const blockHue = (hueBg1 + 160 + Math.floor(bytes[6] / 4)) % 360
+  const blockSat = Math.round(bytePct(bytes[7], 30, 55))
+  const blockLight = Math.round(bytePct(bytes[8], 28, 48))
+  const blockW = Math.round(bytePct(bytes[9], 200, 380))
+  const blockH = h
+  const blockX = bytePct(bytes[10], 0, 1) < 0.5 ? 0 : w - blockW
+  const blockColor = `hsl(${blockHue}, ${blockSat}%, ${blockLight}%)`
 
-  // Vinyl / record rings
-  const ringCx = 256
-  const ringCy = 220
-  const ringHue = byteHue(bytes[12])
-  const ringColor = `hsl(${ringHue}, ${sat}%, 55%)`
+  // Construct overlapping rectangles (replaces vinyl rings)
+  let rects = ''
+  for (let i = 0; i < 3; i++) {
+    const rw = Math.round(bytePct(bytes[(11 + i * 6) % bytes.length], 160, 360))
+    const rh = Math.round(bytePct(bytes[(12 + i * 6) % bytes.length], 120, 300))
+    const rx = Math.round(bytePct(bytes[(13 + i * 6) % bytes.length], 40, w - rw - 40))
+    const ry = Math.round(bytePct(bytes[(14 + i * 6) % bytes.length], 40, h - rh - 40))
+    const rot = Math.round(bytePct(bytes[(15 + i * 6) % bytes.length], -10, 10))
+    const rHue = (hueBg1 + Math.floor(bytes[(16 + i * 6) % bytes.length] / 8)) % 360
+    const rSat = Math.round(bytePct(bytes[(17 + i * 6) % bytes.length], 20, 40))
+    const rOp = bytePct(bytes[(18 + i * 6) % bytes.length], 0.04, 0.14).toFixed(2)
+    rects += `<rect x="${rx}" y="${ry}" width="${rw}" height="${rh}" rx="2" fill="hsl(${rHue},${rSat}%,55%)" opacity="${rOp}" transform="rotate(${rot}, ${rx + rw / 2}, ${ry + rh / 2})"/>`
+  }
 
-  // Waveform bars (bottom area)
+  // Waveform bars (bottom area) — single solid color, low contrast
   const barCount = 48
-  const barMaxH = 80
+  const barMaxH = 70
   const barW = 6
   const barGap = 4
   const barStartX = (w - barCount * (barW + barGap)) / 2 + barGap / 2
-  const barBaseY = 420
+  const barBaseY = 430
+  const barColor = `hsl(${hueAccent}, ${Math.max(10, sat - 10)}%, ${light1 + 22}%)`
 
   let bars = ''
   for (let i = 0; i < barCount; i++) {
-    const bh = Math.round(bytePct(bytes[(13 + i) % bytes.length], 10, barMaxH))
+    const bh = Math.round(bytePct(bytes[(19 + i) % bytes.length], 8, barMaxH))
     const bx = Math.round(barStartX + i * (barW + barGap))
     const by = barBaseY - bh
-    const barHue = (hueAccent1 + i * 3) % 360
-    const barColor = `hsl(${barHue}, ${sat + 15}%, ${light1 + 30}%)`
-    const opacity = bytePct(bytes[(17 + i) % bytes.length], 0.5, 0.95).toFixed(2)
+    const opacity = bytePct(bytes[(23 + i) % bytes.length], 0.25, 0.55).toFixed(2)
     bars += `<rect x="${bx}" y="${by}" width="${barW}" height="${bh}" rx="3" fill="${barColor}" opacity="${opacity}"/>`
   }
 
-  // Floating particles / dots
-  let particles = ''
-  for (let i = 0; i < 12; i++) {
-    const px = Math.round(bytePct(bytes[(20 + i * 3) % bytes.length], 40, 472))
-    const py = Math.round(bytePct(bytes[(21 + i * 3) % bytes.length], 40, 320))
-    const pr = Math.round(bytePct(bytes[(22 + i * 3) % bytes.length], 2, 8))
-    const ph = (hueAccent2 + i * 15) % 360
-    const pop = bytePct(bytes[(23 + i * 3) % bytes.length], 0.15, 0.45).toFixed(2)
-    particles += `<circle cx="${px}" cy="${py}" r="${pr}" fill="hsl(${ph}, ${sat}%, 70%)" opacity="${pop}"/>`
-  }
+  // Thin accent line
+  const lineY = Math.round(bytePct(bytes[24], 200, 380))
+  const lineHue = (hueAccent + 120) % 360
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">
@@ -109,32 +109,32 @@ function buildVisualizerSVG(hash: Buffer): string {
         <feMergeNode in="SourceGraphic"/>
       </feMerge>
     </filter>
-    <linearGradient id="barGrad" x1="0" y1="1" x2="0" y2="0">
-      <stop offset="0%" stop-color="hsl(${hueAccent1},${sat}%,35%)"/>
-      <stop offset="100%" stop-color="hsl(${hueAccent3},${sat + 10}%,60%)"/>
-    </linearGradient>
   </defs>
   <rect width="${w}" height="${h}" fill="url(#bgGrad)"/>
-  <circle cx="${glowCx}" cy="${glowCy}" r="${glowR}" fill="${glowColor}" opacity="0.25" filter="url(#glow)"/>
-  ${particles}
-  <!-- Vinyl rings -->
-  <circle cx="${ringCx}" cy="${ringCy}" r="80" fill="none" stroke="${ringColor}" stroke-width="1.5" opacity="0.35"/>
-  <circle cx="${ringCx}" cy="${ringCy}" r="62" fill="none" stroke="${ringColor}" stroke-width="1" opacity="0.25"/>
-  <circle cx="${ringCx}" cy="${ringCy}" r="44" fill="none" stroke="${ringColor}" stroke-width="0.8" opacity="0.18"/>
-  <circle cx="${ringCx}" cy="${ringCy}" r="14" fill="none" stroke="${ringColor}" stroke-width="1.2" opacity="0.4"/>
+  <!-- Editorial block -->
+  <rect x="${blockX}" y="0" width="${blockW}" height="${blockH}" fill="${blockColor}" opacity="0.18"/>
+  <!-- Construct rectangles -->
+  <g>${rects}</g>
+  <!-- Accent line -->
+  <line x1="80" y1="${lineY}" x2="432" y2="${lineY}" stroke="hsl(${lineHue},20%,50%)" stroke-width="0.5" opacity="0.25"/>
   <!-- Waveform -->
   <g>${bars}</g>
 </svg>`
 }
 
-export async function generateProceduralCover(filePath: string, id: string): Promise<string | undefined> {
+export async function generateProceduralCover(
+  filePath: string,
+  id: string,
+  artist?: string,
+  album?: string
+): Promise<string | undefined> {
   const dest = join(generatedCache, `${id}.svg`)
   if (existsSync(dest)) {
     return `htpc-thumb://covers/music/generated/${id}.svg`
   }
   try {
     const hash = hashFileHead(filePath)
-    const svg = buildVisualizerSVG(hash)
+    const svg = buildProceduralSVG(hash)
     writeFileSync(dest, svg)
     return `htpc-thumb://covers/music/generated/${id}.svg`
   } catch (err) {
