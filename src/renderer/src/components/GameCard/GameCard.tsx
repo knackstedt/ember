@@ -86,16 +86,14 @@ function generateWatermarkTile(svgString: string): Promise<string> {
     const img = new Image();
     img.onload = () => {
       const iconSize = size * 0.125;
-      // Staggered watermark layout — compressed toward center (70% of spread)
+      // Pseudo-diagonal staggered watermark layout
       const positions = [
-        [size * 0.23, size * 0.22],
-        [size * 0.54, size * 0.19],
-        [size * 0.37, size * 0.47],
-        [size * 0.65, size * 0.44],
-        [size * 0.22, size * 0.71],
-        [size * 0.51, size * 0.70],
+        [40, 48], [240, 48], [440, 48],
+        [160, 152], [360, 152],
+        [80, 256], [280, 256],
+        [200, 360], [400, 360],
+        [120, 464], [320, 464],
       ];
-
       positions.forEach(([x, y]) => {
         ctx.globalAlpha = 0.7;
         ctx.drawImage(img, x - iconSize / 2, y - iconSize / 2, iconSize, iconSize);

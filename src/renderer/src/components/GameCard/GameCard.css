@@ -146,7 +146,6 @@
   --space: 5%;
   --angle: -45deg;
   transform: translate3d(0, 0, 1px);
-  overflow: hidden;
   z-index: 3;
   background: transparent;
   background-size: cover;
@@ -239,6 +238,7 @@
 }
 
 .gc-shine::after {
+  overflow: hidden;
   background-position:
     0 var(--background-y),
     calc(var(--background-x) * 0.4) calc(var(--background-y) * 0.5),
@@ -429,11 +429,11 @@
 
 @keyframes gc-watermark-slide {
   0% {
-    mask-position: 0% 0%;
-    -webkit-mask-position: 0% 0%;
+    mask-position: 0 0;
+    -webkit-mask-position: 0 0;
   }
   100% {
-    mask-position: 100% 100%;
-    -webkit-mask-position: 100% 100%;
+    mask-position: 512px 512px;
+    -webkit-mask-position: 512px 512px;
   }
 }
