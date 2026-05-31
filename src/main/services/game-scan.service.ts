@@ -7,6 +7,8 @@ import { scanSteamGames } from "../scanners/steam.scanner";
 import { scanDolphinGames } from "../scanners/dolphin.scanner";
 import { scanDesktopGames } from "../scanners/desktop.scanner";
 import { scanHeroicGames, scanLutrisGames } from "../scanners/heroic.scanner";
+import { scanFlashGames } from "../scanners/flash.scanner";
+import { scanWindowsGames } from "../scanners/windows.scanner";
 import { Game } from "../../shared/types";
 
 function normalizeGame(game: Game): Record<string, unknown> {
@@ -16,6 +18,7 @@ function normalizeGame(game: Game): Record<string, unknown> {
   if (n.playTime === undefined) n.playTime = 0;
   if (n.rating === undefined) n.rating = 0;
   if (n.lastPlayed === undefined) n.lastPlayed = 0;
+  if (n.hidden === undefined) n.hidden = false;
   return n;
 }
 
@@ -51,7 +54,10 @@ async function scanInMainThread(
   const lutris = scanLutrisGames();
   const desktop = scanDesktopGames();
 
-  const all = [...steam, ...dolphin, ...heroic, ...lutris, ...desktop];
+  const flash = scanFlashGames();
+  const windows = scanWindowsGames();
+
+  const all = [...steam, ...dolphin, ...heroic, ...lutris, ...desktop, ...flash, ...windows];
 
   const db = getDb();
   for (const game of all) {
