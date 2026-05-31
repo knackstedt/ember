@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useSettingsStore } from "../../store/settings.store";
 import { ThemeName } from "../../../../shared/types";
 
@@ -215,6 +215,7 @@ function Toggle({
 
 export const SettingsTab: React.FC = () => {
   const { settings, update } = useSettingsStore();
+  const [clearConfirm, setClearConfirm] = useState(false);
   const [xdgDefaults, setXdgDefaults] = useState<{
     videosDir: string;
     musicDir: string;
@@ -365,6 +366,79 @@ export const SettingsTab: React.FC = () => {
             value={settings.hardwareAcceleration}
             onChange={(v) => update({ hardwareAcceleration: v })}
           />
+        </section>
+
+        <section className="flex flex-col gap-4">
+          <h2
+            className="text-lg font-semibold"
+            style={{ color: "var(--color-text)" }}
+          >
+            Danger Zone
+          </h2>
+          <p className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+            Removes all scanned games, movies, music, and TV shows from the
+            database. Your settings and file paths will be preserved.
+          </p>
+          <AnimatePresence mode="wait">
+            {clearConfirm ? (
+              <motion.div
+                key="confirm"
+                className="flex flex-col sm:flex-row gap-3 items-start sm:items-center"
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 4 }}
+              >
+                <span
+                  className="text-sm"
+                  style={{ color: "var(--color-text-dim)" }}
+                >
+                  Permanently delete all scanned data?
+                </span>
+                <div className="flex gap-2">
+                  <motion.button
+                    className="px-4 py-2 rounded-[var(--radius-card)] text-sm"
+                    style={{
+                      background: "#e05252",
+                      color: "#fff",
+                    }}
+                    onClick={async () => {
+                      await window.htpc.db.clear();
+                      await window.htpc.app.restart();
+                    }}
+                    whileTap={{ scale: 0.96 }}
+                  >
+                    Confirm
+                  </motion.button>
+                  <motion.button
+                    className="px-4 py-2 rounded-[var(--radius-card)] text-sm"
+                    style={{
+                      background: "var(--color-surface-raised)",
+                      color: "var(--color-text)",
+                      border: "1px solid var(--color-border)",
+                    }}
+                    onClick={() => setClearConfirm(false)}
+                    whileTap={{ scale: 0.96 }}
+                  >
+                    Cancel
+                  </motion.button>
+                </div>
+              </motion.div>
+            ) : (
+              <motion.button
+                key="clear"
+                className="self-start px-4 py-2 rounded-[var(--radius-card)] text-sm"
+                style={{
+                  background: "#ff444420",
+                  color: "#ff4444",
+                  border: "1px solid #ff444430",
+                }}
+                onClick={() => setClearConfirm(true)}
+                whileTap={{ scale: 0.96 }}
+              >
+                Clear All Data
+              </motion.button>
+            )}
+          </AnimatePresence>
         </section>
 
         <section className="flex flex-col gap-4">

@@ -22,6 +22,7 @@ const htpc = {
     setFullscreen: (value: boolean): Promise<void> =>
       ipcRenderer.invoke("app:fullscreen", value),
     quit: (): Promise<void> => ipcRenderer.invoke("app:quit"),
+    restart: (): Promise<void> => ipcRenderer.invoke("app:restart"),
     getXdgDefaults: (): Promise<{ videosDir: string; musicDir: string }> =>
       ipcRenderer.invoke("app:xdg-defaults"),
   },
@@ -127,6 +128,10 @@ const htpc = {
   plugins: {
     list: (): Promise<unknown[]> => ipcRenderer.invoke("plugins:list"),
     reload: (): Promise<unknown[]> => ipcRenderer.invoke("plugins:reload"),
+  },
+
+  db: {
+    clear: (): Promise<boolean> => ipcRenderer.invoke("db:clear"),
   },
 
   openDirectory: (): Promise<string | null> =>

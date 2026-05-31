@@ -13,6 +13,20 @@ function findSteamRoot(): string | null {
   return STEAM_ROOTS.find((p) => existsSync(p)) ?? null;
 }
 
+function isSteamTool(name: string): boolean {
+  // Skip Proton compatibility layers (e.g. "Proton 6.3", "Proton Experimental", "Proton - GE")
+  if (/^Proton(?:\s+|-)(?:\d+(?:\.\d+)?|Experimental|Hotfix|EasyAntiCheat|GE)/i.test(name)) return true;
+  // Skip Steam Linux Runtime variants
+  if (/Steam Linux Runtime/i.test(name)) return true;
+  // Skip Steamworks redistributables
+  if (/Steamworks/i.test(name)) return true;
+  // Skip generic runtime / SDK tools
+  if (/^Steam\s+Runtime/i.test(name)) return true;
+  // Skip Steam Friends UI
+  if (/^Friends$/i.test(name)) return true;
+  return false;
+}
+
 function parseAcf(content: string): Record<string, string> {
   const result: Record<string, string> = {};
   const matches = content.matchAll(/"(\w+)"\s+"([^"]+)"/g);
@@ -87,7 +101,9 @@ export function scanSteamGames(): Game[] {
         const content = readFileSync(join(lib, entry), "utf-8");
         const data = parseAcf(content);
         const appId = data["appid"];
-        if (!appId || !data["name"]) continue;
+        const name = data["name"];
+        if (!appId || !name) continue;
+        if (isSteamTool(name)) continue;
 
         const cover = findCover(gridDir, appId);
 

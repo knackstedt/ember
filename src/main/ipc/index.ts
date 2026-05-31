@@ -62,6 +62,16 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     app.quit();
   });
 
+  ipcMain.handle("app:restart", () => {
+    if (app.isPackaged) {
+      app.relaunch();
+      app.quit();
+    } else {
+      // In dev, electron-vite manages the process; just reload the renderer
+      window.reload();
+    }
+  });
+
   ipcMain.handle("games:scan", async (_e, extraPaths?: string[]) => {
     return performGameScan(window, extraPaths);
   });
@@ -470,6 +480,18 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     videosDir: getXdgVideosDir(),
     musicDir: getXdgMusicDir(),
   }));
+
+  ipcMain.handle("db:clear", async () => {
+    const db = getDb();
+    await db.query(`
+      DELETE FROM game;
+      DELETE FROM movie;
+      DELETE FROM music_track;
+      DELETE FROM tv_show;
+      DELETE FROM controller_mapping;
+    `);
+    return true;
+  });
 
   ipcMain.handle("dialog:open-directory", async () => {
     const { canceled, filePaths } = await dialog.showOpenDialog({
