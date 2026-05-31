@@ -71,7 +71,12 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     const result = await db.query<[Game[]]>(
       "SELECT * FROM game ORDER BY title ASC",
     );
-    return result[0] ?? [];
+    const games = (result[0] ?? []) as Game[];
+    return games.map((g) => {
+      const id =
+        typeof g.id === "string" ? g.id : ((g.id as any)?.id ?? String(g.id));
+      return { ...g, id };
+    });
   });
 
   ipcMain.handle("games:launch", (_e, game: Game) => {
@@ -211,11 +216,14 @@ export function registerIpcHandlers(window: BrowserWindow): void {
       "/",
     );
     return movies.map((m) => {
-      if (!m.coverUrl?.startsWith("file://")) return m;
-      const pathPart = m.coverUrl.slice("file://".length);
-      if (!pathPart.startsWith(thumbRoot)) return m;
+      const id =
+        typeof m.id === "string" ? m.id : ((m.id as any)?.id ?? String(m.id));
+      const normalized = { ...m, id };
+      if (!normalized.coverUrl?.startsWith("file://")) return normalized;
+      const pathPart = normalized.coverUrl.slice("file://".length);
+      if (!pathPart.startsWith(thumbRoot)) return normalized;
       const rel = pathPart.slice(thumbRoot.length + 1).replace(/\\/g, "/");
-      return { ...m, coverUrl: `htpc-thumb://thumbnails/${rel}` };
+      return { ...normalized, coverUrl: `htpc-thumb://thumbnails/${rel}` };
     });
   });
 
@@ -391,7 +399,12 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     const result = await db.query<[TVShow[]]>(
       "SELECT * FROM tv_show ORDER BY title ASC",
     );
-    return result[0] ?? [];
+    const shows = (result[0] ?? []) as TVShow[];
+    return shows.map((s) => {
+      const id =
+        typeof s.id === "string" ? s.id : ((s.id as any)?.id ?? String(s.id));
+      return { ...s, id };
+    });
   });
 
   ipcMain.handle("tv:launch", (_e, filePath: string) => {

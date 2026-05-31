@@ -60,18 +60,17 @@ export const MediaCard: React.FC<MediaCardProps> = ({
   return (
     <motion.div
       className={`
-        relative flex flex-col cursor-pointer select-none rounded-[var(--radius-card)]
-        overflow-hidden transition-all duration-150 w-full flex-1 min-w-0
+        relative flex flex-col cursor-pointer select-none rounded-card
+        overflow-hidden flex-1
         ${
           isFocused
-            ? "ring-2 ring-[var(--color-accent)] shadow-[var(--shadow-glow)]"
-            : "ring-1 ring-[var(--color-border)]"
+            ? "ring-2 ring-accent shadow-glow"
+            : "ring-1 ring-border"
         }
-        hover:ring-2 hover:ring-[var(--color-accent)] hover:shadow-[var(--shadow-glow)]
+        hover:ring-2 hover:ring-accent hover:shadow-glow
       `}
       style={{
         backgroundColor: "var(--color-surface)",
-        contain: "layout style paint",
         willChange: "transform",
       }}
       whileHover={{ scale: 1.03, y: -2 }}

@@ -186,10 +186,7 @@ export const GamingTab: React.FC = () => {
             renderItem={(game, index) => {
               const b = gameBadge(game);
               return (
-                <div
-                  className="p-1.5 w-full h-full flex flex-col min-w-0"
-                  style={{ contain: "layout style paint" }}
-                >
+                <div className="p-1.5 w-full h-full flex flex-col min-w-0">
                   <MediaCard
                     key={game.id}
                     id={game.id}

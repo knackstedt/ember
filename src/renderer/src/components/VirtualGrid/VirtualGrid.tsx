@@ -115,6 +115,8 @@ export const VirtualGrid = React.forwardRef(function VirtualGridInner<T>(
           height: "100%",
           width: "100%",
           overflowX: "hidden",
+          paddingTop: 8,
+          paddingBottom: 8,
           // @ts-expect-error - CSS variable
           "--scroll-x": `${offset}px`,
           ...style,
@@ -132,7 +134,7 @@ export const VirtualGrid = React.forwardRef(function VirtualGridInner<T>(
             return <div className="w-full h-full" />;
           }
           return (
-            <div className="w-full h-full min-w-0 overflow-hidden">
+            <div className="w-full h-full min-w-0">
               {renderItem(items[index], index)}
             </div>
           );
