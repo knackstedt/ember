@@ -18,6 +18,7 @@ import { useGridFocus } from "../../hooks/useGridFocus";
 import { useContextMenu } from "../../hooks/useContextMenu";
 import { ContextMenuOption } from "../../components/ContextMenu/ContextMenu";
 import { useFlashPlayerStore } from "../../store/flashPlayer.store";
+import { useToastStore } from "../../store/toast.store";
 
 const PLATFORM_FILTERS: ChipFilter<
   GamePlatform | "all" | "couch-coop" | "favorites"
@@ -183,11 +184,20 @@ export const GamingTab: React.FC = () => {
 
   const badge = selected ? gameBadge(selected) : undefined;
 
-  const launch = (game: Game): void => {
+  const launch = async (game: Game): Promise<void> => {
     if (game.platform === "flash" && game.romPath) {
       useFlashPlayerStore.getState().launch(game.romPath, game.title);
-    } else {
-      window.htpc.games.launch(game);
+      return;
+    }
+    try {
+      await window.htpc.games.launch(game);
+    } catch (err: any) {
+      const message =
+        err?.message ?? "Failed to launch game";
+      useToastStore.getState().push({
+        type: "error",
+        message,
+      });
     }
   };
 

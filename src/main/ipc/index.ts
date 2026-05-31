@@ -92,7 +92,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
   });
 
   ipcMain.handle("games:launch", (_e, game: Game) => {
-    launchGame(game);
+    return launchGame(game);
   });
 
   ipcMain.handle("games:favorite", async (_e, id: string, value: boolean) => {
