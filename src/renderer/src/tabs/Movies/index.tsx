@@ -14,8 +14,6 @@ import { useGridFocus } from '../../hooks/useGridFocus'
 
 type SubTab = 'local' | 'streaming'
 
-const COLUMN_COUNT = 5
-
 export const MoviesTab: React.FC = () => {
   const {
     movies, loading, searchQuery, activeGenre, load, scan, toggleFavorite,
@@ -24,6 +22,7 @@ export const MoviesTab: React.FC = () => {
   const openVideo = useVideoPlayerStore((s) => s.open)
   const [selected, setSelected] = useState<Movie | null>(null)
   const [subTab, setSubTab] = useState<SubTab>('local')
+  const [columnCount, setColumnCount] = useState(5)
   const gridRef = useRef<VirtualGridHandle>(null)
 
   useEffect(() => { load() }, [])
@@ -38,7 +37,7 @@ export const MoviesTab: React.FC = () => {
   const items = filtered()
   const { focusedIndex } = useGridFocus({
     items,
-    columnCount: COLUMN_COUNT,
+    columnCount,
     gridRef,
     onConfirm: (movie) => setSelected(movie),
     enabled: subTab === 'local' && !selected
@@ -118,7 +117,8 @@ export const MoviesTab: React.FC = () => {
               <VirtualGrid
                 ref={gridRef}
                 items={items}
-                columnCount={COLUMN_COUNT}
+                minItemWidth={200}
+                onColumnCountChange={setColumnCount}
                 rowHeight={300}
                 renderItem={(movie, index) => (
                   <div className="p-1.5 w-full h-full flex flex-col min-w-0">

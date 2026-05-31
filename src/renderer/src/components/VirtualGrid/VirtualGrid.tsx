@@ -7,12 +7,17 @@ export interface VirtualGridHandle {
 
 interface VirtualGridProps<T> {
   items: T[]
-  columnCount: number
+  /** Fixed column count. Ignored when minItemWidth is set. */
+  columnCount?: number
+  /** Minimum card width in px — column count is derived dynamically from container width. */
+  minItemWidth?: number
   rowHeight: number
   renderItem: (item: T, index: number) => React.ReactNode
   className?: string
   style?: CSSProperties
   overscan?: number
+  /** Called whenever the effective column count changes (useful for syncing useGridFocus). */
+  onColumnCountChange?: (count: number) => void
 }
 
 const GridCell = React.forwardRef<HTMLDivElement, { style: CSSProperties; children: React.ReactNode }>(
@@ -36,18 +41,21 @@ const GridCell = React.forwardRef<HTMLDivElement, { style: CSSProperties; childr
 export const VirtualGrid = React.forwardRef(function VirtualGridInner<T>(
   {
     items,
-    columnCount,
+    columnCount: columnCountProp = 4,
+    minItemWidth,
     rowHeight,
     renderItem,
     className,
     style,
-    overscan = 4
+    overscan = 4,
+    onColumnCountChange
   }: VirtualGridProps<T>,
   forwardedRef: React.Ref<VirtualGridHandle>
 ): React.ReactElement {
   const ref = useRef<VGridHandle>(null)
   const containerRef = useRef<HTMLDivElement>(null)
-  const [cellWidth, setCellWidth] = useState(200)
+  const [containerWidth, setContainerWidth] = useState(0)
+  const [effectiveColCount, setEffectiveColCount] = useState(columnCountProp)
 
   useEffect(() => {
     const el = containerRef.current
@@ -56,49 +64,64 @@ export const VirtualGrid = React.forwardRef(function VirtualGridInner<T>(
       for (const entry of entries) {
         const w = entry.contentRect.width
         if (w > 0) {
-          const next = Math.floor(w / columnCount)
-          setCellWidth((prev) => (Math.abs(prev - next) > 2 ? next : prev))
+          setContainerWidth(w)
+          const cols = minItemWidth
+            ? Math.max(2, Math.floor(w / minItemWidth))
+            : columnCountProp
+          setEffectiveColCount((prev) => (prev !== cols ? cols : prev))
         }
       }
     })
     ro.observe(el)
     return () => ro.disconnect()
-  }, [columnCount])
+  }, [columnCountProp, minItemWidth])
+
+  useEffect(() => {
+    onColumnCountChange?.(effectiveColCount)
+  }, [effectiveColCount])
 
   React.useImperativeHandle(forwardedRef, () => ({
     scrollToItem(index: number) {
-      const row = Math.floor(index / columnCount)
-      const col = index % columnCount
+      const row = Math.floor(index / effectiveColCount)
+      const col = index % effectiveColCount
       ref.current?.scrollToIndex(col, row)
     }
-  }), [columnCount])
+  }), [effectiveColCount])
+
+  const cellWidth = minItemWidth
+    ? minItemWidth
+    : containerWidth > 0 ? containerWidth / effectiveColCount : 200
+  const gridWidth = containerWidth > 0 ? cellWidth * effectiveColCount : containerWidth
+  const offset = containerWidth > 0 ? Math.max(0, Math.floor((containerWidth - gridWidth) / 2)) : 0
 
   return (
-    <div ref={containerRef} className="w-full h-full">
-      <VGrid
-        key={columnCount}
-        ref={ref}
-        className={`gpu-scroll ${className ?? ''}`}
-        style={{ height: '100%', width: '100%', ...style }}
-        item={GridCell}
-        row={Math.ceil(items.length / columnCount)}
-        col={columnCount}
-        cellHeight={rowHeight}
-        cellWidth={cellWidth}
-        overscan={overscan}
-      >
-        {({ rowIndex, colIndex }) => {
-          const index = rowIndex * columnCount + colIndex
-          if (index >= items.length) {
-            return <div className="w-full h-full" />
-          }
-          return (
-            <div className="w-full h-full min-w-0 overflow-hidden">
-              {renderItem(items[index], index)}
-            </div>
-          )
-        }}
-      </VGrid>
+    <div ref={containerRef} className="w-full h-full relative overflow-hidden">
+      <div style={{ position: 'absolute', top: 0, bottom: 0, left: offset, right: offset }}>
+        <VGrid
+          key={effectiveColCount}
+          ref={ref}
+          className={`gpu-scroll ${className ?? ''}`}
+          style={{ height: '100%', width: '100%', overflowX: 'hidden', ...style }}
+          item={GridCell}
+          row={Math.ceil(items.length / effectiveColCount)}
+          col={effectiveColCount}
+          cellHeight={rowHeight}
+          cellWidth={cellWidth}
+          overscan={overscan}
+        >
+          {({ rowIndex, colIndex }) => {
+            const index = rowIndex * effectiveColCount + colIndex
+            if (index >= items.length) {
+              return <div className="w-full h-full" />
+            }
+            return (
+              <div className="w-full h-full min-w-0 overflow-hidden">
+                {renderItem(items[index], index)}
+              </div>
+            )
+          }}
+        </VGrid>
+      </div>
     </div>
   )
 }) as <T>(props: VirtualGridProps<T> & { ref?: React.Ref<VirtualGridHandle> }) => React.ReactElement

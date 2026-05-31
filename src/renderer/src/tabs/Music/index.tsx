@@ -46,8 +46,6 @@ const LazyMusicCard: React.FC<{
 }
 
 type SubTab = 'local' | 'streaming'
-const COLUMN_COUNT = 6
-
 export const MusicTab: React.FC = () => {
   const {
     tracks, loading, searchQuery, activeArtist, activeAlbum, activeGenre, activeYear,
@@ -58,6 +56,7 @@ export const MusicTab: React.FC = () => {
   const [selected, setSelected] = useState<MusicTrack | null>(null)
   const [subTab, setSubTab] = useState<SubTab>('local')
   const [activeFilterType, setActiveFilterType] = useState<'artist' | 'album' | 'genre' | 'year'>('artist')
+  const [columnCount, setColumnCount] = useState(6)
   const gridRef = useRef<VirtualGridHandle>(null)
 
   useEffect(() => {
@@ -81,7 +80,7 @@ export const MusicTab: React.FC = () => {
   )
   const { focusedIndex } = useGridFocus({
     items,
-    columnCount: COLUMN_COUNT,
+    columnCount,
     gridRef,
     onConfirm: (track, index) => { play(items, index); setSelected(track) },
     enabled: subTab === 'local' && !selected
@@ -172,7 +171,8 @@ export const MusicTab: React.FC = () => {
               <VirtualGrid
                 ref={gridRef}
                 items={items}
-                columnCount={COLUMN_COUNT}
+                minItemWidth={180}
+                onColumnCountChange={setColumnCount}
                 rowHeight={240}
                 renderItem={(track, index) => (
                   <div className="p-1.5 w-full h-full flex flex-col min-w-0">

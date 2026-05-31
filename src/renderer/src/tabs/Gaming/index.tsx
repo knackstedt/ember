@@ -43,11 +43,10 @@ function gameBadge(game: Game): { label: string; color: string } | undefined {
   return undefined
 }
 
-const COLUMN_COUNT = 6
-
 export const GamingTab: React.FC = () => {
   const { games, loading, scanning, activeFilter, searchQuery, load, scan, setFilter, setSearch, filtered, toggleFavorite, setTags } = useGamesStore()
   const [selected, setSelected] = useState<Game | null>(null)
+  const [columnCount, setColumnCount] = useState(6)
   const gridRef = useRef<VirtualGridHandle>(null)
 
   useEffect(() => {
@@ -63,7 +62,7 @@ export const GamingTab: React.FC = () => {
   const items = filtered()
   const { focusedIndex } = useGridFocus({
     items,
-    columnCount: COLUMN_COUNT,
+    columnCount,
     gridRef,
     onConfirm: (game) => setSelected(game),
     enabled: !selected
@@ -143,7 +142,8 @@ export const GamingTab: React.FC = () => {
           <VirtualGrid
             ref={gridRef}
             items={items}
-            columnCount={COLUMN_COUNT}
+            minItemWidth={200}
+            onColumnCountChange={setColumnCount}
             rowHeight={260}
             renderItem={(game, index) => {
               const b = gameBadge(game)

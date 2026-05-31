@@ -9,13 +9,12 @@ import { TVShow } from '../../../../shared/types'
 import { useVideoPlayerStore } from '../../store/videoPlayer.store'
 import { useGridFocus } from '../../hooks/useGridFocus'
 
-const COLUMN_COUNT = 5
-
 export const TVShowsTab: React.FC = () => {
   const { shows, loading, searchQuery, load, scan, toggleFavorite, setTags, setSearch, filtered } = useTvStore()
   const openVideo = useVideoPlayerStore((s) => s.open)
   const [selected, setSelected] = useState<TVShow | null>(null)
   const [selectedSeason, setSelectedSeason] = useState<number>(1)
+  const [columnCount, setColumnCount] = useState(5)
   const gridRef = useRef<VirtualGridHandle>(null)
 
   useEffect(() => { load() }, [])
@@ -40,7 +39,7 @@ export const TVShowsTab: React.FC = () => {
   const items = filtered()
   const { focusedIndex } = useGridFocus({
     items,
-    columnCount: COLUMN_COUNT,
+    columnCount,
     gridRef,
     onConfirm: (show) => setSelected(show),
     enabled: !selected
@@ -80,7 +79,8 @@ export const TVShowsTab: React.FC = () => {
           <VirtualGrid
             ref={gridRef}
             items={items}
-            columnCount={COLUMN_COUNT}
+            minItemWidth={200}
+            onColumnCountChange={setColumnCount}
             rowHeight={300}
             renderItem={(show, index) => (
               <div className="p-1.5 w-full h-full flex flex-col min-w-0">
