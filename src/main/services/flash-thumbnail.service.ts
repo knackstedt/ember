@@ -256,7 +256,7 @@ async function run() {
     document.getElementById('player').appendChild(player);
     const data = fs.readFileSync('${escapedSwf}');
     await player.load({ data });
-    const waitMs = Math.min(8000, 2000 + (data.length / (1024 * 1024)) * 1000);
+    const waitMs = Math.min(35000, 5000 + (data.length / (1024 * 1024)) * 1000);
     setTimeout(() => ipcRenderer.send('flash-capture:ready'), waitMs);
   } catch (err) {
     ipcRenderer.send('flash-capture:error', String(err));
@@ -328,6 +328,7 @@ class ScreenshotQueue {
           webSecurity: false,
         },
       });
+      win.webContents.setAudioMuted(true);
 
       const targetId = win.webContents.id;
 
@@ -379,7 +380,7 @@ class ScreenshotQueue {
           cleanup();
           resolveOnce();
         }
-      }, 30000);
+      }, 45000);
     });
   }
 }
