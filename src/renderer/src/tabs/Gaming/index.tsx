@@ -172,7 +172,7 @@ export const GamingTab: React.FC = () => {
           );
           break;
         case "folder": {
-          const path = game.execPath || game.romPath;
+          const path = game.romPath || game.execPath;
           if (path) {
             void window.htpc.shell.showItemInFolder(path);
           }
