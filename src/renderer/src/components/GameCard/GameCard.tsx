@@ -47,23 +47,68 @@ function svgDataUri(content: string): string {
   return `data:image/svg+xml,${encodeURIComponent(content)}`;
 }
 
-function platformIconMask(platform: GamePlatform): string {
+function platformSvg(platform: GamePlatform): string {
   const icons: Record<string, string> = {
     steam: steamIcon,
     gog: gogIcon,
     flash: flashIcon,
     "dolphin-gc": gamecubeIcon,
     "dolphin-wii": wiiIcon,
-    heroic: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect x="10" y="10" width="80" height="80" rx="16" fill="white"/><text x="50" y="72" font-size="60" font-weight="bold" text-anchor="middle" fill="black">H</text></svg>`,
-    lutris: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><polygon points="50,5 95,95 5,95" fill="white"/><polygon points="50,25 75,80 25,80" fill="black"/></svg>`,
-    nes: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect x="10" y="20" width="80" height="60" rx="4" fill="white"/><rect x="18" y="28" width="64" height="20" fill="black"/><rect x="22" y="56" width="8" height="8" fill="black"/><rect x="36" y="56" width="8" height="8" fill="black"/></svg>`,
-    snes: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect x="10" y="15" width="80" height="70" rx="12" fill="white"/><rect x="18" y="23" width="64" height="24" fill="black"/><circle cx="30" cy="62" r="6" fill="black"/><circle cx="50" cy="62" r="6" fill="black"/><circle cx="70" cy="62" r="6" fill="black"/></svg>`,
-    gb: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect x="25" y="5" width="50" height="90" rx="8" fill="white"/><rect x="32" y="18" width="36" height="28" fill="black"/><rect x="32" y="54" width="10" height="10" fill="black"/><rect x="48" y="54" width="10" height="10" fill="black"/></svg>`,
-    gba: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect x="5" y="25" width="90" height="50" rx="8" fill="white"/><rect x="15" y="32" width="50" height="28" fill="black"/><circle cx="78" cy="55" r="8" fill="black"/></svg>`,
-    desktop: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect x="10" y="15" width="80" height="55" rx="4" fill="white"/><rect x="35" y="75" width="30" height="8" fill="white"/><rect x="20" y="20" width="60" height="40" fill="black"/></svg>`,
-    unknown: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="white"/><text x="50" y="70" font-size="55" font-weight="bold" text-anchor="middle" fill="black">?</text></svg>`,
+    heroic: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100%" height="100%" fill="black"/><rect x="10" y="10" width="80" height="80" rx="16" fill="white"/><text x="50" y="72" font-size="60" font-weight="bold" text-anchor="middle" fill="black">H</text></svg>`,
+    lutris: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100%" height="100%" fill="black"/><polygon points="50,5 95,95 5,95" fill="white"/><polygon points="50,25 75,80 25,80" fill="black"/></svg>`,
+    nes: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100%" height="100%" fill="black"/><rect x="10" y="20" width="80" height="60" rx="4" fill="white"/><rect x="18" y="28" width="64" height="20" fill="black"/><rect x="22" y="56" width="8" height="8" fill="black"/><rect x="36" y="56" width="8" height="8" fill="black"/></svg>`,
+    snes: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100%" height="100%" fill="black"/><rect x="10" y="15" width="80" height="70" rx="12" fill="white"/><rect x="18" y="23" width="64" height="24" fill="black"/><circle cx="30" cy="62" r="6" fill="black"/><circle cx="50" cy="62" r="6" fill="black"/><circle cx="70" cy="62" r="6" fill="black"/></svg>`,
+    gb: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100%" height="100%" fill="black"/><rect x="25" y="5" width="50" height="90" rx="8" fill="white"/><rect x="32" y="18" width="36" height="28" fill="black"/><rect x="32" y="54" width="10" height="10" fill="black"/><rect x="48" y="54" width="10" height="10" fill="black"/></svg>`,
+    gba: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100%" height="100%" fill="black"/><rect x="5" y="25" width="90" height="50" rx="8" fill="white"/><rect x="15" y="32" width="50" height="28" fill="black"/><circle cx="78" cy="55" r="8" fill="black"/></svg>`,
+    desktop: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100%" height="100%" fill="black"/><rect x="10" y="15" width="80" height="55" rx="4" fill="white"/><rect x="35" y="75" width="30" height="8" fill="white"/><rect x="20" y="20" width="60" height="40" fill="black"/></svg>`,
+    unknown: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100%" height="100%" fill="black"/><circle cx="50" cy="50" r="45" fill="white"/><text x="50" y="70" font-size="55" font-weight="bold" text-anchor="middle" fill="black">?</text></svg>`,
   };
-  return svgDataUri(icons[platform] ?? icons.unknown);
+  return icons[platform] ?? icons.unknown;
+}
+
+const TILE_CACHE = new Map<string, string>();
+
+function generateWatermarkTile(svgString: string): Promise<string> {
+  const cached = TILE_CACHE.get(svgString);
+  if (cached) return Promise.resolve(cached);
+
+  return new Promise((resolve) => {
+    const size = 512;
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d")!;
+
+    // Black background = transparent in luminance mask
+    ctx.fillStyle = "#000000";
+    ctx.fillRect(0, 0, size, size);
+
+    const img = new Image();
+    img.onload = () => {
+      const iconSize = size * 0.125;
+      // Staggered watermark layout — compressed toward center (70% of spread)
+      const positions = [
+        [size * 0.23, size * 0.22],
+        [size * 0.54, size * 0.19],
+        [size * 0.37, size * 0.47],
+        [size * 0.65, size * 0.44],
+        [size * 0.22, size * 0.71],
+        [size * 0.51, size * 0.70],
+      ];
+
+      positions.forEach(([x, y]) => {
+        ctx.globalAlpha = 0.7;
+        ctx.drawImage(img, x - iconSize / 2, y - iconSize / 2, iconSize, iconSize);
+      });
+      ctx.globalAlpha = 1;
+
+      const pngUrl = canvas.toDataURL("image/png");
+      TILE_CACHE.set(svgString, pngUrl);
+      resolve(pngUrl);
+    };
+    img.onerror = () => resolve("");
+    img.src = svgDataUri(svgString);
+  });
 }
 
 const ANIMATION_CONFIG = {
@@ -93,6 +138,7 @@ export const GameCard: React.FC<GameCardProps> = ({
   progress,
 }) => {
   const [imgError, setImgError] = useState(false);
+  const [maskUrl, setMaskUrl] = useState<string>("");
   const showPlaceholder = !coverUrl || imgError;
 
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -100,7 +146,14 @@ export const GameCard: React.FC<GameCardProps> = ({
   const enterTimerRef = useRef<number | null>(null);
   const leaveRafRef = useRef<number | null>(null);
 
-  const iconUrl = useMemo(() => platformIconMask(platform), [platform]);
+  useEffect(() => {
+    let cancelled = false;
+    const svg = platformSvg(platform);
+    generateWatermarkTile(svg).then((url) => {
+      if (!cancelled) setMaskUrl(url);
+    });
+    return () => { cancelled = true; };
+  }, [platform]);
 
   const tiltEngine = useMemo(() => {
     let rafId: number | null = null;
@@ -292,7 +345,7 @@ export const GameCard: React.FC<GameCardProps> = ({
   }, [isFocused, tiltEngine]);
 
   const cardStyle: React.CSSProperties = {
-    "--icon": iconUrl ? `url(${iconUrl})` : "none",
+    "--icon": maskUrl ? `url(${maskUrl})` : "none",
     "--inner-gradient": "linear-gradient(145deg, #60496e8c 0%, #71C4FF44 100%)",
     "--behind-glow-color": badgeColor ? badgeColor : "rgba(125, 190, 255, 0.67)",
     "--behind-glow-size": "50%",
