@@ -1,59 +1,68 @@
-import { app } from 'electron'
-import { join } from 'path'
-import { mkdirSync } from 'fs'
+import { app } from "electron";
+import { join } from "path";
+import { mkdirSync } from "fs";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Surreal = any
-let db: Surreal | null = null
+type Surreal = any;
+let db: Surreal | null = null;
 
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return Promise.race([
     promise,
     new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error(`DB operation timed out after ${ms}ms`)), ms)
-    )
-  ])
+      setTimeout(
+        () => reject(new Error(`DB operation timed out after ${ms}ms`)),
+        ms,
+      ),
+    ),
+  ]);
 }
 
-async function connectWithRetry(instance: Surreal, url: string, retries = 1): Promise<void> {
+async function connectWithRetry(
+  instance: Surreal,
+  url: string,
+  retries = 1,
+): Promise<void> {
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      await withTimeout(instance.connect(url), 6000)
-      return
+      await withTimeout(instance.connect(url), 6000);
+      return;
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
+      const msg = err instanceof Error ? err.message : String(err);
       if (attempt < retries) {
-        console.warn(`[db] Connect attempt ${attempt + 1} failed (${msg}), retrying...`)
+        console.warn(
+          `[db] Connect attempt ${attempt + 1} failed (${msg}), retrying...`,
+        );
         // SurrealKV may hold a file lock briefly after a crash; wait before retry
-        await new Promise(r => setTimeout(r, 800))
+        await new Promise((r) => setTimeout(r, 800));
       } else {
-        throw err
+        throw err;
       }
     }
   }
 }
 
 export async function initDb(): Promise<Surreal> {
-  if (db) return db
+  if (db) return db;
 
-  const dataDir = join(app.getPath('userData'), 'db')
-  mkdirSync(dataDir, { recursive: true })
+  const dataDir = join(app.getPath("userData"), "db");
+  mkdirSync(dataDir, { recursive: true });
 
   const [{ Surreal }, { createNodeEngines }] = await Promise.all([
-    import('surrealdb'),
-    import('@surrealdb/node')
-  ])
-  db = new Surreal({ engines: createNodeEngines() })
-  await connectWithRetry(db, `surrealkv://${join(dataDir, 'htpc.db')}`, 1)
-  await withTimeout(db.use({ namespace: 'htpc', database: 'main' }), 5000)
+    import("surrealdb"),
+    import("@surrealdb/node"),
+  ]);
+  db = new Surreal({ engines: createNodeEngines() });
+  await connectWithRetry(db, `surrealkv://${join(dataDir, "htpc.db")}`, 1);
+  await withTimeout(db.use({ namespace: "htpc", database: "main" }), 5000);
 
-  await withTimeout(runMigrations(db), 8000)
-  return db
+  await withTimeout(runMigrations(db), 8000);
+  return db;
 }
 
 export function getDb(): Surreal {
-  if (!db) throw new Error('Database not initialized')
-  return db
+  if (!db) throw new Error("Database not initialized");
+  return db;
 }
 
 async function runMigrations(db: Surreal): Promise<void> {
@@ -142,5 +151,5 @@ async function runMigrations(db: Surreal): Promise<void> {
     DEFINE FIELD IF NOT EXISTS inputCode ON controller_mapping TYPE string;
     DEFINE FIELD IF NOT EXISTS action ON controller_mapping TYPE string;
     DEFINE INDEX IF NOT EXISTS mapping_unique ON controller_mapping FIELDS deviceId, inputCode UNIQUE;
-  `)
+  `);
 }

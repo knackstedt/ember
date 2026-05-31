@@ -1,18 +1,18 @@
-import React, { useState, useRef, KeyboardEvent } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import React, { useState, useRef, KeyboardEvent } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface DetailPanelProps {
-  open: boolean
-  onClose: () => void
-  title: string
-  coverUrl?: string
-  backdropUrl?: string
-  description?: string
-  metadata?: { label: string; value: string }[]
-  tags?: string[]
-  onTagsChange?: (tags: string[]) => void
-  actions?: React.ReactNode
-  children?: React.ReactNode
+  open: boolean;
+  onClose: () => void;
+  title: string;
+  coverUrl?: string;
+  backdropUrl?: string;
+  description?: string;
+  metadata?: { label: string; value: string }[];
+  tags?: string[];
+  onTagsChange?: (tags: string[]) => void;
+  actions?: React.ReactNode;
+  children?: React.ReactNode;
 }
 
 export const DetailPanel: React.FC<DetailPanelProps> = ({
@@ -26,28 +26,28 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
   tags,
   onTagsChange,
   actions,
-  children
+  children,
 }) => {
-  const [tagInput, setTagInput] = useState('')
-  const inputRef = useRef<HTMLInputElement>(null)
+  const [tagInput, setTagInput] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const handleAddTag = () => {
-    const trimmed = tagInput.trim()
-    if (!trimmed || tags?.includes(trimmed)) return
-    onTagsChange?.([...(tags ?? []), trimmed])
-    setTagInput('')
-  }
+    const trimmed = tagInput.trim();
+    if (!trimmed || tags?.includes(trimmed)) return;
+    onTagsChange?.([...(tags ?? []), trimmed]);
+    setTagInput("");
+  };
 
   const handleRemoveTag = (tag: string) => {
-    onTagsChange?.((tags ?? []).filter((t) => t !== tag))
-  }
+    onTagsChange?.((tags ?? []).filter((t) => t !== tag));
+  };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      handleAddTag()
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleAddTag();
     }
-  }
+  };
 
   return (
     <AnimatePresence>
@@ -63,15 +63,15 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
           <motion.div
             className="fixed right-0 top-0 bottom-0 z-50 flex flex-col overflow-hidden"
             style={{
-              width: 'min(480px, 90vw)',
-              background: 'var(--color-surface-overlay)',
-              backdropFilter: 'blur(var(--blur-panel))',
-              borderLeft: '1px solid var(--color-border)'
+              width: "min(480px, 90vw)",
+              background: "var(--color-surface-overlay)",
+              backdropFilter: "blur(var(--blur-panel))",
+              borderLeft: "1px solid var(--color-border)",
             }}
-            initial={{ x: '100%' }}
+            initial={{ x: "100%" }}
             animate={{ x: 0 }}
-            exit={{ x: '100%' }}
-            transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+            exit={{ x: "100%" }}
+            transition={{ type: "spring", damping: 30, stiffness: 300 }}
           >
             {backdropUrl && (
               <div className="relative h-48 overflow-hidden flex-shrink-0">
@@ -90,20 +90,24 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                   src={coverUrl}
                   alt={title}
                   className="w-24 h-36 object-cover rounded-[var(--radius-card)] flex-shrink-0"
-                  style={{ boxShadow: 'var(--shadow-card)' }}
+                  style={{ boxShadow: "var(--shadow-card)" }}
                 />
               )}
               <div className="flex flex-col justify-end gap-1 min-w-0">
                 <h2
                   className="text-xl font-bold leading-tight"
-                  style={{ color: 'var(--color-text)' }}
+                  style={{ color: "var(--color-text)" }}
                 >
                   {title}
                 </h2>
                 {metadata?.slice(0, 3).map((m) => (
                   <div key={m.label} className="flex gap-1 text-sm">
-                    <span style={{ color: 'var(--color-text-dim)' }}>{m.label}:</span>
-                    <span style={{ color: 'var(--color-text)' }}>{m.value}</span>
+                    <span style={{ color: "var(--color-text-dim)" }}>
+                      {m.label}:
+                    </span>
+                    <span style={{ color: "var(--color-text)" }}>
+                      {m.value}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -117,7 +121,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
 
             <div
               className="flex-1 overflow-y-auto px-4 pb-4 gpu-scroll"
-              style={{ color: 'var(--color-text-dim)' }}
+              style={{ color: "var(--color-text-dim)" }}
             >
               {description && (
                 <p className="text-sm leading-relaxed mb-4">{description}</p>
@@ -126,8 +130,12 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                 <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm mb-4">
                   {metadata.slice(3).map((m) => (
                     <React.Fragment key={m.label}>
-                      <span style={{ color: 'var(--color-text-dim)' }}>{m.label}</span>
-                      <span style={{ color: 'var(--color-text)' }}>{m.value}</span>
+                      <span style={{ color: "var(--color-text-dim)" }}>
+                        {m.label}
+                      </span>
+                      <span style={{ color: "var(--color-text)" }}>
+                        {m.value}
+                      </span>
                     </React.Fragment>
                   ))}
                 </div>
@@ -136,7 +144,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                 <div className="mb-4">
                   <div
                     className="text-xs font-semibold uppercase tracking-wide mb-2"
-                    style={{ color: 'var(--color-text-dim)' }}
+                    style={{ color: "var(--color-text-dim)" }}
                   >
                     Tags
                   </div>
@@ -146,15 +154,17 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                         key={tag}
                         className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium"
                         style={{
-                          background: 'color-mix(in srgb, var(--color-accent) 18%, transparent)',
-                          border: '1px solid color-mix(in srgb, var(--color-accent) 40%, transparent)',
-                          color: 'var(--color-text)'
+                          background:
+                            "color-mix(in srgb, var(--color-accent) 18%, transparent)",
+                          border:
+                            "1px solid color-mix(in srgb, var(--color-accent) 40%, transparent)",
+                          color: "var(--color-text)",
                         }}
                       >
                         {tag}
                         <button
                           className="flex items-center opacity-60 hover:opacity-100 transition-opacity leading-none"
-                          style={{ color: 'var(--color-text)' }}
+                          style={{ color: "var(--color-text)" }}
                           onClick={() => handleRemoveTag(tag)}
                           aria-label={`Remove tag ${tag}`}
                         >
@@ -171,10 +181,10 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                     placeholder="Add tag…"
                     className="w-full text-xs px-2.5 py-1 rounded outline-none"
                     style={{
-                      background: 'var(--color-surface-raised)',
-                      border: '1px solid var(--color-border)',
-                      color: 'var(--color-text)',
-                      caretColor: 'var(--color-accent)'
+                      background: "var(--color-surface-raised)",
+                      border: "1px solid var(--color-border)",
+                      color: "var(--color-text)",
+                      caretColor: "var(--color-accent)",
                     }}
                   />
                 </div>
@@ -187,7 +197,13 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
               onClick={onClose}
               aria-label="Close"
             >
-              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+              <svg
+                className="w-5 h-5"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
                 <path d="M18 6L6 18M6 6l12 12" />
               </svg>
             </button>
@@ -195,5 +211,5 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
         </>
       )}
     </AnimatePresence>
-  )
-}
+  );
+};

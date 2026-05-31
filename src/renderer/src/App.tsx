@@ -1,221 +1,273 @@
-import React, { useEffect, useRef, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { useSettingsStore } from './store/settings.store'
-import { useInputStore } from './store/input.store'
-import { ThemeBackground } from './components/ThemeBackground/ThemeBackground'
-import { GamingTab } from './tabs/Gaming'
-import { MoviesTab } from './tabs/Movies'
-import { MusicTab } from './tabs/Music'
-import { TVShowsTab } from './tabs/TVShows'
-import { SettingsTab } from './tabs/Settings'
-import { ControllersTab } from './tabs/Controllers'
-import { TabId, ScanProgress } from '../../shared/types'
-import { useGamesStore } from './store/games.store'
-import { useMoviesStore, useMusicStore, useTvStore } from './store/media.store'
-import { ToastContainer } from './components/Toast/Toast'
-import { useToastStore } from './store/toast.store'
-import { MusicPlayer } from './components/MusicPlayer/MusicPlayer'
-import { useMusicPlayerStore } from './store/musicPlayer.store'
-import { VideoPlayer } from './components/VideoPlayer/VideoPlayer'
-import { useVideoPlayerStore } from './store/videoPlayer.store'
+import React, { useEffect, useRef, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { useSettingsStore } from "./store/settings.store";
+import { useInputStore } from "./store/input.store";
+import { ThemeBackground } from "./components/ThemeBackground/ThemeBackground";
+import { GamingTab } from "./tabs/Gaming";
+import { MoviesTab } from "./tabs/Movies";
+import { MusicTab } from "./tabs/Music";
+import { TVShowsTab } from "./tabs/TVShows";
+import { SettingsTab } from "./tabs/Settings";
+import { ControllersTab } from "./tabs/Controllers";
+import { TabId, ScanProgress } from "../../shared/types";
+import { useGamesStore } from "./store/games.store";
+import { useMoviesStore, useMusicStore, useTvStore } from "./store/media.store";
+import { ToastContainer } from "./components/Toast/Toast";
+import { useToastStore } from "./store/toast.store";
+import { MusicPlayer } from "./components/MusicPlayer/MusicPlayer";
+import { useMusicPlayerStore } from "./store/musicPlayer.store";
+import { VideoPlayer } from "./components/VideoPlayer/VideoPlayer";
+import { useVideoPlayerStore } from "./store/videoPlayer.store";
 
 interface TabDef {
-  id: TabId
-  label: string
-  icon: string
-  component: React.ComponentType
+  id: TabId;
+  label: string;
+  icon: string;
+  component: React.ComponentType;
 }
 
 const TABS: TabDef[] = [
-  { id: 'gaming', label: 'Gaming', icon: '🎮', component: GamingTab },
-  { id: 'movies', label: 'Movies', icon: '🎬', component: MoviesTab },
-  { id: 'music', label: 'Music', icon: '🎵', component: MusicTab },
-  { id: 'tv-shows', label: 'TV Shows', icon: '📺', component: TVShowsTab },
-  { id: 'controllers', label: 'Controllers', icon: '🕹', component: ControllersTab },
-  { id: 'settings', label: 'Settings', icon: '⚙', component: SettingsTab }
-]
+  { id: "gaming", label: "Gaming", icon: "🎮", component: GamingTab },
+  { id: "movies", label: "Movies", icon: "🎬", component: MoviesTab },
+  { id: "music", label: "Music", icon: "🎵", component: MusicTab },
+  { id: "tv-shows", label: "TV Shows", icon: "📺", component: TVShowsTab },
+  {
+    id: "controllers",
+    label: "Controllers",
+    icon: "🕹",
+    component: ControllersTab,
+  },
+  { id: "settings", label: "Settings", icon: "⚙", component: SettingsTab },
+];
 
-const TAB_IDS = TABS.map((t) => t.id)
+const TAB_IDS = TABS.map((t) => t.id);
 
 export default function App(): React.ReactElement {
-  const { settings, loading, load } = useSettingsStore()
-  const { addDevice, removeDevice } = useInputStore()
-  const hasPlayer = useMusicPlayerStore((s) => s.queue.length > 0)
-  const videoOpen = useVideoPlayerStore((s) => !!s.src)
-  const [activeTab, setActiveTab] = useState<TabId>('gaming')
-  const activeTabRef = useRef<TabId>(activeTab)
-  activeTabRef.current = activeTab
-  const isFullscreenRef = useRef(false)
+  const { settings, loading, load } = useSettingsStore();
+  const { addDevice, removeDevice } = useInputStore();
+  const hasPlayer = useMusicPlayerStore((s) => s.queue.length > 0);
+  const videoOpen = useVideoPlayerStore((s) => !!s.src);
+  const [activeTab, setActiveTab] = useState<TabId>("gaming");
+  const activeTabRef = useRef<TabId>(activeTab);
+  activeTabRef.current = activeTab;
+  const isFullscreenRef = useRef(false);
 
   useEffect(() => {
-    load()
+    load();
 
-    useGamesStore.getState().load()
-    useMoviesStore.getState().load()
-    useMusicStore.getState().load()
-    useTvStore.getState().load()
+    useGamesStore.getState().load();
+    useMoviesStore.getState().load();
+    useMusicStore.getState().load();
+    useTvStore.getState().load();
 
-    useGamesStore.getState().scan()
-    useMoviesStore.getState().scan()
-    useMusicStore.getState().scan()
-    useTvStore.getState().scan()
+    useGamesStore.getState().scan();
+    useMoviesStore.getState().scan();
+    useMusicStore.getState().scan();
+    useTvStore.getState().scan();
 
-    const scanToastIds = new Map<string, string>()
+    const scanToastIds = new Map<string, string>();
     const unsubScan = window.htpc.onScanProgress((p: ScanProgress) => {
-      const { push, update, dismiss } = useToastStore.getState()
-      const pct = p.total > 0 ? Math.round((p.current / p.total) * 100) : 0
-      const label = p.message ?? `${p.current} / ${p.total}`
+      const { push, update, dismiss } = useToastStore.getState();
+      const pct = p.total > 0 ? Math.round((p.current / p.total) * 100) : 0;
+      const label = p.message ?? `${p.current} / ${p.total}`;
       if (!scanToastIds.has(p.scanner)) {
-        const id = push({ type: 'progress', message: `${p.scanner}: ${label}`, progress: pct })
-        scanToastIds.set(p.scanner, id)
+        const id = push({
+          type: "progress",
+          message: `${p.scanner}: ${label}`,
+          progress: pct,
+        });
+        scanToastIds.set(p.scanner, id);
       } else {
-        const id = scanToastIds.get(p.scanner)!
-        if (p.status === 'done') {
-          update(id, { type: 'success', message: `${p.scanner}: Done`, progress: 100 })
-          setTimeout(() => dismiss(id), 1000)
-          scanToastIds.delete(p.scanner)
-        } else if (p.status === 'error') {
-          update(id, { type: 'error', message: `${p.scanner}: ${p.message ?? 'Error'}` })
-          setTimeout(() => dismiss(id), 8000)
-          scanToastIds.delete(p.scanner)
+        const id = scanToastIds.get(p.scanner)!;
+        if (p.status === "done") {
+          update(id, {
+            type: "success",
+            message: `${p.scanner}: Done`,
+            progress: 100,
+          });
+          setTimeout(() => dismiss(id), 1000);
+          scanToastIds.delete(p.scanner);
+        } else if (p.status === "error") {
+          update(id, {
+            type: "error",
+            message: `${p.scanner}: ${p.message ?? "Error"}`,
+          });
+          setTimeout(() => dismiss(id), 8000);
+          scanToastIds.delete(p.scanner);
         } else {
-          update(id, { message: `${p.scanner}: ${label}`, progress: pct })
+          update(id, { message: `${p.scanner}: ${label}`, progress: pct });
         }
       }
-    })
+    });
 
-    return unsubScan
-  }, [])
-
-  useEffect(() => {
-    if (settings?.defaultTab) setActiveTab(settings.defaultTab)
-  }, [settings?.defaultTab])
+    return unsubScan;
+  }, []);
 
   useEffect(() => {
-    const unsubConnect = window.htpc.input.onDeviceConnected(addDevice)
-    const unsubDisconnect = window.htpc.input.onDeviceDisconnected(removeDevice)
+    if (settings?.defaultTab) setActiveTab(settings.defaultTab);
+  }, [settings?.defaultTab]);
+
+  useEffect(() => {
+    const unsubConnect = window.htpc.input.onDeviceConnected(addDevice);
+    const unsubDisconnect =
+      window.htpc.input.onDeviceDisconnected(removeDevice);
     const unsubEvent = window.htpc.input.onEvent((ev) => {
-      useInputStore.getState().setLastEvent(ev)
-      if (ev.type === 'button_press' && ev.action === 'start') {
-        const idx = TAB_IDS.indexOf(activeTabRef.current)
-        setActiveTab(TAB_IDS[(idx + 1) % TAB_IDS.length])
+      useInputStore.getState().setLastEvent(ev);
+      if (ev.type === "button_press" && ev.action === "start") {
+        const idx = TAB_IDS.indexOf(activeTabRef.current);
+        setActiveTab(TAB_IDS[(idx + 1) % TAB_IDS.length]);
       }
-    })
+    });
     return () => {
-      unsubConnect()
-      unsubDisconnect()
-      unsubEvent()
-    }
-  }, [])
+      unsubConnect();
+      unsubDisconnect();
+      unsubEvent();
+    };
+  }, []);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent): void => {
-      const target = e.target as HTMLElement | null
-      const isTyping = target != null && (
-        target.tagName === 'INPUT' ||
-        target.tagName === 'TEXTAREA' ||
-        target.tagName === 'SELECT' ||
-        target.isContentEditable
-      )
+      const target = e.target as HTMLElement | null;
+      const isTyping =
+        target != null &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "SELECT" ||
+          target.isContentEditable);
 
-      if (e.key === 'F11') {
-        e.preventDefault()
-        isFullscreenRef.current = !isFullscreenRef.current
-        window.htpc.app.setFullscreen(isFullscreenRef.current)
-      } else if (e.key === 'Escape') {
-        useVideoPlayerStore.getState().close()
-        window.dispatchEvent(new CustomEvent('htpc:escape'))
-      } else if (!isTyping && e.key === 'q') {
-        e.preventDefault()
-        const idx = TAB_IDS.indexOf(activeTabRef.current)
-        setActiveTab(TAB_IDS[(idx - 1 + TAB_IDS.length) % TAB_IDS.length])
-      } else if (!isTyping && e.key === 'e') {
-        e.preventDefault()
-        const idx = TAB_IDS.indexOf(activeTabRef.current)
-        setActiveTab(TAB_IDS[(idx + 1) % TAB_IDS.length])
-      } else if (!isTyping && ['w','a','s','d','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Enter'].includes(e.key)) {
-        e.preventDefault()
+      if (e.key === "F11") {
+        e.preventDefault();
+        isFullscreenRef.current = !isFullscreenRef.current;
+        window.htpc.app.setFullscreen(isFullscreenRef.current);
+      } else if (e.key === "Escape") {
+        useVideoPlayerStore.getState().close();
+        window.dispatchEvent(new CustomEvent("htpc:escape"));
+      } else if (!isTyping && e.key === "q") {
+        e.preventDefault();
+        const idx = TAB_IDS.indexOf(activeTabRef.current);
+        setActiveTab(TAB_IDS[(idx - 1 + TAB_IDS.length) % TAB_IDS.length]);
+      } else if (!isTyping && e.key === "e") {
+        e.preventDefault();
+        const idx = TAB_IDS.indexOf(activeTabRef.current);
+        setActiveTab(TAB_IDS[(idx + 1) % TAB_IDS.length]);
+      } else if (
+        !isTyping &&
+        [
+          "w",
+          "a",
+          "s",
+          "d",
+          "ArrowUp",
+          "ArrowDown",
+          "ArrowLeft",
+          "ArrowRight",
+          "Enter",
+        ].includes(e.key)
+      ) {
+        e.preventDefault();
         const actionMap: Record<string, string> = {
-          w: 'up', ArrowUp: 'up',
-          s: 'down', ArrowDown: 'down',
-          a: 'left', ArrowLeft: 'left',
-          d: 'right', ArrowRight: 'right',
-          Enter: 'confirm'
-        }
-        const action = actionMap[e.key]
+          w: "up",
+          ArrowUp: "up",
+          s: "down",
+          ArrowDown: "down",
+          a: "left",
+          ArrowLeft: "left",
+          d: "right",
+          ArrowRight: "right",
+          Enter: "confirm",
+        };
+        const action = actionMap[e.key];
         if (action) {
-          window.dispatchEvent(new CustomEvent('htpc:nav', { detail: { action } }))
+          window.dispatchEvent(
+            new CustomEvent("htpc:nav", { detail: { action } }),
+          );
         }
-      } else if (e.key === 'Tab' && !e.shiftKey) {
-        e.preventDefault()
-        const idx = TAB_IDS.indexOf(activeTabRef.current)
-        setActiveTab(TAB_IDS[(idx + 1) % TAB_IDS.length])
-      } else if (e.key === 'Tab' && e.shiftKey) {
-        e.preventDefault()
-        const idx = TAB_IDS.indexOf(activeTabRef.current)
-        setActiveTab(TAB_IDS[(idx - 1 + TAB_IDS.length) % TAB_IDS.length])
-      } else if (e.key === 'F5') {
-        e.preventDefault()
+      } else if (e.key === "Tab" && !e.shiftKey) {
+        e.preventDefault();
+        const idx = TAB_IDS.indexOf(activeTabRef.current);
+        setActiveTab(TAB_IDS[(idx + 1) % TAB_IDS.length]);
+      } else if (e.key === "Tab" && e.shiftKey) {
+        e.preventDefault();
+        const idx = TAB_IDS.indexOf(activeTabRef.current);
+        setActiveTab(TAB_IDS[(idx - 1 + TAB_IDS.length) % TAB_IDS.length]);
+      } else if (e.key === "F5") {
+        e.preventDefault();
         const scanMap: Partial<Record<TabId, () => void>> = {
           gaming: () => useGamesStore.getState().scan(),
           movies: () => useMoviesStore.getState().scan(),
           music: () => useMusicStore.getState().scan(),
-          'tv-shows': () => useTvStore.getState().scan()
-        }
-        scanMap[activeTabRef.current]?.()
-      } else if (e.key === 'f' && e.ctrlKey) {
-        e.preventDefault()
-        document.querySelector<HTMLInputElement>('input[placeholder^="Search"]')?.focus()
+          "tv-shows": () => useTvStore.getState().scan(),
+        };
+        scanMap[activeTabRef.current]?.();
+      } else if (e.key === "f" && e.ctrlKey) {
+        e.preventDefault();
+        document
+          .querySelector<HTMLInputElement>('input[placeholder^="Search"]')
+          ?.focus();
       }
-    }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [])
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
 
   if (loading) {
     return (
-      <div className="h-screen w-screen flex items-center justify-center" style={{ background: '#000', color: '#fff' }}>
+      <div
+        className="h-screen w-screen flex items-center justify-center"
+        style={{ background: "#000", color: "#fff" }}
+      >
         <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: 'var(--color-accent)', borderTopColor: 'transparent' }} />
+          <div
+            className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin"
+            style={{
+              borderColor: "var(--color-accent)",
+              borderTopColor: "transparent",
+            }}
+          />
           <span className="text-sm opacity-50">Loading HTPC…</span>
         </div>
       </div>
-    )
+    );
   }
 
-  const ActiveComponent = TABS.find((t) => t.id === activeTab)?.component ?? GamingTab
+  const ActiveComponent =
+    TABS.find((t) => t.id === activeTab)?.component ?? GamingTab;
 
   return (
     <div
       className="h-screen w-screen flex flex-col overflow-hidden relative"
-      style={{
-        background: 'var(--color-bg)',
-        '--player-bar-height': hasPlayer ? '72px' : '0px'
-      } as React.CSSProperties}
+      style={
+        {
+          background: "var(--color-bg)",
+          "--player-bar-height": hasPlayer ? "72px" : "0px",
+        } as React.CSSProperties
+      }
     >
       <ToastContainer />
       <ThemeBackground />
 
-      <AnimatePresence>
-        {videoOpen && <VideoPlayer />}
-      </AnimatePresence>
+      <AnimatePresence>{videoOpen && <VideoPlayer />}</AnimatePresence>
 
       <div className="relative z-10 flex flex-col h-full">
         {/* Tab bar */}
         <nav
           className="flex items-center gap-1 px-4 pt-3 pb-0 flex-shrink-0"
-          style={{ borderBottom: '1px solid var(--color-border)' }}
+          style={{ borderBottom: "1px solid var(--color-border)" }}
         >
           {TABS.map((tab) => {
-            const isActive = tab.id === activeTab
+            const isActive = tab.id === activeTab;
             return (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className="relative flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium rounded-t-lg transition-colors focus:outline-none"
                 style={{
-                  color: isActive ? 'var(--color-text)' : 'var(--color-text-dim)',
-                  background: isActive ? 'var(--color-surface-raised)' : 'transparent'
+                  color: isActive
+                    ? "var(--color-text)"
+                    : "var(--color-text-dim)",
+                  background: isActive
+                    ? "var(--color-surface-raised)"
+                    : "transparent",
                 }}
               >
                 <span>{tab.icon}</span>
@@ -224,18 +276,24 @@ export default function App(): React.ReactElement {
                   <motion.div
                     layoutId="tab-indicator"
                     className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full"
-                    style={{ background: 'var(--color-accent)', boxShadow: 'var(--shadow-glow)' }}
-                    transition={{ type: 'spring', damping: 30, stiffness: 400 }}
+                    style={{
+                      background: "var(--color-accent)",
+                      boxShadow: "var(--shadow-glow)",
+                    }}
+                    transition={{ type: "spring", damping: 30, stiffness: 400 }}
                   />
                 )}
               </button>
-            )
+            );
           })}
 
           <div className="ml-auto flex items-center gap-2 pb-1">
             <button
               className="px-3 py-1.5 rounded text-xs"
-              style={{ color: 'var(--color-text-dim)', background: 'transparent' }}
+              style={{
+                color: "var(--color-text-dim)",
+                background: "transparent",
+              }}
               onClick={() => window.htpc.app.setFullscreen(true)}
               title="Fullscreen"
             >
@@ -253,7 +311,7 @@ export default function App(): React.ReactElement {
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.15, ease: 'easeOut' }}
+              transition={{ duration: 0.15, ease: "easeOut" }}
             >
               <ActiveComponent />
             </motion.div>
@@ -261,10 +319,8 @@ export default function App(): React.ReactElement {
         </div>
 
         {/* Music mini-player */}
-        <AnimatePresence>
-          {hasPlayer && <MusicPlayer />}
-        </AnimatePresence>
+        <AnimatePresence>{hasPlayer && <MusicPlayer />}</AnimatePresence>
       </div>
     </div>
-  )
+  );
 }

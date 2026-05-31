@@ -1,109 +1,125 @@
-import { Worker } from 'worker_threads'
-import { join } from 'path'
-import { existsSync } from 'fs'
-import { BrowserWindow } from 'electron'
-import { getDb } from '../db'
-import { scanSteamGames } from '../scanners/steam.scanner'
-import { scanDolphinGames } from '../scanners/dolphin.scanner'
-import { scanDesktopGames } from '../scanners/desktop.scanner'
-import { scanHeroicGames, scanLutrisGames } from '../scanners/heroic.scanner'
-import { Game } from '../../shared/types'
+import { Worker } from "worker_threads";
+import { join } from "path";
+import { existsSync } from "fs";
+import { BrowserWindow } from "electron";
+import { getDb } from "../db";
+import { scanSteamGames } from "../scanners/steam.scanner";
+import { scanDolphinGames } from "../scanners/dolphin.scanner";
+import { scanDesktopGames } from "../scanners/desktop.scanner";
+import { scanHeroicGames, scanLutrisGames } from "../scanners/heroic.scanner";
+import { Game } from "../../shared/types";
 
 function normalizeGame(game: Game): Record<string, unknown> {
-  const n: Record<string, unknown> = { ...game }
-  if (n.isFavorite === undefined) n.isFavorite = false
-  if (n.tags === undefined) n.tags = []
-  if (n.playTime === undefined) n.playTime = 0
-  if (n.rating === undefined) n.rating = 0
-  if (n.lastPlayed === undefined) n.lastPlayed = 0
-  return n
+  const n: Record<string, unknown> = { ...game };
+  if (n.isFavorite === undefined) n.isFavorite = false;
+  if (n.tags === undefined) n.tags = [];
+  if (n.playTime === undefined) n.playTime = 0;
+  if (n.rating === undefined) n.rating = 0;
+  if (n.lastPlayed === undefined) n.lastPlayed = 0;
+  return n;
 }
 
 async function scanInMainThread(
   window: BrowserWindow | null,
-  extraPaths?: string[]
+  extraPaths?: string[],
 ): Promise<Game[]> {
-  const report = (scanner: string, current: number, total: number, status: 'scanning' | 'done') => {
+  const report = (
+    scanner: string,
+    current: number,
+    total: number,
+    status: "scanning" | "done",
+  ) => {
     if (window && !window.isDestroyed()) {
-      window.webContents.send('scan:progress', { scanner, current, total, status })
+      window.webContents.send("scan:progress", {
+        scanner,
+        current,
+        total,
+        status,
+      });
     }
-  }
+  };
 
-  report('steam', 0, 0, 'scanning')
-  const steam = scanSteamGames()
-  report('steam', steam.length, steam.length, 'done')
+  report("steam", 0, 0, "scanning");
+  const steam = scanSteamGames();
+  report("steam", steam.length, steam.length, "done");
 
-  report('dolphin', 0, 0, 'scanning')
-  const dolphin = scanDolphinGames(extraPaths)
-  report('dolphin', dolphin.length, dolphin.length, 'done')
+  report("dolphin", 0, 0, "scanning");
+  const dolphin = scanDolphinGames(extraPaths);
+  report("dolphin", dolphin.length, dolphin.length, "done");
 
-  const heroic = scanHeroicGames()
-  const lutris = scanLutrisGames()
-  const desktop = scanDesktopGames()
+  const heroic = scanHeroicGames();
+  const lutris = scanLutrisGames();
+  const desktop = scanDesktopGames();
 
-  const all = [...steam, ...dolphin, ...heroic, ...lutris, ...desktop]
+  const all = [...steam, ...dolphin, ...heroic, ...lutris, ...desktop];
 
-  const db = getDb()
+  const db = getDb();
   for (const game of all) {
     try {
-      await db.query(`UPSERT game:⟨${game.id}⟩ CONTENT $game`, { game: normalizeGame(game) })
+      await db.query(`UPSERT game:⟨${game.id}⟩ CONTENT $game`, {
+        game: normalizeGame(game),
+      });
     } catch (err) {
-      console.warn(`[scan] Failed to upsert ${game.id}:`, err)
+      console.warn(`[scan] Failed to upsert ${game.id}:`, err);
     }
   }
 
-  return all
+  return all;
 }
 
 export async function performGameScan(
   window: BrowserWindow | null,
-  extraPaths?: string[]
+  extraPaths?: string[],
 ): Promise<Game[]> {
-  const workerPath = join(__dirname, 'workers/game-scan.worker.js')
+  const workerPath = join(__dirname, "workers/game-scan.worker.js");
 
   if (!existsSync(workerPath)) {
-    console.warn('[scan] Worker bundle not found, falling back to main-thread scan')
-    return scanInMainThread(window, extraPaths)
+    console.warn(
+      "[scan] Worker bundle not found, falling back to main-thread scan",
+    );
+    return scanInMainThread(window, extraPaths);
   }
 
   return new Promise((resolve, reject) => {
-    const worker = new Worker(workerPath)
+    const worker = new Worker(workerPath);
 
-    worker.on('message', (msg: { type: string } & Record<string, unknown>) => {
-      if (msg.type === 'progress') {
+    worker.on("message", (msg: { type: string } & Record<string, unknown>) => {
+      if (msg.type === "progress") {
         if (window && !window.isDestroyed()) {
-          window.webContents.send('scan:progress', msg)
+          window.webContents.send("scan:progress", msg);
         }
-      } else if (msg.type === 'result') {
-        const games = (msg.games as Game[]) ?? []
-        ;(async () => {
+      } else if (msg.type === "result") {
+        const games = (msg.games as Game[]) ?? [];
+        (async () => {
           try {
-            const db = getDb()
+            const db = getDb();
             for (const game of games) {
               try {
-                await db.query(`UPSERT game:⟨${game.id}⟩ CONTENT $game`, { game: normalizeGame(game) })
+                await db.query(`UPSERT game:⟨${game.id}⟩ CONTENT $game`, {
+                  game: normalizeGame(game),
+                });
               } catch (err) {
-                console.warn(`[scan] Failed to upsert ${game.id}:`, err)
+                console.warn(`[scan] Failed to upsert ${game.id}:`, err);
               }
             }
-            worker.terminate()
-            resolve(games)
+            worker.terminate();
+            resolve(games);
           } catch (err) {
-            worker.terminate()
-            reject(err)
+            worker.terminate();
+            reject(err);
           }
-        })()
-      } else if (msg.type === 'error') {
-        worker.terminate()
-        reject(new Error(String(msg.error)))
+        })();
+      } else if (msg.type === "error") {
+        worker.terminate();
+        reject(new Error(String(msg.error)));
       }
-    })
+    });
 
-    worker.on('error', (err) => {
-      worker.terminate()
-      reject(err)
-    })
+    worker.on("error", (err) => {
+      worker.terminate();
+      reject(err);
+    });
 
-    worker.postMessage(extraPaths)
-  })
+    worker.postMessage(extraPaths);
+  });
 }

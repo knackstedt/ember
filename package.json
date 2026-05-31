@@ -4,7 +4,7 @@
   "description": "Home Theater PC Application",
   "main": "out/main/index.js",
   "scripts": {
-    "dev": "bun run scripts/dev.ts",
+    "dev": "electron-vite dev -- --no-sandbox --disable-setuid-sandbox",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "lint": "eslint src"

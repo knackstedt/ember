@@ -1,198 +1,249 @@
-import { existsSync, readdirSync, statSync, mkdirSync, unlinkSync } from 'fs'
-import { join, extname, basename } from 'path'
-import { createHash } from 'crypto'
-import { exec } from 'child_process'
-import { promisify } from 'util'
-import { app } from 'electron'
-import { getXdgVideosDir } from './xdg'
-import { Movie, TVShow, TVSeason, TVEpisode } from '../../shared/types'
+import { existsSync, readdirSync, statSync, mkdirSync, unlinkSync } from "fs";
+import { join, extname, basename } from "path";
+import { createHash } from "crypto";
+import { exec } from "child_process";
+import { promisify } from "util";
+import { app } from "electron";
+import { getXdgVideosDir } from "./xdg";
+import { Movie, TVShow, TVSeason, TVEpisode } from "../../shared/types";
 
-const execAsync = promisify(exec)
+const execAsync = promisify(exec);
 
 const VIDEO_EXTS = new Set([
-  '.mp4', '.mkv', '.avi', '.mov', '.wmv', '.m4v', '.ts', '.m2ts', '.webm', '.flv'
-])
+  ".mp4",
+  ".mkv",
+  ".avi",
+  ".mov",
+  ".wmv",
+  ".m4v",
+  ".ts",
+  ".m2ts",
+  ".webm",
+  ".flv",
+]);
 
-const TV_PATTERN = /[Ss](\d+)[Ee](\d+)/
+const TV_PATTERN = /[Ss](\d+)[Ee](\d+)/;
 
-const movieThumbCache = join(app.getPath('userData'), 'thumbnails', 'movies')
-mkdirSync(movieThumbCache, { recursive: true })
+const movieThumbCache = join(app.getPath("userData"), "thumbnails", "movies");
+mkdirSync(movieThumbCache, { recursive: true });
 
-let ffmpegAvailable: boolean | undefined
+let ffmpegAvailable: boolean | undefined;
 
 export async function checkFfmpeg(): Promise<boolean> {
-  if (ffmpegAvailable !== undefined) return ffmpegAvailable
+  if (ffmpegAvailable !== undefined) return ffmpegAvailable;
   try {
-    await execAsync('ffmpeg -version', { timeout: 5000 })
-    console.log('[video.scanner] ffmpeg is available')
-    ffmpegAvailable = true
+    await execAsync("ffmpeg -version", { timeout: 5000 });
+    console.log("[video.scanner] ffmpeg is available");
+    ffmpegAvailable = true;
   } catch {
-    console.warn('[video.scanner] ffmpeg NOT found in PATH — thumbnails will not be generated')
-    ffmpegAvailable = false
+    console.warn(
+      "[video.scanner] ffmpeg NOT found in PATH — thumbnails will not be generated",
+    );
+    ffmpegAvailable = false;
   }
-  return ffmpegAvailable
+  return ffmpegAvailable;
 }
 
 interface FfprobeStream {
-  codec_type: string
-  codec_name: string
-  width?: number
-  height?: number
-  disposition?: { attached_pic?: number }
+  codec_type: string;
+  codec_name: string;
+  width?: number;
+  height?: number;
+  disposition?: { attached_pic?: number };
 }
 
 interface FfprobeData {
-  streams?: FfprobeStream[]
-  format?: { duration?: string; tags?: Record<string, string> }
+  streams?: FfprobeStream[];
+  format?: { duration?: string; tags?: Record<string, string> };
 }
 
 async function probVideo(filePath: string): Promise<{
-  duration?: number
-  resolution?: string
-  codec?: string
-  title?: string
+  duration?: number;
+  resolution?: string;
+  codec?: string;
+  title?: string;
 } | null> {
-  if (!(await checkFfmpeg())) return null
+  if (!(await checkFfmpeg())) return null;
   try {
     const { stdout } = await execAsync(
       `ffprobe -v quiet -print_format json -show_streams -show_format "${filePath.replace(/"/g, '\\"')}"`,
-      { timeout: 30000 }
-    )
-    const data: FfprobeData = JSON.parse(stdout)
-    const video = data.streams?.find((s) => s.codec_type === 'video' && s.disposition?.attached_pic !== 1)
+      { timeout: 30000 },
+    );
+    const data: FfprobeData = JSON.parse(stdout);
+    const video = data.streams?.find(
+      (s) => s.codec_type === "video" && s.disposition?.attached_pic !== 1,
+    );
     return {
-      duration: data.format?.duration ? parseFloat(data.format.duration) : undefined,
+      duration: data.format?.duration
+        ? parseFloat(data.format.duration)
+        : undefined,
       resolution: video ? `${video.width}x${video.height}` : undefined,
       codec: video?.codec_name,
-      title: data.format?.tags?.title
-    }
+      title: data.format?.tags?.title,
+    };
   } catch (err) {
-    console.error('[video.scanner] ffprobe failed for', filePath, err)
-    return null
+    console.error("[video.scanner] ffprobe failed for", filePath, err);
+    return null;
   }
 }
 
-async function extractEmbeddedVideoCover(filePath: string, dest: string): Promise<boolean> {
-  if (!(await checkFfmpeg())) return false
+async function extractEmbeddedVideoCover(
+  filePath: string,
+  dest: string,
+): Promise<boolean> {
+  if (!(await checkFfmpeg())) return false;
   try {
     const { stdout } = await execAsync(
       `ffprobe -v quiet -select_streams v -show_entries stream_disposition=attached_pic -of json "${filePath.replace(/"/g, '\\"')}"`,
-      { timeout: 30000 }
-    )
-    const data = JSON.parse(stdout)
-    const streams = data.streams || []
-    const picIndex = streams.findIndex((s: any) => s.disposition?.attached_pic === 1)
+      { timeout: 30000 },
+    );
+    const data = JSON.parse(stdout);
+    const streams = data.streams || [];
+    const picIndex = streams.findIndex(
+      (s: any) => s.disposition?.attached_pic === 1,
+    );
     if (picIndex >= 0) {
       await execAsync(
         `ffmpeg -i "${filePath.replace(/"/g, '\\"')}" -map 0:v:${picIndex} -frames:v 1 -q:v 2 -y "${dest}"`,
-        { timeout: 30000 }
-      )
-      if (existsSync(dest) && statSync(dest).size > 0) return true
-      try { unlinkSync(dest) } catch { /* ignore */ }
-      return false
+        { timeout: 30000 },
+      );
+      if (existsSync(dest) && statSync(dest).size > 0) return true;
+      try {
+        unlinkSync(dest);
+      } catch {
+        /* ignore */
+      }
+      return false;
     }
-    return false
+    return false;
   } catch (err) {
-    console.error('[video.scanner] extractEmbeddedVideoCover failed for', filePath, err)
-    return false
+    console.error(
+      "[video.scanner] extractEmbeddedVideoCover failed for",
+      filePath,
+      err,
+    );
+    return false;
   }
 }
 
-async function generateFrameThumbnail(filePath: string, dest: string, duration?: number): Promise<boolean> {
-  if (!(await checkFfmpeg())) return false
+async function generateFrameThumbnail(
+  filePath: string,
+  dest: string,
+  duration?: number,
+): Promise<boolean> {
+  if (!(await checkFfmpeg())) return false;
   try {
-    let seekSec = 30
+    let seekSec = 30;
     if (duration && duration > 0) {
-      seekSec = Math.max(5, Math.min(Math.round(duration * 0.1), 300))
+      seekSec = Math.max(5, Math.min(Math.round(duration * 0.1), 300));
     }
-    const hh = String(Math.floor(seekSec / 3600)).padStart(2, '0')
-    const mm = String(Math.floor((seekSec % 3600) / 60)).padStart(2, '0')
-    const ss = String(seekSec % 60).padStart(2, '0')
-    const seek = `${hh}:${mm}:${ss}`
+    const hh = String(Math.floor(seekSec / 3600)).padStart(2, "0");
+    const mm = String(Math.floor((seekSec % 3600) / 60)).padStart(2, "0");
+    const ss = String(seekSec % 60).padStart(2, "0");
+    const seek = `${hh}:${mm}:${ss}`;
     await execAsync(
       `ffmpeg -ss ${seek} -i "${filePath.replace(/"/g, '\\"')}" -frames:v 1 -q:v 2 -vf "scale=480:-1" -y "${dest}"`,
-      { timeout: 30000 }
-    )
-    if (existsSync(dest) && statSync(dest).size > 0) return true
-    try { unlinkSync(dest) } catch { /* ignore */ }
-    return false
+      { timeout: 30000 },
+    );
+    if (existsSync(dest) && statSync(dest).size > 0) return true;
+    try {
+      unlinkSync(dest);
+    } catch {
+      /* ignore */
+    }
+    return false;
   } catch (err) {
-    console.error('[video.scanner] generateFrameThumbnail failed for', filePath, err)
-    return false
+    console.error(
+      "[video.scanner] generateFrameThumbnail failed for",
+      filePath,
+      err,
+    );
+    return false;
   }
 }
 
-async function generateMovieThumbnail(filePath: string, id: string, duration?: number): Promise<string | undefined> {
-  const dest = join(movieThumbCache, `${id}.jpg`)
+async function generateMovieThumbnail(
+  filePath: string,
+  id: string,
+  duration?: number,
+): Promise<string | undefined> {
+  const dest = join(movieThumbCache, `${id}.jpg`);
   if (existsSync(dest)) {
     try {
-      if (statSync(dest).size > 0) return `htpc-thumb://thumbnails/movies/${id}.jpg`
-      unlinkSync(dest)
-    } catch { /* ignore */ }
+      if (statSync(dest).size > 0)
+        return `htpc-thumb://thumbnails/movies/${id}.jpg`;
+      unlinkSync(dest);
+    } catch {
+      /* ignore */
+    }
   }
-  const hasEmbedded = await extractEmbeddedVideoCover(filePath, dest)
+  const hasEmbedded = await extractEmbeddedVideoCover(filePath, dest);
   if (hasEmbedded) {
-    return `htpc-thumb://thumbnails/movies/${id}.jpg`
+    return `htpc-thumb://thumbnails/movies/${id}.jpg`;
   }
-  const generated = await generateFrameThumbnail(filePath, dest, duration)
+  const generated = await generateFrameThumbnail(filePath, dest, duration);
   if (generated) {
-    return `htpc-thumb://thumbnails/movies/${id}.jpg`
+    return `htpc-thumb://thumbnails/movies/${id}.jpg`;
   }
-  console.warn('[video.scanner] No thumbnail generated for', filePath)
-  return undefined
+  console.warn("[video.scanner] No thumbnail generated for", filePath);
+  return undefined;
 }
 
 function walkDir(dir: string, results: string[]): void {
-  let entries: string[]
+  let entries: string[];
   try {
-    entries = readdirSync(dir)
+    entries = readdirSync(dir);
   } catch {
-    return
+    return;
   }
   for (const entry of entries) {
-    const full = join(dir, entry)
+    const full = join(dir, entry);
     try {
-      const stat = statSync(full)
+      const stat = statSync(full);
       if (stat.isDirectory()) {
-        walkDir(full, results)
+        walkDir(full, results);
       } else if (VIDEO_EXTS.has(extname(entry).toLowerCase())) {
-        results.push(full)
+        results.push(full);
       }
     } catch {
-      continue
+      continue;
     }
   }
 }
 
 function isTvEpisode(filePath: string): boolean {
-  return TV_PATTERN.test(basename(filePath))
+  return TV_PATTERN.test(basename(filePath));
 }
 
 export async function scanMovieFiles(
   extraPaths: string[] = [],
-  onProgress?: (current: number, total: number) => void
+  onProgress?: (current: number, total: number) => void,
 ): Promise<Movie[]> {
-  const roots = [getXdgVideosDir(), ...extraPaths].filter(existsSync)
-  const allFiles: string[] = []
-  for (const root of roots) walkDir(root, allFiles)
+  const roots = [getXdgVideosDir(), ...extraPaths].filter(existsSync);
+  const allFiles: string[] = [];
+  for (const root of roots) walkDir(root, allFiles);
 
-  const movies: Movie[] = []
-  const total = allFiles.length
+  const movies: Movie[] = [];
+  const total = allFiles.length;
 
   for (let i = 0; i < allFiles.length; i++) {
-    const filePath = allFiles[i]
-    onProgress?.(i, total)
+    const filePath = allFiles[i];
+    onProgress?.(i, total);
 
-    if (isTvEpisode(filePath)) continue
+    if (isTvEpisode(filePath)) continue;
     try {
-      const probe = await probVideo(filePath)
+      const probe = await probVideo(filePath);
       const name = basename(filePath, extname(filePath))
-        .replace(/\.\d{4}\..*$/, '')
-        .replace(/[._]/g, ' ')
-        .trim()
+        .replace(/\.\d{4}\..*$/, "")
+        .replace(/[._]/g, " ")
+        .trim();
 
-      const id = createHash('md5').update(filePath).digest('hex').slice(0, 16)
-      const coverUrl = await generateMovieThumbnail(filePath, id, probe?.duration)
+      const id = createHash("md5").update(filePath).digest("hex").slice(0, 16);
+      const coverUrl = await generateMovieThumbnail(
+        filePath,
+        id,
+        probe?.duration,
+      );
 
       movies.push({
         id,
@@ -202,66 +253,75 @@ export async function scanMovieFiles(
         runtime: probe?.duration ? Math.round(probe.duration) : undefined,
         resolution: probe?.resolution,
         codec: probe?.codec,
-        tags: []
-      })
+        tags: [],
+      });
     } catch (err) {
-      console.error('[video.scanner] Unhandled error processing file:', filePath, err)
+      console.error(
+        "[video.scanner] Unhandled error processing file:",
+        filePath,
+        err,
+      );
     }
   }
 
-  onProgress?.(total, total)
-  return movies
+  onProgress?.(total, total);
+  return movies;
 }
 
-export async function scanTvShows(extraPaths: string[] = []): Promise<TVShow[]> {
-  const roots = [getXdgVideosDir(), ...extraPaths].filter(existsSync)
-  const showMap = new Map<string, { episodes: { season: number; ep: number; path: string }[] }>()
+export async function scanTvShows(
+  extraPaths: string[] = [],
+): Promise<TVShow[]> {
+  const roots = [getXdgVideosDir(), ...extraPaths].filter(existsSync);
+  const showMap = new Map<
+    string,
+    { episodes: { season: number; ep: number; path: string }[] }
+  >();
 
   for (const root of roots) {
-    let dirs: string[]
+    let dirs: string[];
     try {
-      dirs = readdirSync(root)
+      dirs = readdirSync(root);
     } catch {
-      continue
+      continue;
     }
     for (const dir of dirs) {
-      const showPath = join(root, dir)
-      if (!statSync(showPath).isDirectory()) continue
-      const epFiles: string[] = []
-      walkDir(showPath, epFiles)
-      const tvEps = epFiles.filter((f) => isTvEpisode(f))
-      if (tvEps.length === 0) continue
+      const showPath = join(root, dir);
+      if (!statSync(showPath).isDirectory()) continue;
+      const epFiles: string[] = [];
+      walkDir(showPath, epFiles);
+      const tvEps = epFiles.filter((f) => isTvEpisode(f));
+      if (tvEps.length === 0) continue;
 
       const episodes = tvEps.map((f) => {
-        const m = TV_PATTERN.exec(basename(f))!
-        return { season: parseInt(m[1]), ep: parseInt(m[2]), path: f }
-      })
+        const m = TV_PATTERN.exec(basename(f))!;
+        return { season: parseInt(m[1]), ep: parseInt(m[2]), path: f };
+      });
 
-      showMap.set(showPath, { episodes })
+      showMap.set(showPath, { episodes });
     }
   }
 
-  const shows: TVShow[] = []
+  const shows: TVShow[] = [];
 
   for (const [dirPath, { episodes }] of showMap) {
-    const seasonMap = new Map<number, TVEpisode[]>()
+    const seasonMap = new Map<number, TVEpisode[]>();
     for (const { season, ep, path } of episodes) {
-      if (!seasonMap.has(season)) seasonMap.set(season, [])
-      seasonMap.get(season)!.push({ episodeNumber: ep, filePath: path })
+      if (!seasonMap.has(season)) seasonMap.set(season, []);
+      seasonMap.get(season)!.push({ episodeNumber: ep, filePath: path });
     }
 
     const seasons: TVSeason[] = [...seasonMap.entries()]
       .sort(([a], [b]) => a - b)
       .map(([seasonNumber, eps]) => ({
         seasonNumber,
-        episodes: eps.sort((a, b) => a.episodeNumber - b.episodeNumber)
-      }))
+        episodes: eps.sort((a, b) => a.episodeNumber - b.episodeNumber),
+      }));
 
-    const title = basename(dirPath).replace(/[._]/g, ' ').trim()
-    const id = createHash('md5').update(dirPath).digest('hex').slice(0, 16)
+    const title = basename(dirPath).replace(/[._]/g, " ").trim();
+    const id = createHash("md5").update(dirPath).digest("hex").slice(0, 16);
 
-    shows.push({ id, title, dirPath, seasons, tags: [] })
+    shows.push({ id, title, dirPath, seasons, tags: [] });
   }
 
-  return shows
+  return shows;
 }
