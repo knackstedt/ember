@@ -126,17 +126,17 @@ async function generateMovieThumbnail(filePath: string, id: string, duration?: n
   const dest = join(movieThumbCache, `${id}.jpg`)
   if (existsSync(dest)) {
     try {
-      if (statSync(dest).size > 0) return `htpc-thumb://movies/${id}.jpg`
+      if (statSync(dest).size > 0) return `htpc-thumb://thumbnails/movies/${id}.jpg`
       unlinkSync(dest)
     } catch { /* ignore */ }
   }
   const hasEmbedded = await extractEmbeddedVideoCover(filePath, dest)
   if (hasEmbedded) {
-    return `htpc-thumb://movies/${id}.jpg`
+    return `htpc-thumb://thumbnails/movies/${id}.jpg`
   }
   const generated = await generateFrameThumbnail(filePath, dest, duration)
   if (generated) {
-    return `htpc-thumb://movies/${id}.jpg`
+    return `htpc-thumb://thumbnails/movies/${id}.jpg`
   }
   console.warn('[video.scanner] No thumbnail generated for', filePath)
   return undefined

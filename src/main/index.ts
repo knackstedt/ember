@@ -264,7 +264,7 @@ app.whenReady().then(async () => {
     if (pathname.includes('..')) {
       return new Response('Forbidden', { status: 403 })
     }
-    const filePath = join(app.getPath('userData'), 'thumbnails', pathname)
+    const filePath = join(app.getPath('userData'), pathname)
     console.log('[protocol] htpc-thumb request:', request.url, '→', filePath)
     try {
       const data = readFileSync(filePath)

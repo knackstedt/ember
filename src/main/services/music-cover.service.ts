@@ -130,13 +130,13 @@ function buildVisualizerSVG(hash: Buffer): string {
 export async function generateProceduralCover(filePath: string, id: string): Promise<string | undefined> {
   const dest = join(generatedCache, `${id}.svg`)
   if (existsSync(dest)) {
-    return `file://${dest}`
+    return `htpc-thumb://covers/music/generated/${id}.svg`
   }
   try {
     const hash = hashFileHead(filePath)
     const svg = buildVisualizerSVG(hash)
     writeFileSync(dest, svg)
-    return `file://${dest}`
+    return `htpc-thumb://covers/music/generated/${id}.svg`
   } catch (err) {
     console.error('[generateProceduralCover]', err)
     return undefined
@@ -237,14 +237,15 @@ export async function embedCoverArt(track: MusicTrack, imageBuffer: Buffer): Pro
   }
 
   // Update DB
+  const htpcUrl = `htpc-thumb://covers/music/${track.id}.jpg`
   try {
     const db = getDb()
-    await db.query(`UPDATE music_track:⟨${track.id}⟩ SET albumArtUrl = $url`, { url: `file://${cachePath}` })
+    await db.query(`UPDATE music_track:⟨${track.id}⟩ SET albumArtUrl = $url`, { url: htpcUrl })
   } catch (err) {
     console.error('[embedCoverArt] db update failed', err)
   }
 
-  return `file://${cachePath}`
+  return htpcUrl
 }
 
 async function embedMp3Cover(filePath: string, imageBuffer: Buffer): Promise<boolean> {

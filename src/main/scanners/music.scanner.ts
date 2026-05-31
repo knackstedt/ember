@@ -29,7 +29,7 @@ async function extractCover(filePath: string, id: string, pictures?: any[]): Pro
     if (!existsSync(dest)) {
       writeFileSync(dest, picture.data)
     }
-    return `file://${dest}`
+    return `htpc-thumb://covers/music/${id}.jpg`
   } catch {
     return undefined
   }
@@ -51,7 +51,7 @@ function findFolderArt(filePath: string, id: string): string | undefined {
           const data = readFileSync(full)
           writeFileSync(dest, data)
         }
-        return `file://${dest}`
+        return `htpc-thumb://covers/music/${id}.jpg`
       }
     }
     return undefined

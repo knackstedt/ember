@@ -119,7 +119,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
       const pathPart = m.coverUrl.slice('file://'.length)
       if (!pathPart.startsWith(thumbRoot)) return m
       const rel = pathPart.slice(thumbRoot.length + 1).replace(/\\/g, '/')
-      return { ...m, coverUrl: `htpc-thumb://${rel}` }
+      return { ...m, coverUrl: `htpc-thumb://thumbnails/${rel}` }
     })
   })
 
@@ -174,7 +174,15 @@ export function registerIpcHandlers(window: BrowserWindow): void {
   ipcMain.handle('music:list', async () => {
     const db = getDb()
     const result = await db.query<[MusicTrack[]]>('SELECT * FROM music_track ORDER BY artist, album, trackNumber ASC')
-    return result[0] ?? []
+    const tracks = (result[0] ?? []) as MusicTrack[]
+    const coverRoot = join(app.getPath('userData'), 'covers', 'music').replace(/\\/g, '/')
+    return tracks.map((t) => {
+      if (!t.albumArtUrl?.startsWith('file://')) return t
+      const pathPart = t.albumArtUrl.slice('file://'.length)
+      if (!pathPart.startsWith(coverRoot)) return t
+      const rel = pathPart.slice(coverRoot.length + 1).replace(/\\/g, '/')
+      return { ...t, albumArtUrl: `htpc-thumb://covers/music/${rel}` }
+    })
   })
 
   ipcMain.handle('music:launch', (_e, track: MusicTrack) => {
