@@ -184,6 +184,43 @@ export interface ButtonMapping {
   action: string;
 }
 
+export type FlashAspectRatio = "free" | "4:3" | "16:9" | "16:10";
+export type FlashUpscaleStyle = "none" | "gaussian" | "pixelate";
+export type FlashCanvasSize =
+  | "window"
+  | "550x400"
+  | "640x480"
+  | "800x600"
+  | "1024x768"
+  | "custom";
+
+export interface FlashControllerMap {
+  south: string;
+  east: string;
+  north: string;
+  west: string;
+  left_bumper: string;
+  right_bumper: string;
+  select: string;
+  start: string;
+  dpad_up: string;
+  dpad_down: string;
+  dpad_left: string;
+  dpad_right: string;
+}
+
+export interface FlashSettings {
+  aspectRatio: FlashAspectRatio;
+  canvasSize: FlashCanvasSize;
+  customWidth: number;
+  customHeight: number;
+  upscaleStyle: FlashUpscaleStyle;
+  controllerMap: FlashControllerMap;
+  stickToMouse: boolean;
+  stickSensitivity: number;
+  aiUpscaling: boolean;
+}
+
 export interface AppSettings {
   theme: ThemeName;
   fullscreen: boolean;
@@ -198,6 +235,7 @@ export interface AppSettings {
   enableAnalytics: boolean;
   startOnBoot: boolean;
   hardwareAcceleration: boolean;
+  flashSettings?: FlashSettings;
 }
 
 export interface PluginManifest {

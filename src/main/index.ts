@@ -126,6 +126,15 @@ protocol.registerSchemesAsPrivileged([
       corsEnabled: true,
     },
   },
+  {
+    scheme: "htpc-game",
+    privileges: {
+      secure: true,
+      standard: true,
+      supportFetchAPI: true,
+      corsEnabled: true,
+    },
+  },
 ]);
 
 app.whenReady().then(async () => {
@@ -152,6 +161,30 @@ app.whenReady().then(async () => {
       });
     } catch {
       console.warn("[protocol] file not found:", filePath);
+      return new Response("Not Found", { status: 404 });
+    }
+  });
+
+  protocol.handle("htpc-game", async (request) => {
+    const url = new URL(request.url);
+    const filePath = decodeURIComponent(url.pathname);
+    if (!filePath || filePath.includes("..")) {
+      return new Response("Forbidden", { status: 403 });
+    }
+    try {
+      const data = readFileSync(filePath);
+      const ext = filePath.toLowerCase().slice(filePath.lastIndexOf("."));
+      let contentType = "application/octet-stream";
+      if (ext === ".swf") contentType = "application/x-shockwave-flash";
+      else if (ext === ".jpg" || ext === ".jpeg") contentType = "image/jpeg";
+      else if (ext === ".png") contentType = "image/png";
+      else if (ext === ".svg") contentType = "image/svg+xml";
+      else if (ext === ".webp") contentType = "image/webp";
+      return new Response(new Uint8Array(data), {
+        headers: { "Content-Type": contentType },
+      });
+    } catch {
+      console.warn("[protocol] game file not found:", filePath);
       return new Response("Not Found", { status: 404 });
     }
   });

@@ -17,6 +17,7 @@ import { Game, GamePlatform } from "../../../../shared/types";
 import { useGridFocus } from "../../hooks/useGridFocus";
 import { useContextMenu } from "../../hooks/useContextMenu";
 import { ContextMenuOption } from "../../components/ContextMenu/ContextMenu";
+import { useFlashPlayerStore } from "../../store/flashPlayer.store";
 
 const PLATFORM_FILTERS: ChipFilter<
   GamePlatform | "all" | "couch-coop" | "favorites"
@@ -149,7 +150,11 @@ export const GamingTab: React.FC = () => {
   const badge = selected ? gameBadge(selected) : undefined;
 
   const launch = (game: Game): void => {
-    window.htpc.games.launch(game);
+    if (game.platform === "flash" && game.romPath) {
+      useFlashPlayerStore.getState().launch(game.romPath, game.title);
+    } else {
+      window.htpc.games.launch(game);
+    }
   };
 
   const recentlyPlayed = [...games]

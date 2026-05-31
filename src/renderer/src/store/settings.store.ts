@@ -20,6 +20,30 @@ const defaults: AppSettings = {
   enableAnalytics: false,
   startOnBoot: false,
   hardwareAcceleration: true,
+  flashSettings: {
+    aspectRatio: "free",
+    canvasSize: "window",
+    customWidth: 800,
+    customHeight: 600,
+    upscaleStyle: "none",
+    controllerMap: {
+      south: "Space",
+      east: "Escape",
+      north: "KeyE",
+      west: "KeyQ",
+      left_bumper: "ShiftLeft",
+      right_bumper: "ShiftRight",
+      select: "Tab",
+      start: "Enter",
+      dpad_up: "ArrowUp",
+      dpad_down: "ArrowDown",
+      dpad_left: "ArrowLeft",
+      dpad_right: "ArrowRight",
+    },
+    stickToMouse: true,
+    stickSensitivity: 1.0,
+    aiUpscaling: false,
+  },
 };
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({

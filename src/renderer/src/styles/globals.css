@@ -183,3 +183,11 @@ html, body, #root {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-accent-dim);
 }
+
+/* Ruffle player fills and stretches its container */
+#ruffle-player-instance,
+#ruffle-player-instance canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}

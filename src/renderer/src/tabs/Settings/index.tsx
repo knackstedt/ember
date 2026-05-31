@@ -1,7 +1,42 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSettingsStore } from "../../store/settings.store";
-import { ThemeName } from "../../../../shared/types";
+import {
+  ThemeName,
+  FlashAspectRatio,
+  FlashCanvasSize,
+  FlashUpscaleStyle,
+  FlashSettings,
+} from "../../../../shared/types";
+
+const DEFAULT_FLASH_SETTINGS: FlashSettings = {
+  aspectRatio: "free",
+  canvasSize: "window",
+  customWidth: 800,
+  customHeight: 600,
+  upscaleStyle: "none",
+  controllerMap: {
+    south: "Space",
+    east: "Escape",
+    north: "KeyE",
+    west: "KeyQ",
+    left_bumper: "ShiftLeft",
+    right_bumper: "ShiftRight",
+    select: "Tab",
+    start: "Enter",
+    dpad_up: "ArrowUp",
+    dpad_down: "ArrowDown",
+    dpad_left: "ArrowLeft",
+    dpad_right: "ArrowRight",
+  },
+  stickToMouse: true,
+  stickSensitivity: 1.0,
+  aiUpscaling: false,
+};
+
+function getFlashSettings(settings?: Partial<FlashSettings>): FlashSettings {
+  return { ...DEFAULT_FLASH_SETTINGS, ...settings };
+}
 
 const THEMES: { id: ThemeName; label: string; preview: string }[] = [
   { id: "dark-oled", label: "Dark OLED", preview: "#000" },
@@ -366,6 +401,177 @@ export const SettingsTab: React.FC = () => {
             value={settings.hardwareAcceleration}
             onChange={(v) => update({ hardwareAcceleration: v })}
           />
+        </section>
+
+        <section className="flex flex-col gap-4">
+          <h2
+            className="text-lg font-semibold"
+            style={{ color: "var(--color-text)" }}
+          >
+            Flash Player
+          </h2>
+          <div className="flex flex-col gap-3">
+            <div>
+              <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--color-text-dim)" }}>
+                Default Aspect Ratio
+              </label>
+              <select
+                value={settings.flashSettings?.aspectRatio ?? "free"}
+                onChange={(e) =>
+                  update({
+                    flashSettings: {
+                      ...getFlashSettings(settings.flashSettings),
+                      aspectRatio: e.target.value as FlashAspectRatio,
+                    },
+                  })
+                }
+                className="w-full text-sm px-2 py-1.5 rounded"
+                style={{
+                  background: "var(--color-surface-raised)",
+                  border: "1px solid var(--color-border)",
+                  color: "var(--color-text)",
+                  outline: "none",
+                }}
+              >
+                <option value="free">Free (fill window)</option>
+                <option value="4:3">4:3</option>
+                <option value="16:9">16:9</option>
+                <option value="16:10">16:10</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--color-text-dim)" }}>
+                Default Canvas Size
+              </label>
+              <select
+                value={settings.flashSettings?.canvasSize ?? "window"}
+                onChange={(e) =>
+                  update({
+                    flashSettings: {
+                      ...getFlashSettings(settings.flashSettings),
+                      canvasSize: e.target.value as FlashCanvasSize,
+                    },
+                  })
+                }
+                className="w-full text-sm px-2 py-1.5 rounded"
+                style={{
+                  background: "var(--color-surface-raised)",
+                  border: "1px solid var(--color-border)",
+                  color: "var(--color-text)",
+                  outline: "none",
+                }}
+              >
+                <option value="window">Fit Window</option>
+                <option value="550x400">550x400 (Common Flash)</option>
+                <option value="640x480">640x480 (VGA)</option>
+                <option value="800x600">800x600 (SVGA)</option>
+                <option value="1024x768">1024x768 (XGA)</option>
+                <option value="custom">Custom…</option>
+              </select>
+              {(settings.flashSettings?.canvasSize ?? "window") === "custom" && (
+                <div className="flex gap-2 mt-2">
+                  <input
+                    type="number"
+                    min={1}
+                    max={3840}
+                    value={settings.flashSettings?.customWidth ?? 800}
+                    onChange={(e) =>
+                      update({
+                        flashSettings: {
+                          ...getFlashSettings(settings.flashSettings),
+                          customWidth: parseInt(e.target.value) || 1,
+                        },
+                      })
+                    }
+                    placeholder="Width"
+                    className="flex-1 text-sm px-2 py-1.5 rounded"
+                    style={{
+                      background: "var(--color-surface-raised)",
+                      border: "1px solid var(--color-border)",
+                      color: "var(--color-text)",
+                      outline: "none",
+                    }}
+                  />
+                  <input
+                    type="number"
+                    min={1}
+                    max={2160}
+                    value={settings.flashSettings?.customHeight ?? 600}
+                    onChange={(e) =>
+                      update({
+                        flashSettings: {
+                          ...getFlashSettings(settings.flashSettings),
+                          customHeight: parseInt(e.target.value) || 1,
+                        },
+                      })
+                    }
+                    placeholder="Height"
+                    className="flex-1 text-sm px-2 py-1.5 rounded"
+                    style={{
+                      background: "var(--color-surface-raised)",
+                      border: "1px solid var(--color-border)",
+                      color: "var(--color-text)",
+                      outline: "none",
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+            <div>
+              <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--color-text-dim)" }}>
+                Default Upscaling Style
+              </label>
+              <select
+                value={settings.flashSettings?.upscaleStyle ?? "none"}
+                onChange={(e) =>
+                  update({
+                    flashSettings: {
+                      ...getFlashSettings(settings.flashSettings),
+                      upscaleStyle: e.target.value as FlashUpscaleStyle,
+                    },
+                  })
+                }
+                className="w-full text-sm px-2 py-1.5 rounded"
+                style={{
+                  background: "var(--color-surface-raised)",
+                  border: "1px solid var(--color-border)",
+                  color: "var(--color-text)",
+                  outline: "none",
+                }}
+              >
+                <option value="none">None (Smooth)</option>
+                <option value="gaussian">Gaussian (Soft blur)</option>
+                <option value="pixelate">Pixelate (Crisp pixels)</option>
+              </select>
+            </div>
+            <Toggle
+              label="Stick to Mouse"
+              value={settings.flashSettings?.stickToMouse ?? true}
+              onChange={(v) =>
+                update({
+                  flashSettings: {
+                    ...getFlashSettings(settings.flashSettings),
+                    stickToMouse: v,
+                  },
+                })
+              }
+            />
+            <div className="flex items-center justify-between">
+              <span className="text-xs" style={{ color: "var(--color-text-dim)" }}>
+                AI Upscaling (Experimental)
+              </span>
+              <span
+                className="text-[10px] px-1.5 py-0.5 rounded font-medium"
+                style={{
+                  background: "#ffaa0020",
+                  color: "#ffaa00",
+                  border: "1px solid #ffaa0030",
+                }}
+              >
+                Coming Soon
+              </span>
+            </div>
+          </div>
         </section>
 
         <section className="flex flex-col gap-4">

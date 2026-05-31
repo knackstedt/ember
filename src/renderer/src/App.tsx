@@ -18,6 +18,8 @@ import { MusicPlayer } from "./components/MusicPlayer/MusicPlayer";
 import { useMusicPlayerStore } from "./store/musicPlayer.store";
 import { VideoPlayer } from "./components/VideoPlayer/VideoPlayer";
 import { useVideoPlayerStore } from "./store/videoPlayer.store";
+import { FlashPlayer } from "./components/FlashPlayer/FlashPlayer";
+import { useFlashPlayerStore } from "./store/flashPlayer.store";
 import { useContextMenuStore } from "./store/contextMenu.store";
 
 interface TabDef {
@@ -101,7 +103,7 @@ export default function App(): React.ReactElement {
       }
     });
 
-    return unsubScan;
+    return () => { unsubScan(); };
   }, []);
 
   useEffect(() => {
@@ -168,6 +170,11 @@ export default function App(): React.ReactElement {
     const longPressTimers = new Map<string, number>();
 
     const handler = (e: KeyboardEvent): void => {
+      // Let Flash Player receive raw keyboard events; only allow Escape/F11
+      if (useFlashPlayerStore.getState().open && !(e.key === "Escape" || e.key === "F11")) {
+        return;
+      }
+
       const target = e.target as HTMLElement | null;
       const isTyping =
         target != null &&
@@ -201,16 +208,17 @@ export default function App(): React.ReactElement {
             longPressTimers.delete(e.key);
           }
         }
-      } else if (!isTyping && e.key === "q") {
+      } else if (!isTyping && e.type === "keydown" && e.key === "q") {
         e.preventDefault();
         const idx = TAB_IDS.indexOf(activeTabRef.current);
         setActiveTab(TAB_IDS[(idx - 1 + TAB_IDS.length) % TAB_IDS.length]);
-      } else if (!isTyping && e.key === "e") {
+      } else if (!isTyping && e.type === "keydown" && e.key === "e") {
         e.preventDefault();
         const idx = TAB_IDS.indexOf(activeTabRef.current);
         setActiveTab(TAB_IDS[(idx + 1) % TAB_IDS.length]);
       } else if (
         !isTyping &&
+        e.type === "keydown" &&
         [
           "w",
           "a",
@@ -247,15 +255,15 @@ export default function App(): React.ReactElement {
             );
           }
         }
-      } else if (e.key === "Tab" && !e.shiftKey) {
+      } else if (e.type === "keydown" && e.key === "Tab" && !e.shiftKey) {
         e.preventDefault();
         const idx = TAB_IDS.indexOf(activeTabRef.current);
         setActiveTab(TAB_IDS[(idx + 1) % TAB_IDS.length]);
-      } else if (e.key === "Tab" && e.shiftKey) {
+      } else if (e.type === "keydown" && e.key === "Tab" && e.shiftKey) {
         e.preventDefault();
         const idx = TAB_IDS.indexOf(activeTabRef.current);
         setActiveTab(TAB_IDS[(idx - 1 + TAB_IDS.length) % TAB_IDS.length]);
-      } else if (e.key === "F5") {
+      } else if (e.type === "keydown" && e.key === "F5") {
         e.preventDefault();
         const scanMap: Partial<Record<TabId, () => void>> = {
           gaming: () => useGamesStore.getState().scan(),
@@ -318,6 +326,7 @@ export default function App(): React.ReactElement {
       <ThemeBackground />
 
       <AnimatePresence>{videoOpen && <VideoPlayer />}</AnimatePresence>
+      <FlashPlayer />
 
       <div className="relative z-10 flex flex-col h-full">
         {/* Tab bar */}

@@ -10,6 +10,7 @@
     "lint": "eslint src"
   },
   "dependencies": {
+    "@ruffle-rs/ruffle": "^0.2.0",
     "@surrealdb/node": "^3.0.0",
     "castv2": "^0.1.10",
     "esbuild": "^0.21.5",

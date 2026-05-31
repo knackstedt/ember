@@ -5,6 +5,7 @@
     "": {
       "name": "htpc",
       "dependencies": {
+        "@ruffle-rs/ruffle": "^0.2.0",
         "@surrealdb/node": "^3.0.0",
         "castv2": "^0.1.10",
         "esbuild": "^0.21.5",
@@ -219,6 +220,8 @@
     "@rollup/rollup-win32-x64-gnu": ["@rollup/rollup-win32-x64-gnu@4.60.4", "", { "os": "win32", "cpu": "x64" }, "sha512-DRS4G7mi9lJxqEDezIkKCaUIKCrLUUDCUaCsTPCi/rtqaC6D/jjwslMQyiDU50Ka0JKpeXeRBFBAXwArY52vBw=="],
 
     "@rollup/rollup-win32-x64-msvc": ["@rollup/rollup-win32-x64-msvc@4.60.4", "", { "os": "win32", "cpu": "x64" }, "sha512-QVTUovf40zgTqlFVrKA1uXMVvU2QWEFWfAH8Wdc48IxLvrJMQVMBRjuQyUpzZCDkakImib9eVazbWlC6ksWtJw=="],
+
+    "@ruffle-rs/ruffle": ["@ruffle-rs/ruffle@0.2.0", "", {}, "sha512-3SgiTrl+q4cCROpWiKZIwXyrWBpxfSFB42sNUINq1X4IcLNy/lq00UBbIonMB99Onmo1nx91lWxkI83I2tMwvw=="],
 
     "@sec-ant/readable-stream": ["@sec-ant/readable-stream@0.4.1", "", {}, "sha512-831qok9r2t8AlxLko40y2ebgSDhenenCatLVeW/uBtnHPyhHOvG0C7TvfgecV+wHzIm5KUICgzmVpWS+IMEAeg=="],
 

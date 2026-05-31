@@ -1,4 +1,5 @@
 import { join, dirname } from "path";
+import { readFileSync } from "fs";
 import { BrowserWindow, ipcMain, app, dialog, shell } from "electron";
 import {
   getSettings,
@@ -526,5 +527,14 @@ export function registerIpcHandlers(window: BrowserWindow): void {
 
   ipcMain.handle("shell:showItemInFolder", async (_e, path: string) => {
     shell.showItemInFolder(path);
+  });
+
+  ipcMain.handle("files:read", async (_e, filePath: string) => {
+    try {
+      return readFileSync(filePath);
+    } catch (err) {
+      console.warn("[files:read] failed:", filePath, err);
+      return null;
+    }
   });
 }

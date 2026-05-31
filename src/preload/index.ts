@@ -152,6 +152,11 @@ const htpc = {
       Promise.resolve(shell.showItemInFolder(path)),
   },
 
+  files: {
+    read: (filePath: string): Promise<Uint8Array | null> =>
+      ipcRenderer.invoke("files:read", filePath),
+  },
+
   onScanProgress: (cb: (progress: ScanProgress) => void) => {
     const handler = (_: Electron.IpcRendererEvent, p: ScanProgress) => cb(p);
     ipcRenderer.on("scan:progress", handler);
