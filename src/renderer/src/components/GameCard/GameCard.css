@@ -135,8 +135,8 @@
   mask-repeat: repeat;
   -webkit-mask-repeat: repeat;
   transition: filter 0.8s ease;
-  filter: brightness(1.1) contrast(1.1) saturate(0.5) opacity(0.35);
-  animation: gc-holo-bg 18s linear infinite, gc-watermark-slide 30s linear infinite;
+  filter: brightness(1.1) contrast(1.1) saturate(0.5) opacity(0.25);
+  animation: gc-holo-bg 18s linear infinite, gc-watermark-slide 90s linear infinite;
   animation-play-state: running, running;
   mix-blend-mode: screen;
 }
@@ -195,15 +195,14 @@
   background-position: center;
   background-size: cover;
   grid-area: 1 / 1;
-  opacity: 0.35;
+  opacity: 0.5;
   transition: opacity 0.8s ease;
 }
 
 .gc-card:hover .gc-shine,
 .gc-card.active .gc-shine,
 .gc-card-wrapper.focused .gc-shine {
-  filter: brightness(1.2) contrast(1.5) saturate(0.8) opacity(0.85);
-  animation-play-state: paused, paused;
+  filter: brightness(1.2) contrast(1.5) saturate(0.8) opacity(0.3);
 }
 
 .gc-card:hover .gc-shine::before,
