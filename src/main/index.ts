@@ -8,7 +8,7 @@ import { getSettings } from "./services/settings.service";
 
 const isDev = !app.isPackaged || process.env.NODE_ENV === "development";
 
-if (!app.requestSingleInstanceLock()) {
+if (!isDev && !app.requestSingleInstanceLock()) {
   console.log("[lock] Another instance is already running, exiting");
   app.exit(0);
 }
