@@ -5,6 +5,7 @@ import { initDb } from "./db";
 import { registerIpcHandlers } from "./ipc";
 import { initInputSystem, destroyInputSystem } from "./input/evdev";
 import { getSettings } from "./services/settings.service";
+import { getWindowState, saveWindowState } from "./services/window-state.service";
 
 const isDev = !app.isPackaged || process.env.NODE_ENV === "development";
 
@@ -31,10 +32,14 @@ let mainWindow: BrowserWindow | null = null;
 async function createWindow(): Promise<void> {
   await initDb();
   const settings = await getSettings();
+  const winState = getWindowState();
+  console.log("[window-state] creating window with", winState);
 
   mainWindow = new BrowserWindow({
-    width: 1280,
-    height: 720,
+    width: winState.width,
+    height: winState.height,
+    x: winState.x,
+    y: winState.y,
     show: false,
     fullscreen: settings.fullscreen ?? false,
     backgroundColor: "#000000",
@@ -51,8 +56,27 @@ async function createWindow(): Promise<void> {
     },
   });
 
+  const persistBounds = () => {
+    if (!mainWindow) return;
+    const bounds = mainWindow.getNormalBounds();
+    saveWindowState({
+      width: bounds.width,
+      height: bounds.height,
+      x: bounds.x,
+      y: bounds.y,
+      maximized: mainWindow.isMaximized(),
+    });
+  };
+
+  mainWindow.on("resize", persistBounds);
+  mainWindow.on("move", persistBounds);
+  mainWindow.on("close", persistBounds);
+
   mainWindow.on("ready-to-show", () => {
     mainWindow?.show();
+    if (winState.maximized && mainWindow && !mainWindow.isMaximized()) {
+      mainWindow.maximize();
+    }
   });
 
   mainWindow.webContents.on("did-finish-load", () => {
