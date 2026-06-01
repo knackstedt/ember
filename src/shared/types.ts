@@ -42,6 +42,7 @@ export interface Game {
   platform: GamePlatform;
   execPath?: string;
   coverUrl?: string;
+  coverSource?: string;
   bannerUrl?: string;
   description?: string;
   genres?: string[];
@@ -309,5 +310,8 @@ export type IpcChannel =
   | "movies:hide"
   | "music:hide"
   | "tv:hide"
+  | "movies:regenerateThumbnail"
+  | "tv:regenerateThumbnail"
+  | "games:regenerateThumbnail"
   | "shell:openPath"
   | "shell:showItemInFolder";

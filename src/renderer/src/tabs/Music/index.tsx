@@ -243,6 +243,11 @@ export const MusicTab: React.FC = () => {
       { id: "hide", label: "Hide", icon: "🙈", destructive: true },
       { id: "tags", label: "Update metadata / tags", icon: "🏷" },
       {
+        id: "searchCover",
+        label: "Search cover art",
+        icon: "🔄",
+      },
+      {
         id: "folder",
         label: "Open containing folder",
         icon: "📂",
@@ -259,6 +264,9 @@ export const MusicTab: React.FC = () => {
           break;
         case "tags":
           setSelected(track);
+          break;
+        case "searchCover":
+          void searchCoverArt(track.id);
           break;
         case "folder":
           if (track.filePath) {

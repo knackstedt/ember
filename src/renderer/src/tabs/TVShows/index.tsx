@@ -27,7 +27,9 @@ export const TVShowsTab: React.FC = () => {
     setSearch,
     filtered,
     hide,
+    regenerateThumbnail,
   } = useTvStore();
+  const regeneratingIds = useTvStore((s) => s.regeneratingIds);
   const openVideo = useVideoPlayerStore((s) => s.open);
   const [selected, setSelected] = useState<TVShow | null>(null);
   const [selectedSeason, setSelectedSeason] = useState<number>(1);
@@ -79,6 +81,12 @@ export const TVShowsTab: React.FC = () => {
       { id: "hide", label: "Hide", icon: "🙈", destructive: true },
       { id: "tags", label: "Update metadata / tags", icon: "🏷" },
       {
+        id: "regenerate",
+        label: "Regenerate thumbnail",
+        icon: "🔄",
+        disabled: !show.dirPath,
+      },
+      {
         id: "folder",
         label: "Open containing folder",
         icon: "📂",
@@ -95,6 +103,9 @@ export const TVShowsTab: React.FC = () => {
           break;
         case "tags":
           setSelected(show);
+          break;
+        case "regenerate":
+          void regenerateThumbnail(show.id);
           break;
         case "folder":
           if (show.dirPath) {
@@ -194,6 +205,7 @@ export const TVShowsTab: React.FC = () => {
                   coverUrl={show.coverUrl}
                   isFavorite={show.isFavorite}
                   isFocused={index === focusedIndex}
+                  isLoading={regeneratingIds.has(show.id)}
                   onSelect={() => setSelected(show)}
                   onFavorite={() => toggleFavorite(show.id)}
                 />

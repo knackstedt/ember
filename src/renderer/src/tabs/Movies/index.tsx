@@ -37,7 +37,9 @@ export const MoviesTab: React.FC = () => {
     setTags,
     filtered,
     hide,
+    regenerateThumbnail,
   } = useMoviesStore();
+  const regeneratingIds = useMoviesStore((s) => s.regeneratingIds);
   const openVideo = useVideoPlayerStore((s) => s.open);
   const [selected, setSelected] = useState<Movie | null>(null);
   const [subTab, setSubTab] = useState<SubTab>("local");
@@ -76,6 +78,12 @@ export const MoviesTab: React.FC = () => {
       { id: "hide", label: "Hide", icon: "🙈", destructive: true },
       { id: "tags", label: "Update metadata / tags", icon: "🏷" },
       {
+        id: "regenerate",
+        label: "Regenerate thumbnail",
+        icon: "🔄",
+        disabled: !movie.filePath,
+      },
+      {
         id: "folder",
         label: "Open containing folder",
         icon: "📂",
@@ -92,6 +100,9 @@ export const MoviesTab: React.FC = () => {
           break;
         case "tags":
           setSelected(movie);
+          break;
+        case "regenerate":
+          void regenerateThumbnail(movie.id);
           break;
         case "folder":
           if (movie.filePath) {
@@ -248,6 +259,7 @@ export const MoviesTab: React.FC = () => {
                       coverUrl={movie.coverUrl}
                       isFavorite={movie.isFavorite}
                       isFocused={index === focusedIndex}
+                      isLoading={regeneratingIds.has(movie.id)}
                       progress={movie.watchProgress}
                       onSelect={() => setSelected(movie)}
                       onFavorite={() => toggleFavorite(movie.id)}

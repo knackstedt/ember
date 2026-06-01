@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 
 export interface MediaCardProps {
@@ -57,6 +57,9 @@ export const MediaCard: React.FC<MediaCardProps> = ({
   isLoading,
 }) => {
   const [imgError, setImgError] = useState(false);
+  useEffect(() => {
+    setImgError(false);
+  }, [coverUrl]);
   const showPlaceholder = !coverUrl || imgError;
 
   return (
@@ -100,14 +103,8 @@ export const MediaCard: React.FC<MediaCardProps> = ({
           />
         )}
         {isLoading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-            <div
-              className="w-6 h-6 rounded-full border-2 border-t-transparent animate-spin"
-              style={{
-                borderColor: "var(--color-accent)",
-                borderTopColor: "transparent",
-              }}
-            />
+          <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-10">
+            <div className="w-7 h-7 rounded-full border-[3px] border-white/30 border-t-white animate-spin" />
           </div>
         )}
 

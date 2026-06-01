@@ -34,6 +34,46 @@ function getRuffleBaseUrl(): string {
   return `file://${join(__dirname, "../renderer/ruffle")}`;
 }
 
+/* ------------------------------------------------------------------ */
+/*  Per-SWF capture config                                            */
+/* ------------------------------------------------------------------ */
+
+interface FlashCaptureConfig {
+  width: number;
+  height: number;
+  waitMs: number;
+  timeoutMs: number;
+  backgroundColor: string;
+}
+
+const DEFAULT_CAPTURE_CONFIG: FlashCaptureConfig = {
+  width: 800,
+  height: 600,
+  waitMs: 15000,
+  timeoutMs: 45000,
+  backgroundColor: "#000",
+};
+
+function loadCaptureConfig(swfPath: string): FlashCaptureConfig {
+  const configPath = join(
+    dirname(swfPath),
+    `${basename(swfPath, extname(swfPath))}.htpc.json`,
+  );
+  if (!existsSync(configPath)) return DEFAULT_CAPTURE_CONFIG;
+  try {
+    const raw = JSON.parse(readFileSync(configPath, "utf-8"));
+    return {
+      width: typeof raw.width === "number" ? raw.width : DEFAULT_CAPTURE_CONFIG.width,
+      height: typeof raw.height === "number" ? raw.height : DEFAULT_CAPTURE_CONFIG.height,
+      waitMs: typeof raw.waitMs === "number" ? raw.waitMs : DEFAULT_CAPTURE_CONFIG.waitMs,
+      timeoutMs: typeof raw.timeoutMs === "number" ? raw.timeoutMs : DEFAULT_CAPTURE_CONFIG.timeoutMs,
+      backgroundColor: typeof raw.backgroundColor === "string" ? raw.backgroundColor : DEFAULT_CAPTURE_CONFIG.backgroundColor,
+    };
+  } catch {
+    return DEFAULT_CAPTURE_CONFIG;
+  }
+}
+
 function hashFileHead(filePath: string): Buffer {
   try {
     const fd = openSync(filePath, "r");
@@ -226,7 +266,7 @@ function isImageUniform(image: NativeImage): boolean {
   return variance < 600;
 }
 
-function buildCaptureHTML(swfPath: string): string {
+function buildCaptureHTML(swfPath: string, config: FlashCaptureConfig): string {
   const ruffleUrl = getRuffleBaseUrl();
   const escapedSwf = swfPath.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
   return `<!DOCTYPE html>
@@ -235,7 +275,7 @@ function buildCaptureHTML(swfPath: string): string {
 <meta charset="utf-8">
 <base href="${ruffleUrl}/">
 <style>
-html,body{margin:0;padding:0;width:800px;height:600px;background:#000;overflow:hidden;display:flex;align-items:center;justify-content:center}
+html,body{margin:0;padding:0;width:${config.width}px;height:${config.height}px;background:${config.backgroundColor};overflow:hidden;display:flex;align-items:center;justify-content:center}
 #player{width:100%;height:100%}
 </style>
 <script src="${ruffleUrl}/ruffle.js"></script>
@@ -256,7 +296,7 @@ async function run() {
     document.getElementById('player').appendChild(player);
     const data = fs.readFileSync('${escapedSwf}');
     await player.load({ data });
-    const waitMs = Math.min(35000, 5000 + (data.length / (1024 * 1024)) * 1000);
+    const waitMs = ${config.waitMs};
     setTimeout(() => ipcRenderer.send('flash-capture:ready'), waitMs);
   } catch (err) {
     ipcRenderer.send('flash-capture:error', String(err));
@@ -271,10 +311,10 @@ else window.addEventListener('load', run);
 }
 
 class ScreenshotQueue {
-  private queue: Array<{ game: Game; resolve: (url?: string) => void }> = [];
+  private queue: Array<{ game: Game; resolve: (result: { url?: string; source?: string }) => void }> = [];
   private running = false;
 
-  enqueue(game: Game): Promise<string | undefined> {
+  enqueue(game: Game): Promise<{ url?: string; source?: string }> {
     return new Promise((resolve) => {
       this.queue.push({ game, resolve });
       this.process();
@@ -291,34 +331,37 @@ class ScreenshotQueue {
         item.resolve(result);
       } catch (e) {
         console.error("[flash:screenshot] queue error:", e);
-        item.resolve(undefined);
+        item.resolve({});
       }
     }
     this.running = false;
   }
 
-  private async run(game: Game): Promise<string | undefined> {
-    if (!game.romPath) return undefined;
+  private async run(game: Game): Promise<{ url?: string; source?: string }> {
+    const romPath = game.romPath;
+    if (!romPath) return {};
     const id = game.id;
     const destPath = join(screenshotDir, `${id}.png`);
     if (existsSync(destPath)) {
-      return `htpc-thumb://covers/flash/screenshots/${id}.png`;
+      return { url: `htpc-thumb://covers/flash/screenshots/${id}.png`, source: "ruffle-screenshot" };
     }
 
-    return new Promise<string | undefined>((resolve) => {
+    return new Promise<{ url?: string; source?: string }>((resolve) => {
       let resolved = false;
-      const resolveOnce = (val?: string) => {
+      const resolveOnce = (val?: string, source?: string) => {
         if (resolved) return;
         resolved = true;
-        resolve(val);
+        resolve({ url: val, source });
         try {
           win.destroy();
         } catch {}
       };
 
+      const config = loadCaptureConfig(romPath);
+
       const win = new BrowserWindow({
-        width: 800,
-        height: 600,
+        width: config.width,
+        height: config.height,
         show: false,
         frame: false,
         skipTaskbar: true,
@@ -329,6 +372,7 @@ class ScreenshotQueue {
         },
       });
       win.webContents.setAudioMuted(true);
+      win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
 
       const targetId = win.webContents.id;
 
@@ -339,24 +383,29 @@ class ScreenshotQueue {
           .webContents.capturePage()
           .then((image: NativeImage) => {
             if (isImageUniform(image)) {
-              // Mostly blank — generate procedural instead
-              const svgUrl = generateProceduralThumbnail(game.romPath!, id);
-              resolveOnce(svgUrl);
+              console.warn(`[flash:screenshot] blank/uniform screenshot for "${game.title}" (${id}), falling back to procedural`);
+              const svgUrl = generateProceduralThumbnail(romPath, id);
+              resolveOnce(svgUrl, "procedural-blank");
             } else {
               const png = image.toPNG();
               writeFileSync(destPath, png);
               resolveOnce(
                 `htpc-thumb://covers/flash/screenshots/${id}.png`,
+                "ruffle-screenshot",
               );
             }
           })
-          .catch(() => resolveOnce());
+          .catch((err) => {
+            console.error(`[flash:screenshot] capturePage failed for "${game.title}" (${id}):`, err);
+            resolveOnce(undefined, "procedural-capture-error");
+          });
       };
 
       const onError = (event: Electron.IpcMainEvent, _err: string) => {
         if (event.sender.id !== targetId) return;
+        console.error(`[flash:screenshot] Ruffle IPC error for "${game.title}" (${id}):`, _err);
         cleanup();
-        resolveOnce();
+        resolveOnce(undefined, "procedural-ruffle-error");
       };
 
       const cleanup = () => {
@@ -367,26 +416,32 @@ class ScreenshotQueue {
       ipcMain.on("flash-capture:ready", onReady);
       ipcMain.on("flash-capture:error", onError);
 
-      const html = buildCaptureHTML(game.romPath);
+      const html = buildCaptureHTML(romPath, config);
       win
         .loadURL(`data:text/html,${encodeURIComponent(html)}`)
-        .catch(() => {
+        .catch((err) => {
+          console.error(`[flash:screenshot] window load failed for "${game.title}" (${id}):`, err);
           cleanup();
-          resolveOnce();
+          resolveOnce(undefined, "procedural-load-error");
         });
 
       setTimeout(() => {
         if (!resolved) {
+          console.warn(`[flash:screenshot] timeout for "${game.title}" (${id}) after ${config.timeoutMs}ms, giving up`);
           cleanup();
-          resolveOnce();
+          resolveOnce(undefined, "procedural-timeout");
         }
-      }, 45000);
+      }, config.timeoutMs);
     });
   }
 }
 
 const screenshotQueue = new ScreenshotQueue();
 const inFlight = new Set<string>();
+
+export function clearInFlight(id: string): void {
+  inFlight.delete(id);
+}
 
 function coverExistsOnDisk(id: string): string | undefined {
   for (const ext of [".png", ".jpg", ".webp"]) {
@@ -489,11 +544,15 @@ export function generateProceduralThumbnail(
 /*  Orchestrator                                                       */
 /* ------------------------------------------------------------------ */
 
-async function updateGameCover(id: string, url: string): Promise<void> {
+async function updateGameCover(id: string, url: string, source?: string): Promise<void> {
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
       const db = getDb();
-      await db.query(`UPDATE game:⟨${id}⟩ SET coverUrl = $url`, { url });
+      if (source) {
+        await db.query(`UPDATE game:⟨${id}⟩ SET coverUrl = $url, coverSource = $source`, { url, source });
+      } else {
+        await db.query(`UPDATE game:⟨${id}⟩ SET coverUrl = $url`, { url });
+      }
       return;
     } catch (err: any) {
       const isConflict =
@@ -513,24 +572,33 @@ async function updateGameCover(id: string, url: string): Promise<void> {
 export async function loadFlashThumbnail(
   game: Game,
 ): Promise<string | undefined> {
-  if (!game.romPath) return undefined;
+  const romPath = game.romPath;
+  if (!romPath) {
+    console.log("[flash:loadFlashThumbnail] no romPath for", game.id);
+    return undefined;
+  }
   const id = game.id;
 
   // Deduplicate concurrent calls
-  if (inFlight.has(id)) return undefined;
+  if (inFlight.has(id)) {
+    console.log("[flash:loadFlashThumbnail] already in flight", id);
+    return undefined;
+  }
   inFlight.add(id);
 
   try {
     // Check if already on disk from a previous run
     const cached = coverExistsOnDisk(id);
     if (cached) {
-      await updateGameCover(id, cached);
+      console.log("[flash:loadFlashThumbnail] using cached", cached);
+      await updateGameCover(id, cached, "cached");
       return cached;
     }
 
     // 1. Sidecar image
-    const sidecar = findSidecarImage(game.romPath);
+    const sidecar = findSidecarImage(romPath);
     if (sidecar) {
+      console.log("[flash:loadFlashThumbnail] using sidecar", sidecar);
       const ext = extname(sidecar).toLowerCase();
       const destExt = ext === ".webp" ? ".webp" : ".jpg";
       const dest = join(screenshotDir, `${id}${destExt}`);
@@ -539,13 +607,14 @@ export async function loadFlashThumbnail(
         writeFileSync(dest, data);
       }
       const url = `htpc-thumb://covers/flash/screenshots/${id}${destExt}`;
-      await updateGameCover(id, url);
+      await updateGameCover(id, url, "sidecar");
       return url;
     }
 
     // 2. Online database
     const onlineUrl = await searchOnlineThumbnail(game.title);
     if (onlineUrl) {
+      console.log("[flash:loadFlashThumbnail] downloading online cover", onlineUrl);
       try {
         const res = await fetch(onlineUrl);
         if (res.ok) {
@@ -553,22 +622,25 @@ export async function loadFlashThumbnail(
           const dest = join(screenshotDir, `${id}.jpg`);
           writeFileSync(dest, buf);
           const url = `htpc-thumb://covers/flash/screenshots/${id}.jpg`;
-          await updateGameCover(id, url);
+          await updateGameCover(id, url, "online");
           return url;
         }
       } catch {}
     }
 
     // 3. Offscreen Ruffle screenshot (queued)
-    const screenshotUrl = await screenshotQueue.enqueue(game);
+    console.log("[flash:loadFlashThumbnail] queuing Ruffle screenshot for", game.title);
+    const { url: screenshotUrl, source: screenshotSource } = await screenshotQueue.enqueue(game);
     if (screenshotUrl) {
-      await updateGameCover(id, screenshotUrl);
+      console.log("[flash:loadFlashThumbnail] got screenshot", screenshotUrl, "source:", screenshotSource);
+      await updateGameCover(id, screenshotUrl, screenshotSource);
       return screenshotUrl;
     }
 
     // 4. Procedural fallback
-    const procUrl = generateProceduralThumbnail(game.romPath, id);
-    if (procUrl) await updateGameCover(id, procUrl);
+    console.log("[flash:loadFlashThumbnail] falling back to procedural for", game.title);
+    const procUrl = generateProceduralThumbnail(romPath, id);
+    if (procUrl) await updateGameCover(id, procUrl, "procedural-fallback");
     return procUrl;
   } finally {
     inFlight.delete(id);

@@ -20,11 +20,16 @@ import {
   loadThumbnail,
   fetchArtistThumbnail,
 } from "../services/music-cover.service";
-import { scanMovieFiles, scanTvShows } from "../scanners/video.scanner";
+import {
+  scanMovieFiles,
+  scanTvShows,
+  generateMovieThumbnail,
+  generateShowThumbnail,
+} from "../scanners/video.scanner";
 import { getDb } from "../db";
 import { getProtonRating } from "../services/protondb.service";
 import { performGameScan } from "../services/game-scan.service";
-import { loadFlashThumbnail } from "../services/flash-thumbnail.service";
+import { loadFlashThumbnail, clearInFlight } from "../services/flash-thumbnail.service";
 import { searchGame } from "../services/rawg.service";
 import { searchMovie, searchShow } from "../services/tmdb.service";
 import { listPlugins, reloadPlugins } from "../plugins/loader";
@@ -128,6 +133,49 @@ export function registerIpcHandlers(window: BrowserWindow): void {
       return { rawg, proton };
     },
   );
+
+  ipcMain.handle("games:regenerateThumbnail", async (_e, game: Game) => {
+    console.log("[ipc:games:regenerateThumbnail] called for", game.id, game.platform);
+    if (game.platform === "flash" && game.romPath) {
+      const { join } = await import("path");
+      const { existsSync, unlinkSync } = await import("fs");
+      const coverRoot = join(app.getPath("userData"), "covers", "flash");
+      const screenshotDir = join(coverRoot, "screenshots");
+      const generatedDir = join(coverRoot, "generated");
+      const id = game.id;
+      for (const ext of [".png", ".jpg", ".webp"]) {
+        const p = join(screenshotDir, `${id}${ext}`);
+        if (existsSync(p)) {
+          try {
+            unlinkSync(p);
+            console.log("[ipc:games:regenerateThumbnail] deleted", p);
+          } catch {}
+        }
+      }
+      const svg = join(generatedDir, `${id}.svg`);
+      if (existsSync(svg)) {
+        try {
+          unlinkSync(svg);
+          console.log("[ipc:games:regenerateThumbnail] deleted", svg);
+        } catch {}
+      }
+      clearInFlight(id);
+      console.log("[ipc:games:regenerateThumbnail] cleared inFlight for", id);
+      const url = await loadFlashThumbnail(game);
+      console.log("[ipc:games:regenerateThumbnail] loadFlashThumbnail returned", url);
+      return url ?? null;
+    }
+    const settings = await getSettings();
+    const rawg = await searchGame(game.title, settings.rawgApiKey);
+    if (rawg?.background_image) {
+      const db = getDb();
+      await db.query(`UPDATE game:⟨${game.id}⟩ SET coverUrl = $url`, {
+        url: rawg.background_image,
+      });
+      return rawg.background_image;
+    }
+    return null;
+  });
 
   ipcMain.handle("movies:scan", async (_e, extraPaths?: string[]) => {
     if (scanLocks.movies) return [];
@@ -292,6 +340,30 @@ export function registerIpcHandlers(window: BrowserWindow): void {
   ipcMain.handle("movies:metadata", async (_e, title: string) => {
     const settings = await getSettings();
     return await searchMovie(title, settings.tmdbApiKey);
+  });
+
+  ipcMain.handle("movies:regenerateThumbnail", async (_e, movie: Movie) => {
+    const { join } = await import("path");
+    const { existsSync, unlinkSync } = await import("fs");
+    const dest = join(
+      app.getPath("userData"),
+      "thumbnails",
+      "movies",
+      `${movie.id}.jpg`,
+    );
+    if (existsSync(dest)) {
+      try {
+        unlinkSync(dest);
+      } catch {}
+    }
+    const coverUrl = await generateMovieThumbnail(movie.filePath, movie.id);
+    if (coverUrl) {
+      const db = getDb();
+      await db.query(`UPDATE movie:⟨${movie.id}⟩ SET coverUrl = $url`, {
+        url: coverUrl,
+      });
+    }
+    return coverUrl ?? null;
   });
 
   ipcMain.handle("music:scan", async (_e, extraPaths?: string[]) => {
@@ -469,6 +541,38 @@ export function registerIpcHandlers(window: BrowserWindow): void {
   ipcMain.handle("tv:metadata", async (_e, title: string) => {
     const settings = await getSettings();
     return await searchShow(title, settings.tmdbApiKey);
+  });
+
+  ipcMain.handle("tv:regenerateThumbnail", async (_e, show: TVShow) => {
+    const { join } = await import("path");
+    const { existsSync, unlinkSync } = await import("fs");
+    const dest = join(
+      app.getPath("userData"),
+      "thumbnails",
+      "tv",
+      `${show.id}.jpg`,
+    );
+    if (existsSync(dest)) {
+      try {
+        unlinkSync(dest);
+      } catch {}
+    }
+    const episodes =
+      show.seasons?.flatMap((s) =>
+        s.episodes.map((ep) => ({
+          season: s.seasonNumber,
+          ep: ep.episodeNumber,
+          path: ep.filePath,
+        })),
+      ) ?? [];
+    const coverUrl = await generateShowThumbnail(show.dirPath, episodes, show.id);
+    if (coverUrl) {
+      const db = getDb();
+      await db.query(`UPDATE tv_show:⟨${show.id}⟩ SET coverUrl = $url`, {
+        url: coverUrl,
+      });
+    }
+    return coverUrl ?? null;
   });
 
   ipcMain.handle("input:devices", () => {

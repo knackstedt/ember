@@ -10,6 +10,7 @@ export interface MusicPlayerStore {
   volume: number;
   shuffle: boolean;
   repeat: "none" | "one" | "all";
+  bladeCollapsed: boolean;
   play(tracks: MusicTrack[], startIndex?: number): void;
   pause(): void;
   resume(): void;
@@ -20,6 +21,8 @@ export interface MusicPlayerStore {
   toggleShuffle(): void;
   toggleRepeat(): void;
   updateTrackCover(id: string, url: string): void;
+  setBladeCollapsed(collapsed: boolean): void;
+  toggleBlade(): void;
 }
 
 const audio = new Audio();
@@ -56,6 +59,7 @@ export const useMusicPlayerStore = create<MusicPlayerStore>((set, get) => {
     volume: 1,
     shuffle: false,
     repeat: "none",
+    bladeCollapsed: false,
 
     play(tracks, startIndex = 0) {
       set({
@@ -136,6 +140,14 @@ export const useMusicPlayerStore = create<MusicPlayerStore>((set, get) => {
           t.id === id ? { ...t, albumArtUrl: url } : t,
         ),
       }));
+    },
+
+    setBladeCollapsed(collapsed) {
+      set({ bladeCollapsed: collapsed });
+    },
+
+    toggleBlade() {
+      set((s) => ({ bladeCollapsed: !s.bladeCollapsed }));
     },
   };
 });

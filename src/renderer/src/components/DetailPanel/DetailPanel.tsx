@@ -52,27 +52,20 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
   return (
     <AnimatePresence>
       {open && (
-        <>
-          <motion.div
-            className="fixed inset-0 bg-black/60 z-40"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-          />
-          <motion.div
-            className="fixed right-0 top-0 bottom-0 z-50 flex flex-col overflow-hidden"
-            style={{
-              width: "min(480px, 90vw)",
-              background: "var(--color-surface-overlay)",
-              backdropFilter: "blur(var(--blur-panel))",
-              borderLeft: "1px solid var(--color-border)",
-            }}
-            initial={{ x: "100%" }}
-            animate={{ x: 0 }}
-            exit={{ x: "100%" }}
-            transition={{ type: "spring", damping: 30, stiffness: 300 }}
-          >
+        <motion.div
+          className="absolute top-0 bottom-0 flex flex-col overflow-hidden"
+          style={{
+            width: "min(480px, 90%)",
+            right: 0,
+            background: "var(--color-surface-overlay)",
+            backdropFilter: "blur(var(--blur-panel))",
+            borderLeft: "1px solid var(--color-border)",
+          }}
+          initial={{ x: "100%" }}
+          animate={{ x: 0 }}
+          exit={{ x: "100%" }}
+          transition={{ type: "spring", damping: 30, stiffness: 300 }}
+        >
             {backdropUrl && (
               <div className="relative h-48 overflow-hidden flex-shrink-0">
                 <img
@@ -208,7 +201,6 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
               </svg>
             </button>
           </motion.div>
-        </>
       )}
     </AnimatePresence>
   );

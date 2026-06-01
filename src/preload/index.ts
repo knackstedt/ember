@@ -43,6 +43,8 @@ const htpc = {
       ipcRenderer.invoke("games:hide", id, value),
     loadThumbnail: (game: Game): Promise<string | null> =>
       ipcRenderer.invoke("games:loadThumbnail", game),
+    regenerateThumbnail: (game: Game): Promise<string | null> =>
+      ipcRenderer.invoke("games:regenerateThumbnail", game),
   },
 
   movies: {
@@ -61,6 +63,8 @@ const htpc = {
       ipcRenderer.invoke("movies:metadata", title),
     hide: (id: string, value: boolean): Promise<void> =>
       ipcRenderer.invoke("movies:hide", id, value),
+    regenerateThumbnail: (movie: Movie): Promise<string | null> =>
+      ipcRenderer.invoke("movies:regenerateThumbnail", movie),
   },
 
   music: {
@@ -99,6 +103,8 @@ const htpc = {
       ipcRenderer.invoke("tv:metadata", title),
     hide: (id: string, value: boolean): Promise<void> =>
       ipcRenderer.invoke("tv:hide", id, value),
+    regenerateThumbnail: (show: TVShow): Promise<string | null> =>
+      ipcRenderer.invoke("tv:regenerateThumbnail", show),
   },
 
   input: {

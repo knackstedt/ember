@@ -27,6 +27,9 @@ const TV_PATTERN = /[Ss](\d+)[Ee](\d+)/;
 const movieThumbCache = join(app.getPath("userData"), "thumbnails", "movies");
 mkdirSync(movieThumbCache, { recursive: true });
 
+const showThumbCache = join(app.getPath("userData"), "thumbnails", "tv");
+mkdirSync(showThumbCache, { recursive: true });
+
 let ffmpegAvailable: boolean | undefined;
 
 export async function checkFfmpeg(): Promise<boolean> {
@@ -162,7 +165,7 @@ async function generateFrameThumbnail(
   }
 }
 
-async function generateMovieThumbnail(
+export async function generateMovieThumbnail(
   filePath: string,
   id: string,
   duration?: number,
@@ -186,6 +189,36 @@ async function generateMovieThumbnail(
     return `htpc-thumb://thumbnails/movies/${id}.jpg`;
   }
   console.warn("[video.scanner] No thumbnail generated for", filePath);
+  return undefined;
+}
+
+export async function generateShowThumbnail(
+  dirPath: string,
+  episodes: { season: number; ep: number; path: string }[],
+  id: string,
+): Promise<string | undefined> {
+  const dest = join(showThumbCache, `${id}.jpg`);
+  if (existsSync(dest)) {
+    try {
+      if (statSync(dest).size > 0)
+        return `htpc-thumb://thumbnails/tv/${id}.jpg`;
+      unlinkSync(dest);
+    } catch {
+      /* ignore */
+    }
+  }
+  const firstEp = episodes
+    .sort((a, b) => a.season - b.season || a.ep - b.ep)[0];
+  if (!firstEp) return undefined;
+  const hasEmbedded = await extractEmbeddedVideoCover(firstEp.path, dest);
+  if (hasEmbedded) {
+    return `htpc-thumb://thumbnails/tv/${id}.jpg`;
+  }
+  const generated = await generateFrameThumbnail(firstEp.path, dest);
+  if (generated) {
+    return `htpc-thumb://thumbnails/tv/${id}.jpg`;
+  }
+  console.warn("[video.scanner] No thumbnail generated for show", dirPath);
   return undefined;
 }
 
@@ -319,8 +352,9 @@ export async function scanTvShows(
 
     const title = basename(dirPath).replace(/[._]/g, " ").trim();
     const id = createHash("md5").update(dirPath).digest("hex").slice(0, 16);
+    const coverUrl = await generateShowThumbnail(dirPath, episodes, id);
 
-    shows.push({ id, title, dirPath, seasons, tags: [] });
+    shows.push({ id, title, dirPath, seasons, coverUrl, tags: [] });
   }
 
   return shows;

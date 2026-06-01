@@ -21,6 +21,7 @@ import { useVideoPlayerStore } from "./store/videoPlayer.store";
 import { FlashPlayer } from "./components/FlashPlayer/FlashPlayer";
 import { useFlashPlayerStore } from "./store/flashPlayer.store";
 import { useContextMenuStore } from "./store/contextMenu.store";
+import { QueueBlade } from "./components/QueueBlade/QueueBlade";
 
 interface TabDef {
   id: TabId;
@@ -54,7 +55,9 @@ export default function App(): React.ReactElement {
   const visibleTabIds = visibleTabs.map((t) => t.id);
   const { addDevice, removeDevice } = useInputStore();
   const hasPlayer = useMusicPlayerStore((s) => s.queue.length > 0);
+  const setBladeCollapsed = useMusicPlayerStore((s) => s.setBladeCollapsed);
   const videoOpen = useVideoPlayerStore((s) => !!s.src);
+  const flashOpen = useFlashPlayerStore((s) => s.open);
   const [activeTab, setActiveTab] = useState<TabId>("gaming");
   const activeTabRef = useRef<TabId>(activeTab);
   activeTabRef.current = activeTab;
@@ -116,6 +119,16 @@ export default function App(): React.ReactElement {
       setActiveTab(settings.defaultTab);
     }
   }, [settings?.defaultTab]);
+
+  useEffect(() => {
+    setBladeCollapsed(flashOpen);
+  }, [flashOpen]);
+
+  useEffect(() => {
+    if (videoOpen) {
+      useMusicPlayerStore.getState().pause();
+    }
+  }, [videoOpen]);
 
   useEffect(() => {
     if (!visibleTabIds.includes(activeTab)) {
@@ -395,19 +408,27 @@ export default function App(): React.ReactElement {
           </div>
         </nav>
 
-        {/* Tab content */}
-        <div className="flex-1 min-h-0 relative">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeTab}
-              className="absolute inset-0"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.15, ease: "easeOut" }}
-            >
-              <ActiveComponent />
-            </motion.div>
+        {/* Main area: tab content + queue blade */}
+        <div className="flex-1 min-h-0 flex flex-row overflow-hidden">
+          {/* Tab content */}
+          <div className="flex-1 min-h-0 relative">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeTab}
+                className="absolute inset-0"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.15, ease: "easeOut" }}
+              >
+                <ActiveComponent />
+              </motion.div>
+            </AnimatePresence>
+          </div>
+
+          {/* Queue blade */}
+          <AnimatePresence>
+            {hasPlayer && <QueueBlade key="queue-blade" />}
           </AnimatePresence>
         </div>
 

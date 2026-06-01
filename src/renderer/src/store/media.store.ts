@@ -11,6 +11,7 @@ interface MoviesState {
   activeGenre: string | null;
   activeYear: number | null;
   showFavoritesOnly: boolean;
+  regeneratingIds: Set<string>;
   load: () => Promise<void>;
   scan: () => Promise<void>;
   toggleFavorite: (id: string) => Promise<void>;
@@ -21,6 +22,7 @@ interface MoviesState {
   toggleFavoritesFilter: () => void;
   updateProgress: (id: string, progress: number | null) => void;
   hide: (id: string) => Promise<void>;
+  regenerateThumbnail: (id: string) => Promise<void>;
   filtered: () => Movie[];
 }
 
@@ -32,6 +34,7 @@ export const useMoviesStore = create<MoviesState>((set, get) => ({
   activeGenre: null,
   activeYear: null,
   showFavoritesOnly: false,
+  regeneratingIds: new Set(),
 
   load: async () => {
     set({ loading: true });
@@ -82,6 +85,33 @@ export const useMoviesStore = create<MoviesState>((set, get) => ({
     set((s) => ({
       movies: s.movies.filter((m) => m.id !== id),
     }));
+  },
+
+  regenerateThumbnail: async (id) => {
+    const movie = get().movies.find((m) => m.id === id);
+    if (!movie) return;
+    set((s) => {
+      const next = new Set(s.regeneratingIds);
+      next.add(id);
+      return { regeneratingIds: next };
+    });
+    try {
+      const coverUrl = await window.htpc.movies.regenerateThumbnail(movie);
+      if (coverUrl) {
+        const busted = `${coverUrl}#t=${Date.now()}`;
+        set((s) => ({
+          movies: s.movies.map((m) =>
+            m.id === id ? { ...m, coverUrl: busted } : m,
+          ),
+        }));
+      }
+    } finally {
+      set((s) => {
+        const next = new Set(s.regeneratingIds);
+        next.delete(id);
+        return { regeneratingIds: next };
+      });
+    }
   },
 
   updateProgress: (id, progress) => {
@@ -294,12 +324,14 @@ interface TvState {
   loading: boolean;
   scanning: boolean;
   searchQuery: string;
+  regeneratingIds: Set<string>;
   load: () => Promise<void>;
   scan: () => Promise<void>;
   toggleFavorite: (id: string) => Promise<void>;
   setTags: (id: string, tags: string[]) => Promise<void>;
   setSearch: (q: string) => void;
   hide: (id: string) => Promise<void>;
+  regenerateThumbnail: (id: string) => Promise<void>;
   filtered: () => TVShow[];
 }
 
@@ -308,6 +340,7 @@ export const useTvStore = create<TvState>((set, get) => ({
   loading: false,
   scanning: false,
   searchQuery: "",
+  regeneratingIds: new Set(),
 
   load: async () => {
     set({ loading: true });
@@ -352,6 +385,33 @@ export const useTvStore = create<TvState>((set, get) => ({
     set((s) => ({
       shows: s.shows.filter((sh) => sh.id !== id),
     }));
+  },
+
+  regenerateThumbnail: async (id) => {
+    const show = get().shows.find((s) => s.id === id);
+    if (!show) return;
+    set((s) => {
+      const next = new Set(s.regeneratingIds);
+      next.add(id);
+      return { regeneratingIds: next };
+    });
+    try {
+      const coverUrl = await window.htpc.tv.regenerateThumbnail(show);
+      if (coverUrl) {
+        const busted = `${coverUrl}#t=${Date.now()}`;
+        set((s) => ({
+          shows: s.shows.map((sh) =>
+            sh.id === id ? { ...sh, coverUrl: busted } : sh,
+          ),
+        }));
+      }
+    } finally {
+      set((s) => {
+        const next = new Set(s.regeneratingIds);
+        next.delete(id);
+        return { regeneratingIds: next };
+      });
+    }
   },
 
   setSearch: (searchQuery) => set({ searchQuery }),

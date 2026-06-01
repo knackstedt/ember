@@ -78,6 +78,7 @@ async function runMigrations(db: Surreal): Promise<void> {
     DEFINE FIELD IF NOT EXISTS platform ON game TYPE string;
     DEFINE FIELD IF NOT EXISTS execPath ON game TYPE option<string>;
     DEFINE FIELD IF NOT EXISTS coverUrl ON game TYPE option<string>;
+    DEFINE FIELD IF NOT EXISTS coverSource ON game TYPE option<string>;
     DEFINE FIELD IF NOT EXISTS bannerUrl ON game TYPE option<string>;
     DEFINE FIELD IF NOT EXISTS description ON game TYPE option<string>;
     DEFINE FIELD IF NOT EXISTS genres ON game TYPE option<array<string>>;

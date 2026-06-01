@@ -56,6 +56,7 @@ const LazyGameCard: React.FC<{
   onFavorite: () => void;
 }> = ({ game, index, focusedIndex, onSelect, onFavorite }) => {
   const loadThumbnail = useGamesStore((s) => s.loadThumbnail);
+  const regeneratingIds = useGamesStore((s) => s.regeneratingIds);
   const [isPending, setIsPending] = useState(false);
 
   useEffect(() => {
@@ -78,7 +79,7 @@ const LazyGameCard: React.FC<{
       badgeColor={b?.color}
       isFavorite={game.isFavorite}
       isFocused={index === focusedIndex}
-      isThumbnailPending={isPending}
+      isThumbnailPending={isPending || regeneratingIds.has(game.id)}
       onSelect={onSelect}
       onFavorite={onFavorite}
     />
@@ -110,6 +111,7 @@ export const GamingTab: React.FC = () => {
     toggleFavorite,
     setTags,
     hide,
+    regenerateThumbnail,
   } = useGamesStore();
   const [selected, setSelected] = useState<Game | null>(null);
   const [columnCount, setColumnCount] = useState(6);
@@ -148,6 +150,11 @@ export const GamingTab: React.FC = () => {
         { id: "tags", label: "Update metadata / tags", icon: "🏷" },
         { id: "controls", label: "Customize Input controls", icon: "🎮" },
         {
+          id: "regenerate",
+          label: "Regenerate thumbnail",
+          icon: "🔄",
+        },
+        {
           id: "folder",
           label: "Open containing folder",
           icon: "📂",
@@ -173,6 +180,9 @@ export const GamingTab: React.FC = () => {
               detail: { tab: "controllers" },
             }),
           );
+          break;
+        case "regenerate":
+          void regenerateThumbnail(game.id);
           break;
         case "folder": {
           const path = game.romPath || game.execPath;
