@@ -14,6 +14,7 @@ export interface GameCardProps {
   badgeColor?: string;
   isFavorite?: boolean;
   isFocused?: boolean;
+  isThumbnailPending?: boolean;
   onSelect?: () => void;
   onFavorite?: () => void;
   progress?: number;
@@ -131,6 +132,7 @@ export const GameCard: React.FC<GameCardProps> = ({
   badgeColor,
   isFavorite,
   isFocused,
+  isThumbnailPending,
   onSelect,
   onFavorite,
   progress,
@@ -370,7 +372,22 @@ export const GameCard: React.FC<GameCardProps> = ({
                   className="gc-placeholder"
                   style={{ backgroundColor: placeholderColor(title) }}
                 >
-                  <span className="gc-placeholder-text">{initials(title)}</span>
+                  {isThumbnailPending ? (
+                    <svg
+                      className="gc-placeholder-icon"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="rgba(255,255,255,0.4)"
+                      strokeWidth={2}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M5 22h14M5 2h14M17 22v-4.5a3.5 3.5 0 0 0-7 0V22" />
+                      <path d="M17 2v4.5a3.5 3.5 0 0 1-7 0V2" />
+                    </svg>
+                  ) : (
+                    <span className="gc-placeholder-text">{initials(title)}</span>
+                  )}
                 </div>
               ) : (
                 <img
