@@ -210,6 +210,26 @@ export interface FlashControllerMap {
   dpad_right: string;
 }
 
+export type FlashFilterType =
+  | "none"
+  | "dither"
+  | "edge-detect"
+  | "scanlines"
+  | "crt"
+  | "pixelate"
+  | "grayscale"
+  | "invert"
+  | "posterize"
+  | "chromatic"
+  | "custom";
+
+export interface FlashFilterDefinition {
+  id: string;
+  name: string;
+  source: "builtin" | "custom";
+  content?: string;
+}
+
 export interface FlashSettings {
   aspectRatio: FlashAspectRatio;
   canvasSize: FlashCanvasSize;
@@ -220,6 +240,11 @@ export interface FlashSettings {
   stickToMouse: boolean;
   stickSensitivity: number;
   aiUpscaling: boolean;
+  filter: FlashFilterType;
+  filterIntensity: number;
+  pixelateSize: number;
+  ditherLevels: number;
+  customFilterId?: string;
 }
 
 export type DailyBackgroundSource =

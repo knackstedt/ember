@@ -8,8 +8,11 @@ import {
   FlashCanvasSize,
   FlashUpscaleStyle,
   FlashControllerMap,
+  FlashFilterType,
   NormalizedInputEvent,
 } from "../../../../shared/types";
+import { FlashFilterEngine } from "./FlashFilterEngine";
+import { BUILT_IN_FILTERS } from "./builtInFilters";
 
 const DEFAULT_FLASH_SETTINGS: FlashSettings = {
   aspectRatio: "free",
@@ -34,6 +37,10 @@ const DEFAULT_FLASH_SETTINGS: FlashSettings = {
   stickToMouse: true,
   stickSensitivity: 1.0,
   aiUpscaling: false,
+  filter: "none",
+  filterIntensity: 1.0,
+  pixelateSize: 4,
+  ditherLevels: 4,
 };
 
 function getFlashSettings(settings: unknown): FlashSettings {
@@ -155,9 +162,12 @@ export const FlashPlayer: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const playerContainerRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<RufflePlayerInstance | null>(null);
+  const displayCanvasRef = useRef<HTMLCanvasElement>(null);
+  const filterEngineRef = useRef<FlashFilterEngine | null>(null);
   const ruffleLoaded = useRuffleScript();
 
   const [localSettings, setLocalSettings] = useState<FlashSettings>(flashSettings);
+  const [customFilters, setCustomFilters] = useState<{ id: string; name: string; content: string }[]>([]);
 
   useEffect(() => {
     setLocalSettings(flashSettings);
@@ -167,10 +177,50 @@ export const FlashPlayer: React.FC = () => {
     (partial: Partial<FlashSettings>) => {
       const next = { ...localSettings, ...partial };
       setLocalSettings(next);
-      void useSettingsStore.getState().update({ flashSettings: next });
     },
     [localSettings],
   );
+
+  // Debounced persist to disk so sliders don't spam writes / re-renders
+  const persistTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const debouncedPersist = useCallback(
+    (next: FlashSettings) => {
+      if (persistTimeoutRef.current) clearTimeout(persistTimeoutRef.current);
+      persistTimeoutRef.current = setTimeout(() => {
+        void useSettingsStore.getState().update({ flashSettings: next });
+      }, 300);
+    },
+    [],
+  );
+
+  useEffect(() => {
+    debouncedPersist(localSettings);
+    return () => {
+      if (persistTimeoutRef.current) clearTimeout(persistTimeoutRef.current);
+    };
+  }, [localSettings, debouncedPersist]);
+
+  // Load custom filters from user data directory
+  useEffect(() => {
+    if (!open) return;
+    void window.htpc.flashFilters.list().then(setCustomFilters).catch(() => setCustomFilters([]));
+  }, [open]);
+
+  // Find the Ruffle source canvas inside the player container
+  const findRuffleCanvas = useCallback((): HTMLCanvasElement | null => {
+    if (!playerContainerRef.current) return null;
+    const container = playerContainerRef.current;
+    // Ruffle may render inside shadow DOM or as a direct child
+    const canvas = container.querySelector("canvas");
+    if (canvas) return canvas as HTMLCanvasElement;
+    // Search inside shadow roots if present
+    const shadowHost = container.querySelector("*[shadowroot], ruffle-object, ruffle-embed, ruffle-player");
+    if (shadowHost && (shadowHost as HTMLElement).shadowRoot) {
+      const shadowCanvas = (shadowHost as HTMLElement).shadowRoot!.querySelector("canvas");
+      if (shadowCanvas) return shadowCanvas as HTMLCanvasElement;
+    }
+    return null;
+  }, []);
 
   // Create / destroy Ruffle player
   useEffect(() => {
@@ -196,18 +246,53 @@ export const FlashPlayer: React.FC = () => {
       }
     })();
 
+    // Give Ruffle time to create its canvas, then wire up the filter engine
+    const connectTimeout = setTimeout(() => {
+      const sourceCanvas = findRuffleCanvas();
+      const displayCanvas = displayCanvasRef.current;
+      if (sourceCanvas && displayCanvas && !filterEngineRef.current) {
+        const engine = new FlashFilterEngine(displayCanvas);
+        engine.setSourceCanvas(sourceCanvas);
+        filterEngineRef.current = engine;
+        // Apply current filter
+        if (localSettings.filter === "none") {
+          engine.stop();
+          sourceCanvas.style.opacity = "1";
+          displayCanvas.style.opacity = "0";
+        } else {
+          sourceCanvas.style.opacity = "0";
+          displayCanvas.style.opacity = "1";
+          if (localSettings.filter === "custom" && localSettings.customFilterId) {
+            const custom = customFilters.find((f) => f.id === localSettings.customFilterId);
+            if (custom) engine.setFilter(custom.id, custom.content);
+          } else {
+            engine.setFilter(localSettings.filter);
+          }
+          engine.setIntensity(localSettings.filterIntensity);
+        }
+      }
+    }, 800);
+
     return () => {
+      clearTimeout(connectTimeout);
       try {
-        // Attempt to destroy the player instance before removing from DOM
         (player as any).destroy?.();
         (player as any).remove?.();
       } catch {
         /* ignore */
       }
-      playerContainerRef.current?.removeChild(player as unknown as Node);
+      try {
+        if ((player as unknown as Node).parentNode === playerContainerRef.current) {
+          playerContainerRef.current?.removeChild(player as unknown as Node);
+        }
+      } catch {
+        /* ignore */
+      }
       playerRef.current = null;
+      filterEngineRef.current?.dispose();
+      filterEngineRef.current = null;
     };
-  }, [open, ruffleLoaded, swfPath]);
+  }, [open, ruffleLoaded, swfPath, findRuffleCanvas]);
 
   // Apply aspect ratio / canvas size / upscale styles
   useEffect(() => {
@@ -224,7 +309,6 @@ export const FlashPlayer: React.FC = () => {
       el.style.imageRendering = "pixelated";
     } else if (localSettings.upscaleStyle === "gaussian") {
       el.style.imageRendering = "auto";
-      // Gaussian blur is applied via a CSS filter on the container
     } else {
       el.style.imageRendering = "auto";
     }
@@ -261,6 +345,40 @@ export const FlashPlayer: React.FC = () => {
       container.style.aspectRatio = localSettings.aspectRatio;
     }
   }, [localSettings]);
+
+  // Apply filter changes to the engine
+  useEffect(() => {
+    const engine = filterEngineRef.current;
+    if (!engine) return;
+
+    const sourceCanvas = findRuffleCanvas();
+    if (sourceCanvas) engine.setSourceCanvas(sourceCanvas);
+
+    if (localSettings.filter === "none") {
+      engine.stop();
+      // Show original, hide overlay
+      const source = findRuffleCanvas();
+      if (source) source.style.opacity = "1";
+      if (displayCanvasRef.current) displayCanvasRef.current.style.opacity = "0";
+      return;
+    }
+
+    // Hide original, show overlay
+    const source = findRuffleCanvas();
+    if (source) source.style.opacity = "0";
+    if (displayCanvasRef.current) displayCanvasRef.current.style.opacity = "1";
+    engine.start();
+
+    if (localSettings.filter === "custom" && localSettings.customFilterId) {
+      const custom = customFilters.find((f) => f.id === localSettings.customFilterId);
+      if (custom) engine.setFilter(custom.id, custom.content);
+    } else {
+      engine.setFilter(localSettings.filter);
+    }
+    engine.setIntensity(localSettings.filterIntensity);
+    engine.setPixelateSize(localSettings.pixelateSize);
+    engine.setDitherLevels(localSettings.ditherLevels);
+  }, [localSettings.filter, localSettings.filterIntensity, localSettings.customFilterId, localSettings.pixelateSize, localSettings.ditherLevels, customFilters, findRuffleCanvas]);
 
   // Controller input mapping
   useEffect(() => {
@@ -397,6 +515,7 @@ export const FlashPlayer: React.FC = () => {
           alignItems: "center",
           justifyContent: "center",
           filter: upscaleFilter,
+          position: "relative",
         }}
       >
         <div
@@ -404,6 +523,19 @@ export const FlashPlayer: React.FC = () => {
           style={{
             width: localSettings.canvasSize === "window" ? "100%" : undefined,
             height: localSettings.canvasSize === "window" ? "100%" : undefined,
+          }}
+        />
+        <canvas
+          ref={displayCanvasRef}
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            opacity: localSettings.filter === "none" ? 0 : 1,
+            pointerEvents: "none",
+            zIndex: 1,
           }}
         />
       </div>
@@ -586,6 +718,127 @@ export const FlashPlayer: React.FC = () => {
                 <option value="gaussian">Gaussian (Soft blur)</option>
                 <option value="pixelate">Pixelate (Crisp pixels)</option>
               </select>
+            </div>
+
+            {/* Visual Filter */}
+            <div className="mb-4">
+              <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--color-text-dim)" }}>
+                Visual Filter
+              </label>
+              <select
+                value={localSettings.filter === "custom" && localSettings.customFilterId ? `custom:${localSettings.customFilterId}` : localSettings.filter}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value.startsWith("custom:")) {
+                    saveSettings({ filter: "custom", customFilterId: value.slice(7) });
+                  } else {
+                    saveSettings({ filter: value as FlashFilterType });
+                  }
+                }}
+                className="w-full text-sm px-2 py-1.5 rounded"
+                style={{
+                  background: "var(--color-bg, #000)",
+                  border: "1px solid var(--color-border, #333)",
+                  color: "var(--color-text, #fff)",
+                  outline: "none",
+                }}
+              >
+                {BUILT_IN_FILTERS.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.name}
+                  </option>
+                ))}
+                {customFilters.length > 0 && (
+                  <optgroup label="Custom">
+                    {customFilters.map((f) => (
+                      <option key={f.id} value={`custom:${f.id}`}>
+                        {f.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+              </select>
+              {localSettings.filter !== "none" && (
+                <div className="flex items-center gap-2 mt-2">
+                  <span className="text-xs" style={{ color: "var(--color-text-dim)" }}>
+                    Intensity
+                  </span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    value={localSettings.filterIntensity}
+                    onChange={(e) =>
+                      saveSettings({ filterIntensity: parseFloat(e.target.value) })
+                    }
+                    className="flex-1 h-1 cursor-pointer"
+                    style={{ accentColor: "var(--color-accent, #0af)" }}
+                  />
+                  <span className="text-xs tabular-nums w-8 text-right">
+                    {Math.round(localSettings.filterIntensity * 100)}%
+                  </span>
+                </div>
+              )}
+              {localSettings.filter === "pixelate" && (
+                <div className="flex items-center gap-2 mt-2">
+                  <span className="text-xs" style={{ color: "var(--color-text-dim)" }}>
+                    Block Size
+                  </span>
+                  <select
+                    value={localSettings.pixelateSize}
+                    onChange={(e) =>
+                      saveSettings({ pixelateSize: parseInt(e.target.value, 10) })
+                    }
+                    className="text-xs px-2 py-1 rounded flex-1"
+                    style={{
+                      background: "var(--color-bg, #000)",
+                      border: "1px solid var(--color-border, #333)",
+                      color: "var(--color-text, #fff)",
+                      outline: "none",
+                    }}
+                  >
+                    <option value={2}>2 px</option>
+                    <option value={4}>4 px</option>
+                    <option value={8}>8 px</option>
+                    <option value={12}>12 px</option>
+                    <option value={16}>16 px</option>
+                  </select>
+                </div>
+              )}
+              {localSettings.filter === "dither" && (
+                <div className="flex items-center gap-2 mt-2">
+                  <span className="text-xs" style={{ color: "var(--color-text-dim)" }}>
+                    Levels
+                  </span>
+                  <input
+                    type="range"
+                    min={2}
+                    max={16}
+                    step={1}
+                    value={localSettings.ditherLevels}
+                    onChange={(e) =>
+                      saveSettings({ ditherLevels: parseInt(e.target.value, 10) })
+                    }
+                    className="flex-1 h-1 cursor-pointer"
+                    style={{ accentColor: "var(--color-accent, #0af)" }}
+                  />
+                  <span className="text-xs tabular-nums w-8 text-right">
+                    {localSettings.ditherLevels}
+                  </span>
+                </div>
+              )}
+              <button
+                onClick={() => void window.htpc.flashFilters.openDir()}
+                className="mt-2 w-full text-xs py-1 rounded hover:bg-white/10 transition-colors"
+                style={{
+                  color: "var(--color-text-dim)",
+                  background: "rgba(255,255,255,0.05)",
+                  border: "1px dashed var(--color-border, #333)",
+                }}
+              >
+                Open custom filters folder
+              </button>
             </div>
 
             {/* Controller Input Mapping */}

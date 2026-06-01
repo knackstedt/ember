@@ -167,6 +167,13 @@ const htpc = {
       ipcRenderer.invoke("files:read", filePath),
   },
 
+  flashFilters: {
+    list: (): Promise<{ id: string; name: string; content: string }[]> =>
+      ipcRenderer.invoke("flash-filters:list"),
+    openDir: (): Promise<void> =>
+      ipcRenderer.invoke("flash-filters:open-dir"),
+  },
+
   onScanProgress: (cb: (progress: ScanProgress) => void) => {
     const handler = (_: Electron.IpcRendererEvent, p: ScanProgress) => cb(p);
     ipcRenderer.on("scan:progress", handler);

@@ -1,5 +1,5 @@
 import { join, dirname } from "path";
-import { readFileSync, rmSync, mkdirSync } from "fs";
+import { readFileSync, rmSync, mkdirSync, readdirSync, existsSync } from "fs";
 import { BrowserWindow, ipcMain, app, dialog, shell } from "electron";
 import {
   getSettings,
@@ -687,5 +687,22 @@ export function registerIpcHandlers(window: BrowserWindow): void {
       log.warn("files:read", `failed: ${filePath} ${err}`);
       return null;
     }
+  });
+
+  ipcMain.handle("flash-filters:list", async () => {
+    const dir = join(app.getPath("userData"), "flash-filters");
+    if (!existsSync(dir)) return [];
+    const entries = readdirSync(dir);
+    const glslFiles = entries.filter((f) => f.endsWith(".glsl"));
+    return glslFiles.map((name) => {
+      const content = readFileSync(join(dir, name), "utf-8");
+      return { id: name.replace(".glsl", ""), name: name.replace(".glsl", ""), content };
+    });
+  });
+
+  ipcMain.handle("flash-filters:open-dir", async () => {
+    const dir = join(app.getPath("userData"), "flash-filters");
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+    shell.openPath(dir);
   });
 }
