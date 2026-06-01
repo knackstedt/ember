@@ -18,6 +18,13 @@ function ruffleStaticPlugin(): Plugin {
     name: "ruffle-static",
     configureServer(server) {
       server.middlewares.use("/ruffle", (req, res, next) => {
+        try {
+          decodeURI(req.url ?? "");
+        } catch {
+          res.statusCode = 400;
+          res.end("Bad Request");
+          return;
+        }
         const fileName = req.url?.replace(/^\/+/, "") ?? "";
         if (!fileName) {
           res.statusCode = 404;

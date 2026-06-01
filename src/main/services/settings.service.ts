@@ -12,6 +12,8 @@ const DEFAULTS: AppSettings = {
   enableAnalytics: false,
   startOnBoot: false,
   hardwareAcceleration: true,
+  disabledTabs: [],
+  dailyBackground: { enabled: false, source: "bing" },
 };
 
 export async function getSettings(): Promise<AppSettings> {

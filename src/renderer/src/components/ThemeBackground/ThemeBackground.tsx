@@ -1,10 +1,75 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useSettingsStore } from "../../store/settings.store";
+import { DailyBackgroundSource } from "../../../../shared/types";
+
+const CACHE_DATE_KEY = "htpc-daily-bg-date";
+const CACHE_URL_KEY = "htpc-daily-bg-url";
+const CACHE_SOURCE_KEY = "htpc-daily-bg-source";
+
+async function fetchBingImageUrl(): Promise<string | null> {
+  try {
+    const res = await fetch(
+      "https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=1&mkt=en-US",
+    );
+    const data = await res.json();
+    const path = data?.images?.[0]?.url;
+    return path ? `https://www.bing.com${path}` : null;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchUnsplashUrl(): Promise<string | null> {
+  try {
+    const res = await fetch(
+      "https://source.unsplash.com/random/1920x1080/?nature,landscape",
+      { redirect: "follow" },
+    );
+    return res.url ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchPicsumUrl(): Promise<string | null> {
+  try {
+    const res = await fetch("https://picsum.photos/1920/1080", {
+      redirect: "follow",
+    });
+    return res.url ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchDailyImageUrl(
+  source: DailyBackgroundSource,
+  customUrl?: string,
+): Promise<string | null> {
+  switch (source) {
+    case "bing":
+      return fetchBingImageUrl();
+    case "unsplash":
+      return fetchUnsplashUrl();
+    case "picsum":
+      return fetchPicsumUrl();
+    case "custom":
+      return customUrl || null;
+    default:
+      return null;
+  }
+}
+
+function getTodayStr(): string {
+  return new Date().toISOString().slice(0, 10);
+}
 
 export const ThemeBackground: React.FC = () => {
   const theme = useSettingsStore((s) => s.settings?.theme ?? "dark-oled");
+  const dailyBg = useSettingsStore((s) => s.settings?.dailyBackground);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animRef = useRef<number>(0);
+  const [bgUrl, setBgUrl] = useState<string | null>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -155,15 +220,69 @@ export const ThemeBackground: React.FC = () => {
     };
   }, [theme]);
 
+  useEffect(() => {
+    if (!dailyBg?.enabled) {
+      setBgUrl(null);
+      return;
+    }
+
+    const today = getTodayStr();
+    const cachedDate = localStorage.getItem(CACHE_DATE_KEY);
+    const cachedUrl = localStorage.getItem(CACHE_URL_KEY);
+    const cachedSource = localStorage.getItem(CACHE_SOURCE_KEY);
+
+    if (
+      cachedDate === today &&
+      cachedUrl &&
+      cachedSource === dailyBg.source &&
+      (dailyBg.source !== "custom" || cachedUrl === dailyBg.customUrl)
+    ) {
+      setBgUrl(cachedUrl);
+      return;
+    }
+
+    let cancelled = false;
+    fetchDailyImageUrl(dailyBg.source, dailyBg.customUrl).then((url) => {
+      if (cancelled || !url) return;
+      localStorage.setItem(CACHE_DATE_KEY, today);
+      localStorage.setItem(CACHE_URL_KEY, url);
+      localStorage.setItem(CACHE_SOURCE_KEY, dailyBg.source);
+      setBgUrl(url);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [dailyBg?.enabled, dailyBg?.source, dailyBg?.customUrl]);
+
   return (
-    <canvas
-      ref={canvasRef}
-      style={{
-        position: "absolute",
-        inset: 0,
-        pointerEvents: "none",
-        zIndex: 0,
-      }}
-    />
+    <>
+      {bgUrl && (
+        <img
+          src={bgUrl}
+          alt=""
+          style={{
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            pointerEvents: "none",
+            zIndex: 0,
+            opacity: 0.35,
+          }}
+        />
+      )}
+      <canvas
+        ref={canvasRef}
+        style={{
+          position: "absolute",
+          inset: 0,
+          pointerEvents: "none",
+          zIndex: 0,
+          mixBlendMode: bgUrl ? "overlay" : "normal",
+        }}
+      />
+    </>
   );
 };

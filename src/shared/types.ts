@@ -221,6 +221,18 @@ export interface FlashSettings {
   aiUpscaling: boolean;
 }
 
+export type DailyBackgroundSource =
+  | "bing"
+  | "unsplash"
+  | "picsum"
+  | "custom";
+
+export interface DailyBackgroundSettings {
+  enabled: boolean;
+  source: DailyBackgroundSource;
+  customUrl?: string;
+}
+
 export interface AppSettings {
   theme: ThemeName;
   fullscreen: boolean;
@@ -236,6 +248,8 @@ export interface AppSettings {
   startOnBoot: boolean;
   hardwareAcceleration: boolean;
   flashSettings?: FlashSettings;
+  disabledTabs: TabId[];
+  dailyBackground: DailyBackgroundSettings;
 }
 
 export interface PluginManifest {

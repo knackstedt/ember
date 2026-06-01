@@ -490,11 +490,23 @@ export function generateProceduralThumbnail(
 /* ------------------------------------------------------------------ */
 
 async function updateGameCover(id: string, url: string): Promise<void> {
-  try {
-    const db = getDb();
-    await db.query(`UPDATE game:⟨${id}⟩ SET coverUrl = $url`, { url });
-  } catch (err) {
-    console.error("[flash:updateGameCover] DB update failed", err);
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const db = getDb();
+      await db.query(`UPDATE game:⟨${id}⟩ SET coverUrl = $url`, { url });
+      return;
+    } catch (err: any) {
+      const isConflict =
+        err?.kind === "Query" &&
+        (err?.message?.includes("Transaction conflict") ||
+          err?.message?.includes("write conflict"));
+      if (isConflict && attempt < 3) {
+        await new Promise((r) => setTimeout(r, 50 * attempt));
+        continue;
+      }
+      console.error("[flash:updateGameCover] DB update failed", err);
+      return;
+    }
   }
 }
 

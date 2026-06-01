@@ -20,6 +20,8 @@ const defaults: AppSettings = {
   enableAnalytics: false,
   startOnBoot: false,
   hardwareAcceleration: true,
+  disabledTabs: [],
+  dailyBackground: { enabled: false, source: "bing" },
   flashSettings: {
     aspectRatio: "free",
     canvasSize: "window",

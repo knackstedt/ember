@@ -6,6 +6,7 @@ import { useCoverCacheStore } from "./coverCache.store";
 interface MoviesState {
   movies: Movie[];
   loading: boolean;
+  scanning: boolean;
   searchQuery: string;
   activeGenre: string | null;
   activeYear: number | null;
@@ -26,6 +27,7 @@ interface MoviesState {
 export const useMoviesStore = create<MoviesState>((set, get) => ({
   movies: [],
   loading: false,
+  scanning: false,
   searchQuery: "",
   activeGenre: null,
   activeYear: null,
@@ -38,15 +40,15 @@ export const useMoviesStore = create<MoviesState>((set, get) => ({
   },
 
   scan: async () => {
-    if (get().loading) return;
-    set({ loading: true });
+    if (get().scanning) return;
+    set({ scanning: true });
     try {
       await window.htpc.movies.scan().catch(() => []);
       await get().load();
     } catch {
       /* scan errors already logged in main */
     } finally {
-      set({ loading: false });
+      set({ scanning: false });
     }
   },
 
@@ -118,6 +120,7 @@ export const useMoviesStore = create<MoviesState>((set, get) => ({
 interface MusicState {
   tracks: MusicTrack[];
   loading: boolean;
+  scanning: boolean;
   searchQuery: string;
   activeArtist: string | null;
   activeAlbum: string | null;
@@ -142,6 +145,7 @@ interface MusicState {
 export const useMusicStore = create<MusicState>((set, get) => ({
   tracks: [],
   loading: false,
+  scanning: false,
   searchQuery: "",
   activeArtist: null,
   activeAlbum: null,
@@ -155,15 +159,15 @@ export const useMusicStore = create<MusicState>((set, get) => ({
   },
 
   scan: async () => {
-    if (get().loading) return;
-    set({ loading: true });
+    if (get().scanning) return;
+    set({ scanning: true });
     try {
       await window.htpc.music.scan().catch(() => []);
       await get().load();
     } catch {
       /* scan errors already logged in main */
     } finally {
-      set({ loading: false });
+      set({ scanning: false });
     }
   },
 
@@ -267,6 +271,7 @@ export const useMusicStore = create<MusicState>((set, get) => ({
 interface TvState {
   shows: TVShow[];
   loading: boolean;
+  scanning: boolean;
   searchQuery: string;
   load: () => Promise<void>;
   scan: () => Promise<void>;
@@ -280,6 +285,7 @@ interface TvState {
 export const useTvStore = create<TvState>((set, get) => ({
   shows: [],
   loading: false,
+  scanning: false,
   searchQuery: "",
 
   load: async () => {
@@ -289,15 +295,15 @@ export const useTvStore = create<TvState>((set, get) => ({
   },
 
   scan: async () => {
-    if (get().loading) return;
-    set({ loading: true });
+    if (get().scanning) return;
+    set({ scanning: true });
     try {
       await window.htpc.tv.scan().catch(() => []);
       await get().load();
     } catch {
       /* scan errors already logged in main */
     } finally {
-      set({ loading: false });
+      set({ scanning: false });
     }
   },
 

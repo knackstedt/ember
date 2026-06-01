@@ -9,7 +9,7 @@ import { MusicTab } from "./tabs/Music";
 import { TVShowsTab } from "./tabs/TVShows";
 import { SettingsTab } from "./tabs/Settings";
 import { ControllersTab } from "./tabs/Controllers";
-import { TabId, ScanProgress } from "../../shared/types";
+import { TabId, ScanProgress, AppSettings } from "../../shared/types";
 import { useGamesStore } from "./store/games.store";
 import { useMoviesStore, useMusicStore, useTvStore } from "./store/media.store";
 import { ToastContainer } from "./components/Toast/Toast";
@@ -43,10 +43,15 @@ const TABS: TabDef[] = [
   { id: "settings", label: "Settings", icon: "⚙", component: SettingsTab },
 ];
 
-const TAB_IDS = TABS.map((t) => t.id);
+function useVisibleTabs(settings: AppSettings | null) {
+  const disabled = new Set(settings?.disabledTabs ?? []);
+  return TABS.filter((t) => !disabled.has(t.id));
+}
 
 export default function App(): React.ReactElement {
   const { settings, loading, load } = useSettingsStore();
+  const visibleTabs = useVisibleTabs(settings);
+  const visibleTabIds = visibleTabs.map((t) => t.id);
   const { addDevice, removeDevice } = useInputStore();
   const hasPlayer = useMusicPlayerStore((s) => s.queue.length > 0);
   const videoOpen = useVideoPlayerStore((s) => !!s.src);
@@ -107,13 +112,21 @@ export default function App(): React.ReactElement {
   }, []);
 
   useEffect(() => {
-    if (settings?.defaultTab) setActiveTab(settings.defaultTab);
+    if (settings?.defaultTab && visibleTabIds.includes(settings.defaultTab)) {
+      setActiveTab(settings.defaultTab);
+    }
   }, [settings?.defaultTab]);
+
+  useEffect(() => {
+    if (!visibleTabIds.includes(activeTab)) {
+      setActiveTab(visibleTabIds[0] ?? "gaming");
+    }
+  }, [visibleTabIds.join(","), activeTab]);
 
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail as { tab?: TabId };
-      if (detail?.tab && TAB_IDS.includes(detail.tab)) {
+      if (detail?.tab && visibleTabIds.includes(detail.tab)) {
         setActiveTab(detail.tab);
       }
     };
@@ -130,8 +143,8 @@ export default function App(): React.ReactElement {
       if (ev.type !== "button_press") return;
 
       if (ev.action === "start") {
-        const idx = TAB_IDS.indexOf(activeTabRef.current);
-        setActiveTab(TAB_IDS[(idx + 1) % TAB_IDS.length]);
+        const idx = visibleTabIds.indexOf(activeTabRef.current);
+        setActiveTab(visibleTabIds[(idx + 1) % visibleTabIds.length]);
       } else if (ev.action === "west") {
         window.dispatchEvent(
           new CustomEvent("htpc:contextmenu", { detail: { source: "gamepad" } }),
@@ -210,12 +223,12 @@ export default function App(): React.ReactElement {
         }
       } else if (!isTyping && e.type === "keydown" && e.key === "q") {
         e.preventDefault();
-        const idx = TAB_IDS.indexOf(activeTabRef.current);
-        setActiveTab(TAB_IDS[(idx - 1 + TAB_IDS.length) % TAB_IDS.length]);
+        const idx = visibleTabIds.indexOf(activeTabRef.current);
+        setActiveTab(visibleTabIds[(idx - 1 + visibleTabIds.length) % visibleTabIds.length]);
       } else if (!isTyping && e.type === "keydown" && e.key === "e") {
         e.preventDefault();
-        const idx = TAB_IDS.indexOf(activeTabRef.current);
-        setActiveTab(TAB_IDS[(idx + 1) % TAB_IDS.length]);
+        const idx = visibleTabIds.indexOf(activeTabRef.current);
+        setActiveTab(visibleTabIds[(idx + 1) % visibleTabIds.length]);
       } else if (
         !isTyping &&
         e.type === "keydown" &&
@@ -257,12 +270,12 @@ export default function App(): React.ReactElement {
         }
       } else if (e.type === "keydown" && e.key === "Tab" && !e.shiftKey) {
         e.preventDefault();
-        const idx = TAB_IDS.indexOf(activeTabRef.current);
-        setActiveTab(TAB_IDS[(idx + 1) % TAB_IDS.length]);
+        const idx = visibleTabIds.indexOf(activeTabRef.current);
+        setActiveTab(visibleTabIds[(idx + 1) % visibleTabIds.length]);
       } else if (e.type === "keydown" && e.key === "Tab" && e.shiftKey) {
         e.preventDefault();
-        const idx = TAB_IDS.indexOf(activeTabRef.current);
-        setActiveTab(TAB_IDS[(idx - 1 + TAB_IDS.length) % TAB_IDS.length]);
+        const idx = visibleTabIds.indexOf(activeTabRef.current);
+        setActiveTab(visibleTabIds[(idx - 1 + visibleTabIds.length) % visibleTabIds.length]);
       } else if (e.type === "keydown" && e.key === "F5") {
         e.preventDefault();
         const scanMap: Partial<Record<TabId, () => void>> = {
@@ -334,7 +347,7 @@ export default function App(): React.ReactElement {
           className="flex items-center gap-1 px-4 pt-3 pb-0 flex-shrink-0"
           style={{ borderBottom: "1px solid var(--color-border)" }}
         >
-          {TABS.map((tab) => {
+          {visibleTabs.map((tab) => {
             const isActive = tab.id === activeTab;
             return (
               <button
