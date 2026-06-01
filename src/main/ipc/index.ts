@@ -1,5 +1,5 @@
 import { join, dirname } from "path";
-import { readFileSync } from "fs";
+import { readFileSync, rmSync, mkdirSync } from "fs";
 import { BrowserWindow, ipcMain, app, dialog, shell } from "electron";
 import {
   getSettings,
@@ -48,6 +48,8 @@ const scanLocks = {
   music: false,
   tv: false,
 };
+
+const regenerateLocks = new Set<string>();
 
 export function registerIpcHandlers(window: BrowserWindow): void {
   ipcMain.handle("settings:get", async () => {
@@ -136,45 +138,54 @@ export function registerIpcHandlers(window: BrowserWindow): void {
 
   ipcMain.handle("games:regenerateThumbnail", async (_e, game: Game) => {
     console.log("[ipc:games:regenerateThumbnail] called for", game.id, game.platform);
-    if (game.platform === "flash" && game.romPath) {
-      const { join } = await import("path");
-      const { existsSync, unlinkSync } = await import("fs");
-      const coverRoot = join(app.getPath("userData"), "covers", "flash");
-      const screenshotDir = join(coverRoot, "screenshots");
-      const generatedDir = join(coverRoot, "generated");
-      const id = game.id;
-      for (const ext of [".png", ".jpg", ".webp"]) {
-        const p = join(screenshotDir, `${id}${ext}`);
-        if (existsSync(p)) {
+    if (regenerateLocks.has(game.id)) {
+      console.log("[ipc:games:regenerateThumbnail] already regenerating", game.id);
+      return null;
+    }
+    regenerateLocks.add(game.id);
+    try {
+      if (game.platform === "flash" && game.romPath) {
+        const { join } = await import("path");
+        const { existsSync, unlinkSync } = await import("fs");
+        const coverRoot = join(app.getPath("userData"), "covers", "flash");
+        const screenshotDir = join(coverRoot, "screenshots");
+        const generatedDir = join(coverRoot, "generated");
+        const id = game.id;
+        for (const ext of [".png", ".jpg", ".webp"]) {
+          const p = join(screenshotDir, `${id}${ext}`);
+          if (existsSync(p)) {
+            try {
+              unlinkSync(p);
+              console.log("[ipc:games:regenerateThumbnail] deleted", p);
+            } catch {}
+          }
+        }
+        const svg = join(generatedDir, `${id}.svg`);
+        if (existsSync(svg)) {
           try {
-            unlinkSync(p);
-            console.log("[ipc:games:regenerateThumbnail] deleted", p);
+            unlinkSync(svg);
+            console.log("[ipc:games:regenerateThumbnail] deleted", svg);
           } catch {}
         }
+        clearInFlight(id);
+        console.log("[ipc:games:regenerateThumbnail] cleared inFlight for", id);
+        const url = await loadFlashThumbnail(game);
+        console.log("[ipc:games:regenerateThumbnail] loadFlashThumbnail returned", url);
+        return url ?? null;
       }
-      const svg = join(generatedDir, `${id}.svg`);
-      if (existsSync(svg)) {
-        try {
-          unlinkSync(svg);
-          console.log("[ipc:games:regenerateThumbnail] deleted", svg);
-        } catch {}
+      const settings = await getSettings();
+      const rawg = await searchGame(game.title, settings.rawgApiKey);
+      if (rawg?.background_image) {
+        const db = getDb();
+        await db.query(`UPDATE game:⟨${game.id}⟩ SET coverUrl = $url`, {
+          url: rawg.background_image,
+        });
+        return rawg.background_image;
       }
-      clearInFlight(id);
-      console.log("[ipc:games:regenerateThumbnail] cleared inFlight for", id);
-      const url = await loadFlashThumbnail(game);
-      console.log("[ipc:games:regenerateThumbnail] loadFlashThumbnail returned", url);
-      return url ?? null;
+      return null;
+    } finally {
+      regenerateLocks.delete(game.id);
     }
-    const settings = await getSettings();
-    const rawg = await searchGame(game.title, settings.rawgApiKey);
-    if (rawg?.background_image) {
-      const db = getDb();
-      await db.query(`UPDATE game:⟨${game.id}⟩ SET coverUrl = $url`, {
-        url: rawg.background_image,
-      });
-      return rawg.background_image;
-    }
-    return null;
   });
 
   ipcMain.handle("movies:scan", async (_e, extraPaths?: string[]) => {
@@ -629,6 +640,25 @@ export function registerIpcHandlers(window: BrowserWindow): void {
       DELETE FROM tv_show;
       DELETE FROM controller_mapping;
     `);
+
+    const userData = app.getPath("userData");
+    const cacheDirs = [
+      join(userData, "covers", "flash", "screenshots"),
+      join(userData, "covers", "flash", "generated"),
+      join(userData, "covers", "music"),
+      join(userData, "covers", "artists"),
+      join(userData, "thumbnails", "movies"),
+      join(userData, "thumbnails", "tv"),
+    ];
+    for (const dir of cacheDirs) {
+      try {
+        rmSync(dir, { recursive: true, force: true });
+        mkdirSync(dir, { recursive: true });
+      } catch (err) {
+        console.warn("[db:clear] failed to clear cache dir:", dir, err);
+      }
+    }
+
     return true;
   });
 

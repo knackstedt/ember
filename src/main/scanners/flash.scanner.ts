@@ -126,7 +126,8 @@ export function scanFlashGames(): Game[] {
 
       const fileTitle = titleFromFilename(basename(fullPath));
       const swfMeta = extractSwfMeta(fullPath);
-      const title = swfMeta.title && swfMeta.title.length > 0 ? swfMeta.title : fileTitle;
+      const isGenericFlexTitle = swfMeta.title ? /^Adobe Flex\s+\d+(?:\.\d+)?\s+Application$/i.test(swfMeta.title) : false;
+      const title = swfMeta.title && swfMeta.title.length > 0 && !isGenericFlexTitle ? swfMeta.title : fileTitle;
       const id = hashId("flash", fullPath);
 
       console.log("[flash] found", title, "→", id, "path:", fullPath);

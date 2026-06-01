@@ -49,8 +49,8 @@ interface FlashCaptureConfig {
 const DEFAULT_CAPTURE_CONFIG: FlashCaptureConfig = {
   width: 800,
   height: 600,
-  waitMs: 15000,
-  timeoutMs: 45000,
+  waitMs: 40000,
+  timeoutMs: 120000,
   backgroundColor: "#000",
 };
 
@@ -296,15 +296,34 @@ async function run() {
     document.getElementById('player').appendChild(player);
     const data = fs.readFileSync('${escapedSwf}');
     await player.load({ data });
-    const waitMs = ${config.waitMs};
-    setTimeout(() => ipcRenderer.send('flash-capture:ready'), waitMs);
+    setTimeout(() => {
+      ipcRenderer.send('flash-capture:ready');
+    }, ${config.waitMs});
   } catch (err) {
     ipcRenderer.send('flash-capture:error', String(err));
   }
 }
 
-if (window.RufflePlayer) run();
-else window.addEventListener('load', run);
+function startWhenReady() {
+  if (window.RufflePlayer) {
+    run();
+  } else if (document.readyState === 'loading') {
+    window.addEventListener('load', startWhenReady);
+  } else {
+    const poll = setInterval(() => {
+      if (window.RufflePlayer) {
+        clearInterval(poll);
+        run();
+      }
+    }, 50);
+    setTimeout(() => {
+      clearInterval(poll);
+      ipcRenderer.send('flash-capture:log', '[flash:run] RufflePlayer never appeared, sending error');
+      ipcRenderer.send('flash-capture:error', 'RufflePlayer not available');
+    }, 15000);
+  }
+}
+startWhenReady();
 </script>
 </body>
 </html>`;
@@ -368,11 +387,23 @@ class ScreenshotQueue {
         webPreferences: {
           nodeIntegration: true,
           contextIsolation: false,
-          webSecurity: false,
+          webSecurity: false,          
         },
       });
       win.webContents.setAudioMuted(true);
       win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+
+      win.webContents.on("console-message", (event, level, message) => {
+        if (level >= 3) {
+          console.error(`[flash:renderer] ${message}`);
+        }
+      });
+
+      win.webContents.on("render-process-gone", (event, details) => {
+        console.error(`[flash:renderer:crashed] reason=${details.reason}, exitCode=${details.exitCode}`);
+        cleanup();
+        resolveOnce(undefined, "procedural-crash");
+      });
 
       const targetId = win.webContents.id;
 
@@ -408,13 +439,20 @@ class ScreenshotQueue {
         resolveOnce(undefined, "procedural-ruffle-error");
       };
 
+      const onLog = (event: Electron.IpcMainEvent, msg: string) => {
+        if (event.sender.id !== targetId) return;
+        console.log(msg);
+      };
+
       const cleanup = () => {
         ipcMain.off("flash-capture:ready", onReady);
         ipcMain.off("flash-capture:error", onError);
+        ipcMain.off("flash-capture:log", onLog);
       };
 
       ipcMain.on("flash-capture:ready", onReady);
       ipcMain.on("flash-capture:error", onError);
+      ipcMain.on("flash-capture:log", onLog);
 
       const html = buildCaptureHTML(romPath, config);
       win
