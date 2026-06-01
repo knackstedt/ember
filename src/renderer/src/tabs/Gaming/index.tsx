@@ -261,6 +261,20 @@ export const GamingTab: React.FC = () => {
         >
           Loading games…
         </div>
+      ) : scanning && items.length === 0 ? (
+        <div
+          className="flex-1 flex flex-col items-center justify-center gap-3"
+          style={{ color: "var(--color-text-dim)" }}
+        >
+          <div
+            className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin"
+            style={{
+              borderColor: "var(--color-accent)",
+              borderTopColor: "transparent",
+            }}
+          />
+          <span className="text-sm">Scanning for games…</span>
+        </div>
       ) : items.length === 0 ? (
         <div
           className="flex-1 flex flex-col items-center justify-center gap-4"

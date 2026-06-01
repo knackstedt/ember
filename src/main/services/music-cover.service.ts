@@ -18,6 +18,8 @@ const coverCache = join(app.getPath("userData"), "covers", "music");
 const generatedCache = join(coverCache, "generated");
 mkdirSync(generatedCache, { recursive: true });
 
+const inFlight = new Set<string>();
+
 let musicMetadata: any = null;
 
 async function getMusicMetadata() {
@@ -243,26 +245,56 @@ function normalizeId(raw: unknown): string {
   return String(raw);
 }
 
-export async function loadThumbnail(
-  track: MusicTrack,
-): Promise<string | undefined> {
-  const { filePath } = track;
-  const id = normalizeId(track.id);
-  const url =
-    (await extractCover(filePath, id)) ??
-    findFolderArt(filePath, id) ??
-    (await generateProceduralCover(filePath, id));
-  if (url) {
+async function updateTrackCoverWithRetry(
+  id: string,
+  url: string,
+  retries = 3,
+): Promise<void> {
+  for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       const db = getDb();
       await db.query(`UPDATE music_track:⟨${id}⟩ SET albumArtUrl = $url`, {
         url,
       });
-    } catch (err) {
-      console.error("[loadThumbnail] DB update failed", err);
+      return;
+    } catch (err: any) {
+      const isConflict =
+        err?.kind === "Query" &&
+        (err?.message?.includes("Transaction conflict") ||
+          err?.message?.includes("write conflict"));
+      if (isConflict && attempt < retries) {
+        await new Promise((r) => setTimeout(r, 50 * attempt));
+        continue;
+      }
+      throw err;
     }
   }
-  return url;
+}
+
+export async function loadThumbnail(
+  track: MusicTrack,
+): Promise<string | undefined> {
+  const id = normalizeId(track.id);
+  if (inFlight.has(id)) return undefined;
+  inFlight.add(id);
+
+  try {
+    const { filePath } = track;
+    const url =
+      (await extractCover(filePath, id)) ??
+      findFolderArt(filePath, id) ??
+      (await generateProceduralCover(filePath, id));
+    if (url) {
+      try {
+        await updateTrackCoverWithRetry(id, url);
+      } catch (err) {
+        console.error("[loadThumbnail] DB update failed", err);
+      }
+    }
+    return url;
+  } finally {
+    inFlight.delete(id);
+  }
 }
 
 /* ------------------------------------------------------------------ */

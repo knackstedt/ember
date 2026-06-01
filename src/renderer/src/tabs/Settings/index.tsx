@@ -7,6 +7,8 @@ import {
   FlashCanvasSize,
   FlashUpscaleStyle,
   FlashSettings,
+  TabId,
+  DailyBackgroundSource,
 } from "../../../../shared/types";
 
 const DEFAULT_FLASH_SETTINGS: FlashSettings = {
@@ -316,6 +318,135 @@ export const SettingsTab: React.FC = () => {
             value={settings.fullscreen}
             onChange={(v) => update({ fullscreen: v })}
           />
+        </section>
+
+        <section className="flex flex-col gap-4">
+          <h2
+            className="text-lg font-semibold"
+            style={{ color: "var(--color-text)" }}
+          >
+            Tabs
+          </h2>
+          <p className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+            Choose which tabs are visible in the navigation bar.
+          </p>
+          {(
+            [
+              ["gaming", "Gaming", "🎮"],
+              ["movies", "Movies", "🎬"],
+              ["music", "Music", "🎵"],
+              ["tv-shows", "TV Shows", "📺"],
+              ["controllers", "Controllers", "🕹"],
+            ] as [TabId, string, string][]
+          ).map(([id, label, icon]) => {
+            const disabled = settings.disabledTabs.includes(id);
+            return (
+              <div key={id} className="flex items-center justify-between py-1">
+                <span className="text-sm" style={{ color: "var(--color-text)" }}>
+                  {icon} {label}
+                </span>
+                <button
+                  onClick={() =>
+                    update({
+                      disabledTabs: disabled
+                        ? settings.disabledTabs.filter((t) => t !== id)
+                        : [...settings.disabledTabs, id],
+                    })
+                  }
+                  className="w-11 h-6 rounded-full transition-colors relative"
+                  style={{
+                    background: !disabled
+                      ? "var(--color-accent)"
+                      : "var(--color-surface-raised)",
+                    border: "1px solid var(--color-border)",
+                  }}
+                >
+                  <span
+                    className="absolute top-0.5 w-5 h-5 rounded-full transition-transform"
+                    style={{
+                      background: "white",
+                      left: !disabled ? "1.25rem" : "0.125rem",
+                    }}
+                  />
+                </button>
+              </div>
+            );
+          })}
+        </section>
+
+        <section className="flex flex-col gap-4">
+          <h2
+            className="text-lg font-semibold"
+            style={{ color: "var(--color-text)" }}
+          >
+            Daily Background
+          </h2>
+          <p className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+            Fetches a new wallpaper image every day and layers it behind the
+            theme canvas.
+          </p>
+          <Toggle
+            label="Enable Daily Background"
+            value={settings.dailyBackground.enabled}
+            onChange={(v) =>
+              update({
+                dailyBackground: {
+                  ...settings.dailyBackground,
+                  enabled: v,
+                },
+              })
+            }
+          />
+          {settings.dailyBackground.enabled && (
+            <div className="flex flex-col gap-3">
+              <div>
+                <label
+                  className="text-xs font-medium mb-1.5 block"
+                  style={{ color: "var(--color-text-dim)" }}
+                >
+                  Source
+                </label>
+                <select
+                  value={settings.dailyBackground.source}
+                  onChange={(e) =>
+                    update({
+                      dailyBackground: {
+                        ...settings.dailyBackground,
+                        source: e.target.value as DailyBackgroundSource,
+                      },
+                    })
+                  }
+                  className="w-full text-sm px-2 py-1.5 rounded"
+                  style={{
+                    background: "var(--color-surface-raised)",
+                    border: "1px solid var(--color-border)",
+                    color: "var(--color-text)",
+                    outline: "none",
+                  }}
+                >
+                  <option value="bing">Bing Wallpaper of the Day</option>
+                  <option value="unsplash">Unsplash Random</option>
+                  <option value="picsum">Picsum Random</option>
+                  <option value="custom">Custom URL</option>
+                </select>
+              </div>
+              {settings.dailyBackground.source === "custom" && (
+                <Field
+                  label="Custom Image URL"
+                  value={settings.dailyBackground.customUrl ?? ""}
+                  onChange={(v) =>
+                    update({
+                      dailyBackground: {
+                        ...settings.dailyBackground,
+                        customUrl: v,
+                      },
+                    })
+                  }
+                  placeholder="https://example.com/wallpaper.jpg"
+                />
+              )}
+            </div>
+          )}
         </section>
 
         <section className="flex flex-col gap-4">

@@ -18,6 +18,7 @@ export const TVShowsTab: React.FC = () => {
   const {
     shows,
     loading,
+    scanning,
     searchQuery,
     load,
     scan,
@@ -123,8 +124,9 @@ export const TVShowsTab: React.FC = () => {
           }}
           onClick={scan}
           whileTap={{ scale: 0.96 }}
+          disabled={scanning}
         >
-          ↺ Scan
+          {scanning ? "⟳ Scanning…" : "↺ Scan"}
         </motion.button>
         <span className="text-sm" style={{ color: "var(--color-text-dim)" }}>
           {items.length} shows
@@ -137,6 +139,20 @@ export const TVShowsTab: React.FC = () => {
           style={{ color: "var(--color-text-dim)" }}
         >
           Loading TV shows…
+        </div>
+      ) : scanning && items.length === 0 ? (
+        <div
+          className="flex-1 flex flex-col items-center justify-center gap-3"
+          style={{ color: "var(--color-text-dim)" }}
+        >
+          <div
+            className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin"
+            style={{
+              borderColor: "var(--color-accent)",
+              borderTopColor: "transparent",
+            }}
+          />
+          <span className="text-sm">Scanning for shows…</span>
         </div>
       ) : items.length === 0 ? (
         <div

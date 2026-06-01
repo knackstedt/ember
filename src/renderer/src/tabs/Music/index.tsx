@@ -58,6 +58,7 @@ export const MusicTab: React.FC = () => {
   const {
     tracks,
     loading,
+    scanning,
     searchQuery,
     activeArtist,
     activeAlbum,
@@ -244,8 +245,9 @@ export const MusicTab: React.FC = () => {
               }}
               onClick={scan}
               whileTap={{ scale: 0.96 }}
+              disabled={scanning}
             >
-              ↺ Scan
+              {scanning ? "⟳ Scanning…" : "↺ Scan"}
             </motion.button>
           </>
         )}
@@ -299,6 +301,38 @@ export const MusicTab: React.FC = () => {
               style={{ color: "var(--color-text-dim)" }}
             >
               Loading music…
+            </div>
+          ) : scanning && items.length === 0 ? (
+            <div
+              className="flex-1 flex flex-col items-center justify-center gap-3"
+              style={{ color: "var(--color-text-dim)" }}
+            >
+              <div
+                className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin"
+                style={{
+                  borderColor: "var(--color-accent)",
+                  borderTopColor: "transparent",
+                }}
+              />
+              <span className="text-sm">Scanning for music…</span>
+            </div>
+          ) : items.length === 0 ? (
+            <div
+              className="flex-1 flex flex-col items-center justify-center gap-4"
+              style={{ color: "var(--color-text-dim)" }}
+            >
+              <p>No music found.</p>
+              <motion.button
+                className="px-6 py-2.5 rounded-[var(--radius-card)] font-medium"
+                style={{
+                  background: "var(--color-accent)",
+                  color: "var(--color-bg)",
+                }}
+                onClick={scan}
+                whileTap={{ scale: 0.96 }}
+              >
+                Scan for music
+              </motion.button>
             </div>
           ) : (
             <div className="flex-1 min-h-0 min-w-0 overflow-hidden">
