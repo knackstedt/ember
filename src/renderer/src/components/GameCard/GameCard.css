@@ -137,7 +137,7 @@
   transition: filter 0.8s ease;
   filter: brightness(1.1) contrast(1.1) saturate(0.5) opacity(0.25);
   animation: gc-holo-bg 18s linear infinite, gc-watermark-slide 90s linear infinite;
-  animation-play-state: running, running;
+  animation-play-state: paused, paused;
   mix-blend-mode: screen;
 }
 
@@ -202,6 +202,7 @@
 .gc-card.active .gc-shine,
 .gc-card-wrapper.focused .gc-shine {
   filter: brightness(1.2) contrast(1.5) saturate(0.8) opacity(0.3);
+  animation-play-state: running, running;
 }
 
 .gc-card:hover .gc-shine::before,
@@ -249,19 +250,6 @@
     100% 100%;
   mix-blend-mode: difference;
   filter: brightness(0.8) contrast(1.5);
-}
-
-.gc-glare {
-  transform: translate3d(0, 0, 1.1px);
-  overflow: hidden;
-  background-image: radial-gradient(
-    farthest-corner circle at var(--pointer-x) var(--pointer-y),
-    hsl(248, 25%, 80%) 12%,
-    hsla(207, 40%, 30%, 0.8) 90%
-  );
-  mix-blend-mode: overlay;
-  filter: brightness(0.8) contrast(1.2);
-  z-index: 4;
 }
 
 /* Cover image content */
