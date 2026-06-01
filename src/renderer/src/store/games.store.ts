@@ -8,6 +8,7 @@ interface GamesState {
   activeFilter: GamePlatform | "all" | "couch-coop" | "favorites";
   searchQuery: string;
   regeneratingIds: Set<string>;
+  pendingThumbnailIds: Set<string>;
   load: () => Promise<void>;
   scan: () => Promise<void>;
   setFilter: (filter: GamesState["activeFilter"]) => void;
@@ -27,6 +28,7 @@ export const useGamesStore = create<GamesState>((set, get) => ({
   activeFilter: "all",
   searchQuery: "",
   regeneratingIds: new Set(),
+  pendingThumbnailIds: new Set(),
 
   load: async () => {
     set({ loading: true });
@@ -81,13 +83,28 @@ export const useGamesStore = create<GamesState>((set, get) => ({
   loadThumbnail: async (id) => {
     const game = get().games.find((g) => g.id === id);
     if (!game || game.coverUrl || game.platform !== "flash") return;
-    const url = await window.htpc.games.loadThumbnail(game);
-    if (!url) return;
-    set((s) => ({
-      games: s.games.map((g) =>
-        g.id === id ? { ...g, coverUrl: url } : g,
-      ),
-    }));
+    if (get().pendingThumbnailIds.has(id)) return;
+    set((s) => {
+      const next = new Set(s.pendingThumbnailIds);
+      next.add(id);
+      return { pendingThumbnailIds: next };
+    });
+    try {
+      const url = await window.htpc.games.loadThumbnail(game);
+      if (url) {
+        set((s) => ({
+          games: s.games.map((g) =>
+            g.id === id ? { ...g, coverUrl: url } : g,
+          ),
+        }));
+      }
+    } finally {
+      set((s) => {
+        const next = new Set(s.pendingThumbnailIds);
+        next.delete(id);
+        return { pendingThumbnailIds: next };
+      });
+    }
   },
 
   regenerateThumbnail: async (id) => {

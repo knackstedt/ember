@@ -57,12 +57,11 @@ const LazyGameCard: React.FC<{
 }> = ({ game, index, focusedIndex, onSelect, onFavorite }) => {
   const loadThumbnail = useGamesStore((s) => s.loadThumbnail);
   const regeneratingIds = useGamesStore((s) => s.regeneratingIds);
-  const [isPending, setIsPending] = useState(false);
+  const pendingThumbnailIds = useGamesStore((s) => s.pendingThumbnailIds);
 
   useEffect(() => {
     if (game.platform === "flash" && !game.coverUrl) {
-      setIsPending(true);
-      loadThumbnail(game.id).finally(() => setIsPending(false));
+      loadThumbnail(game.id);
     }
   }, [game.id, game.platform, game.coverUrl, loadThumbnail]);
 
@@ -79,7 +78,7 @@ const LazyGameCard: React.FC<{
       badgeColor={b?.color}
       isFavorite={game.isFavorite}
       isFocused={index === focusedIndex}
-      isThumbnailPending={isPending || regeneratingIds.has(game.id)}
+      isThumbnailPending={pendingThumbnailIds.has(game.id) || regeneratingIds.has(game.id)}
       onSelect={onSelect}
       onFavorite={onFavorite}
     />

@@ -334,7 +334,8 @@ startWhenReady();
 
 class ScreenshotQueue {
   private queue: Array<{ game: Game; resolve: (result: { url?: string; source?: string }) => void }> = [];
-  private running = false;
+  private running = 0;
+  private readonly maxConcurrency = 4;
 
   enqueue(game: Game): Promise<{ url?: string; source?: string }> {
     return new Promise((resolve) => {
@@ -344,19 +345,20 @@ class ScreenshotQueue {
   }
 
   private async process() {
-    if (this.running) return;
-    this.running = true;
-    while (this.queue.length > 0) {
+    while (this.running < this.maxConcurrency && this.queue.length > 0) {
+      this.running++;
       const item = this.queue.shift()!;
-      try {
-        const result = await this.run(item.game);
-        item.resolve(result);
-      } catch (e) {
-        log.error("flash:screenshot", `queue error: ${e}`);
-        item.resolve({});
-      }
+      this.run(item.game)
+        .then((result) => item.resolve(result))
+        .catch((e) => {
+          log.error("flash:screenshot", `queue error: ${e}`);
+          item.resolve({});
+        })
+        .finally(() => {
+          this.running--;
+          this.process();
+        });
     }
-    this.running = false;
   }
 
   private async run(game: Game): Promise<{ url?: string; source?: string }> {
