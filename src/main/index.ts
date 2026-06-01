@@ -1,6 +1,6 @@
 import { app, BrowserWindow, shell, protocol } from "electron";
 import { join } from "path";
-import { readFileSync } from "fs";
+import { readFileSync, createReadStream, statSync } from "fs";
 import { initDb } from "./db";
 import { registerIpcHandlers } from "./ipc";
 import { initInputSystem, destroyInputSystem } from "./input/evdev";
@@ -135,6 +135,15 @@ protocol.registerSchemesAsPrivileged([
       corsEnabled: true,
     },
   },
+  {
+    scheme: "htpc-media",
+    privileges: {
+      secure: true,
+      standard: true,
+      supportFetchAPI: true,
+      corsEnabled: true,
+    },
+  },
 ]);
 
 app.whenReady().then(async () => {
@@ -187,6 +196,61 @@ app.whenReady().then(async () => {
       console.warn("[protocol] game file not found:", filePath);
       return new Response("Not Found", { status: 404 });
     }
+  });
+
+  protocol.handle("htpc-media", async (request) => {
+    const url = new URL(request.url);
+    const filePath = decodeURIComponent(url.pathname.slice(1));
+    if (!filePath || filePath.includes("..")) {
+      return new Response("Forbidden", { status: 403 });
+    }
+
+    let stats;
+    try {
+      stats = statSync(filePath);
+    } catch {
+      return new Response("Not Found", { status: 404 });
+    }
+
+    const ext = filePath.toLowerCase().slice(filePath.lastIndexOf("."));
+    let contentType = "application/octet-stream";
+    if (ext === ".mp3") contentType = "audio/mpeg";
+    else if (ext === ".flac") contentType = "audio/flac";
+    else if (ext === ".ogg") contentType = "audio/ogg";
+    else if (ext === ".wav") contentType = "audio/wav";
+    else if (ext === ".m4a" || ext === ".aac") contentType = "audio/aac";
+    else if (ext === ".opus") contentType = "audio/opus";
+    else if (ext === ".wma") contentType = "audio/x-ms-wma";
+
+    const range = request.headers.get("Range") || "";
+    if (range) {
+      const match = range.match(/bytes=(\d+)-(\d*)/);
+      if (match) {
+        const start = parseInt(match[1], 10);
+        const end = match[2] ? parseInt(match[2], 10) : stats.size - 1;
+        const length = end - start + 1;
+        const stream = createReadStream(filePath, { start, end });
+        return new Response(stream as any, {
+          status: 206,
+          headers: {
+            "Content-Type": contentType,
+            "Content-Length": String(length),
+            "Content-Range": `bytes ${start}-${end}/${stats.size}`,
+            "Accept-Ranges": "bytes",
+          },
+        });
+      }
+    }
+
+    const stream = createReadStream(filePath);
+    return new Response(stream as any, {
+      status: 200,
+      headers: {
+        "Content-Type": contentType,
+        "Content-Length": String(stats.size),
+        "Accept-Ranges": "bytes",
+      },
+    });
   });
 
   await createWindow();

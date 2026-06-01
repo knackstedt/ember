@@ -128,6 +128,7 @@ interface MusicState {
   activeYear: number | null;
   artistThumbnails: Record<string, string>;
   artistThumbnailsLoading: Record<string, boolean>;
+  artistThumbnailsFailed: Record<string, number>;
   load: () => Promise<void>;
   scan: () => Promise<void>;
   toggleFavorite: (id: string) => Promise<void>;
@@ -156,6 +157,7 @@ export const useMusicStore = create<MusicState>((set, get) => ({
   activeYear: null,
   artistThumbnails: {},
   artistThumbnailsLoading: {},
+  artistThumbnailsFailed: {},
 
   load: async () => {
     set({ loading: true });
@@ -237,14 +239,16 @@ export const useMusicStore = create<MusicState>((set, get) => ({
   },
 
   loadArtistThumbnail: async (artist) => {
-    if (!artist || get().artistThumbnails[artist] || get().artistThumbnailsLoading[artist]) return;
+    if (!artist || get().artistThumbnails[artist] || get().artistThumbnailsLoading[artist] || get().artistThumbnailsFailed[artist]) return;
     set((s) => ({
       artistThumbnailsLoading: { ...s.artistThumbnailsLoading, [artist]: true },
     }));
     const url = await window.htpc.music.artistThumbnail(artist);
     set((s) => ({
       artistThumbnailsLoading: { ...s.artistThumbnailsLoading, [artist]: false },
-      ...(url ? { artistThumbnails: { ...s.artistThumbnails, [artist]: url } } : {}),
+      ...(url
+        ? { artistThumbnails: { ...s.artistThumbnails, [artist]: url } }
+        : { artistThumbnailsFailed: { ...s.artistThumbnailsFailed, [artist]: Date.now() } }),
     }));
   },
 

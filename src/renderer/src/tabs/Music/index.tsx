@@ -168,8 +168,9 @@ export const MusicTab: React.FC = () => {
     const BATCH = 8;
     const INTERVAL = 200;
     const timer = setInterval(() => {
+      const state = useMusicStore.getState();
       const pending = artistGroups
-        .filter((g) => !useMusicStore.getState().artistThumbnails[g.name])
+        .filter((g) => !state.artistThumbnails[g.name] && !state.artistThumbnailsFailed[g.name])
         .map((g) => g.name);
       if (pending.length === 0) {
         clearInterval(timer);
