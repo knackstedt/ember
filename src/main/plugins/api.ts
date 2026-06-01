@@ -1,4 +1,7 @@
 import { PluginManifest } from "../../shared/types";
+import { createLogger } from "../util/logger";
+
+const log = createLogger("info");
 
 export type PluginSlotId =
   | "gaming.grid.before"
@@ -48,17 +51,18 @@ export const registeredPlugins: RegisteredPlugin[] = [];
 export function createPluginApi(manifest: PluginManifest): PluginApi {
   return {
     registerTab(id, label, component) {
-      console.log(`[plugin:${manifest.id}] Register tab: ${id} (${label})`);
+      log.info(`plugin:${manifest.id}`, `Register tab: ${id} (${label})`);
     },
     registerSettingsPanel(id, label, component) {
-      console.log(`[plugin:${manifest.id}] Register settings panel: ${id}`);
+      log.info(`plugin:${manifest.id}`, `Register settings panel: ${id}`);
     },
     registerScanner(id, fn) {
-      console.log(`[plugin:${manifest.id}] Register scanner: ${id}`);
+      log.info(`plugin:${manifest.id}`, `Register scanner: ${id}`);
     },
     addChipFilter(tab, filter) {
-      console.log(
-        `[plugin:${manifest.id}] Add chip filter on tab "${tab}": ${filter.id}`,
+      log.info(
+        `plugin:${manifest.id}`,
+        `Add chip filter on tab "${tab}": ${filter.id}`,
       );
     },
     onIpc(channel, handler) {
@@ -69,7 +73,7 @@ export function createPluginApi(manifest: PluginManifest): PluginApi {
       );
     },
     log(message) {
-      console.log(`[plugin:${manifest.id}] ${message}`);
+      log.info(`plugin:${manifest.id}`, message);
     },
   };
 }

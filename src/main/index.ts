@@ -6,11 +6,14 @@ import { registerIpcHandlers } from "./ipc";
 import { initInputSystem, destroyInputSystem } from "./input/evdev";
 import { getSettings } from "./services/settings.service";
 import { getWindowState, saveWindowState } from "./services/window-state.service";
+import { createLogger } from "./util/logger";
+
+const log = createLogger("info");
 
 const isDev = !app.isPackaged || process.env.NODE_ENV === "development";
 
 if (!isDev && !app.requestSingleInstanceLock()) {
-  console.log("[lock] Another instance is already running, exiting");
+  log.info("lock", "Another instance is already running, exiting");
   app.exit(0);
 }
 
@@ -33,7 +36,7 @@ async function createWindow(): Promise<void> {
   await initDb();
   const settings = await getSettings();
   const winState = getWindowState();
-  console.log("[window-state] creating window with", winState);
+  log.info("window-state", `creating window with ${JSON.stringify(winState)}`);
 
   mainWindow = new BrowserWindow({
     width: winState.width,
@@ -103,9 +106,9 @@ async function createWindow(): Promise<void> {
   try {
     await initInputSystem(mainWindow);
   } catch (err) {
-    console.warn(
-      "[input] evdev init failed (user may not be in input group):",
-      err,
+    log.warn(
+      "input",
+      `evdev init failed (user may not be in input group): ${err}`
     );
   }
 
@@ -169,7 +172,7 @@ app.whenReady().then(async () => {
         headers: { "Content-Type": contentType },
       });
     } catch {
-      console.warn("[protocol] file not found:", filePath);
+      log.warn("protocol", `file not found: ${filePath}`);
       return new Response("Not Found", { status: 404 });
     }
   });
@@ -193,7 +196,7 @@ app.whenReady().then(async () => {
         headers: { "Content-Type": contentType },
       });
     } catch {
-      console.warn("[protocol] game file not found:", filePath);
+      log.warn("protocol", `game file not found: ${filePath}`);
       return new Response("Not Found", { status: 404 });
     }
   });

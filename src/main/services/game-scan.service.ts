@@ -10,6 +10,9 @@ import { scanHeroicGames, scanLutrisGames } from "../scanners/heroic.scanner";
 import { scanFlashGames } from "../scanners/flash.scanner";
 import { scanWindowsGames } from "../scanners/windows.scanner";
 import { Game } from "../../shared/types";
+import { createLogger } from "../util/logger";
+
+const log = createLogger("info");
 
 function normalizeGame(game: Game): Record<string, unknown> {
   const n: Record<string, unknown> = { ...game };
@@ -66,7 +69,7 @@ async function scanInMainThread(
         game: normalizeGame(game),
       });
     } catch (err) {
-      console.warn(`[scan] Failed to upsert ${game.id}:`, err);
+      log.warn("scan", `Failed to upsert ${game.id}: ${err}`);
     }
   }
 
@@ -80,8 +83,9 @@ export async function performGameScan(
   const workerPath = join(__dirname, "workers/game-scan.worker.js");
 
   if (!existsSync(workerPath)) {
-    console.warn(
-      "[scan] Worker bundle not found, falling back to main-thread scan",
+    log.warn(
+      "scan",
+      "Worker bundle not found, falling back to main-thread scan",
     );
     return scanInMainThread(window, extraPaths);
   }
@@ -105,7 +109,7 @@ export async function performGameScan(
                   game: normalizeGame(game),
                 });
               } catch (err) {
-                console.warn(`[scan] Failed to upsert ${game.id}:`, err);
+                log.warn("scan", `Failed to upsert ${game.id}: ${err}`);
               }
             }
             worker.terminate();

@@ -1,6 +1,9 @@
 import { app, screen } from "electron";
 import { join } from "path";
 import { readFileSync, writeFileSync, existsSync } from "fs";
+import { createLogger } from "../util/logger";
+
+const log = createLogger("info");
 
 interface WindowState {
   width: number;
@@ -40,13 +43,13 @@ export function getWindowState(): WindowState {
         parsed.x = undefined;
         parsed.y = undefined;
       }
-      console.log("[window-state] loaded", statePath, parsed);
+      log.info("window-state", `loaded ${statePath} ${JSON.stringify(parsed)}`);
       return parsed;
     }
   } catch (err) {
-    console.warn("[window-state] failed to load", err);
+    log.warn("window-state", `failed to load: ${err}`);
   }
-  console.log("[window-state] using defaults", defaultState);
+  log.info("window-state", `using defaults ${JSON.stringify(defaultState)}`);
   return { ...defaultState };
 }
 
@@ -55,9 +58,9 @@ export function saveWindowState(state: WindowState): void {
   saveTimer = setTimeout(() => {
     try {
       writeFileSync(statePath, JSON.stringify(state), "utf-8");
-      console.log("[window-state] saved", statePath, state);
+      log.info("window-state", `saved ${statePath} ${JSON.stringify(state)}`);
     } catch (err) {
-      console.warn("[window-state] failed to save", err);
+      log.warn("window-state", `failed to save: ${err}`);
     }
   }, 300);
 }

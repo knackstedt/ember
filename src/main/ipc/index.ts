@@ -42,6 +42,9 @@ import {
   TVShow,
   AppSettings,
 } from "../../shared/types";
+import { createLogger } from "../util/logger";
+
+const log = createLogger("info");
 
 const scanLocks = {
   movies: false,
@@ -137,9 +140,9 @@ export function registerIpcHandlers(window: BrowserWindow): void {
   );
 
   ipcMain.handle("games:regenerateThumbnail", async (_e, game: Game) => {
-    console.log("[ipc:games:regenerateThumbnail] called for", game.id, game.platform);
+    log.info("ipc:games:regenerateThumbnail", `called for ${game.id} ${game.platform}`);
     if (regenerateLocks.has(game.id)) {
-      console.log("[ipc:games:regenerateThumbnail] already regenerating", game.id);
+      log.info("ipc:games:regenerateThumbnail", `already regenerating ${game.id}`);
       return null;
     }
     regenerateLocks.add(game.id);
@@ -156,7 +159,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
           if (existsSync(p)) {
             try {
               unlinkSync(p);
-              console.log("[ipc:games:regenerateThumbnail] deleted", p);
+              log.info("ipc:games:regenerateThumbnail", `deleted ${p}`);
             } catch {}
           }
         }
@@ -164,13 +167,13 @@ export function registerIpcHandlers(window: BrowserWindow): void {
         if (existsSync(svg)) {
           try {
             unlinkSync(svg);
-            console.log("[ipc:games:regenerateThumbnail] deleted", svg);
+            log.info("ipc:games:regenerateThumbnail", `deleted ${svg}`);
           } catch {}
         }
         clearInFlight(id);
-        console.log("[ipc:games:regenerateThumbnail] cleared inFlight for", id);
+        log.info("ipc:games:regenerateThumbnail", `cleared inFlight for ${id}`);
         const url = await loadFlashThumbnail(game);
-        console.log("[ipc:games:regenerateThumbnail] loadFlashThumbnail returned", url);
+        log.info("ipc:games:regenerateThumbnail", `loadFlashThumbnail returned ${url}`);
         return url ?? null;
       }
       const settings = await getSettings();
@@ -288,11 +291,11 @@ export function registerIpcHandlers(window: BrowserWindow): void {
       "SELECT * FROM movie ORDER BY title ASC",
     );
     const movies = (result[0] ?? []) as Movie[];
-    console.log(
-      "[movies:list] returning",
-      movies.length,
-      "movies, coverUrl samples:",
-      movies.slice(0, 3).map((m) => ({ title: m.title, coverUrl: m.coverUrl })),
+    log.info(
+      "movies:list",
+      `returning ${movies.length} movies, coverUrl samples: ${JSON.stringify(
+        movies.slice(0, 3).map((m) => ({ title: m.title, coverUrl: m.coverUrl })),
+      )}`,
     );
     const thumbRoot = join(app.getPath("userData"), "thumbnails").replace(
       /\\/g,
@@ -390,11 +393,11 @@ export function registerIpcHandlers(window: BrowserWindow): void {
       scanLocks.music = false;
     });
     const db = getDb();
-    console.log("[music:scan] inserting", tracks.length, "tracks into DB...");
+    log.info("music:scan", `inserting ${tracks.length} tracks into DB...`);
     for (let i = 0; i < tracks.length; i++) {
       const track = tracks[i];
       if (i % 100 === 0)
-        console.log(`[music:scan] db insert ${i + 1}/${tracks.length}`);
+        log.info("music:scan", `db insert ${i + 1}/${tracks.length}`);
       const clean = {
         ...track,
         isFavorite: track.isFavorite ?? false,
@@ -405,7 +408,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
         track: clean,
       });
     }
-    console.log("[music:scan] DB insert done");
+    log.info("music:scan", "DB insert done");
     window.webContents.send("scan:progress", {
       scanner: "music",
       current: tracks.length,
@@ -655,7 +658,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
         rmSync(dir, { recursive: true, force: true });
         mkdirSync(dir, { recursive: true });
       } catch (err) {
-        console.warn("[db:clear] failed to clear cache dir:", dir, err);
+        log.warn("db:clear", `failed to clear cache dir: ${dir} ${err}`);
       }
     }
 
@@ -681,7 +684,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     try {
       return readFileSync(filePath);
     } catch (err) {
-      console.warn("[files:read] failed:", filePath, err);
+      log.warn("files:read", `failed: ${filePath} ${err}`);
       return null;
     }
   });

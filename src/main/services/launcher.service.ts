@@ -1,5 +1,8 @@
 import { spawn, spawnSync, ChildProcess } from "child_process";
 import { Game, Movie, MusicTrack } from "../../shared/types";
+import { createLogger } from "../util/logger";
+
+const log = createLogger("info");
 
 const activeProcesses = new Map<string, ChildProcess>();
 
@@ -29,8 +32,9 @@ function fullscreenDolphinWindow(): void {
       stdio: "ignore",
     });
     if (xdotoolCheck.status !== 0) {
-      console.warn(
-        "[launcher] xdotool not found; cannot auto-fullscreen Dolphin. Install xdotool for best HTPC experience.",
+      log.warn(
+        "launcher",
+        "xdotool not found; cannot auto-fullscreen Dolphin. Install xdotool for best HTPC experience.",
       );
       return;
     }
@@ -58,14 +62,14 @@ function fullscreenDolphinWindow(): void {
 
     watcher.stdout?.on("data", (data: Buffer) => {
       const msg = data.toString().trim();
-      if (msg) console.log(msg);
+      if (msg) log.info("launcher", msg);
     });
     watcher.stderr?.on("data", (data: Buffer) => {
       const msg = data.toString().trim();
-      if (msg) console.error("[launcher] fullscreen watcher stderr:", msg);
+      if (msg) log.error("launcher", `fullscreen watcher stderr: ${msg}`);
     });
   } catch (err) {
-    console.warn("[launcher] Failed to start Dolphin fullscreen watcher:", err);
+    log.warn("launcher", `Failed to start Dolphin fullscreen watcher: ${err}`);
   }
 }
 
@@ -115,7 +119,7 @@ export function launchGame(game: Game): Promise<void> {
       }
   }
 
-  console.log(`[launcher] Spawning: ${cmd} ${args.map((a) => (a.includes(" ") ? `"${a}"` : a)).join(" ")}`);
+  log.info("launcher", `Spawning: ${cmd} ${args.map((a) => (a.includes(" ") ? `"${a}"` : a)).join(" ")}`);
 
   const isDolphin =
     game.platform === "dolphin-gc" || game.platform === "dolphin-wii";
@@ -142,7 +146,7 @@ export function launchGame(game: Game): Promise<void> {
       if (settled) return;
       settled = true;
       activeProcesses.delete(game.id);
-      console.error(`[launcher] Spawn error for "${game.title}":`, err);
+      log.error("launcher", `Spawn error for "${game.title}": ${err}`);
       reject(err);
     });
 
@@ -153,7 +157,7 @@ export function launchGame(game: Game): Promise<void> {
         settled = true;
         proc.unref();
         activeProcesses.set(game.id, proc);
-        console.log(`[launcher] "${game.title}" started successfully`);
+        log.info("launcher", `"${game.title}" started successfully`);
         if (isDolphin) fullscreenDolphinWindow();
         resolve();
       }, 1500);
@@ -167,7 +171,7 @@ export function launchGame(game: Game): Promise<void> {
         const reason = signal
           ? `Emulator was killed by signal ${signal}. ${stderrTail}`
           : `Emulator exited immediately with code ${code}. ${stderrTail}`;
-        console.error(`[launcher] "${game.title}" failed:`, reason);
+        log.error("launcher", `"${game.title}" failed: ${reason}`);
         reject(new Error(reason));
       }
     });
@@ -180,9 +184,9 @@ export function launchMovie(movie: Movie): void {
     stdio: "ignore",
   });
   proc.on("error", (err) => {
-    console.error(
-      `[launcher] Failed to open movie "${movie.title}":`,
-      err,
+    log.error(
+      "launcher",
+      `Failed to open movie "${movie.title}": ${err}`,
     );
   });
   proc.unref();
@@ -194,9 +198,9 @@ export function launchTrack(track: MusicTrack): void {
     stdio: "ignore",
   });
   proc.on("error", (err) => {
-    console.error(
-      `[launcher] Failed to open track "${track.title}":`,
-      err,
+    log.error(
+      "launcher",
+      `Failed to open track "${track.title}": ${err}`,
     );
   });
   proc.unref();

@@ -3,6 +3,9 @@ import { join, extname, basename } from "path";
 import { homedir } from "os";
 import { createHash } from "crypto";
 import { Game, GamePlatform } from "../../shared/types";
+import { createLogger } from "../util/logger";
+
+const log = createLogger("info");
 
 function resolveCaseInsensitive(
   basePath: string,
@@ -109,7 +112,7 @@ function hashId(prefix: string, fullPath: string): string {
 
 export function scanDolphinGames(extraPaths: string[] = []): Game[] {
   const dirs = [...getDefaultRomDirs(), ...extraPaths].filter(existsSync);
-  console.log("[dolphin] scanning dirs:", dirs);
+  log.info("dolphin", `scanning dirs: ${dirs.join(", ")}`);
   const games: Game[] = [];
   const seen = new Set<string>();
 
@@ -121,7 +124,7 @@ export function scanDolphinGames(extraPaths: string[] = []): Game[] {
         return;
       }
       if (seen.has(fullPath)) {
-        console.log("[dolphin] skip duplicate path:", fullPath);
+        log.info("dolphin", `skip duplicate path: ${fullPath}`);
         return;
       }
 
@@ -129,7 +132,7 @@ export function scanDolphinGames(extraPaths: string[] = []): Game[] {
       const platform = platformFromExt(ext, fullPath);
       const title = titleFromFilename(basename(fullPath));
       const id = hashId("dolphin", fullPath);
-      console.log("[dolphin] found", title, "→", id, "platform:", platform, "path:", fullPath);
+      log.info("dolphin", `found ${title} → ${id} platform: ${platform} path: ${fullPath}`);
 
       games.push({
         id,
@@ -142,6 +145,6 @@ export function scanDolphinGames(extraPaths: string[] = []): Game[] {
     });
   }
 
-  console.log("[dolphin] total found:", games.length);
+  log.info("dolphin", `total found: ${games.length}`);
   return games;
 }

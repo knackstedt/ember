@@ -2,6 +2,9 @@ import { existsSync, readdirSync, readFileSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 import { Game } from "../../shared/types";
+import { createLogger } from "../util/logger";
+
+const log = createLogger("info");
 
 const STEAM_ROOTS = [
   join(homedir(), ".steam", "steam"),
@@ -117,6 +120,7 @@ export function scanSteamGames(): Game[] {
           tags: [],
         });
       } catch {
+        log.error("scanSteamGames", `Failed to parse Steam game: ${entry}`);
         continue;
       }
     }

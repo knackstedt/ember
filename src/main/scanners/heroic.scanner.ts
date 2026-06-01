@@ -2,6 +2,9 @@ import { existsSync, readdirSync, readFileSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 import { Game, GamePlatform } from "../../shared/types";
+import { createLogger } from "../util/logger";
+
+const log = createLogger("info");
 
 const HEROIC_FLATPAK_ID = "com.heroicgameslauncher.hgl";
 
@@ -90,6 +93,7 @@ function parseLibrary(
       tags: [],
     }));
   } catch {
+    log.error("parseLibrary", `Failed to parse Heroic library: ${path}`);
     return [];
   }
 }
@@ -129,6 +133,7 @@ export function scanLutrisGames(): Game[] {
   try {
     entries = readdirSync(LUTRIS_GAMES_DIR);
   } catch {
+    log.error("scanLutrisGames", "Failed to read Lutris games directory");
     return [];
   }
 
@@ -150,6 +155,7 @@ export function scanLutrisGames(): Game[] {
         tags: [],
       });
     } catch {
+      log.error("scanLutrisGames", `Failed to parse Lutris game: ${entry}`);
       continue;
     }
   }

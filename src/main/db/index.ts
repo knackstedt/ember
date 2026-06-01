@@ -1,6 +1,9 @@
 import { app } from "electron";
 import { join } from "path";
 import { mkdirSync } from "fs";
+import { createLogger } from "../util/logger";
+
+const log = createLogger("info");
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Surreal = any;
@@ -30,8 +33,9 @@ async function connectWithRetry(
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       if (attempt < retries) {
-        console.warn(
-          `[db] Connect attempt ${attempt + 1} failed (${msg}), retrying...`,
+        log.warn(
+          "db",
+          `Connect attempt ${attempt + 1} failed (${msg}), retrying...`,
         );
         // SurrealKV may hold a file lock briefly after a crash; wait before retry
         await new Promise((r) => setTimeout(r, 800));

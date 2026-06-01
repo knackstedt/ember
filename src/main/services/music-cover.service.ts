@@ -13,6 +13,9 @@ import { app, dialog } from "electron";
 import { loadMusicMetadata } from "music-metadata";
 import { MusicTrack } from "../../shared/types";
 import { getDb } from "../db";
+import { createLogger } from "../util/logger";
+
+const log = createLogger("info");
 
 const coverCache = join(app.getPath("userData"), "covers", "music");
 const generatedCache = join(coverCache, "generated");
@@ -190,7 +193,7 @@ export async function generateProceduralCover(
     writeFileSync(dest, svg);
     return `htpc-thumb://covers/music/generated/${id}.svg`;
   } catch (err) {
-    console.error("[generateProceduralCover]", err);
+    log.error("generateProceduralCover", String(err));
     return undefined;
   }
 }
@@ -290,7 +293,7 @@ export async function loadThumbnail(
       try {
         await updateTrackCoverWithRetry(id, url);
       } catch (err) {
-        console.error("[loadThumbnail] DB update failed", err);
+        log.error("loadThumbnail", `DB update failed: ${err}`);
       }
     }
     return url;
@@ -402,7 +405,7 @@ export async function searchCoverArt(
 
     return undefined;
   } catch (err) {
-    console.error("[searchCoverArt]", err);
+    log.error("searchCoverArt", String(err));
     return undefined;
   }
 }
@@ -418,7 +421,7 @@ export async function downloadImage(url: string): Promise<Buffer | undefined> {
     const arrayBuffer = await res.arrayBuffer();
     return Buffer.from(arrayBuffer);
   } catch (err) {
-    console.error("[downloadImage]", err);
+    log.error("downloadImage", String(err));
     return undefined;
   }
 }
@@ -437,7 +440,7 @@ export async function embedCoverArt(
   try {
     writeFileSync(cachePath, imageBuffer);
   } catch (err) {
-    console.error("[embedCoverArt] cache write failed", err);
+    log.error("embedCoverArt", `cache write failed: ${err}`);
     return undefined;
   }
 
@@ -453,7 +456,7 @@ export async function embedCoverArt(
     try {
       writeFileSync(coverPath, imageBuffer);
     } catch (err) {
-      console.error("[embedCoverArt] folder write failed", err);
+      log.error("embedCoverArt", `folder write failed: ${err}`);
     }
   }
 
@@ -465,7 +468,7 @@ export async function embedCoverArt(
       url: htpcUrl,
     });
   } catch (err) {
-    console.error("[embedCoverArt] db update failed", err);
+    log.error("embedCoverArt", `db update failed: ${err}`);
   }
 
   return htpcUrl;
@@ -489,7 +492,7 @@ async function embedMp3Cover(
     const result = NodeID3.write(tags, filePath);
     return result === true || typeof result === "object";
   } catch (err) {
-    console.error("[embedMp3Cover]", err);
+    log.error("embedMp3Cover", String(err));
     return false;
   }
 }
@@ -558,7 +561,7 @@ export async function fetchArtistThumbnail(
 
     return `htpc-thumb://covers/artists/${safeName}.jpg`;
   } catch (err) {
-    console.error("[fetchArtistThumbnail]", err);
+    log.error("fetchArtistThumbnail", String(err));
     return undefined;
   } finally {
     artistInFlight.delete(safeName);

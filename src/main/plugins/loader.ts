@@ -10,6 +10,9 @@ import {
   createPluginApi,
   PluginModule,
 } from "./api";
+import { createLogger } from "../util/logger";
+
+const log = createLogger("info");
 
 const PLUGINS_DIR = join(app.getPath("home"), ".config", "htpc", "plugins");
 const PLUGIN_BUILD_DIR = join(app.getPath("userData"), "plugin-builds");
@@ -81,13 +84,13 @@ async function loadPluginFromDir(
   try {
     manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
   } catch (err) {
-    console.error(`[plugins] Failed to read manifest at ${manifestPath}:`, err);
+    log.error("plugins", `Failed to read manifest at ${manifestPath}: ${err}`);
     return null;
   }
 
   const entryPath = join(pluginDir, manifest.entryPoint);
   if (!existsSync(entryPath)) {
-    console.error(`[plugins] Entry point not found: ${entryPath}`);
+    log.error("plugins", `Entry point not found: ${entryPath}`);
     return null;
   }
 
@@ -126,7 +129,7 @@ async function loadPluginFromDir(
       buildResult.map,
     );
     errorMsg = resolved;
-    console.error(`[plugins] Runtime error in ${manifest.id}:\n${resolved}`);
+    log.error("plugins", `Runtime error in ${manifest.id}:\n${resolved}`);
   }
 
   const plugin: RegisteredPlugin = {

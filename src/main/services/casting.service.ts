@@ -3,6 +3,9 @@
 // Full media session handling is a future implementation.
 
 import { BrowserWindow } from "electron";
+import { createLogger } from "../util/logger";
+
+const log = createLogger("info");
 
 let receiverActive = false;
 
@@ -13,7 +16,7 @@ export async function startCastReceiver(window: BrowserWindow): Promise<void> {
   // 3. Handle LOAD, PLAY, PAUSE, STOP messages
   // 4. Forward media URL to renderer for playback
 
-  console.log("[casting] Cast receiver stub — not yet implemented");
+  log.info("casting", "Cast receiver stub — not yet implemented");
   receiverActive = false;
   window.webContents.send("casting:status", {
     active: false,

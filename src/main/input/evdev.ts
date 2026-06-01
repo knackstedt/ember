@@ -20,6 +20,9 @@ import {
   ControllerDevice,
   ControllerType,
 } from "../../shared/types";
+import { createLogger } from "../util/logger";
+
+const log = createLogger("info");
 
 const INPUT_DIR = "/dev/input";
 
@@ -235,7 +238,7 @@ async function openDevice(
       },
     };
   } catch (err) {
-    console.warn(`[evdev] Could not open ${eventPath}:`, err);
+    log.warn("evdev", `Could not open ${eventPath}: ${err}`);
     return null;
   }
 }
@@ -258,7 +261,7 @@ function withTimeout<T>(
 
 export async function initInputSystem(window: BrowserWindow): Promise<void> {
   if (!existsSync(INPUT_DIR)) {
-    console.warn("[evdev] /dev/input not available");
+    log.warn("evdev", "/dev/input not available");
     return;
   }
 
@@ -284,7 +287,7 @@ export async function initInputSystem(window: BrowserWindow): Promise<void> {
           );
           if (handle) activeDevices.set(device, handle);
         } catch (err) {
-          console.warn(`[evdev] Skipping ${device} due to timeout/error:`, err);
+          log.warn("evdev", `Skipping ${device} due to timeout/error: ${err}`);
         }
       }
     }
@@ -301,11 +304,11 @@ export async function initInputSystem(window: BrowserWindow): Promise<void> {
     await withTimeout(scanDevices(), 5000, "scanDevices");
     watcher = setInterval(() => {
       scanDevices().catch((err) =>
-        console.warn("[evdev] scanDevices error:", err),
+        log.warn("evdev", `scanDevices error: ${err}`),
       );
     }, 3000);
   } catch (err) {
-    console.warn("[evdev] Initial device scan timed out:", err);
+    log.warn("evdev", `Initial device scan timed out: ${err}`);
   }
 }
 

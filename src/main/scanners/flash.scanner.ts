@@ -3,6 +3,9 @@ import { join, extname, basename } from "path";
 import { homedir } from "os";
 import { createHash } from "crypto";
 import { Game } from "../../shared/types";
+import { createLogger } from "../util/logger";
+
+const log = createLogger("info");
 
 function walkDir(dir: string, callback: (filePath: string) => void): void {
   let entries: string[];
@@ -110,7 +113,7 @@ export function scanFlashGames(): Game[] {
     join(homedir(), "roms"),
   ].filter(existsSync);
 
-  console.log("[flash] scanning roots:", roots);
+  log.info("flash", `scanning roots: ${roots.join(", ")}`);
   const games: Game[] = [];
   const seen = new Set<string>();
 
@@ -119,7 +122,7 @@ export function scanFlashGames(): Game[] {
       const ext = extname(fullPath).toLowerCase();
       if (!FLASH_EXTS.has(ext)) return;
       if (seen.has(fullPath)) {
-        console.log("[flash] skip duplicate path:", fullPath);
+        log.info("flash", `skip duplicate path: ${fullPath}`);
         return;
       }
       seen.add(fullPath);
@@ -130,7 +133,7 @@ export function scanFlashGames(): Game[] {
       const title = swfMeta.title && swfMeta.title.length > 0 && !isGenericFlexTitle ? swfMeta.title : fileTitle;
       const id = hashId("flash", fullPath);
 
-      console.log("[flash] found", title, "→", id, "path:", fullPath);
+      log.info("flash", `found ${title} → ${id} path: ${fullPath}`);
 
       games.push({
         id,
@@ -144,6 +147,6 @@ export function scanFlashGames(): Game[] {
     });
   }
 
-  console.log("[flash] total found:", games.length);
+  log.info("flash", `total found: ${games.length}`);
   return games;
 }

@@ -4,6 +4,9 @@ import { createHash } from "crypto";
 import { loadMusicMetadata } from "music-metadata";
 import { getXdgMusicDir } from "./xdg";
 import { MusicTrack } from "../../shared/types";
+import { createLogger } from "../util/logger";
+
+const log = createLogger("info");
 
 const AUDIO_EXTS = new Set([
   ".mp3",
@@ -49,18 +52,19 @@ export async function scanMusicFiles(
   extraPaths: string[] = [],
 ): Promise<MusicTrack[]> {
   const roots = [getXdgMusicDir(), ...extraPaths].filter(existsSync);
-  console.log("[music:scan] roots:", roots);
+  log.info("music:scan", `roots: ${roots.join(", ")}`);
   const allFiles: string[] = [];
   for (const root of roots) walkDir(root, allFiles);
-  console.log("[music:scan] found", allFiles.length, "audio files");
+  log.info("music:scan", `found ${allFiles.length} audio files`);
 
   const tracks: MusicTrack[] = [];
 
   for (let i = 0; i < allFiles.length; i++) {
     const filePath = allFiles[i];
     if (i % 100 === 0)
-      console.log(
-        `[music:scan] parsing ${i + 1}/${allFiles.length} ${filePath}`,
+      log.info(
+        "music:scan",
+        `parsing ${i + 1}/${allFiles.length} ${filePath}`,
       );
     try {
       const mm = await getMusicMetadata();
@@ -87,15 +91,14 @@ export async function scanMusicFiles(
         tags: [],
       });
     } catch (err: any) {
-      console.error(
-        "[music:scan] failed to parse",
-        filePath,
-        err?.message ?? String(err),
+      log.error(
+        "music:scan",
+        `failed to parse ${filePath}: ${err?.message ?? String(err)}`,
       );
       continue;
     }
   }
 
-  console.log("[music:scan] completed, tracks:", tracks.length);
+  log.info("music:scan", `completed, tracks: ${tracks.length}`);
   return tracks;
 }

@@ -6,6 +6,9 @@ import { promisify } from "util";
 import { app } from "electron";
 import { getXdgVideosDir } from "./xdg";
 import { Movie, TVShow, TVSeason, TVEpisode } from "../../shared/types";
+import { createLogger } from "../util/logger";
+
+const log = createLogger("info");
 
 const execAsync = promisify(exec);
 
@@ -36,11 +39,12 @@ export async function checkFfmpeg(): Promise<boolean> {
   if (ffmpegAvailable !== undefined) return ffmpegAvailable;
   try {
     await execAsync("ffmpeg -version", { timeout: 5000 });
-    console.log("[video.scanner] ffmpeg is available");
+    log.info("video.scanner", "ffmpeg is available");
     ffmpegAvailable = true;
   } catch {
-    console.warn(
-      "[video.scanner] ffmpeg NOT found in PATH — thumbnails will not be generated",
+    log.warn(
+      "video.scanner",
+      "ffmpeg NOT found in PATH — thumbnails will not be generated",
     );
     ffmpegAvailable = false;
   }
@@ -85,7 +89,7 @@ async function probVideo(filePath: string): Promise<{
       title: data.format?.tags?.title,
     };
   } catch (err) {
-    console.error("[video.scanner] ffprobe failed for", filePath, err);
+    log.error("video.scanner", `ffprobe failed for ${filePath}: ${err}`);
     return null;
   }
 }
@@ -120,10 +124,9 @@ async function extractEmbeddedVideoCover(
     }
     return false;
   } catch (err) {
-    console.error(
-      "[video.scanner] extractEmbeddedVideoCover failed for",
-      filePath,
-      err,
+    log.error(
+      "video.scanner",
+      `extractEmbeddedVideoCover failed for ${filePath}: ${err}`,
     );
     return false;
   }
@@ -156,10 +159,9 @@ async function generateFrameThumbnail(
     }
     return false;
   } catch (err) {
-    console.error(
-      "[video.scanner] generateFrameThumbnail failed for",
-      filePath,
-      err,
+    log.error(
+      "video.scanner",
+      `generateFrameThumbnail failed for ${filePath}: ${err}`,
     );
     return false;
   }
@@ -188,7 +190,7 @@ export async function generateMovieThumbnail(
   if (generated) {
     return `htpc-thumb://thumbnails/movies/${id}.jpg`;
   }
-  console.warn("[video.scanner] No thumbnail generated for", filePath);
+  log.warn("video.scanner", `No thumbnail generated for ${filePath}`);
   return undefined;
 }
 
@@ -218,7 +220,7 @@ export async function generateShowThumbnail(
   if (generated) {
     return `htpc-thumb://thumbnails/tv/${id}.jpg`;
   }
-  console.warn("[video.scanner] No thumbnail generated for show", dirPath);
+  log.warn("video.scanner", `No thumbnail generated for show ${dirPath}`);
   return undefined;
 }
 
@@ -289,10 +291,9 @@ export async function scanMovieFiles(
         tags: [],
       });
     } catch (err) {
-      console.error(
-        "[video.scanner] Unhandled error processing file:",
-        filePath,
-        err,
+      log.error(
+        "video.scanner",
+        `Unhandled error processing file: ${filePath}: ${err}`,
       );
     }
   }

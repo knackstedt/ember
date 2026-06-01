@@ -3,6 +3,9 @@ import { join, extname, basename, dirname } from "path";
 import { homedir } from "os";
 import { createHash } from "crypto";
 import { Game } from "../../shared/types";
+import { createLogger } from "../util/logger";
+
+const log = createLogger("info");
 
 function walkDir(dir: string, callback: (filePath: string) => void): void {
   let entries: string[];
@@ -67,7 +70,7 @@ export function scanWindowsGames(): Game[] {
     join(homedir(), "games"),
   ].filter(existsSync);
 
-  console.log("[windows] scanning roots:", roots);
+  log.info("windows", `scanning roots: ${roots.join(", ")}`);
   const games: Game[] = [];
   const seen = new Set<string>();
 
@@ -76,17 +79,17 @@ export function scanWindowsGames(): Game[] {
       const ext = extname(fullPath).toLowerCase();
       if (ext !== ".exe") return;
       if (seen.has(fullPath)) {
-        console.log("[windows] skip duplicate path:", fullPath);
+        log.info("windows", `skip duplicate path: ${fullPath}`);
         return;
       }
 
       const base = basename(fullPath, ".exe").toLowerCase();
       if (SKIP_NAMES.has(base)) {
-        console.log("[windows] skip junk exe:", fullPath);
+        log.info("windows", `skip junk exe: ${fullPath}`);
         return;
       }
       if (base.endsWith("_data") || base.startsWith("unity")) {
-        console.log("[windows] skip unity data exe:", fullPath);
+        log.info("windows", `skip unity data exe: ${fullPath}`);
         return;
       }
 
@@ -94,7 +97,7 @@ export function scanWindowsGames(): Game[] {
       const title = titleFromFilename(basename(fullPath));
       const isUnity = isUnityGame(fullPath);
       const id = hashId("win", fullPath);
-      console.log("[windows] found", title, "→", id, "unity:", isUnity, "path:", fullPath);
+      log.info("windows", `found ${title} → ${id} unity: ${isUnity} path: ${fullPath}`);
 
       games.push({
         id,
@@ -107,6 +110,6 @@ export function scanWindowsGames(): Game[] {
     });
   }
 
-  console.log("[windows] total found:", games.length);
+  log.info("windows", `total found: ${games.length}`);
   return games;
 }

@@ -15,6 +15,9 @@ import { getDb } from "../db";
 import { Game } from "../../shared/types";
 import { searchGame } from "./rawg.service";
 import { getSettings } from "./settings.service";
+import { createLogger } from "../util/logger";
+
+const log = createLogger("info");
 
 const coverRoot = join(app.getPath("userData"), "covers", "flash");
 const screenshotDir = join(coverRoot, "screenshots");
@@ -205,7 +208,7 @@ export function extractSwfMetadata(filePath: string): SwfMetadata {
 
     return metadata;
   } catch (err) {
-    console.error("[flash:metadata]", err);
+    log.error("flash:metadata", String(err));
     return {};
   }
 }
@@ -349,7 +352,7 @@ class ScreenshotQueue {
         const result = await this.run(item.game);
         item.resolve(result);
       } catch (e) {
-        console.error("[flash:screenshot] queue error:", e);
+        log.error("flash:screenshot", `queue error: ${e}`);
         item.resolve({});
       }
     }
@@ -395,12 +398,12 @@ class ScreenshotQueue {
 
       win.webContents.on("console-message", (event, level, message) => {
         if (level >= 3) {
-          console.error(`[flash:renderer] ${message}`);
+          log.error("flash:renderer", message);
         }
       });
 
       win.webContents.on("render-process-gone", (event, details) => {
-        console.error(`[flash:renderer:crashed] reason=${details.reason}, exitCode=${details.exitCode}`);
+        log.error("flash:renderer:crashed", `reason=${details.reason}, exitCode=${details.exitCode}`);
         cleanup();
         resolveOnce(undefined, "procedural-crash");
       });
@@ -414,7 +417,7 @@ class ScreenshotQueue {
           .webContents.capturePage()
           .then((image: NativeImage) => {
             if (isImageUniform(image)) {
-              console.warn(`[flash:screenshot] blank/uniform screenshot for "${game.title}" (${id}), falling back to procedural`);
+              log.warn("flash:screenshot", `blank/uniform screenshot for "${game.title}" (${id}), falling back to procedural`);
               const svgUrl = generateProceduralThumbnail(romPath, id);
               resolveOnce(svgUrl, "procedural-blank");
             } else {
@@ -427,21 +430,21 @@ class ScreenshotQueue {
             }
           })
           .catch((err) => {
-            console.error(`[flash:screenshot] capturePage failed for "${game.title}" (${id}):`, err);
+            log.error("flash:screenshot", `capturePage failed for "${game.title}" (${id}): ${err}`);
             resolveOnce(undefined, "procedural-capture-error");
           });
       };
 
       const onError = (event: Electron.IpcMainEvent, _err: string) => {
         if (event.sender.id !== targetId) return;
-        console.error(`[flash:screenshot] Ruffle IPC error for "${game.title}" (${id}):`, _err);
+        log.error("flash:screenshot", `Ruffle IPC error for "${game.title}" (${id}): ${_err}`);
         cleanup();
         resolveOnce(undefined, "procedural-ruffle-error");
       };
 
       const onLog = (event: Electron.IpcMainEvent, msg: string) => {
         if (event.sender.id !== targetId) return;
-        console.log(msg);
+        log.info("flash:renderer", msg);
       };
 
       const cleanup = () => {
@@ -458,14 +461,14 @@ class ScreenshotQueue {
       win
         .loadURL(`data:text/html,${encodeURIComponent(html)}`)
         .catch((err) => {
-          console.error(`[flash:screenshot] window load failed for "${game.title}" (${id}):`, err);
+          log.error("flash:screenshot", `window load failed for "${game.title}" (${id}): ${err}`);
           cleanup();
           resolveOnce(undefined, "procedural-load-error");
         });
 
       setTimeout(() => {
         if (!resolved) {
-          console.warn(`[flash:screenshot] timeout for "${game.title}" (${id}) after ${config.timeoutMs}ms, giving up`);
+          log.warn("flash:screenshot", `timeout for "${game.title}" (${id}) after ${config.timeoutMs}ms, giving up`);
           cleanup();
           resolveOnce(undefined, "procedural-timeout");
         }
@@ -573,7 +576,7 @@ export function generateProceduralThumbnail(
     writeFileSync(dest, svg);
     return `htpc-thumb://covers/flash/generated/${id}.svg`;
   } catch (err) {
-    console.error("[flash:procedural]", err);
+    log.error("flash:procedural", String(err));
     return undefined;
   }
 }
@@ -601,7 +604,7 @@ async function updateGameCover(id: string, url: string, source?: string): Promis
         await new Promise((r) => setTimeout(r, 50 * attempt));
         continue;
       }
-      console.error("[flash:updateGameCover] DB update failed", err);
+      log.error("flash:updateGameCover", `DB update failed: ${err}`);
       return;
     }
   }
@@ -612,14 +615,14 @@ export async function loadFlashThumbnail(
 ): Promise<string | undefined> {
   const romPath = game.romPath;
   if (!romPath) {
-    console.log("[flash:loadFlashThumbnail] no romPath for", game.id);
+    log.info("flash:loadFlashThumbnail", `no romPath for ${game.id}`);
     return undefined;
   }
   const id = game.id;
 
   // Deduplicate concurrent calls
   if (inFlight.has(id)) {
-    console.log("[flash:loadFlashThumbnail] already in flight", id);
+    log.info("flash:loadFlashThumbnail", `already in flight ${id}`);
     return undefined;
   }
   inFlight.add(id);
@@ -628,7 +631,7 @@ export async function loadFlashThumbnail(
     // Check if already on disk from a previous run
     const cached = coverExistsOnDisk(id);
     if (cached) {
-      console.log("[flash:loadFlashThumbnail] using cached", cached);
+      log.info("flash:loadFlashThumbnail", `using cached ${cached}`);
       await updateGameCover(id, cached, "cached");
       return cached;
     }
@@ -636,7 +639,7 @@ export async function loadFlashThumbnail(
     // 1. Sidecar image
     const sidecar = findSidecarImage(romPath);
     if (sidecar) {
-      console.log("[flash:loadFlashThumbnail] using sidecar", sidecar);
+    log.info("flash:loadFlashThumbnail", `using sidecar ${sidecar}`);
       const ext = extname(sidecar).toLowerCase();
       const destExt = ext === ".webp" ? ".webp" : ".jpg";
       const dest = join(screenshotDir, `${id}${destExt}`);
@@ -652,7 +655,7 @@ export async function loadFlashThumbnail(
     // 2. Online database
     const onlineUrl = await searchOnlineThumbnail(game.title);
     if (onlineUrl) {
-      console.log("[flash:loadFlashThumbnail] downloading online cover", onlineUrl);
+      log.info("flash:loadFlashThumbnail", `downloading online cover ${onlineUrl}`);
       try {
         const res = await fetch(onlineUrl);
         if (res.ok) {
@@ -667,16 +670,16 @@ export async function loadFlashThumbnail(
     }
 
     // 3. Offscreen Ruffle screenshot (queued)
-    console.log("[flash:loadFlashThumbnail] queuing Ruffle screenshot for", game.title);
+    log.info("flash:loadFlashThumbnail", `queuing Ruffle screenshot for ${game.title}`);
     const { url: screenshotUrl, source: screenshotSource } = await screenshotQueue.enqueue(game);
     if (screenshotUrl) {
-      console.log("[flash:loadFlashThumbnail] got screenshot", screenshotUrl, "source:", screenshotSource);
+      log.info("flash:loadFlashThumbnail", `got screenshot ${screenshotUrl} source: ${screenshotSource}`);
       await updateGameCover(id, screenshotUrl, screenshotSource);
       return screenshotUrl;
     }
 
     // 4. Procedural fallback
-    console.log("[flash:loadFlashThumbnail] falling back to procedural for", game.title);
+    log.info("flash:loadFlashThumbnail", `falling back to procedural for ${game.title}`);
     const procUrl = generateProceduralThumbnail(romPath, id);
     if (procUrl) await updateGameCover(id, procUrl, "procedural-fallback");
     return procUrl;
