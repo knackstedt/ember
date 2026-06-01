@@ -7,6 +7,7 @@ export interface UseContextMenuOptions<T> {
   focusedIndex: number;
   getOptions: (item: T) => ContextMenuOption[];
   onAction: (item: T, optionId: string) => void;
+  enabled?: boolean;
 }
 
 export function useContextMenu<T>({
@@ -14,6 +15,7 @@ export function useContextMenu<T>({
   focusedIndex,
   getOptions,
   onAction,
+  enabled = true,
 }: UseContextMenuOptions<T>) {
   const [state, setState] = useState<{
     open: boolean;
@@ -57,9 +59,13 @@ export function useContextMenu<T>({
     setOpen(false);
   }, [setOpen]);
 
+  const enabledRef = useRef(enabled);
+  enabledRef.current = enabled;
+
   // Listen for htpc:contextmenu (gamepad X / long press Enter/Space)
   useEffect(() => {
     const handler = (e: Event) => {
+      if (!enabledRef.current) return;
       const detail = (e as CustomEvent).detail as
         | { source: "gamepad" | "keyboard" }
         | undefined;

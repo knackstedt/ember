@@ -18,6 +18,7 @@ import {
   embedCoverArt,
   pickCoverImage,
   loadThumbnail,
+  fetchArtistThumbnail,
 } from "../services/music-cover.service";
 import { scanMovieFiles, scanTvShows } from "../scanners/video.scanner";
 import { getDb } from "../db";
@@ -315,6 +316,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
         ...track,
         isFavorite: track.isFavorite ?? false,
         tags: track.tags ?? [],
+        hidden: track.hidden ?? false,
       };
       await db.query(`UPSERT music_track:⟨${clean.id}⟩ CONTENT $track`, {
         track: clean,
@@ -392,6 +394,11 @@ export function registerIpcHandlers(window: BrowserWindow): void {
 
   ipcMain.handle("music:loadThumbnail", async (_e, track: MusicTrack) => {
     const url = await loadThumbnail(track);
+    return url ?? null;
+  });
+
+  ipcMain.handle("music:artistThumbnail", async (_e, artist: string) => {
+    const url = await fetchArtistThumbnail(artist);
     return url ?? null;
   });
 

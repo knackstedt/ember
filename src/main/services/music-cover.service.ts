@@ -16,7 +16,9 @@ import { getDb } from "../db";
 
 const coverCache = join(app.getPath("userData"), "covers", "music");
 const generatedCache = join(coverCache, "generated");
+const artistCache = join(app.getPath("userData"), "covers", "artists");
 mkdirSync(generatedCache, { recursive: true });
+mkdirSync(artistCache, { recursive: true });
 
 const inFlight = new Set<string>();
 
@@ -298,6 +300,65 @@ export async function loadThumbnail(
 }
 
 /* ------------------------------------------------------------------ */
+/*  Shared throttled fetch utilities                                    */
+/* ------------------------------------------------------------------ */
+
+interface ThrottleSlot {
+  url: string;
+  resolve: (res: Response) => void;
+  reject: (err: unknown) => void;
+  init?: RequestInit;
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((res) => setTimeout(res, ms));
+}
+
+function createThrottledFetch(
+  concurrency: number,
+  minDelayMs: number,
+) {
+  const queue: ThrottleSlot[] = [];
+  let running = 0;
+  let lastRequest = 0;
+
+  async function pump() {
+    if (running >= concurrency) return;
+    const item = queue.shift();
+    if (!item) return;
+    running++;
+
+    const elapsed = Date.now() - lastRequest;
+    if (elapsed < minDelayMs) {
+      await delay(minDelayMs - elapsed);
+    }
+    lastRequest = Date.now();
+
+    try {
+      const res = await fetch(item.url, item.init);
+      item.resolve(res);
+    } catch (err) {
+      item.reject(err);
+    } finally {
+      running--;
+      pump();
+    }
+  }
+
+  return (url: string, init?: RequestInit): Promise<Response> => {
+    return new Promise((resolve, reject) => {
+      queue.push({ url, resolve, reject, init });
+      pump();
+    });
+  };
+}
+
+// MusicBrainz requires ~1 req/sec for unauthenticated users
+const throttledMbFetch = createThrottledFetch(1, 1100);
+// Deezer is fairly lenient; 4 concurrent with 150ms pacing is well within limits
+const throttledDeezerFetch = createThrottledFetch(4, 150);
+
+/* ------------------------------------------------------------------ */
 /*  Online cover-art search (MusicBrainz + Cover Art Archive)         */
 /* ------------------------------------------------------------------ */
 
@@ -318,24 +379,24 @@ export async function searchCoverArt(
 
   try {
     const searchUrl = `https://musicbrainz.org/ws/2/release/?query=${encodeURIComponent(query)}&fmt=json`;
-    const searchRes = await fetch(searchUrl, {
+    const searchRes = await throttledMbFetch(searchUrl, {
       headers: { "User-Agent": "HTPC-App/0.1.0" },
     });
     if (!searchRes.ok) return undefined;
-    const data = await searchRes.json();
+    const data = (await searchRes.json()) as { releases?: Array<{ id: string; "release-group"?: { id?: string } }> };
     const release = data.releases?.[0];
     if (!release?.id) return undefined;
 
     // Check Cover Art Archive for this release
     const caaUrl = `https://coverartarchive.org/release/${release.id}/front-250`;
-    const head = await fetch(caaUrl, { method: "HEAD" });
+    const head = await throttledMbFetch(caaUrl, { method: "HEAD" });
     if (head.ok) return caaUrl;
 
     // Fallback to release-group front cover
     const rgId = release["release-group"]?.id;
     if (rgId) {
       const rgUrl = `https://coverartarchive.org/release-group/${rgId}/front-250`;
-      const rgHead = await fetch(rgUrl, { method: "HEAD" });
+      const rgHead = await throttledMbFetch(rgUrl, { method: "HEAD" });
       if (rgHead.ok) return rgUrl;
     }
 
@@ -451,4 +512,55 @@ export async function pickCoverImage(
 
   const imageBuffer = readFileSync(filePaths[0]);
   return embedCoverArt(track, imageBuffer);
+}
+
+/* ------------------------------------------------------------------ */
+/*  Online artist thumbnail (Deezer API — no key required)            */
+/* ------------------------------------------------------------------ */
+
+const artistInFlight = new Set<string>();
+
+export async function fetchArtistThumbnail(
+  artist: string,
+): Promise<string | undefined> {
+  if (!artist) return undefined;
+  const safeName = artist.toLowerCase().replace(/[^a-z0-9]/g, "_");
+  const dest = join(artistCache, `${safeName}.jpg`);
+  if (existsSync(dest)) {
+    return `htpc-thumb://covers/artists/${safeName}.jpg`;
+  }
+  if (artistInFlight.has(safeName)) return undefined;
+  artistInFlight.add(safeName);
+
+  try {
+    const searchUrl = `https://api.deezer.com/search/artist?q=${encodeURIComponent(artist)}&limit=1`;
+    const res = await throttledDeezerFetch(searchUrl, {
+      headers: { "User-Agent": "HTPC-App/0.1.0" },
+    });
+    if (!res.ok) return undefined;
+    const data = (await res.json()) as {
+      data?: Array<{
+        picture?: string;
+        picture_big?: string;
+        picture_xl?: string;
+      }>;
+    };
+    const artistData = data.data?.[0];
+    if (!artistData) return undefined;
+
+    const imageUrl = artistData.picture_xl || artistData.picture_big || artistData.picture;
+    if (!imageUrl) return undefined;
+
+    const imageRes = await throttledDeezerFetch(imageUrl);
+    if (!imageRes.ok) return undefined;
+    const buffer = Buffer.from(await imageRes.arrayBuffer());
+    writeFileSync(dest, buffer);
+
+    return `htpc-thumb://covers/artists/${safeName}.jpg`;
+  } catch (err) {
+    console.error("[fetchArtistThumbnail]", err);
+    return undefined;
+  } finally {
+    artistInFlight.delete(safeName);
+  }
 }

@@ -54,6 +54,14 @@ const LazyMusicCard: React.FC<{
 };
 
 type SubTab = "local" | "streaming";
+type BrowseMode = "artists" | "genres" | "tracks";
+
+interface MusicGroup {
+  name: string;
+  trackCount: number;
+  coverUrl?: string;
+}
+
 export const MusicTab: React.FC = () => {
   const {
     tracks,
@@ -75,23 +83,32 @@ export const MusicTab: React.FC = () => {
     setYear,
     searchCoverArt,
     pickCoverImage,
-    filtered,
     hide,
+    artistThumbnails,
+    artistThumbnailsLoading,
+    loadArtistThumbnail,
   } = useMusicStore();
   const play = useMusicPlayerStore((s) => s.play);
   const [selected, setSelected] = useState<MusicTrack | null>(null);
   const [subTab, setSubTab] = useState<SubTab>("local");
+  const [browseMode, setBrowseMode] = useState<BrowseMode>("artists");
+  const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
   const [activeFilterType, setActiveFilterType] = useState<
     "artist" | "album" | "genre" | "year"
   >("artist");
-  const [columnCount, setColumnCount] = useState(6);
-  const gridRef = useRef<VirtualGridHandle>(null);
+  const [trackColumnCount, setTrackColumnCount] = useState(6);
+  const [groupColumnCount, setGroupColumnCount] = useState(6);
+  const trackGridRef = useRef<VirtualGridHandle>(null);
+  const groupGridRef = useRef<VirtualGridHandle>(null);
 
   useEffect(() => {
-    const handler = () => setSelected(null);
+    const handler = () => {
+      if (selected) setSelected(null);
+      else if (selectedGroup) setSelectedGroup(null);
+    };
     window.addEventListener("htpc:escape", handler);
     return () => window.removeEventListener("htpc:escape", handler);
-  }, []);
+  }, [selected, selectedGroup]);
 
   const albumTracks = useMemo(() => {
     if (!selected?.album) return [];
@@ -104,32 +121,118 @@ export const MusicTab: React.FC = () => {
     load();
   }, []);
 
-  const items = useMemo(
-    () => filtered(),
-    [
-      filtered,
-      tracks,
-      searchQuery,
-      activeArtist,
-      activeAlbum,
-      activeGenre,
-      activeYear,
-    ],
-  );
-  const { focusedIndex } = useGridFocus({
-    items,
-    columnCount,
-    gridRef,
-    onConfirm: (track, index) => {
-      play(items, index);
-      setSelected(track);
-    },
-    enabled: subTab === "local" && !selected,
+  const artistGroups = useMemo(() => {
+    const map = new Map<string, { name: string; tracks: MusicTrack[] }>();
+    for (const t of tracks) {
+      if (!t.artist || t.hidden) continue;
+      const key = t.artist.toLowerCase();
+      if (!map.has(key)) map.set(key, { name: t.artist, tracks: [] });
+      map.get(key)!.tracks.push(t);
+    }
+    return Array.from(map.values())
+      .map((g) => ({
+        name: g.name,
+        trackCount: g.tracks.length,
+        coverUrl: g.tracks.find((t) => t.albumArtUrl)?.albumArtUrl,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+  }, [tracks]);
+
+  const genreGroups = useMemo(() => {
+    const map = new Map<string, { name: string; tracks: MusicTrack[] }>();
+    for (const t of tracks) {
+      if (!t.genre || t.hidden) continue;
+      const key = t.genre.toLowerCase();
+      if (!map.has(key)) map.set(key, { name: t.genre, tracks: [] });
+      map.get(key)!.tracks.push(t);
+    }
+    return Array.from(map.values())
+      .map((g) => ({
+        name: g.name,
+        trackCount: g.tracks.length,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+  }, [tracks]);
+
+  const groupItems: MusicGroup[] = useMemo(() => {
+    if (browseMode === "artists") return artistGroups;
+    if (browseMode === "genres") return genreGroups;
+    return [];
+  }, [browseMode, artistGroups, genreGroups]);
+
+  /* batch-load artist thumbnails in background — avoids IPC flood & re-render storms */
+  useEffect(() => {
+    if (browseMode !== "artists") return;
+
+    let i = 0;
+    const BATCH = 8;
+    const INTERVAL = 200;
+    const timer = setInterval(() => {
+      const pending = artistGroups
+        .filter((g) => !useMusicStore.getState().artistThumbnails[g.name])
+        .map((g) => g.name);
+      if (pending.length === 0) {
+        clearInterval(timer);
+        return;
+      }
+      const batch = pending.slice(i, i + BATCH);
+      batch.forEach((a) => loadArtistThumbnail(a));
+      i += BATCH;
+      if (i >= pending.length) i = 0; // loop back for any newly visible artists
+    }, INTERVAL);
+
+    return () => clearInterval(timer);
+  }, [browseMode, artistGroups, loadArtistThumbnail]);
+
+  const trackItems = useMemo(() => {
+    let r = tracks.filter((t) => !t.hidden);
+    if (selectedGroup) {
+      if (browseMode === "artists") {
+        r = r.filter((t) => t.artist?.toLowerCase() === selectedGroup.toLowerCase());
+      } else if (browseMode === "genres") {
+        r = r.filter((t) => t.genre?.toLowerCase() === selectedGroup.toLowerCase());
+      }
+    } else {
+      if (activeArtist) r = r.filter((t) => t.artist?.toLowerCase() === activeArtist.toLowerCase());
+      if (activeAlbum) r = r.filter((t) => t.album === activeAlbum);
+      if (activeGenre) r = r.filter((t) => t.genre === activeGenre);
+      if (activeYear) r = r.filter((t) => t.year === activeYear);
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      r = r.filter(
+        (t) =>
+          t.title.toLowerCase().includes(q) ||
+          t.artist?.toLowerCase().includes(q) ||
+          t.album?.toLowerCase().includes(q),
+      );
+    }
+    return r;
+  }, [tracks, selectedGroup, browseMode, activeArtist, activeAlbum, activeGenre, activeYear, searchQuery]);
+
+  const { focusedIndex: groupFocusedIndex } = useGridFocus<MusicGroup>({
+    items: groupItems,
+    columnCount: groupColumnCount,
+    gridRef: groupGridRef,
+    onConfirm: (group) => setSelectedGroup(group.name),
+    enabled: subTab === "local" && !selected && !selectedGroup && browseMode !== "tracks",
   });
 
-  const { menu, bindItem } = useContextMenu({
-    items,
-    focusedIndex,
+  const { focusedIndex: trackFocusedIndex } = useGridFocus<MusicTrack>({
+    items: trackItems,
+    columnCount: trackColumnCount,
+    gridRef: trackGridRef,
+    onConfirm: (track, index) => {
+      play(trackItems, index);
+      setSelected(track);
+    },
+    enabled: subTab === "local" && !selected && (browseMode === "tracks" || !!selectedGroup),
+  });
+
+  const { menu: trackCtxMenu, bindItem: bindTrackItem } = useContextMenu<MusicTrack>({
+    items: trackItems,
+    focusedIndex: trackFocusedIndex,
+    enabled: subTab === "local" && (browseMode === "tracks" || !!selectedGroup),
     getOptions: (track): ContextMenuOption[] => [
       {
         id: "favorite",
@@ -161,6 +264,28 @@ export const MusicTab: React.FC = () => {
             void window.htpc.shell.showItemInFolder(track.filePath);
           }
           break;
+      }
+    },
+  });
+
+  const { menu: groupCtxMenu, bindItem: bindGroupItem } = useContextMenu<MusicGroup>({
+    items: groupItems,
+    focusedIndex: groupFocusedIndex,
+    enabled: subTab === "local" && !selectedGroup && browseMode !== "tracks",
+    getOptions: (group): ContextMenuOption[] => [
+      { id: "play", label: "Play All", icon: "▶" },
+    ],
+    onAction: (group, optionId) => {
+      if (optionId === "play") {
+        const groupTracks = tracks.filter((t) => {
+          if (t.hidden) return false;
+          if (browseMode === "artists") return t.artist?.toLowerCase() === group.name.toLowerCase();
+          return t.genre?.toLowerCase() === group.name.toLowerCase();
+        });
+        if (groupTracks.length > 0) {
+          play(groupTracks, 0);
+          setSelectedGroup(null);
+        }
       }
     },
   });
@@ -255,46 +380,80 @@ export const MusicTab: React.FC = () => {
 
       {subTab === "local" && (
         <>
-          <div className="flex gap-2 flex-shrink-0">
-            {(["artist", "album", "genre", "year"] as const).map((ft) => (
-              <button
-                key={ft}
-                className="px-3 py-1 rounded text-xs font-medium capitalize"
+          <div className="flex gap-2 flex-shrink-0 items-center">
+            <ChipFilters
+              filters={[
+                { id: "artists", label: "Artists" },
+                { id: "genres", label: "Genres" },
+                { id: "tracks", label: "All Tracks" },
+              ]}
+              active={browseMode}
+              onSelect={(v) => {
+                setBrowseMode(v as BrowseMode);
+                setSelectedGroup(null);
+              }}
+            />
+            {selectedGroup && (
+              <motion.button
+                className="px-3 py-1.5 rounded-full text-sm font-medium"
                 style={{
-                  background:
-                    activeFilterType === ft
-                      ? "var(--color-accent-dim)"
-                      : "var(--color-surface-raised)",
+                  background: "var(--color-surface-raised)",
                   color: "var(--color-text)",
                   border: "1px solid var(--color-border)",
                 }}
-                onClick={() => setActiveFilterType(ft)}
+                onClick={() => setSelectedGroup(null)}
+                whileTap={{ scale: 0.95 }}
               >
-                {ft}
-              </button>
-            ))}
+                ← Back
+              </motion.button>
+            )}
           </div>
-          <ChipFilters
-            filters={filterChips[activeFilterType]}
-            active={
-              activeFilterType === "artist"
-                ? (activeArtist ?? "")
-                : activeFilterType === "album"
-                  ? (activeAlbum ?? "")
-                  : activeFilterType === "genre"
-                    ? (activeGenre ?? "")
-                    : activeYear
-                      ? String(activeYear)
-                      : ""
-            }
-            onSelect={(v) => {
-              if (activeFilterType === "artist") setArtist(v || null);
-              else if (activeFilterType === "album") setAlbum(v || null);
-              else if (activeFilterType === "genre") setGenre(v || null);
-              else setYear(v ? parseInt(v) : null);
-            }}
-            className="flex-shrink-0"
-          />
+
+          {browseMode === "tracks" && !selectedGroup && (
+            <>
+              <div className="flex gap-2 flex-shrink-0">
+                {(["artist", "album", "genre", "year"] as const).map((ft) => (
+                  <button
+                    key={ft}
+                    className="px-3 py-1 rounded text-xs font-medium capitalize"
+                    style={{
+                      background:
+                        activeFilterType === ft
+                          ? "var(--color-accent-dim)"
+                          : "var(--color-surface-raised)",
+                      color: "var(--color-text)",
+                      border: "1px solid var(--color-border)",
+                    }}
+                    onClick={() => setActiveFilterType(ft)}
+                  >
+                    {ft}
+                  </button>
+                ))}
+              </div>
+              <ChipFilters
+                filters={filterChips[activeFilterType]}
+                active={
+                  activeFilterType === "artist"
+                    ? (activeArtist ?? "")
+                    : activeFilterType === "album"
+                      ? (activeAlbum ?? "")
+                      : activeFilterType === "genre"
+                        ? (activeGenre ?? "")
+                        : activeYear
+                          ? String(activeYear)
+                          : ""
+                }
+                onSelect={(v) => {
+                  if (activeFilterType === "artist") setArtist(v || null);
+                  else if (activeFilterType === "album") setAlbum(v || null);
+                  else if (activeFilterType === "genre") setGenre(v || null);
+                  else setYear(v ? parseInt(v) : null);
+                }}
+                className="flex-shrink-0"
+              />
+            </>
+          )}
+
           {loading ? (
             <div
               className="flex-1 flex items-center justify-center"
@@ -302,7 +461,7 @@ export const MusicTab: React.FC = () => {
             >
               Loading music…
             </div>
-          ) : scanning && items.length === 0 ? (
+          ) : scanning && trackItems.length === 0 && groupItems.length === 0 ? (
             <div
               className="flex-1 flex flex-col items-center justify-center gap-3"
               style={{ color: "var(--color-text-dim)" }}
@@ -316,7 +475,7 @@ export const MusicTab: React.FC = () => {
               />
               <span className="text-sm">Scanning for music…</span>
             </div>
-          ) : items.length === 0 ? (
+          ) : trackItems.length === 0 && groupItems.length === 0 ? (
             <div
               className="flex-1 flex flex-col items-center justify-center gap-4"
               style={{ color: "var(--color-text-dim)" }}
@@ -334,22 +493,46 @@ export const MusicTab: React.FC = () => {
                 Scan for music
               </motion.button>
             </div>
+          ) : browseMode !== "tracks" && !selectedGroup ? (
+            <div className="flex-1 min-h-0 min-w-0 overflow-hidden">
+              <VirtualGrid
+                ref={groupGridRef}
+                items={groupItems}
+                minItemWidth={180}
+                onColumnCountChange={setGroupColumnCount}
+                rowHeight={240}
+                renderItem={(group, index) => (
+                  <div className="p-1.5 w-full h-full flex flex-col min-w-0" {...bindGroupItem(group, index)}>
+                    <MediaCard
+                      id={group.name}
+                      title={group.name}
+                      subtitle={`${group.trackCount} track${group.trackCount !== 1 ? "s" : ""}`}
+                      coverUrl={artistThumbnails[group.name] ?? group.coverUrl}
+                      aspectRatio="1/1"
+                      isFocused={index === groupFocusedIndex}
+                      isLoading={browseMode === "artists" && !!artistThumbnailsLoading[group.name]}
+                      onSelect={() => setSelectedGroup(group.name)}
+                    />
+                  </div>
+                )}
+              />
+            </div>
           ) : (
             <div className="flex-1 min-h-0 min-w-0 overflow-hidden">
               <VirtualGrid
-                ref={gridRef}
-                items={items}
+                ref={trackGridRef}
+                items={trackItems}
                 minItemWidth={180}
-                onColumnCountChange={setColumnCount}
+                onColumnCountChange={setTrackColumnCount}
                 rowHeight={240}
                 renderItem={(track, index) => (
-                  <div className="p-1.5 w-full h-full flex flex-col min-w-0" {...bindItem(track, index)}>
+                  <div className="p-1.5 w-full h-full flex flex-col min-w-0" {...bindTrackItem(track, index)}>
                     <LazyMusicCard
                       track={track}
                       index={index}
-                      focusedIndex={focusedIndex}
+                      focusedIndex={trackFocusedIndex}
                       onSelect={() => {
-                        play(items, index);
+                        play(trackItems, index);
                         setSelected(track);
                       }}
                       onFavorite={() => toggleFavorite(track.id)}
@@ -412,8 +595,8 @@ export const MusicTab: React.FC = () => {
                 }}
                 onClick={() => {
                   play(
-                    items,
-                    items.findIndex((t) => t.id === selected!.id),
+                    trackItems,
+                    trackItems.findIndex((t) => t.id === selected!.id),
                   );
                   setSelected(null);
                 }}
@@ -532,7 +715,8 @@ export const MusicTab: React.FC = () => {
           </div>
         )}
       </DetailPanel>
-      {subTab === "local" && menu}
+      {subTab === "local" && trackCtxMenu}
+      {subTab === "local" && groupCtxMenu}
     </div>
   );
 };

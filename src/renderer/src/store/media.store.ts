@@ -126,6 +126,8 @@ interface MusicState {
   activeAlbum: string | null;
   activeGenre: string | null;
   activeYear: number | null;
+  artistThumbnails: Record<string, string>;
+  artistThumbnailsLoading: Record<string, boolean>;
   load: () => Promise<void>;
   scan: () => Promise<void>;
   toggleFavorite: (id: string) => Promise<void>;
@@ -138,6 +140,7 @@ interface MusicState {
   searchCoverArt: (id: string) => Promise<void>;
   pickCoverImage: (id: string) => Promise<void>;
   loadThumbnail: (id: string) => Promise<void>;
+  loadArtistThumbnail: (artist: string) => Promise<void>;
   hide: (id: string) => Promise<void>;
   filtered: () => MusicTrack[];
 }
@@ -151,6 +154,8 @@ export const useMusicStore = create<MusicState>((set, get) => ({
   activeAlbum: null,
   activeGenre: null,
   activeYear: null,
+  artistThumbnails: {},
+  artistThumbnailsLoading: {},
 
   load: async () => {
     set({ loading: true });
@@ -229,6 +234,18 @@ export const useMusicStore = create<MusicState>((set, get) => ({
     if (!url) return;
     useCoverCacheStore.getState().setUrl(id, url);
     useMusicPlayerStore.getState().updateTrackCover(id, url);
+  },
+
+  loadArtistThumbnail: async (artist) => {
+    if (!artist || get().artistThumbnails[artist] || get().artistThumbnailsLoading[artist]) return;
+    set((s) => ({
+      artistThumbnailsLoading: { ...s.artistThumbnailsLoading, [artist]: true },
+    }));
+    const url = await window.htpc.music.artistThumbnail(artist);
+    set((s) => ({
+      artistThumbnailsLoading: { ...s.artistThumbnailsLoading, [artist]: false },
+      ...(url ? { artistThumbnails: { ...s.artistThumbnails, [artist]: url } } : {}),
+    }));
   },
 
   hide: async (id) => {

@@ -14,6 +14,7 @@ export interface MediaCardProps {
   onFavorite?: () => void;
   aspectRatio?: "2/3" | "16/9" | "1/1";
   progress?: number;
+  isLoading?: boolean;
 }
 
 const PLACEHOLDER_COLORS = [
@@ -53,6 +54,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({
   onFavorite,
   aspectRatio = "2/3",
   progress,
+  isLoading,
 }) => {
   const [imgError, setImgError] = useState(false);
   const showPlaceholder = !coverUrl || imgError;
@@ -96,6 +98,17 @@ export const MediaCard: React.FC<MediaCardProps> = ({
             decoding="async"
             onError={() => setImgError(true)}
           />
+        )}
+        {isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+            <div
+              className="w-6 h-6 rounded-full border-2 border-t-transparent animate-spin"
+              style={{
+                borderColor: "var(--color-accent)",
+                borderTopColor: "transparent",
+              }}
+            />
+          </div>
         )}
 
         {badge && (
