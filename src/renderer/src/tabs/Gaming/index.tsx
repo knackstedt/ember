@@ -267,14 +267,7 @@ export const GamingTab: React.FC = () => {
         className="flex-shrink-0"
       />
 
-      {loading ? (
-        <div
-          className="flex-1 flex items-center justify-center"
-          style={{ color: "var(--color-text-dim)" }}
-        >
-          Loading games…
-        </div>
-      ) : scanning && items.length === 0 ? (
+      {loading || scanning ? (
         <div
           className="flex-1 flex flex-col items-center justify-center gap-3"
           style={{ color: "var(--color-text-dim)" }}
@@ -286,7 +279,9 @@ export const GamingTab: React.FC = () => {
               borderTopColor: "transparent",
             }}
           />
-          <span className="text-sm">Scanning for games…</span>
+          <span className="text-sm">
+            {loading ? "Loading games…" : "Scanning for games…"}
+          </span>
         </div>
       ) : items.length === 0 ? (
         <div

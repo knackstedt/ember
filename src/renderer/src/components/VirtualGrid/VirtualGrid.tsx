@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect, CSSProperties } from "react";
+import React, { useRef, useState, useEffect, useLayoutEffect, CSSProperties } from "react";
 import { experimental_VGrid as VGrid, VGridHandle } from "virtua";
 
 export interface VirtualGridHandle {
@@ -57,6 +57,19 @@ export const VirtualGrid = React.forwardRef(function VirtualGridInner<T>(
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
   const [effectiveColCount, setEffectiveColCount] = useState(columnCountProp);
+
+  useLayoutEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const w = el.clientWidth;
+    if (w > 0) {
+      setContainerWidth(w);
+      const cols = minItemWidth
+        ? Math.max(2, Math.floor(w / minItemWidth))
+        : columnCountProp;
+      setEffectiveColCount((prev) => (prev !== cols ? cols : prev));
+    }
+  }, []);
 
   useEffect(() => {
     const el = containerRef.current;
