@@ -624,7 +624,7 @@ export async function loadFlashThumbnail(
 
   // Deduplicate concurrent calls
   if (inFlight.has(id)) {
-    log.info("flash:loadFlashThumbnail", `already in flight ${id}`);
+    log.debug("flash:loadFlashThumbnail", `already in flight ${id}`);
     return undefined;
   }
   inFlight.add(id);
@@ -633,7 +633,6 @@ export async function loadFlashThumbnail(
     // Check if already on disk from a previous run
     const cached = coverExistsOnDisk(id);
     if (cached) {
-      log.info("flash:loadFlashThumbnail", `using cached ${cached}`);
       await updateGameCover(id, cached, "cached");
       return cached;
     }
@@ -641,7 +640,7 @@ export async function loadFlashThumbnail(
     // 1. Sidecar image
     const sidecar = findSidecarImage(romPath);
     if (sidecar) {
-    log.info("flash:loadFlashThumbnail", `using sidecar ${sidecar}`);
+    log.debug("flash:loadFlashThumbnail", `using sidecar ${sidecar}`);
       const ext = extname(sidecar).toLowerCase();
       const destExt = ext === ".webp" ? ".webp" : ".jpg";
       const dest = join(screenshotDir, `${id}${destExt}`);

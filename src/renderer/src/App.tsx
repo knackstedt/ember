@@ -50,10 +50,13 @@ function useVisibleTabs(settings: AppSettings | null) {
 }
 
 export default function App(): React.ReactElement {
-  const { settings, loading, load } = useSettingsStore();
+  const settings = useSettingsStore((s) => s.settings);
+  const loading = useSettingsStore((s) => s.loading);
+  const load = useSettingsStore((s) => s.load);
   const visibleTabs = useVisibleTabs(settings);
   const visibleTabIds = visibleTabs.map((t) => t.id);
-  const { addDevice, removeDevice } = useInputStore();
+  const addDevice = useInputStore((s) => s.addDevice);
+  const removeDevice = useInputStore((s) => s.removeDevice);
   const hasPlayer = useMusicPlayerStore((s) => s.queue.length > 0);
   const setBladeCollapsed = useMusicPlayerStore((s) => s.setBladeCollapsed);
   const videoOpen = useVideoPlayerStore((s) => !!s.src);

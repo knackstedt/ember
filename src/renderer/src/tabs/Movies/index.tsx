@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useMoviesStore } from "../../store/media.store";
 import { ChipFilters } from "../../components/ChipFilters/ChipFilters";
@@ -23,22 +23,20 @@ import { ContextMenuOption } from "../../components/ContextMenu/ContextMenu";
 type SubTab = "local" | "streaming";
 
 export const MoviesTab: React.FC = () => {
-  const {
-    movies,
-    loading,
-    scanning,
-    searchQuery,
-    activeGenre,
-    load,
-    scan,
-    toggleFavorite,
-    setSearch,
-    setGenre,
-    setTags,
-    filtered,
-    hide,
-    regenerateThumbnail,
-  } = useMoviesStore();
+  const movies = useMoviesStore((s) => s.movies);
+  const loading = useMoviesStore((s) => s.loading);
+  const scanning = useMoviesStore((s) => s.scanning);
+  const searchQuery = useMoviesStore((s) => s.searchQuery);
+  const activeGenre = useMoviesStore((s) => s.activeGenre);
+  const load = useMoviesStore((s) => s.load);
+  const scan = useMoviesStore((s) => s.scan);
+  const toggleFavorite = useMoviesStore((s) => s.toggleFavorite);
+  const setSearch = useMoviesStore((s) => s.setSearch);
+  const setGenre = useMoviesStore((s) => s.setGenre);
+  const setTags = useMoviesStore((s) => s.setTags);
+  const filtered = useMoviesStore((s) => s.filtered);
+  const hide = useMoviesStore((s) => s.hide);
+  const regenerateThumbnail = useMoviesStore((s) => s.regenerateThumbnail);
   const regeneratingIds = useMoviesStore((s) => s.regeneratingIds);
   const openVideo = useVideoPlayerStore((s) => s.open);
   const [selected, setSelected] = useState<Movie | null>(null);
@@ -56,8 +54,14 @@ export const MoviesTab: React.FC = () => {
     return () => window.removeEventListener("htpc:escape", handler);
   }, []);
 
-  const allGenres = [...new Set(movies.flatMap((m) => m.genres ?? []))].sort();
-  const items = filtered();
+  const allGenres = useMemo(
+    () => [...new Set(movies.flatMap((m) => m.genres ?? []))].sort(),
+    [movies],
+  );
+  const items = useMemo(
+    () => filtered(),
+    [filtered, movies, searchQuery, activeGenre],
+  );
   const { focusedIndex } = useGridFocus({
     items,
     columnCount,
@@ -112,6 +116,27 @@ export const MoviesTab: React.FC = () => {
       }
     },
   });
+
+  const renderItem = useCallback(
+    (movie: Movie, index: number) => (
+      <div className="p-1.5 w-full h-full flex flex-col min-w-0" {...bindItem(movie, index)}>
+        <MediaCard
+          key={movie.id}
+          id={movie.id}
+          title={movie.title}
+          subtitle={movie.releaseYear ? String(movie.releaseYear) : undefined}
+          coverUrl={movie.coverUrl}
+          isFavorite={movie.isFavorite}
+          isFocused={index === focusedIndex}
+          isLoading={regeneratingIds.has(movie.id)}
+          progress={movie.watchProgress}
+          onSelect={() => setSelected(movie)}
+          onFavorite={() => toggleFavorite(movie.id)}
+        />
+      </div>
+    ),
+    [bindItem, focusedIndex, regeneratingIds, toggleFavorite],
+  );
 
   const recentlyPlayed = [...movies]
     .filter((m) => m.lastPlayed !== undefined)
@@ -245,27 +270,7 @@ export const MoviesTab: React.FC = () => {
                 minItemWidth={200}
                 onColumnCountChange={setColumnCount}
                 rowHeight={300}
-                renderItem={(movie, index) => (
-                  <div className="p-1.5 w-full h-full flex flex-col min-w-0" {...bindItem(movie, index)}>
-                    <MediaCard
-                      key={movie.id}
-                      id={movie.id}
-                      title={movie.title}
-                      subtitle={
-                        movie.releaseYear
-                          ? String(movie.releaseYear)
-                          : undefined
-                      }
-                      coverUrl={movie.coverUrl}
-                      isFavorite={movie.isFavorite}
-                      isFocused={index === focusedIndex}
-                      isLoading={regeneratingIds.has(movie.id)}
-                      progress={movie.watchProgress}
-                      onSelect={() => setSelected(movie)}
-                      onFavorite={() => toggleFavorite(movie.id)}
-                    />
-                  </div>
-                )}
+                renderItem={renderItem}
               />
             </div>
           )}

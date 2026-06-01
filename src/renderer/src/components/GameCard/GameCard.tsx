@@ -123,7 +123,7 @@ const round = (v: number, precision = 3) => parseFloat(v.toFixed(precision));
 const adjust = (v: number, fMin: number, fMax: number, tMin: number, tMax: number) =>
   round(tMin + ((tMax - tMin) * (v - fMin)) / (fMax - fMin));
 
-export const GameCard: React.FC<GameCardProps> = ({
+export const GameCard: React.FC<GameCardProps> = React.memo(({
   title,
   subtitle,
   coverUrl,
@@ -458,6 +458,6 @@ export const GameCard: React.FC<GameCardProps> = ({
       </div>
     </motion.div>
   );
-};
+});
 
 export default GameCard;

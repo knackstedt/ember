@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useGamesStore } from "../../store/games.store";
 import {
@@ -54,7 +54,7 @@ const LazyGameCard: React.FC<{
   focusedIndex: number;
   onSelect: () => void;
   onFavorite: () => void;
-}> = ({ game, index, focusedIndex, onSelect, onFavorite }) => {
+}> = React.memo(({ game, index, focusedIndex, onSelect, onFavorite }) => {
   const loadThumbnail = useGamesStore((s) => s.loadThumbnail);
   const regeneratingIds = useGamesStore((s) => s.regeneratingIds);
   const pendingThumbnailIds = useGamesStore((s) => s.pendingThumbnailIds);
@@ -83,7 +83,7 @@ const LazyGameCard: React.FC<{
       onFavorite={onFavorite}
     />
   );
-};
+});
 
 function gameBadge(game: Game): { label: string; color: string } | undefined {
   if (game.protonRating && game.protonRating !== "unknown") {
@@ -96,22 +96,20 @@ function gameBadge(game: Game): { label: string; color: string } | undefined {
 }
 
 export const GamingTab: React.FC = () => {
-  const {
-    games,
-    loading,
-    scanning,
-    activeFilter,
-    searchQuery,
-    load,
-    scan,
-    setFilter,
-    setSearch,
-    filtered,
-    toggleFavorite,
-    setTags,
-    hide,
-    regenerateThumbnail,
-  } = useGamesStore();
+  const games = useGamesStore((s) => s.games);
+  const loading = useGamesStore((s) => s.loading);
+  const scanning = useGamesStore((s) => s.scanning);
+  const activeFilter = useGamesStore((s) => s.activeFilter);
+  const searchQuery = useGamesStore((s) => s.searchQuery);
+  const load = useGamesStore((s) => s.load);
+  const scan = useGamesStore((s) => s.scan);
+  const setFilter = useGamesStore((s) => s.setFilter);
+  const setSearch = useGamesStore((s) => s.setSearch);
+  const filtered = useGamesStore((s) => s.filtered);
+  const toggleFavorite = useGamesStore((s) => s.toggleFavorite);
+  const setTags = useGamesStore((s) => s.setTags);
+  const hide = useGamesStore((s) => s.hide);
+  const regenerateThumbnail = useGamesStore((s) => s.regenerateThumbnail);
   const [selected, setSelected] = useState<Game | null>(null);
   const [columnCount, setColumnCount] = useState(6);
   const gridRef = useRef<VirtualGridHandle>(null);
@@ -126,7 +124,7 @@ export const GamingTab: React.FC = () => {
     return () => window.removeEventListener("htpc:escape", handler);
   }, []);
 
-  const items = filtered();
+  const items = useMemo(() => filtered(), [filtered, games, activeFilter, searchQuery]);
   const { focusedIndex } = useGridFocus({
     items,
     columnCount,
@@ -193,6 +191,21 @@ export const GamingTab: React.FC = () => {
       }
     },
   });
+
+  const renderItem = useCallback(
+    (game: Game, index: number) => (
+      <div className="p-1.5 w-full h-full flex flex-col min-w-0" {...bindItem(game, index)}>
+        <LazyGameCard
+          game={game}
+          index={index}
+          focusedIndex={focusedIndex}
+          onSelect={() => setSelected(game)}
+          onFavorite={() => toggleFavorite(game.id)}
+        />
+      </div>
+    ),
+    [bindItem, focusedIndex, toggleFavorite],
+  );
 
   const badge = selected ? gameBadge(selected) : undefined;
 
@@ -308,17 +321,7 @@ export const GamingTab: React.FC = () => {
             minItemWidth={200}
             onColumnCountChange={setColumnCount}
             rowHeight={260}
-            renderItem={(game, index) => (
-              <div className="p-1.5 w-full h-full flex flex-col min-w-0" {...bindItem(game, index)}>
-                <LazyGameCard
-                  game={game}
-                  index={index}
-                  focusedIndex={focusedIndex}
-                  onSelect={() => setSelected(game)}
-                  onFavorite={() => toggleFavorite(game.id)}
-                />
-              </div>
-            )}
+            renderItem={renderItem}
           />
         </div>
       )}

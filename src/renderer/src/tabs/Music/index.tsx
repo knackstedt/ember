@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useMusicStore } from "../../store/media.store";
 import { ChipFilters } from "../../components/ChipFilters/ChipFilters";
@@ -26,7 +26,7 @@ const LazyMusicCard: React.FC<{
   focusedIndex: number;
   onSelect: () => void;
   onFavorite: () => void;
-}> = ({ track, index, focusedIndex, onSelect, onFavorite }) => {
+}> = React.memo(({ track, index, focusedIndex, onSelect, onFavorite }) => {
   const loadThumbnail = useMusicStore((s) => s.loadThumbnail);
   const cachedUrl = useCoverCacheStore((s) => s.urls[track.id]);
   const coverUrl = track.albumArtUrl ?? cachedUrl;
@@ -51,7 +51,7 @@ const LazyMusicCard: React.FC<{
       onFavorite={onFavorite}
     />
   );
-};
+});
 
 type SubTab = "local" | "streaming";
 type BrowseMode = "artists" | "genres" | "tracks";
@@ -63,31 +63,29 @@ interface MusicGroup {
 }
 
 export const MusicTab: React.FC = () => {
-  const {
-    tracks,
-    loading,
-    scanning,
-    searchQuery,
-    activeArtist,
-    activeAlbum,
-    activeGenre,
-    activeYear,
-    load,
-    scan,
-    toggleFavorite,
-    setTags,
-    setSearch,
-    setArtist,
-    setAlbum,
-    setGenre,
-    setYear,
-    searchCoverArt,
-    pickCoverImage,
-    hide,
-    artistThumbnails,
-    artistThumbnailsLoading,
-    loadArtistThumbnail,
-  } = useMusicStore();
+  const tracks = useMusicStore((s) => s.tracks);
+  const loading = useMusicStore((s) => s.loading);
+  const scanning = useMusicStore((s) => s.scanning);
+  const searchQuery = useMusicStore((s) => s.searchQuery);
+  const activeArtist = useMusicStore((s) => s.activeArtist);
+  const activeAlbum = useMusicStore((s) => s.activeAlbum);
+  const activeGenre = useMusicStore((s) => s.activeGenre);
+  const activeYear = useMusicStore((s) => s.activeYear);
+  const load = useMusicStore((s) => s.load);
+  const scan = useMusicStore((s) => s.scan);
+  const toggleFavorite = useMusicStore((s) => s.toggleFavorite);
+  const setTags = useMusicStore((s) => s.setTags);
+  const setSearch = useMusicStore((s) => s.setSearch);
+  const setArtist = useMusicStore((s) => s.setArtist);
+  const setAlbum = useMusicStore((s) => s.setAlbum);
+  const setGenre = useMusicStore((s) => s.setGenre);
+  const setYear = useMusicStore((s) => s.setYear);
+  const searchCoverArt = useMusicStore((s) => s.searchCoverArt);
+  const pickCoverImage = useMusicStore((s) => s.pickCoverImage);
+  const hide = useMusicStore((s) => s.hide);
+  const artistThumbnails = useMusicStore((s) => s.artistThumbnails);
+  const artistThumbnailsLoading = useMusicStore((s) => s.artistThumbnailsLoading);
+  const loadArtistThumbnail = useMusicStore((s) => s.loadArtistThumbnail);
   const play = useMusicPlayerStore((s) => s.play);
   const [selected, setSelected] = useState<MusicTrack | null>(null);
   const [subTab, setSubTab] = useState<SubTab>("local");
@@ -298,6 +296,43 @@ export const MusicTab: React.FC = () => {
       }
     },
   });
+
+  const renderGroupItem = useCallback(
+    (group: MusicGroup, index: number) => (
+      <div className="p-1.5 w-full h-full flex flex-col min-w-0" {...bindGroupItem(group, index)}>
+        <MediaCard
+          id={group.name}
+          title={group.name}
+          subtitle={`${group.trackCount} track${group.trackCount !== 1 ? "s" : ""}`}
+          coverUrl={artistThumbnails[group.name] ?? group.coverUrl}
+          aspectRatio="1/1"
+          isFocused={index === groupFocusedIndex}
+          isLoading={browseMode === "artists" && !!artistThumbnailsLoading[group.name]}
+          onSelect={() => setSelectedGroup(group.name)}
+        />
+      </div>
+    ),
+    [bindGroupItem, groupFocusedIndex, artistThumbnails, artistThumbnailsLoading, browseMode],
+  );
+
+  const renderTrackItem = useCallback(
+    (track: MusicTrack, index: number) => (
+      <div className="p-1.5 w-full h-full flex flex-col min-w-0" {...bindTrackItem(track, index)}>
+        <LazyMusicCard
+          track={track}
+          index={index}
+          focusedIndex={trackFocusedIndex}
+          onSelect={() => {
+            play(trackItems, index);
+            setSelected(track);
+          }}
+          onFavorite={() => toggleFavorite(track.id)}
+        />
+      </div>
+    ),
+    [bindTrackItem, trackFocusedIndex, play, trackItems, toggleFavorite],
+  );
+
   const artists = [
     ...tracks
       .reduce((map, t) => {
@@ -511,20 +546,7 @@ export const MusicTab: React.FC = () => {
                 minItemWidth={180}
                 onColumnCountChange={setGroupColumnCount}
                 rowHeight={240}
-                renderItem={(group, index) => (
-                  <div className="p-1.5 w-full h-full flex flex-col min-w-0" {...bindGroupItem(group, index)}>
-                    <MediaCard
-                      id={group.name}
-                      title={group.name}
-                      subtitle={`${group.trackCount} track${group.trackCount !== 1 ? "s" : ""}`}
-                      coverUrl={artistThumbnails[group.name] ?? group.coverUrl}
-                      aspectRatio="1/1"
-                      isFocused={index === groupFocusedIndex}
-                      isLoading={browseMode === "artists" && !!artistThumbnailsLoading[group.name]}
-                      onSelect={() => setSelectedGroup(group.name)}
-                    />
-                  </div>
-                )}
+                renderItem={renderGroupItem}
               />
             </div>
           ) : (
@@ -536,20 +558,7 @@ export const MusicTab: React.FC = () => {
                 minItemWidth={180}
                 onColumnCountChange={setTrackColumnCount}
                 rowHeight={240}
-                renderItem={(track, index) => (
-                  <div className="p-1.5 w-full h-full flex flex-col min-w-0" {...bindTrackItem(track, index)}>
-                    <LazyMusicCard
-                      track={track}
-                      index={index}
-                      focusedIndex={trackFocusedIndex}
-                      onSelect={() => {
-                        play(trackItems, index);
-                        setSelected(track);
-                      }}
-                      onFavorite={() => toggleFavorite(track.id)}
-                    />
-                  </div>
-                )}
+                renderItem={renderTrackItem}
               />
             </div>
           )}

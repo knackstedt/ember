@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useTvStore } from "../../store/media.store";
 import {
@@ -15,20 +15,18 @@ import { useContextMenu } from "../../hooks/useContextMenu";
 import { ContextMenuOption } from "../../components/ContextMenu/ContextMenu";
 
 export const TVShowsTab: React.FC = () => {
-  const {
-    shows,
-    loading,
-    scanning,
-    searchQuery,
-    load,
-    scan,
-    toggleFavorite,
-    setTags,
-    setSearch,
-    filtered,
-    hide,
-    regenerateThumbnail,
-  } = useTvStore();
+  const shows = useTvStore((s) => s.shows);
+  const loading = useTvStore((s) => s.loading);
+  const scanning = useTvStore((s) => s.scanning);
+  const searchQuery = useTvStore((s) => s.searchQuery);
+  const load = useTvStore((s) => s.load);
+  const scan = useTvStore((s) => s.scan);
+  const toggleFavorite = useTvStore((s) => s.toggleFavorite);
+  const setTags = useTvStore((s) => s.setTags);
+  const setSearch = useTvStore((s) => s.setSearch);
+  const filtered = useTvStore((s) => s.filtered);
+  const hide = useTvStore((s) => s.hide);
+  const regenerateThumbnail = useTvStore((s) => s.regenerateThumbnail);
   const regeneratingIds = useTvStore((s) => s.regeneratingIds);
   const openVideo = useVideoPlayerStore((s) => s.open);
   const [selected, setSelected] = useState<TVShow | null>(null);
@@ -60,7 +58,7 @@ export const TVShowsTab: React.FC = () => {
     );
   }, [selected, selectedSeason]);
 
-  const items = filtered();
+  const items = useMemo(() => filtered(), [filtered, shows, searchQuery]);
   const { focusedIndex } = useGridFocus({
     items,
     columnCount,
@@ -115,6 +113,30 @@ export const TVShowsTab: React.FC = () => {
       }
     },
   });
+
+  const renderItem = useCallback(
+    (show: TVShow, index: number) => (
+      <div className="p-1.5 w-full h-full flex flex-col min-w-0" {...bindItem(show, index)}>
+        <MediaCard
+          key={show.id}
+          id={show.id}
+          title={show.title}
+          subtitle={
+            show.seasons
+              ? `${show.seasons.length} season${show.seasons.length !== 1 ? "s" : ""}`
+              : undefined
+          }
+          coverUrl={show.coverUrl}
+          isFavorite={show.isFavorite}
+          isFocused={index === focusedIndex}
+          isLoading={regeneratingIds.has(show.id)}
+          onSelect={() => setSelected(show)}
+          onFavorite={() => toggleFavorite(show.id)}
+        />
+      </div>
+    ),
+    [bindItem, focusedIndex, regeneratingIds, toggleFavorite],
+  );
 
   return (
     <div className="flex flex-col h-full gap-3 p-4">
@@ -191,26 +213,7 @@ export const TVShowsTab: React.FC = () => {
             minItemWidth={200}
             onColumnCountChange={setColumnCount}
             rowHeight={300}
-            renderItem={(show, index) => (
-              <div className="p-1.5 w-full h-full flex flex-col min-w-0" {...bindItem(show, index)}>
-                <MediaCard
-                  key={show.id}
-                  id={show.id}
-                  title={show.title}
-                  subtitle={
-                    show.seasons
-                      ? `${show.seasons.length} season${show.seasons.length !== 1 ? "s" : ""}`
-                      : undefined
-                  }
-                  coverUrl={show.coverUrl}
-                  isFavorite={show.isFavorite}
-                  isFocused={index === focusedIndex}
-                  isLoading={regeneratingIds.has(show.id)}
-                  onSelect={() => setSelected(show)}
-                  onFavorite={() => toggleFavorite(show.id)}
-                />
-              </div>
-            )}
+            renderItem={renderItem}
           />
         </div>
       )}

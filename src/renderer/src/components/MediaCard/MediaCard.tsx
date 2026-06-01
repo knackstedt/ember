@@ -41,7 +41,7 @@ function initials(title: string): string {
     .join("");
 }
 
-export const MediaCard: React.FC<MediaCardProps> = ({
+export const MediaCard: React.FC<MediaCardProps> = React.memo(({
   id,
   title,
   subtitle,
@@ -176,4 +176,4 @@ export const MediaCard: React.FC<MediaCardProps> = ({
       </div>
     </motion.div>
   );
-};
+});
