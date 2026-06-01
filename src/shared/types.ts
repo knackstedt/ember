@@ -221,6 +221,13 @@ export type FlashFilterType =
   | "invert"
   | "posterize"
   | "chromatic"
+  | "sepia"
+  | "bloom"
+  | "noise"
+  | "sharpen"
+  | "blur"
+  | "vignette"
+  | "heatwave"
   | "custom";
 
 export interface FlashFilterDefinition {

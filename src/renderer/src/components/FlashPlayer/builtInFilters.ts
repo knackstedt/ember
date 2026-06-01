@@ -181,6 +181,112 @@ vec4 filterEffect(vec4 color, vec2 uv, sampler2D source, vec2 resolution) {
   return vec4(r, g, b, color.a);
 }`,
   },
+  {
+    id: "sepia",
+    name: "Sepia",
+    fragmentBody: `
+vec4 filterEffect(vec4 color, vec2 uv, sampler2D source, vec2 resolution) {
+  vec3 c = color.rgb;
+  vec3 sepia = vec3(
+    dot(c, vec3(0.393, 0.769, 0.189)),
+    dot(c, vec3(0.349, 0.686, 0.168)),
+    dot(c, vec3(0.272, 0.534, 0.131))
+  );
+  return vec4(sepia, color.a);
+}`,
+  },
+  {
+    id: "bloom",
+    name: "Bloom",
+    fragmentBody: `
+vec4 filterEffect(vec4 color, vec2 uv, sampler2D source, vec2 resolution) {
+  vec2 texel = 1.0 / resolution;
+  vec3 glow = vec3(0.0);
+  glow += texture2D(source, uv + vec2(-texel.x, -texel.y)).rgb * 0.0625;
+  glow += texture2D(source, uv + vec2( 0.0,     -texel.y)).rgb * 0.125;
+  glow += texture2D(source, uv + vec2( texel.x,  -texel.y)).rgb * 0.0625;
+  glow += texture2D(source, uv + vec2(-texel.x,  0.0     )).rgb * 0.125;
+  glow += color.rgb                                          * 0.25;
+  glow += texture2D(source, uv + vec2( texel.x,  0.0     )).rgb * 0.125;
+  glow += texture2D(source, uv + vec2(-texel.x,  texel.y )).rgb * 0.0625;
+  glow += texture2D(source, uv + vec2( 0.0,       texel.y )).rgb * 0.125;
+  glow += texture2D(source, uv + vec2( texel.x,  texel.y )).rgb * 0.0625;
+  vec3 bright = max(glow - 0.6, vec3(0.0));
+  return vec4(color.rgb + bright * 1.2, color.a);
+}`,
+  },
+  {
+    id: "noise",
+    name: "Film Grain",
+    fragmentBody: `
+vec4 filterEffect(vec4 color, vec2 uv, sampler2D source, vec2 resolution) {
+  float x = gl_FragCoord.x / 12.9898;
+  float y = gl_FragCoord.y / 78.233;
+  float grain = fract(sin(dot(vec2(x, y), vec2(12.9898, 78.233))) * 43758.5453);
+  grain = (grain - 0.5) * 0.15;
+  return vec4(color.rgb + grain, color.a);
+}`,
+  },
+  {
+    id: "sharpen",
+    name: "Sharpen",
+    fragmentBody: `
+vec4 filterEffect(vec4 color, vec2 uv, sampler2D source, vec2 resolution) {
+  vec2 texel = 1.0 / resolution;
+  vec3 blurred = texture2D(source, uv + vec2(-texel.x, -texel.y)).rgb * 0.0625;
+  blurred += texture2D(source, uv + vec2( 0.0,     -texel.y)).rgb * 0.125;
+  blurred += texture2D(source, uv + vec2( texel.x,  -texel.y)).rgb * 0.0625;
+  blurred += texture2D(source, uv + vec2(-texel.x,  0.0     )).rgb * 0.125;
+  blurred += color.rgb                                          * 0.25;
+  blurred += texture2D(source, uv + vec2( texel.x,  0.0     )).rgb * 0.125;
+  blurred += texture2D(source, uv + vec2(-texel.x,  texel.y )).rgb * 0.0625;
+  blurred += texture2D(source, uv + vec2( 0.0,       texel.y )).rgb * 0.125;
+  blurred += texture2D(source, uv + vec2( texel.x,  texel.y )).rgb * 0.0625;
+  return vec4(color.rgb + (color.rgb - blurred) * 1.5, color.a);
+}`,
+  },
+  {
+    id: "blur",
+    name: "Gaussian Blur",
+    fragmentBody: `
+vec4 filterEffect(vec4 color, vec2 uv, sampler2D source, vec2 resolution) {
+  vec2 texel = 1.0 / resolution;
+  vec3 c = vec3(0.0);
+  c += texture2D(source, uv + vec2(-texel.x, -texel.y)).rgb * 0.0625;
+  c += texture2D(source, uv + vec2( 0.0,     -texel.y)).rgb * 0.125;
+  c += texture2D(source, uv + vec2( texel.x,  -texel.y)).rgb * 0.0625;
+  c += texture2D(source, uv + vec2(-texel.x,  0.0     )).rgb * 0.125;
+  c += color.rgb                                          * 0.25;
+  c += texture2D(source, uv + vec2( texel.x,  0.0     )).rgb * 0.125;
+  c += texture2D(source, uv + vec2(-texel.x,  texel.y )).rgb * 0.0625;
+  c += texture2D(source, uv + vec2( 0.0,       texel.y )).rgb * 0.125;
+  c += texture2D(source, uv + vec2( texel.x,  texel.y )).rgb * 0.0625;
+  return vec4(c, color.a);
+}`,
+  },
+  {
+    id: "vignette",
+    name: "Vignette",
+    fragmentBody: `
+vec4 filterEffect(vec4 color, vec2 uv, sampler2D source, vec2 resolution) {
+  vec2 centered = (uv - 0.5) * 2.0;
+  float dist = length(centered);
+  float vig = 1.0 - smoothstep(0.5, 1.5, dist);
+  return vec4(color.rgb * vig, color.a);
+}`,
+  },
+  {
+    id: "heatwave",
+    name: "Heatwave",
+    fragmentBody: `
+vec4 filterEffect(vec4 color, vec2 uv, sampler2D source, vec2 resolution) {
+  float yShift = sin(uv.x * 20.0 + u_time * 3.0) * 0.003;
+  float xShift = cos(uv.y * 15.0 + u_time * 2.0) * 0.002;
+  vec2 warped = uv + vec2(xShift, yShift);
+  vec3 c = texture2D(source, warped).rgb;
+  return vec4(c, color.a);
+}`,
+  },
 ];
 
 export function getBuiltInFilter(id: string): BuiltInFilter | undefined {
