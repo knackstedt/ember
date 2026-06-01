@@ -497,6 +497,7 @@ export const MusicTab: React.FC = () => {
           ) : browseMode !== "tracks" && !selectedGroup ? (
             <div className="flex-1 min-h-0 min-w-0 overflow-hidden">
               <VirtualGrid
+                key="groups"
                 ref={groupGridRef}
                 items={groupItems}
                 minItemWidth={180}
@@ -521,6 +522,7 @@ export const MusicTab: React.FC = () => {
           ) : (
             <div className="flex-1 min-h-0 min-w-0 overflow-hidden">
               <VirtualGrid
+                key="tracks"
                 ref={trackGridRef}
                 items={trackItems}
                 minItemWidth={180}

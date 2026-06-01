@@ -108,7 +108,7 @@ export const VirtualGrid = React.forwardRef(function VirtualGridInner<T>(
   return (
     <div ref={containerRef} className="w-full h-full relative overflow-hidden">
       <VGrid
-        key={effectiveColCount}
+        key={`${effectiveColCount}-${items.length}`}
         ref={ref}
         className={`gpu-scroll ${className ?? ""}`}
         style={{
