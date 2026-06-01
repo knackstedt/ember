@@ -365,7 +365,7 @@ class ScreenshotQueue {
     const id = game.id;
     const destPath = join(screenshotDir, `${id}.png`);
     if (existsSync(destPath)) {
-      return { url: `htpc-thumb://covers/flash/screenshots/${id}.png`, source: "ruffle-screenshot" };
+      return { url: `ember://covers/flash/screenshots/${id}.png`, source: "ruffle-screenshot" };
     }
 
     return new Promise<{ url?: string; source?: string }>((resolve) => {
@@ -424,7 +424,7 @@ class ScreenshotQueue {
               const png = image.toPNG();
               writeFileSync(destPath, png);
               resolveOnce(
-                `htpc-thumb://covers/flash/screenshots/${id}.png`,
+                `ember://covers/flash/screenshots/${id}.png`,
                 "ruffle-screenshot",
               );
             }
@@ -487,10 +487,10 @@ export function clearInFlight(id: string): void {
 function coverExistsOnDisk(id: string): string | undefined {
   for (const ext of [".png", ".jpg", ".webp"]) {
     const p = join(screenshotDir, `${id}${ext}`);
-    if (existsSync(p)) return `htpc-thumb://covers/flash/screenshots/${id}${ext}`;
+    if (existsSync(p)) return `ember://covers/flash/screenshots/${id}${ext}`;
   }
   const svg = join(generatedDir, `${id}.svg`);
-  if (existsSync(svg)) return `htpc-thumb://covers/flash/generated/${id}.svg`;
+  if (existsSync(svg)) return `ember://covers/flash/generated/${id}.svg`;
   return undefined;
 }
 
@@ -568,13 +568,13 @@ export function generateProceduralThumbnail(
 ): string | undefined {
   const dest = join(generatedDir, `${id}.svg`);
   if (existsSync(dest)) {
-    return `htpc-thumb://covers/flash/generated/${id}.svg`;
+    return `ember://covers/flash/generated/${id}.svg`;
   }
   try {
     const hash = hashFileHead(filePath);
     const svg = buildProceduralSVG(hash);
     writeFileSync(dest, svg);
-    return `htpc-thumb://covers/flash/generated/${id}.svg`;
+    return `ember://covers/flash/generated/${id}.svg`;
   } catch (err) {
     log.error("flash:procedural", String(err));
     return undefined;
@@ -647,7 +647,7 @@ export async function loadFlashThumbnail(
         const data = readFileSync(sidecar);
         writeFileSync(dest, data);
       }
-      const url = `htpc-thumb://covers/flash/screenshots/${id}${destExt}`;
+      const url = `ember://covers/flash/screenshots/${id}${destExt}`;
       await updateGameCover(id, url, "sidecar");
       return url;
     }
@@ -662,7 +662,7 @@ export async function loadFlashThumbnail(
           const buf = Buffer.from(await res.arrayBuffer());
           const dest = join(screenshotDir, `${id}.jpg`);
           writeFileSync(dest, buf);
-          const url = `htpc-thumb://covers/flash/screenshots/${id}.jpg`;
+          const url = `ember://covers/flash/screenshots/${id}.jpg`;
           await updateGameCover(id, url, "online");
           return url;
         }
@@ -705,5 +705,5 @@ export function copySidecarCover(
     const data = readFileSync(sidecar);
     writeFileSync(dest, data);
   }
-  return `htpc-thumb://covers/flash/screenshots/${id}${destExt}`;
+  return `ember://covers/flash/screenshots/${id}${destExt}`;
 }

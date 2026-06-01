@@ -185,13 +185,13 @@ export async function generateProceduralCover(
 ): Promise<string | undefined> {
   const dest = join(generatedCache, `${id}.svg`);
   if (existsSync(dest)) {
-    return `htpc-thumb://covers/music/generated/${id}.svg`;
+    return `ember://covers/music/generated/${id}.svg`;
   }
   try {
     const hash = hashFileHead(filePath);
     const svg = buildProceduralSVG(hash);
     writeFileSync(dest, svg);
-    return `htpc-thumb://covers/music/generated/${id}.svg`;
+    return `ember://covers/music/generated/${id}.svg`;
   } catch (err) {
     log.error("generateProceduralCover", String(err));
     return undefined;
@@ -215,7 +215,7 @@ export async function extractCover(
     if (!existsSync(dest)) {
       writeFileSync(dest, picture.data);
     }
-    return `htpc-thumb://covers/music/${id}.jpg`;
+    return `ember://covers/music/${id}.jpg`;
   } catch {
     return undefined;
   }
@@ -235,7 +235,7 @@ export function findFolderArt(
           const data = readFileSync(full);
           writeFileSync(dest, data);
         }
-        return `htpc-thumb://covers/music/${id}.jpg`;
+        return `ember://covers/music/${id}.jpg`;
       }
     }
     return undefined;
@@ -461,17 +461,17 @@ export async function embedCoverArt(
   }
 
   // Update DB
-  const htpcUrl = `htpc-thumb://covers/music/${track.id}.jpg`;
+  const emberUrl = `ember://covers/music/${track.id}.jpg`;
   try {
     const db = getDb();
     await db.query(`UPDATE music_track:⟨${track.id}⟩ SET albumArtUrl = $url`, {
-      url: htpcUrl,
+      url: emberUrl,
     });
   } catch (err) {
     log.error("embedCoverArt", `db update failed: ${err}`);
   }
 
-  return htpcUrl;
+  return emberUrl;
 }
 
 async function embedMp3Cover(
@@ -530,7 +530,7 @@ export async function fetchArtistThumbnail(
   const safeName = artist.toLowerCase().replace(/[^a-z0-9]/g, "_");
   const dest = join(artistCache, `${safeName}.jpg`);
   if (existsSync(dest)) {
-    return `htpc-thumb://covers/artists/${safeName}.jpg`;
+    return `ember://covers/artists/${safeName}.jpg`;
   }
   if (artistInFlight.has(safeName)) return undefined;
   artistInFlight.add(safeName);
@@ -559,7 +559,7 @@ export async function fetchArtistThumbnail(
     const buffer = Buffer.from(await imageRes.arrayBuffer());
     writeFileSync(dest, buffer);
 
-    return `htpc-thumb://covers/artists/${safeName}.jpg`;
+    return `ember://covers/artists/${safeName}.jpg`;
   } catch (err) {
     log.error("fetchArtistThumbnail", String(err));
     return undefined;

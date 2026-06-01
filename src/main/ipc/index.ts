@@ -309,7 +309,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
       const pathPart = normalized.coverUrl.slice("file://".length);
       if (!pathPart.startsWith(thumbRoot)) return normalized;
       const rel = pathPart.slice(thumbRoot.length + 1).replace(/\\/g, "/");
-      return { ...normalized, coverUrl: `htpc-thumb://thumbnails/${rel}` };
+      return { ...normalized, coverUrl: `ember://thumbnails/${rel}` };
     });
   });
 
@@ -436,7 +436,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
       const pathPart = normalized.albumArtUrl.slice("file://".length);
       if (!pathPart.startsWith(coverRoot)) return normalized;
       const rel = pathPart.slice(coverRoot.length + 1).replace(/\\/g, "/");
-      return { ...normalized, albumArtUrl: `htpc-thumb://covers/music/${rel}` };
+      return { ...normalized, albumArtUrl: `ember://covers/music/${rel}` };
     });
   });
 

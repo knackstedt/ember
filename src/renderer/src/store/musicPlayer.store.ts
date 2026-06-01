@@ -28,7 +28,7 @@ export interface MusicPlayerStore {
 const audio = new Audio();
 
 function loadAndPlay(track: MusicTrack, autoplay: boolean): void {
-  audio.src = `htpc-media://media/${encodeURIComponent(track.filePath)}`;
+  audio.src = `ember://media/${encodeURIComponent(track.filePath)}`;
   audio.load();
   if (autoplay) void audio.play();
 }

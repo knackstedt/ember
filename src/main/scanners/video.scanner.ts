@@ -176,7 +176,7 @@ export async function generateMovieThumbnail(
   if (existsSync(dest)) {
     try {
       if (statSync(dest).size > 0)
-        return `htpc-thumb://thumbnails/movies/${id}.jpg`;
+        return `ember://thumbnails/movies/${id}.jpg`;
       unlinkSync(dest);
     } catch {
       /* ignore */
@@ -184,11 +184,11 @@ export async function generateMovieThumbnail(
   }
   const hasEmbedded = await extractEmbeddedVideoCover(filePath, dest);
   if (hasEmbedded) {
-    return `htpc-thumb://thumbnails/movies/${id}.jpg`;
+    return `ember://thumbnails/movies/${id}.jpg`;
   }
   const generated = await generateFrameThumbnail(filePath, dest, duration);
   if (generated) {
-    return `htpc-thumb://thumbnails/movies/${id}.jpg`;
+    return `ember://thumbnails/movies/${id}.jpg`;
   }
   log.warn("video.scanner", `No thumbnail generated for ${filePath}`);
   return undefined;
@@ -203,7 +203,7 @@ export async function generateShowThumbnail(
   if (existsSync(dest)) {
     try {
       if (statSync(dest).size > 0)
-        return `htpc-thumb://thumbnails/tv/${id}.jpg`;
+        return `ember://thumbnails/tv/${id}.jpg`;
       unlinkSync(dest);
     } catch {
       /* ignore */
@@ -214,11 +214,11 @@ export async function generateShowThumbnail(
   if (!firstEp) return undefined;
   const hasEmbedded = await extractEmbeddedVideoCover(firstEp.path, dest);
   if (hasEmbedded) {
-    return `htpc-thumb://thumbnails/tv/${id}.jpg`;
+    return `ember://thumbnails/tv/${id}.jpg`;
   }
   const generated = await generateFrameThumbnail(firstEp.path, dest);
   if (generated) {
-    return `htpc-thumb://thumbnails/tv/${id}.jpg`;
+    return `ember://thumbnails/tv/${id}.jpg`;
   }
   log.warn("video.scanner", `No thumbnail generated for show ${dirPath}`);
   return undefined;

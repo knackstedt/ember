@@ -121,25 +121,7 @@ async function createWindow(): Promise<void> {
 
 protocol.registerSchemesAsPrivileged([
   {
-    scheme: "htpc-thumb",
-    privileges: {
-      secure: true,
-      standard: true,
-      supportFetchAPI: true,
-      corsEnabled: true,
-    },
-  },
-  {
-    scheme: "htpc-game",
-    privileges: {
-      secure: true,
-      standard: true,
-      supportFetchAPI: true,
-      corsEnabled: true,
-    },
-  },
-  {
-    scheme: "htpc-media",
+    scheme: "ember",
     privileges: {
       secure: true,
       standard: true,
@@ -152,58 +134,20 @@ protocol.registerSchemesAsPrivileged([
 app.whenReady().then(async () => {
   app.setAppUserModelId("com.htpc.app");
 
-  protocol.handle("htpc-thumb", async (request) => {
+  protocol.handle("ember", async (request) => {
     const url = new URL(request.url);
-    let pathname = decodeURIComponent(url.hostname + url.pathname);
-    if (pathname.startsWith("/")) pathname = pathname.slice(1);
-    if (pathname.includes("..")) {
-      return new Response("Forbidden", { status: 403 });
-    }
-    const filePath = join(app.getPath("userData"), pathname);
-    try {
-      const data = readFileSync(filePath);
-      const ext = pathname.toLowerCase().slice(pathname.lastIndexOf("."));
-      let contentType = "application/octet-stream";
-      if (ext === ".jpg" || ext === ".jpeg") contentType = "image/jpeg";
-      else if (ext === ".png") contentType = "image/png";
-      else if (ext === ".svg") contentType = "image/svg+xml";
-      else if (ext === ".webp") contentType = "image/webp";
-      return new Response(new Uint8Array(data), {
-        headers: { "Content-Type": contentType },
-      });
-    } catch {
-      log.warn("protocol", `file not found: ${filePath}`);
-      return new Response("Not Found", { status: 404 });
-    }
-  });
 
-  protocol.handle("htpc-game", async (request) => {
-    const url = new URL(request.url);
-    const filePath = decodeURIComponent(url.pathname);
-    if (!filePath || filePath.includes("..")) {
-      return new Response("Forbidden", { status: 403 });
+    let filePath: string;
+    if (url.hostname === "media") {
+      filePath = decodeURIComponent(url.pathname.slice(1));
+    } else if (url.hostname === "thumbnails" || url.hostname === "covers") {
+      let rel = decodeURIComponent(url.hostname + url.pathname);
+      if (rel.startsWith("/")) rel = rel.slice(1);
+      filePath = join(app.getPath("userData"), rel);
+    } else {
+      filePath = decodeURIComponent(url.pathname);
     }
-    try {
-      const data = readFileSync(filePath);
-      const ext = filePath.toLowerCase().slice(filePath.lastIndexOf("."));
-      let contentType = "application/octet-stream";
-      if (ext === ".swf") contentType = "application/x-shockwave-flash";
-      else if (ext === ".jpg" || ext === ".jpeg") contentType = "image/jpeg";
-      else if (ext === ".png") contentType = "image/png";
-      else if (ext === ".svg") contentType = "image/svg+xml";
-      else if (ext === ".webp") contentType = "image/webp";
-      return new Response(new Uint8Array(data), {
-        headers: { "Content-Type": contentType },
-      });
-    } catch {
-      log.warn("protocol", `game file not found: ${filePath}`);
-      return new Response("Not Found", { status: 404 });
-    }
-  });
 
-  protocol.handle("htpc-media", async (request) => {
-    const url = new URL(request.url);
-    const filePath = decodeURIComponent(url.pathname.slice(1));
     if (!filePath || filePath.includes("..")) {
       return new Response("Forbidden", { status: 403 });
     }
@@ -217,7 +161,12 @@ app.whenReady().then(async () => {
 
     const ext = filePath.toLowerCase().slice(filePath.lastIndexOf("."));
     let contentType = "application/octet-stream";
-    if (ext === ".mp3") contentType = "audio/mpeg";
+    if (ext === ".jpg" || ext === ".jpeg") contentType = "image/jpeg";
+    else if (ext === ".png") contentType = "image/png";
+    else if (ext === ".svg") contentType = "image/svg+xml";
+    else if (ext === ".webp") contentType = "image/webp";
+    else if (ext === ".swf") contentType = "application/x-shockwave-flash";
+    else if (ext === ".mp3") contentType = "audio/mpeg";
     else if (ext === ".flac") contentType = "audio/flac";
     else if (ext === ".ogg") contentType = "audio/ogg";
     else if (ext === ".wav") contentType = "audio/wav";
