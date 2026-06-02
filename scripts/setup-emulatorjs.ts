@@ -13,7 +13,9 @@ const CORE_PACKAGES: Record<string, string> = {
 };
 
 // CDN URLs for pre-built frontend assets (npm package is source-only)
-const CDN_BASE = "https://cdn.emulatorjs.org/latest/data";
+// Pinned to match the npm package version for reproducible builds
+const EJS_VERSION = "4.2.3";
+const CDN_BASE = `https://cdn.emulatorjs.org/${EJS_VERSION}/data`;
 
 async function download(url: string, dest: string) {
   console.log(`Downloading ${url} -> ${dest}`);

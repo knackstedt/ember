@@ -5,7 +5,7 @@
   "license": "PolyForm-Noncommercial-1.0.0",
   "main": "out/main/index.js",
   "scripts": {
-    "postinstall": "node node_modules/electron/install.js",
+    "postinstall": "node node_modules/electron/install.js && bun scripts/setup-emulatorjs.ts",
     "setup:emulatorjs": "bun scripts/setup-emulatorjs.ts",
     "dev": "bun scripts/dev.ts",
     "build": "electron-vite build",
