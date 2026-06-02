@@ -20,6 +20,12 @@ import { VideoPlayer } from "./components/VideoPlayer/VideoPlayer";
 import { useVideoPlayerStore } from "./store/videoPlayer.store";
 import { FlashPlayer } from "./components/FlashPlayer/FlashPlayer";
 import { useFlashPlayerStore } from "./store/flashPlayer.store";
+import { JsnesPlayer } from "./components/JsnesPlayer/JsnesPlayer";
+import { useJsnesPlayerStore } from "./store/jsnesPlayer.store";
+import { EmulatorJSPlayer } from "./components/EmulatorJSPlayer/EmulatorJSPlayer";
+import { useEmulatorjsPlayerStore } from "./store/emulatorjsPlayer.store";
+import { V86Player } from "./components/V86Player/V86Player";
+import { useV86PlayerStore } from "./store/v86Player.store";
 import { useContextMenuStore } from "./store/contextMenu.store";
 import { QueueBlade } from "./components/QueueBlade/QueueBlade";
 
@@ -61,6 +67,10 @@ export default function App(): React.ReactElement {
   const setBladeCollapsed = useMusicPlayerStore((s) => s.setBladeCollapsed);
   const videoOpen = useVideoPlayerStore((s) => !!s.src);
   const flashOpen = useFlashPlayerStore((s) => s.open);
+  const jsnesOpen = useJsnesPlayerStore((s) => s.open);
+  const emulatorjsOpen = useEmulatorjsPlayerStore((s) => s.open);
+  const v86Open = useV86PlayerStore((s) => s.open);
+  const anyEmulatorOpen = flashOpen || jsnesOpen || emulatorjsOpen || v86Open;
   const [activeTab, setActiveTab] = useState<TabId>("gaming");
   const activeTabRef = useRef<TabId>(activeTab);
   activeTabRef.current = activeTab;
@@ -124,8 +134,8 @@ export default function App(): React.ReactElement {
   }, [settings?.defaultTab]);
 
   useEffect(() => {
-    setBladeCollapsed(flashOpen);
-  }, [flashOpen]);
+    setBladeCollapsed(anyEmulatorOpen);
+  }, [anyEmulatorOpen]);
 
   useEffect(() => {
     if (videoOpen) {
@@ -199,8 +209,13 @@ export default function App(): React.ReactElement {
     const longPressTimers = new Map<string, number>();
 
     const handler = (e: KeyboardEvent): void => {
-      // Let Flash Player receive raw keyboard events; only allow Escape/F11
-      if (useFlashPlayerStore.getState().open && !(e.key === "Escape" || e.key === "F11")) {
+      // Let emulator players receive raw keyboard events; only allow Escape/F11
+      const emuOpen =
+        useFlashPlayerStore.getState().open ||
+        useJsnesPlayerStore.getState().open ||
+        useEmulatorjsPlayerStore.getState().open ||
+        useV86PlayerStore.getState().open;
+      if (emuOpen && !(e.key === "Escape" || e.key === "F11")) {
         return;
       }
 
@@ -356,6 +371,9 @@ export default function App(): React.ReactElement {
 
       <AnimatePresence>{videoOpen && <VideoPlayer />}</AnimatePresence>
       <FlashPlayer />
+      <JsnesPlayer />
+      <EmulatorJSPlayer />
+      <V86Player />
 
       <div className="relative z-10 flex flex-col h-full">
         {/* Tab bar */}

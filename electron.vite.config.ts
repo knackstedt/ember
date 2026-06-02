@@ -11,6 +11,23 @@ import {
   statSync,
 } from "fs";
 
+function getMimeType(fileName: string): string {
+  const ext = fileName.split(".").pop() || "";
+  const mime: Record<string, string> = {
+    js: "application/javascript",
+    mjs: "application/javascript",
+    wasm: "application/wasm",
+    map: "application/json",
+    json: "application/json",
+    css: "text/css",
+    svg: "image/svg+xml",
+    png: "image/png",
+    ico: "image/x-icon",
+    bin: "application/octet-stream",
+  };
+  return mime[ext] || "application/octet-stream";
+}
+
 function ruffleStaticPlugin(): Plugin {
   const ruffleDir = resolve("node_modules/@ruffle-rs/ruffle");
 
@@ -36,16 +53,7 @@ function ruffleStaticPlugin(): Plugin {
           next();
           return;
         }
-        const ext = fileName.split(".").pop();
-        const mime: Record<string, string> = {
-          js: "application/javascript",
-          wasm: "application/wasm",
-          map: "application/json",
-        };
-        res.setHeader(
-          "Content-Type",
-          mime[ext || ""] || "application/octet-stream",
-        );
+        res.setHeader("Content-Type", getMimeType(fileName));
         res.end(readFileSync(filePath));
       });
     },
@@ -60,6 +68,113 @@ function ruffleStaticPlugin(): Plugin {
           copyFileSync(src, resolve(destDir, file));
         }
       }
+    },
+  };
+}
+
+function copyDirRecursive(src: string, dest: string): void {
+  if (!existsSync(dest)) mkdirSync(dest, { recursive: true });
+  for (const entry of readdirSync(src)) {
+    const srcPath = resolve(src, entry);
+    const destPath = resolve(dest, entry);
+    const stat = statSync(srcPath);
+    if (stat.isDirectory()) {
+      copyDirRecursive(srcPath, destPath);
+    } else if (stat.isFile()) {
+      copyFileSync(srcPath, destPath);
+    }
+  }
+}
+
+function emulatorjsStaticPlugin(): Plugin {
+  const ejsResourceDir = resolve("resources/emulatorjs");
+  const ejsNpmDir = resolve("node_modules/@emulatorjs/emulatorjs/data");
+
+  return {
+    name: "emulatorjs-static",
+    configureServer(server) {
+      server.middlewares.use("/emulatorjs", (req, res, next) => {
+        try {
+          decodeURI(req.url ?? "");
+        } catch {
+          res.statusCode = 400;
+          res.end("Bad Request");
+          return;
+        }
+        const fileName = req.url?.replace(/^\/+/, "") ?? "";
+        if (!fileName) {
+          res.statusCode = 404;
+          res.end("Not found");
+          return;
+        }
+        // Try resources first, then npm package
+        let filePath = resolve(ejsResourceDir, fileName);
+        if (!existsSync(filePath) || !statSync(filePath).isFile()) {
+          filePath = resolve(ejsNpmDir, fileName);
+        }
+        if (!existsSync(filePath) || !statSync(filePath).isFile()) {
+          next();
+          return;
+        }
+        res.setHeader("Content-Type", getMimeType(filePath));
+        res.end(readFileSync(filePath));
+      });
+    },
+    writeBundle(options) {
+      const outDir = options.dir;
+      if (!outDir) return;
+      const destDir = resolve(outDir, "emulatorjs");
+      // Copy npm package first, then resources on top (overwrites)
+      copyDirRecursive(ejsNpmDir, destDir);
+      copyDirRecursive(ejsResourceDir, destDir);
+    },
+  };
+}
+
+function v86StaticPlugin(): Plugin {
+  const v86BuildDir = resolve("node_modules/v86/build");
+  const v86BiosDir = resolve("resources/v86-bios");
+
+  return {
+    name: "v86-static",
+    configureServer(server) {
+      server.middlewares.use("/v86", (req, res, next) => {
+        try {
+          decodeURI(req.url ?? "");
+        } catch {
+          res.statusCode = 400;
+          res.end("Bad Request");
+          return;
+        }
+        const fileName = req.url?.replace(/^\/+/, "") ?? "";
+        if (!fileName) {
+          res.statusCode = 404;
+          res.end("Not found");
+          return;
+        }
+        let filePath: string;
+        if (fileName.startsWith("build/")) {
+          filePath = resolve(v86BuildDir, fileName.slice(6));
+        } else if (fileName.startsWith("bios/")) {
+          filePath = resolve(v86BiosDir, fileName.slice(5));
+        } else {
+          res.statusCode = 404;
+          res.end("Not found");
+          return;
+        }
+        if (!existsSync(filePath) || !statSync(filePath).isFile()) {
+          next();
+          return;
+        }
+        res.setHeader("Content-Type", getMimeType(filePath));
+        res.end(readFileSync(filePath));
+      });
+    },
+    writeBundle(options) {
+      const outDir = options.dir;
+      if (!outDir) return;
+      copyDirRecursive(v86BuildDir, resolve(outDir, "v86", "build"));
+      copyDirRecursive(v86BiosDir, resolve(outDir, "v86", "bios"));
     },
   };
 }
@@ -103,6 +218,6 @@ export default defineConfig({
         "@shared": resolve("src/shared"),
       },
     },
-    plugins: [react(), ruffleStaticPlugin()],
+    plugins: [react(), ruffleStaticPlugin(), emulatorjsStaticPlugin(), v86StaticPlugin()],
   },
 });

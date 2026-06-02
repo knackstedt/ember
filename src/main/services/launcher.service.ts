@@ -105,7 +105,12 @@ export function launchGame(game: Game): Promise<void> {
       }
       break;
     case "flash":
-      // Handled via webview in renderer
+    case "nes":
+    case "snes":
+    case "gb":
+    case "gba":
+    case "dos":
+      // Handled via in-renderer emulator components
       return Promise.resolve();
     default:
       if (game.execPath) {

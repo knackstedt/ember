@@ -8,6 +8,8 @@ import { scanDolphinGames } from "../scanners/dolphin.scanner";
 import { scanDesktopGames } from "../scanners/desktop.scanner";
 import { scanHeroicGames, scanLutrisGames } from "../scanners/heroic.scanner";
 import { scanFlashGames } from "../scanners/flash.scanner";
+import { scanRomGames } from "../scanners/rom.scanner";
+import { scanV86Games } from "../scanners/v86.scanner";
 import { scanWindowsGames } from "../scanners/windows.scanner";
 import { Game } from "../../shared/types";
 import { createLogger } from "../util/logger";
@@ -58,9 +60,11 @@ async function scanInMainThread(
   const desktop = scanDesktopGames();
 
   const flash = scanFlashGames();
+  const roms = scanRomGames();
+  const v86 = scanV86Games();
   const windows = scanWindowsGames();
 
-  const all = [...steam, ...dolphin, ...heroic, ...lutris, ...desktop, ...flash, ...windows];
+  const all = [...steam, ...dolphin, ...heroic, ...lutris, ...desktop, ...flash, ...roms, ...v86, ...windows];
 
   const db = getDb();
   for (const game of all) {

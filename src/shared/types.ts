@@ -25,6 +25,7 @@ export type GamePlatform =
   | "gb"
   | "gba"
   | "flash"
+  | "dos"
   | "desktop"
   | "unknown";
 

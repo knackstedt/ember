@@ -18,6 +18,9 @@ import { useGridFocus } from "../../hooks/useGridFocus";
 import { useContextMenu } from "../../hooks/useContextMenu";
 import { ContextMenuOption } from "../../components/ContextMenu/ContextMenu";
 import { useFlashPlayerStore } from "../../store/flashPlayer.store";
+import { useJsnesPlayerStore } from "../../store/jsnesPlayer.store";
+import { useEmulatorjsPlayerStore } from "../../store/emulatorjsPlayer.store";
+import { useV86PlayerStore } from "../../store/v86Player.store";
 import { useToastStore } from "../../store/toast.store";
 
 const PLATFORM_FILTERS: ChipFilter<
@@ -37,6 +40,7 @@ const PLATFORM_FILTERS: ChipFilter<
   { id: "gb", label: "Game Boy" },
   { id: "gba", label: "GBA" },
   { id: "flash", label: "Flash" },
+  { id: "dos", label: "DOS/PC" },
   { id: "desktop", label: "Other" },
 ];
 
@@ -213,6 +217,18 @@ export const GamingTab: React.FC = () => {
   const launch = async (game: Game): Promise<void> => {
     if (game.platform === "flash" && game.romPath) {
       useFlashPlayerStore.getState().launch(game.romPath, game.title);
+      return;
+    }
+    if (game.platform === "nes" && game.romPath) {
+      useJsnesPlayerStore.getState().launch(game.romPath, game.title);
+      return;
+    }
+    if ((game.platform === "snes" || game.platform === "gb" || game.platform === "gba") && game.romPath) {
+      useEmulatorjsPlayerStore.getState().launch(game.romPath, game.title, game.platform);
+      return;
+    }
+    if (game.platform === "dos" && game.romPath) {
+      useV86PlayerStore.getState().launch(game.romPath, game.title);
       return;
     }
     try {

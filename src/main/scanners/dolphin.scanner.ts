@@ -86,10 +86,9 @@ function detectIsoPlatform(filePath: string): "dolphin-gc" | "dolphin-wii" | nul
   }
 }
 
-function platformFromExt(ext: string, filePath: string): GamePlatform {
+function platformFromExt(ext: string, filePath: string): GamePlatform | null {
   if (ext === ".iso") {
-    const detected = detectIsoPlatform(filePath);
-    if (detected) return detected;
+    return detectIsoPlatform(filePath);
   }
   const lower = filePath.toLowerCase();
   if (lower.includes("wii") && !lower.includes("gamecube"))
@@ -130,6 +129,10 @@ export function scanDolphinGames(extraPaths: string[] = []): Game[] {
 
       seen.add(fullPath);
       const platform = platformFromExt(ext, fullPath);
+      if (!platform) {
+        log.info("dolphin", `skip unknown ISO: ${fullPath}`);
+        return;
+      }
       const title = titleFromFilename(basename(fullPath));
       const id = hashId("dolphin", fullPath);
       log.info("dolphin", `found ${title} → ${id} platform: ${platform} path: ${fullPath}`);

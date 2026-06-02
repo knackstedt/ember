@@ -4,6 +4,8 @@ import { scanDolphinGames } from "../scanners/dolphin.scanner";
 import { scanDesktopGames } from "../scanners/desktop.scanner";
 import { scanHeroicGames, scanLutrisGames } from "../scanners/heroic.scanner";
 import { scanFlashGames } from "../scanners/flash.scanner";
+import { scanRomGames } from "../scanners/rom.scanner";
+import { scanV86Games } from "../scanners/v86.scanner";
 import { scanWindowsGames } from "../scanners/windows.scanner";
 
 parentPort?.once("message", (extraPaths?: string[]) => {
@@ -44,11 +46,13 @@ parentPort?.once("message", (extraPaths?: string[]) => {
     const lutris = scanLutrisGames();
     const desktop = scanDesktopGames();
     const flash = scanFlashGames();
+    const roms = scanRomGames();
+    const v86 = scanV86Games();
     const windows = scanWindowsGames();
 
     parentPort?.postMessage({
       type: "result",
-      games: [...steam, ...dolphin, ...heroic, ...lutris, ...desktop, ...flash, ...windows],
+      games: [...steam, ...dolphin, ...heroic, ...lutris, ...desktop, ...flash, ...roms, ...v86, ...windows],
     });
   } catch (err) {
     parentPort?.postMessage({ type: "error", error: (err as Error).message });
