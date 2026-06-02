@@ -92,9 +92,10 @@ export const useGamesStore = create<GamesState>((set, get) => ({
     try {
       const url = await window.htpc.games.loadThumbnail(game);
       if (url) {
+        const isBroken = url.includes("-broken.svg");
         set((s) => ({
           games: s.games.map((g) =>
-            g.id === id ? { ...g, coverUrl: url } : g,
+            g.id === id ? { ...g, coverUrl: url, corrupt: isBroken } : g,
           ),
         }));
       }
@@ -119,9 +120,10 @@ export const useGamesStore = create<GamesState>((set, get) => ({
       const url = await window.htpc.games.regenerateThumbnail(game);
       if (url) {
         const busted = `${url}#t=${Date.now()}`;
+        const isBroken = url.includes("-broken.svg");
         set((s) => ({
           games: s.games.map((g) =>
-            g.id === id ? { ...g, coverUrl: busted } : g,
+            g.id === id ? { ...g, coverUrl: busted, corrupt: isBroken } : g,
           ),
         }));
       }

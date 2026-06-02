@@ -170,6 +170,23 @@ export function registerIpcHandlers(window: BrowserWindow): void {
             log.info("ipc:games:regenerateThumbnail", `deleted ${svg}`);
           } catch {}
         }
+        const brokenSvg = join(generatedDir, `${id}-broken.svg`);
+        if (existsSync(brokenSvg)) {
+          try {
+            unlinkSync(brokenSvg);
+            log.info("ipc:games:regenerateThumbnail", `deleted ${brokenSvg}`);
+          } catch {}
+        }
+        try {
+          const db = getDb();
+          await db.query(`DELETE broken_flash_game:⟨${id}⟩`);
+          log.info("ipc:games:regenerateThumbnail", `cleared broken record for ${id}`);
+        } catch {}
+        try {
+          const db = getDb();
+          await db.query(`UPDATE game:⟨${id}⟩ SET corrupt = false`);
+          log.info("ipc:games:regenerateThumbnail", `cleared corrupt for ${id}`);
+        } catch {}
         clearInFlight(id);
         log.info("ipc:games:regenerateThumbnail", `cleared inFlight for ${id}`);
         const url = await loadFlashThumbnail(game);

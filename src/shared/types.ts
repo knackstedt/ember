@@ -43,6 +43,7 @@ export interface Game {
   execPath?: string;
   coverUrl?: string;
   coverSource?: string;
+  corrupt?: boolean;
   bannerUrl?: string;
   description?: string;
   genres?: string[];

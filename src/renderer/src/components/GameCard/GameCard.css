@@ -385,6 +385,18 @@
   transition: width 0.3s ease;
 }
 
+.gc-broken-overlay {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--card-radius);
+  border: 4px solid #ff0000;
+  background: rgba(255, 0, 0, 0.25);
+  box-shadow: inset 0 0 0 2px rgba(0,0,0,0.6), inset 0 0 48px rgba(255, 0, 0, 0.4);
+  box-sizing: border-box;
+  pointer-events: none;
+  z-index: 10;
+}
+
 /* Title details */
 .gc-details {
   position: absolute;

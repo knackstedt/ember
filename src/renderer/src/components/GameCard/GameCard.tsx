@@ -15,6 +15,7 @@ export interface GameCardProps {
   isFavorite?: boolean;
   isFocused?: boolean;
   isThumbnailPending?: boolean;
+  corrupt?: boolean;
   onSelect?: () => void;
   onFavorite?: () => void;
   progress?: number;
@@ -133,6 +134,7 @@ export const GameCard: React.FC<GameCardProps> = React.memo(({
   isFavorite,
   isFocused,
   isThumbnailPending,
+  corrupt,
   onSelect,
   onFavorite,
   progress,
@@ -442,6 +444,10 @@ export const GameCard: React.FC<GameCardProps> = React.memo(({
                 </div>
               )}
             </div>
+
+            {corrupt && (
+              <div className="gc-broken-overlay" />
+            )}
 
             {/* Title area */}
             <div className="gc-details">

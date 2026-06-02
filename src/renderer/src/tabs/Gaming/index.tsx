@@ -79,6 +79,7 @@ const LazyGameCard: React.FC<{
       isFavorite={game.isFavorite}
       isFocused={index === focusedIndex}
       isThumbnailPending={pendingThumbnailIds.has(game.id) || regeneratingIds.has(game.id)}
+      corrupt={game.corrupt}
       onSelect={onSelect}
       onFavorite={onFavorite}
     />

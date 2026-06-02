@@ -407,7 +407,13 @@ class ScreenshotQueue {
       win.webContents.on("render-process-gone", (event, details) => {
         log.error("flash:renderer:crashed", `reason=${details.reason}, exitCode=${details.exitCode}`);
         cleanup();
-        resolveOnce(undefined, "procedural-crash");
+        const brokenUrl = generateBrokenThumbnail(id, "CRASHED", "RENDERER GONE");
+        if (brokenUrl) {
+          recordBrokenFlashGame(game, `render-process-gone: ${details.reason}`);
+          resolveOnce(brokenUrl, "broken");
+        } else {
+          resolveOnce(undefined, "procedural-crash");
+        }
       });
 
       const targetId = win.webContents.id;
@@ -433,7 +439,13 @@ class ScreenshotQueue {
           })
           .catch((err) => {
             log.error("flash:screenshot", `capturePage failed for "${game.title}" (${id}): ${err}`);
-            resolveOnce(undefined, "procedural-capture-error");
+            const brokenUrl = generateBrokenThumbnail(id, "CAPTURE FAIL", "SCREENSHOT ERROR");
+            if (brokenUrl) {
+              recordBrokenFlashGame(game, `capturePage failed: ${err}`);
+              resolveOnce(brokenUrl, "broken");
+            } else {
+              resolveOnce(undefined, "procedural-capture-error");
+            }
           });
       };
 
@@ -441,7 +453,16 @@ class ScreenshotQueue {
         if (event.sender.id !== targetId) return;
         log.error("flash:screenshot", `Ruffle IPC error for "${game.title}" (${id}): ${_err}`);
         cleanup();
-        resolveOnce(undefined, "procedural-ruffle-error");
+        const errLower = _err.toLowerCase();
+        const slug = errLower.includes("buffer") ? "LOAD FAIL" : errLower.includes("movie") ? "LOAD FAIL" : "BROKEN";
+        const subtext = errLower.includes("buffer") ? "BUFFER ERROR" : "FLASH ERROR";
+        const brokenUrl = generateBrokenThumbnail(id, slug, subtext);
+        if (brokenUrl) {
+          recordBrokenFlashGame(game, _err);
+          resolveOnce(brokenUrl, "broken");
+        } else {
+          resolveOnce(undefined, "procedural-ruffle-error");
+        }
       };
 
       const onLog = (event: Electron.IpcMainEvent, msg: string) => {
@@ -465,14 +486,26 @@ class ScreenshotQueue {
         .catch((err) => {
           log.error("flash:screenshot", `window load failed for "${game.title}" (${id}): ${err}`);
           cleanup();
-          resolveOnce(undefined, "procedural-load-error");
+          const brokenUrl = generateBrokenThumbnail(id, "LOAD FAIL", "WINDOW ERROR");
+          if (brokenUrl) {
+            recordBrokenFlashGame(game, `window load failed: ${err}`);
+            resolveOnce(brokenUrl, "broken");
+          } else {
+            resolveOnce(undefined, "procedural-load-error");
+          }
         });
 
       setTimeout(() => {
         if (!resolved) {
           log.warn("flash:screenshot", `timeout for "${game.title}" (${id}) after ${config.timeoutMs}ms, giving up`);
           cleanup();
-          resolveOnce(undefined, "procedural-timeout");
+          const brokenUrl = generateBrokenThumbnail(id, "TIMEOUT", "NO RESPONSE");
+          if (brokenUrl) {
+            recordBrokenFlashGame(game, `timeout after ${config.timeoutMs}ms`);
+            resolveOnce(brokenUrl, "broken");
+          } else {
+            resolveOnce(undefined, "procedural-timeout");
+          }
         }
       }, config.timeoutMs);
     });
@@ -493,6 +526,8 @@ function coverExistsOnDisk(id: string): string | undefined {
   }
   const svg = join(generatedDir, `${id}.svg`);
   if (existsSync(svg)) return `ember://covers/flash/generated/${id}.svg`;
+  const broken = join(generatedDir, `${id}-broken.svg`);
+  if (existsSync(broken)) return `ember://covers/flash/generated/${id}-broken.svg`;
   return undefined;
 }
 
@@ -584,17 +619,100 @@ export function generateProceduralThumbnail(
 }
 
 /* ------------------------------------------------------------------ */
+/*  6. Broken thumbnail (Pixel Graveyard style)                        */
+/* ------------------------------------------------------------------ */
+
+function buildBrokenSVG(slug: string, subtext: string): string {
+  const safeSlug = slug.slice(0, 14).toUpperCase();
+  const safeSub = subtext.slice(0, 20).toUpperCase();
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <filter id="noise">
+      <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="4" stitchTiles="stitch"/>
+      <feColorMatrix type="saturate" values="0"/>
+    </filter>
+    <radialGradient id="vignette" cx="50%" cy="50%" r="70%">
+      <stop offset="0%" stop-color="black" stop-opacity="0"/>
+      <stop offset="100%" stop-color="black" stop-opacity="0.82"/>
+    </radialGradient>
+    <pattern id="scan" x="0" y="0" width="512" height="6" patternUnits="userSpaceOnUse">
+      <rect width="512" height="2" fill="black" fill-opacity="0.22"/>
+    </pattern>
+  </defs>
+  <rect width="512" height="512" fill="#1a0505"/>
+  <rect width="512" height="512" filter="url(#noise)" fill="#aa5555" opacity="0.9"/>
+  <rect width="512" height="512" fill="url(#scan)"/>
+  <rect width="512" height="512" fill="url(#vignette)"/>
+
+  <!-- Warning triangle -->
+  <g opacity="0.85">
+    <polygon points="256,55 328,180 184,180" fill="none" stroke="#ff3333" stroke-width="6" stroke-linejoin="round"/>
+    <line x1="256" y1="105" x2="256" y2="145" stroke="#ff3333" stroke-width="8" stroke-linecap="round"/>
+    <circle cx="256" cy="162" r="5" fill="#ff3333"/>
+  </g>
+
+  <text x="256" y="310" text-anchor="middle" fill="#ff3333" font-size="32" font-weight="bold" font-family="'Courier New',monospace" letter-spacing="6">${safeSlug}</text>
+  <line x1="80" y1="330" x2="432" y2="330" stroke="#ff3333" stroke-width="1.5" opacity="0.3"/>
+  <text x="256" y="360" text-anchor="middle" fill="#ff3333" font-size="18" font-family="'Courier New',monospace" letter-spacing="2" opacity="0.55">${safeSub}</text>
+  <text x="256" y="480" text-anchor="middle" fill="#ff3333" font-size="14" font-family="'Courier New',monospace" letter-spacing="2" opacity="0.3">0xDEAD · FLASH ERROR</text>
+</svg>`;
+}
+
+export function generateBrokenThumbnail(
+  id: string,
+  slug: string,
+  subtext: string,
+): string | undefined {
+  const dest = join(generatedDir, `${id}-broken.svg`);
+  if (existsSync(dest)) {
+    return `ember://covers/flash/generated/${id}-broken.svg`;
+  }
+  try {
+    const svg = buildBrokenSVG(slug, subtext);
+    writeFileSync(dest, svg);
+    return `ember://covers/flash/generated/${id}-broken.svg`;
+  } catch (err) {
+    log.error("flash:broken", String(err));
+    return undefined;
+  }
+}
+
+async function recordBrokenFlashGame(
+  game: Game,
+  reason: string,
+): Promise<void> {
+  try {
+    const db = getDb();
+    await db.query(`UPSERT broken_flash_game:⟨${game.id}⟩ CONTENT $data`, {
+      data: {
+        id: game.id,
+        gameId: game.id,
+        title: game.title,
+        romPath: game.romPath ?? "",
+        reason,
+        detectedAt: Date.now(),
+      },
+    });
+  } catch (err) {
+    log.error("flash:broken", `Failed to record broken game: ${err}`);
+  }
+}
+
+/* ------------------------------------------------------------------ */
 /*  Orchestrator                                                       */
 /* ------------------------------------------------------------------ */
 
 async function updateGameCover(id: string, url: string, source?: string): Promise<void> {
+  const broken = source === "broken";
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
       const db = getDb();
       if (source) {
-        await db.query(`UPDATE game:⟨${id}⟩ SET coverUrl = $url, coverSource = $source`, { url, source });
+        await db.query(`UPDATE game:⟨${id}⟩ SET coverUrl = $url, coverSource = $source, corrupt = $broken`, { url, source, broken });
       } else {
-        await db.query(`UPDATE game:⟨${id}⟩ SET coverUrl = $url`, { url });
+        await db.query(`UPDATE game:⟨${id}⟩ SET coverUrl = $url, corrupt = $broken`, { url, broken });
       }
       return;
     } catch (err: any) {
@@ -633,7 +751,8 @@ export async function loadFlashThumbnail(
     // Check if already on disk from a previous run
     const cached = coverExistsOnDisk(id);
     if (cached) {
-      await updateGameCover(id, cached, "cached");
+      const source = cached.includes("-broken.svg") ? "broken" : "cached";
+      await updateGameCover(id, cached, source);
       return cached;
     }
 

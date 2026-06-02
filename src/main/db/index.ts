@@ -83,6 +83,7 @@ async function runMigrations(db: Surreal): Promise<void> {
     DEFINE FIELD IF NOT EXISTS execPath ON game TYPE option<string>;
     DEFINE FIELD IF NOT EXISTS coverUrl ON game TYPE option<string>;
     DEFINE FIELD IF NOT EXISTS coverSource ON game TYPE option<string>;
+    DEFINE FIELD IF NOT EXISTS corrupt ON game TYPE option<bool>;
     DEFINE FIELD IF NOT EXISTS bannerUrl ON game TYPE option<string>;
     DEFINE FIELD IF NOT EXISTS description ON game TYPE option<string>;
     DEFINE FIELD IF NOT EXISTS genres ON game TYPE option<array<string>>;
@@ -160,5 +161,14 @@ async function runMigrations(db: Surreal): Promise<void> {
     DEFINE FIELD IF NOT EXISTS inputCode ON controller_mapping TYPE string;
     DEFINE FIELD IF NOT EXISTS action ON controller_mapping TYPE string;
     DEFINE INDEX IF NOT EXISTS mapping_unique ON controller_mapping FIELDS deviceId, inputCode UNIQUE;
+
+    DEFINE TABLE IF NOT EXISTS broken_flash_game SCHEMAFULL;
+    DEFINE FIELD IF NOT EXISTS id ON broken_flash_game TYPE string;
+    DEFINE FIELD IF NOT EXISTS gameId ON broken_flash_game TYPE string;
+    DEFINE FIELD IF NOT EXISTS title ON broken_flash_game TYPE string;
+    DEFINE FIELD IF NOT EXISTS romPath ON broken_flash_game TYPE string;
+    DEFINE FIELD IF NOT EXISTS reason ON broken_flash_game TYPE string;
+    DEFINE FIELD IF NOT EXISTS detectedAt ON broken_flash_game TYPE int;
+    DEFINE INDEX IF NOT EXISTS broken_game_id ON broken_flash_game FIELDS gameId UNIQUE;
   `);
 }
