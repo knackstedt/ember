@@ -50,6 +50,8 @@ export const IPC_CHANNELS = {
     pickCoverImage: "music:pickCoverImage",
     loadThumbnail: "music:loadThumbnail",
     artistThumbnail: "music:artistThumbnail",
+    enrich: "music:enrich",
+    enrichBatch: "music:enrichBatch",
   },
   tv: {
     scan: "tv:scan",

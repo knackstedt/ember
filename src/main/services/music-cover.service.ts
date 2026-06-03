@@ -381,26 +381,50 @@ export async function searchCoverArt(
   const query = parts.join(" AND ");
 
   try {
+    // ── MusicBrainz release search → Cover Art Archive ──────────────
     const searchUrl = `https://musicbrainz.org/ws/2/release/?query=${encodeURIComponent(query)}&fmt=json`;
     const searchRes = await throttledMbFetch(searchUrl, {
       headers: { "User-Agent": "HTPC-App/0.1.0" },
     });
-    if (!searchRes.ok) return undefined;
-    const data = (await searchRes.json()) as { releases?: Array<{ id: string; "release-group"?: { id?: string } }> };
-    const release = data.releases?.[0];
-    if (!release?.id) return undefined;
+    if (searchRes.ok) {
+      const data = (await searchRes.json()) as { releases?: Array<{ id: string; "release-group"?: { id?: string } }> };
+      const release = data.releases?.[0];
+      if (release?.id) {
+        // Try 500px first, then 250px
+        for (const size of [500, 250] as const) {
+          const caaUrl = `https://coverartarchive.org/release/${release.id}/front-${size}`;
+          const head = await throttledMbFetch(caaUrl, { method: "HEAD" });
+          if (head.ok) return caaUrl;
+        }
 
-    // Check Cover Art Archive for this release
-    const caaUrl = `https://coverartarchive.org/release/${release.id}/front-250`;
-    const head = await throttledMbFetch(caaUrl, { method: "HEAD" });
-    if (head.ok) return caaUrl;
+        // Fallback to release-group front cover
+        const rgId = release["release-group"]?.id;
+        if (rgId) {
+          for (const size of [500, 250] as const) {
+            const rgUrl = `https://coverartarchive.org/release-group/${rgId}/front-${size}`;
+            const rgHead = await throttledMbFetch(rgUrl, { method: "HEAD" });
+            if (rgHead.ok) return rgUrl;
+          }
+        }
+      }
+    }
 
-    // Fallback to release-group front cover
-    const rgId = release["release-group"]?.id;
-    if (rgId) {
-      const rgUrl = `https://coverartarchive.org/release-group/${rgId}/front-250`;
-      const rgHead = await throttledMbFetch(rgUrl, { method: "HEAD" });
-      if (rgHead.ok) return rgUrl;
+    // ── TheAudioDB album art fallback ───────────────────────────────
+    if (artist && album) {
+      try {
+        const tadbUrl = `https://www.theaudiodb.com/api/v1/json/2/searchalbum.php?s=${encodeURIComponent(artist)}&a=${encodeURIComponent(album)}`;
+        const tadbRes = await fetch(tadbUrl, {
+          headers: { "User-Agent": "HTPC-App/0.1.0" },
+        });
+        if (tadbRes.ok) {
+          const tadbData = (await tadbRes.json()) as { album?: Array<{ strAlbumThumbHQ?: string; strAlbumThumb?: string }> | null };
+          const tadbAlbum = tadbData.album?.[0];
+          const tadbThumb = tadbAlbum?.strAlbumThumbHQ || tadbAlbum?.strAlbumThumb;
+          if (tadbThumb) return tadbThumb;
+        }
+      } catch {
+        // TheAudioDB fallback failed; continue
+      }
     }
 
     return undefined;
@@ -518,7 +542,7 @@ export async function pickCoverImage(
 }
 
 /* ------------------------------------------------------------------ */
-/*  Online artist thumbnail (Deezer API — no key required)            */
+/*  Online artist thumbnail (Deezer + TheAudioDB fallback)            */
 /* ------------------------------------------------------------------ */
 
 const artistInFlight = new Set<string>();
@@ -536,25 +560,53 @@ export async function fetchArtistThumbnail(
   artistInFlight.add(safeName);
 
   try {
-    const searchUrl = `https://api.deezer.com/search/artist?q=${encodeURIComponent(artist)}&limit=1`;
-    const res = await throttledDeezerFetch(searchUrl, {
-      headers: { "User-Agent": "HTPC-App/0.1.0" },
-    });
-    if (!res.ok) return undefined;
-    const data = (await res.json()) as {
-      data?: Array<{
-        picture?: string;
-        picture_big?: string;
-        picture_xl?: string;
-      }>;
-    };
-    const artistData = data.data?.[0];
-    if (!artistData) return undefined;
+    let imageUrl: string | undefined;
 
-    const imageUrl = artistData.picture_xl || artistData.picture_big || artistData.picture;
+    // Try Deezer first (usually fastest, no key required)
+    try {
+      const searchUrl = `https://api.deezer.com/search/artist?q=${encodeURIComponent(artist)}&limit=1`;
+      const res = await throttledDeezerFetch(searchUrl, {
+        headers: { "User-Agent": "HTPC-App/0.1.0" },
+      });
+      if (res.ok) {
+        const data = (await res.json()) as {
+          data?: Array<{
+            picture?: string;
+            picture_big?: string;
+            picture_xl?: string;
+          }>;
+        };
+        const artistData = data.data?.[0];
+        imageUrl = artistData?.picture_xl || artistData?.picture_big || artistData?.picture || undefined;
+      }
+    } catch {
+      // Deezer failed, try TheAudioDB
+    }
+
+    // Fallback to TheAudioDB artist thumbnail
+    if (!imageUrl) {
+      try {
+        const tadbUrl = `https://www.theaudiodb.com/api/v1/json/2/search.php?s=${encodeURIComponent(artist)}`;
+        const tadbRes = await fetch(tadbUrl, {
+          headers: { "User-Agent": "HTPC-App/0.1.0" },
+        });
+        if (tadbRes.ok) {
+          const tadbData = (await tadbRes.json()) as {
+            artists?: Array<{ strArtistThumb?: string; strArtistWideThumb?: string }> | null;
+          };
+          const tadbArtist = tadbData.artists?.[0];
+          imageUrl = tadbArtist?.strArtistThumb || tadbArtist?.strArtistWideThumb || undefined;
+        }
+      } catch {
+        // TheAudioDB fallback also failed
+      }
+    }
+
     if (!imageUrl) return undefined;
 
-    const imageRes = await throttledDeezerFetch(imageUrl);
+    const imageRes = await fetch(imageUrl, {
+      headers: { "User-Agent": "HTPC-App/0.1.0" },
+    });
     if (!imageRes.ok) return undefined;
     const buffer = Buffer.from(await imageRes.arrayBuffer());
     writeFileSync(dest, buffer);

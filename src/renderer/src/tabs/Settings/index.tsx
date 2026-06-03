@@ -691,6 +691,13 @@ export const SettingsTab: React.FC = () => {
             placeholder="Optional"
             type="password"
           />
+          <Field
+            label="TheAudioDB API Key"
+            value={settings.theaudiodbApiKey ?? ""}
+            onChange={(v) => update({ theaudiodbApiKey: v })}
+            placeholder="Optional (uses free tier by default)"
+            type="password"
+          />
         </section>
 
         <section className="flex flex-col gap-2">
