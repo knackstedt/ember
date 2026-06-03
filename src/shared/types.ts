@@ -64,6 +64,10 @@ export interface Game {
   hidden?: boolean;
 }
 
+export interface GameEmulatorConfig {
+  shader?: string;
+}
+
 export interface Movie {
   id: string;
   title: string;
@@ -285,6 +289,8 @@ export interface AppSettings {
   flashSettings?: FlashSettings;
   disabledTabs: TabId[];
   dailyBackground: DailyBackgroundSettings;
+  defaultEmulatorShader?: string;
+  emulatorShaders?: Partial<Record<GamePlatform, string>>;
 }
 
 export interface PluginManifest {
@@ -313,6 +319,8 @@ export type IpcChannel =
   | "games:launch"
   | "games:favorite"
   | "games:tag"
+  | "games:emulatorConfig:get"
+  | "games:emulatorConfig:set"
   | "movies:scan"
   | "movies:list"
   | "movies:launch"

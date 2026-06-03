@@ -9,6 +9,7 @@ import {
   FlashSettings,
   TabId,
   DailyBackgroundSource,
+  GamePlatform,
 } from "../../../../shared/types";
 
 const DEFAULT_FLASH_SETTINGS: FlashSettings = {
@@ -702,6 +703,87 @@ export const SettingsTab: React.FC = () => {
                 Coming Soon
               </span>
             </div>
+          </div>
+        </section>
+
+        <section className="flex flex-col gap-4">
+          <h2
+            className="text-lg font-semibold"
+            style={{ color: "var(--color-text)" }}
+          >
+            Emulators
+          </h2>
+          <div className="flex flex-col gap-3">
+            <div>
+              <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--color-text-dim)" }}>
+                Default Shader (Global)
+              </label>
+              <select
+                value={settings.defaultEmulatorShader ?? ""}
+                onChange={(e) => update({ defaultEmulatorShader: e.target.value })}
+                className="w-full text-sm px-2 py-1.5 rounded"
+                style={{
+                  background: "var(--color-surface-raised)",
+                  border: "1px solid var(--color-border)",
+                  color: "var(--color-text)",
+                  outline: "none",
+                }}
+              >
+                <option value="">None</option>
+                <option value="2xSal.glsl">2xSal</option>
+                <option value="4xBR.glsl">4xBR</option>
+                <option value="6xBRZ.glsl">6xBRZ</option>
+                <option value="crt-easymode.glsl">CRT Easymode</option>
+                <option value="crt-geom.glsl">CRT Geom</option>
+                <option value="dot.glsl">Dot</option>
+                <option value="lcd.glsl">LCD</option>
+                <option value="ntsc.glsl">NTSC</option>
+                <option value="sharp-bilinear.glsl">Sharp Bilinear</option>
+                <option value="supereagle.glsl">Super Eagle</option>
+                <option value="xbrz.glsl">xBRZ</option>
+              </select>
+            </div>
+            {(
+              [
+                ["nes", "NES"],
+                ["snes", "SNES"],
+                ["gb", "Game Boy"],
+                ["gba", "GBA"],
+              ] as [GamePlatform, string][]
+            ).map(([platform, label]) => (
+              <div key={platform}>
+                <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--color-text-dim)" }}>
+                  {label} Default Shader
+                </label>
+                <select
+                  value={settings.emulatorShaders?.[platform] ?? ""}
+                  onChange={(e) => {
+                    const next = { ...settings.emulatorShaders, [platform]: e.target.value || undefined };
+                    update({ emulatorShaders: next });
+                  }}
+                  className="w-full text-sm px-2 py-1.5 rounded"
+                  style={{
+                    background: "var(--color-surface-raised)",
+                    border: "1px solid var(--color-border)",
+                    color: "var(--color-text)",
+                    outline: "none",
+                  }}
+                >
+                  <option value="">Inherit (use global default)</option>
+                  <option value="2xSal.glsl">2xSal</option>
+                  <option value="4xBR.glsl">4xBR</option>
+                  <option value="6xBRZ.glsl">6xBRZ</option>
+                  <option value="crt-easymode.glsl">CRT Easymode</option>
+                  <option value="crt-geom.glsl">CRT Geom</option>
+                  <option value="dot.glsl">Dot</option>
+                  <option value="lcd.glsl">LCD</option>
+                  <option value="ntsc.glsl">NTSC</option>
+                  <option value="sharp-bilinear.glsl">Sharp Bilinear</option>
+                  <option value="supereagle.glsl">Super Eagle</option>
+                  <option value="xbrz.glsl">xBRZ</option>
+                </select>
+              </div>
+            ))}
           </div>
         </section>
 

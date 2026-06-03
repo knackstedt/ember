@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { Game, GamePlatform } from "../../../shared/types";
+import { Game, GamePlatform, GameEmulatorConfig } from "../../../shared/types";
 
 interface GamesState {
   games: Game[];
@@ -18,6 +18,8 @@ interface GamesState {
   hide: (id: string) => Promise<void>;
   loadThumbnail: (id: string) => Promise<void>;
   regenerateThumbnail: (id: string) => Promise<void>;
+  getEmulatorConfig: (id: string) => Promise<GameEmulatorConfig>;
+  setEmulatorConfig: (id: string, config: GameEmulatorConfig) => Promise<void>;
   filtered: () => Game[];
 }
 
@@ -134,6 +136,14 @@ export const useGamesStore = create<GamesState>((set, get) => ({
         return { regeneratingIds: next };
       });
     }
+  },
+
+  getEmulatorConfig: async (id) => {
+    return window.htpc.games.emulatorConfig.get(id);
+  },
+
+  setEmulatorConfig: async (id, config) => {
+    await window.htpc.games.emulatorConfig.set(id, config);
   },
 
   filtered: () => {

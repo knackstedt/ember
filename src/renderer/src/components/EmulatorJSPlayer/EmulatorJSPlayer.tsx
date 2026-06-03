@@ -19,7 +19,7 @@ function platformToCore(platform: GamePlatform): string {
 }
 
 export const EmulatorJSPlayer: React.FC = () => {
-  const { open, romPath, title, platform, close } = useEmulatorjsPlayerStore();
+  const { open, romPath, title, platform, shader, close } = useEmulatorjsPlayerStore();
   const containerRef = useRef<HTMLDivElement>(null);
   const initedRef = useRef(false);
   const romUrlRef = useRef("");
@@ -44,6 +44,9 @@ export const EmulatorJSPlayer: React.FC = () => {
       (window as any).EJS_pathtodata = "/emulatorjs/";
       (window as any).EJS_startOnLoaded = true;
       (window as any).EJS_gameID = romPath;
+      if (shader) {
+        (window as any).EJS_Shader = shader;
+      }
 
       // Inject loader script
       const script = document.createElement("script");
@@ -106,6 +109,7 @@ export const EmulatorJSPlayer: React.FC = () => {
       delete (window as any).EJS_gameManager;
       delete (window as any).EJS_gameID;
       delete (window as any).EJS_adBlocked;
+      delete (window as any).EJS_Shader;
 
       if (container) {
         container.innerHTML = "";

@@ -14,6 +14,8 @@ const DEFAULTS: AppSettings = {
   hardwareAcceleration: true,
   disabledTabs: [],
   dailyBackground: { enabled: false, source: "bing" },
+  defaultEmulatorShader: "",
+  emulatorShaders: {},
 };
 
 export async function getSettings(): Promise<AppSettings> {

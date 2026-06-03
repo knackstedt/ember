@@ -6,7 +6,8 @@ export interface EmulatorJSPlayerStore {
   romPath: string;
   title: string;
   platform: GamePlatform;
-  launch(romPath: string, title: string, platform: GamePlatform): void;
+  shader: string;
+  launch(romPath: string, title: string, platform: GamePlatform, shader?: string): void;
   close(): void;
 }
 
@@ -15,12 +16,13 @@ export const useEmulatorjsPlayerStore = create<EmulatorJSPlayerStore>((set) => (
   romPath: "",
   title: "",
   platform: "snes",
+  shader: "",
 
-  launch(romPath, title, platform) {
-    set({ open: true, romPath, title, platform });
+  launch(romPath, title, platform, shader = "") {
+    set({ open: true, romPath, title, platform, shader });
   },
 
   close() {
-    set({ open: false, romPath: "", title: "", platform: "snes" });
+    set({ open: false, romPath: "", title: "", platform: "snes", shader: "" });
   },
 }));

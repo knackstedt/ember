@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer, shell } from "electron";
 import {
   AppSettings,
   Game,
+  GameEmulatorConfig,
   Movie,
   MusicTrack,
   TVShow,
@@ -41,6 +42,12 @@ const htpc = {
       ipcRenderer.invoke("games:metadata", title, steamAppId),
     hide: (id: string, value: boolean): Promise<void> =>
       ipcRenderer.invoke("games:hide", id, value),
+    emulatorConfig: {
+      get: (id: string): Promise<GameEmulatorConfig> =>
+        ipcRenderer.invoke("games:emulatorConfig:get", id),
+      set: (id: string, config: GameEmulatorConfig): Promise<void> =>
+        ipcRenderer.invoke("games:emulatorConfig:set", id, config),
+    },
     loadThumbnail: (game: Game): Promise<string | null> =>
       ipcRenderer.invoke("games:loadThumbnail", game),
     regenerateThumbnail: (game: Game): Promise<string | null> =>

@@ -170,5 +170,9 @@ async function runMigrations(db: Surreal): Promise<void> {
     DEFINE FIELD IF NOT EXISTS reason ON broken_flash_game TYPE string;
     DEFINE FIELD IF NOT EXISTS detectedAt ON broken_flash_game TYPE int;
     DEFINE INDEX IF NOT EXISTS broken_game_id ON broken_flash_game FIELDS gameId UNIQUE;
+
+    DEFINE TABLE IF NOT EXISTS game_config SCHEMAFULL;
+    DEFINE FIELD IF NOT EXISTS id ON game_config TYPE string;
+    DEFINE FIELD IF NOT EXISTS shader ON game_config TYPE option<string>;
   `);
 }

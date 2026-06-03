@@ -13,7 +13,7 @@ import { GameCard } from "../../components/GameCard/GameCard";
 import { DetailPanel } from "../../components/DetailPanel/DetailPanel";
 import { OskInput } from "../../components/OnScreenKeyboard/OnScreenKeyboard";
 import { RecentlyPlayedRow } from "../../components/RecentlyPlayedRow/RecentlyPlayedRow";
-import { Game, GamePlatform } from "../../../../shared/types";
+import { Game, GamePlatform, GameEmulatorConfig } from "../../../../shared/types";
 import { useGridFocus } from "../../hooks/useGridFocus";
 import { useContextMenu } from "../../hooks/useContextMenu";
 import { ContextMenuOption } from "../../components/ContextMenu/ContextMenu";
@@ -22,6 +22,7 @@ import { useJsnesPlayerStore } from "../../store/jsnesPlayer.store";
 import { useEmulatorjsPlayerStore } from "../../store/emulatorjsPlayer.store";
 import { useV86PlayerStore } from "../../store/v86Player.store";
 import { useToastStore } from "../../store/toast.store";
+import { useSettingsStore } from "../../store/settings.store";
 
 const PLATFORM_FILTERS: ChipFilter<
   GamePlatform | "all" | "couch-coop" | "favorites"
@@ -117,7 +118,23 @@ export const GamingTab: React.FC = () => {
   const regenerateThumbnail = useGamesStore((s) => s.regenerateThumbnail);
   const [selected, setSelected] = useState<Game | null>(null);
   const [columnCount, setColumnCount] = useState(6);
+  const [selectedEmulatorConfig, setSelectedEmulatorConfig] = useState<GameEmulatorConfig>({});
   const gridRef = useRef<VirtualGridHandle>(null);
+
+  const setEmulatorConfig = useGamesStore((s) => s.setEmulatorConfig);
+  const getEmulatorConfig = useGamesStore((s) => s.getEmulatorConfig);
+
+  useEffect(() => {
+    if (!selected) {
+      setSelectedEmulatorConfig({});
+      return;
+    }
+    if (selected.platform === "nes" || selected.platform === "snes" || selected.platform === "gb" || selected.platform === "gba") {
+      getEmulatorConfig(selected.id).then(setSelectedEmulatorConfig).catch(() => setSelectedEmulatorConfig({}));
+    } else {
+      setSelectedEmulatorConfig({});
+    }
+  }, [selected, getEmulatorConfig]);
 
   useEffect(() => {
     load();
@@ -214,6 +231,15 @@ export const GamingTab: React.FC = () => {
 
   const badge = selected ? gameBadge(selected) : undefined;
 
+  const resolveShader = async (game: Game): Promise<string> => {
+    const perGame = await getEmulatorConfig(game.id);
+    if (perGame.shader) return perGame.shader;
+    const settings = useSettingsStore.getState().settings;
+    const platformShader = settings?.emulatorShaders?.[game.platform];
+    if (platformShader) return platformShader;
+    return settings?.defaultEmulatorShader ?? "";
+  };
+
   const launch = async (game: Game): Promise<void> => {
     if (game.platform === "flash" && game.romPath) {
       useFlashPlayerStore.getState().launch(game.romPath, game.title);
@@ -224,7 +250,8 @@ export const GamingTab: React.FC = () => {
       return;
     }
     if ((game.platform === "snes" || game.platform === "gb" || game.platform === "gba") && game.romPath) {
-      useEmulatorjsPlayerStore.getState().launch(game.romPath, game.title, game.platform);
+      const shader = await resolveShader(game);
+      useEmulatorjsPlayerStore.getState().launch(game.romPath, game.title, game.platform, shader);
       return;
     }
     if (game.platform === "dos" && game.romPath) {
@@ -432,6 +459,45 @@ export const GamingTab: React.FC = () => {
                     ? `${Math.floor(selected.playTime / 60)}h ${selected.playTime % 60}m`
                     : `${selected.playTime}m`}
                 </span>
+              </div>
+            )}
+            {(selected.platform === "nes" || selected.platform === "snes" || selected.platform === "gb" || selected.platform === "gba") && (
+              <div>
+                <div
+                  className="text-xs font-semibold uppercase tracking-wide mb-2"
+                  style={{ color: "var(--color-text-dim)" }}
+                >
+                  Emulator Shader
+                </div>
+                <select
+                  value={selectedEmulatorConfig.shader ?? ""}
+                  onChange={(e) => {
+                    const shader = e.target.value;
+                    const next = { ...selectedEmulatorConfig, shader: shader || undefined };
+                    setSelectedEmulatorConfig(next);
+                    void setEmulatorConfig(selected.id, next);
+                  }}
+                  className="w-full text-sm px-2 py-1.5 rounded"
+                  style={{
+                    background: "var(--color-surface-raised)",
+                    border: "1px solid var(--color-border)",
+                    color: "var(--color-text)",
+                    outline: "none",
+                  }}
+                >
+                  <option value="">Inherit (use emulator/global default)</option>
+                  <option value="2xSal.glsl">2xSal</option>
+                  <option value="4xBR.glsl">4xBR</option>
+                  <option value="6xBRZ.glsl">6xBRZ</option>
+                  <option value="crt-easymode.glsl">CRT Easymode</option>
+                  <option value="crt-geom.glsl">CRT Geom</option>
+                  <option value="dot.glsl">Dot</option>
+                  <option value="lcd.glsl">LCD</option>
+                  <option value="ntsc.glsl">NTSC</option>
+                  <option value="sharp-bilinear.glsl">Sharp Bilinear</option>
+                  <option value="supereagle.glsl">Super Eagle</option>
+                  <option value="xbrz.glsl">xBRZ</option>
+                </select>
               </div>
             )}
           </div>

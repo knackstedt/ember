@@ -41,6 +41,7 @@ import {
   MusicTrack,
   TVShow,
   AppSettings,
+  GameEmulatorConfig,
 } from "../../shared/types";
 import { createLogger } from "../util/logger";
 
@@ -119,6 +120,23 @@ export function registerIpcHandlers(window: BrowserWindow): void {
   ipcMain.handle("games:hide", async (_e, id: string, value: boolean) => {
     const db = getDb();
     await db.query(`UPDATE game:⟨${id}⟩ SET hidden = $value`, { value });
+  });
+
+  ipcMain.handle("games:emulatorConfig:get", async (_e, id: string) => {
+    const db = getDb();
+    const rows = await db.query(
+      "SELECT shader FROM game_config:⟨" + id + "⟩",
+    );
+    const row = ((rows as any[])[0] ?? [])[0];
+    return (row ?? {}) as GameEmulatorConfig;
+  });
+
+  ipcMain.handle("games:emulatorConfig:set", async (_e, id: string, config: GameEmulatorConfig) => {
+    const db = getDb();
+    await db.query(
+      "UPSERT game_config:⟨" + id + "⟩ CONTENT $config",
+      { config },
+    );
   });
 
   ipcMain.handle("games:loadThumbnail", async (_e, game: Game) => {
