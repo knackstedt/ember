@@ -382,6 +382,12 @@ export interface LocalAiConfig {
   model: string;
 }
 
+export interface AiGroup {
+  label: string;
+  itemIds: string[];
+  centerItemId: string;
+}
+
 export type StreamingServiceCategory = "music" | "video";
 
 export interface StreamingService {
@@ -397,6 +403,34 @@ export interface StreamingService {
   enabled: boolean;
   isBuiltin: boolean;
   sortOrder: number;
+}
+
+export type PackageManager = "apt" | "flatpak" | "appimage";
+
+export interface ManagedPackage {
+  id: string;
+  name: string;
+  displayName: string;
+  description?: string;
+  manager: PackageManager;
+  version?: string;
+  installedVersion?: string;
+  isInstalled: boolean;
+  isPinned: boolean;
+  autoUpdate: boolean;
+  category: "core" | "emulator" | "dependency" | "game";
+  platforms?: string[];
+  sourceUrl?: string;
+  installArgs?: string[];
+  installPath?: string;
+}
+
+export interface PackageOperationProgress {
+  packageId: string;
+  operation: "install" | "uninstall" | "update" | "search";
+  status: "pending" | "running" | "success" | "error";
+  message?: string;
+  percent?: number;
 }
 
 export type IpcChannel =
@@ -473,4 +507,13 @@ export type IpcChannel =
   | "streaming:delete"
   | "streaming:setEnabled"
   | "streaming:detectDesktopApp"
-  | "streaming:launch";
+  | "streaming:launch"
+  | "packages:list"
+  | "packages:search"
+  | "packages:install"
+  | "packages:uninstall"
+  | "packages:pin"
+  | "packages:setAutoUpdate"
+  | "packages:checkUpdates"
+  | "packages:progress"
+  | "packages:apt:password";

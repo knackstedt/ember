@@ -21,8 +21,10 @@ import { useCollectionsStore, evaluateSmartFilter, sortByCollection } from "../.
 import { CollectionsBar } from "../../components/CollectionsBar/CollectionsBar";
 import { CollectionManager } from "../../components/CollectionManager/CollectionManager";
 import { useToastStore } from "../../store/toast.store";
+import { AiGroup } from "../../../../shared/types";
+import { DynamicFacetFilters, FacetField } from "../../components/DynamicFacetFilters/DynamicFacetFilters";
 
-type SubTab = "local" | "streaming";
+type SubTab = "local" | "streaming" | "ai-groups";
 
 export const MoviesTab: React.FC = () => {
   const movies = useMoviesStore((s) => s.movies);
@@ -42,13 +44,23 @@ export const MoviesTab: React.FC = () => {
   const regeneratingIds = useMoviesStore((s) => s.regeneratingIds);
   const openVideo = useVideoPlayerStore((s) => s.open);
   const [selected, setSelected] = useState<Movie | null>(null);
-  const [subTab, setSubTab] = useState<SubTab>("local");
+  const [subTab, setSubTab] = useState<SubTab>("ai-groups");
   const [columnCount, setColumnCount] = useState(5);
   const [activeCollectionId, setActiveCollectionId] = useState<string | null>(null);
   const [showCollectionManager, setShowCollectionManager] = useState(false);
   const [collectionItemIds, setCollectionItemIds] = useState<Set<string>>(new Set());
   const [streamingServices, setStreamingServices] = useState<StreamingService[]>([]);
   const gridRef = useRef<VirtualGridHandle>(null);
+
+  const [aiGroups, setAiGroups] = useState<AiGroup[]>([]);
+  const [aiGroupsLoading, setAiGroupsLoading] = useState(false);
+  const [selectedAiGroup, setSelectedAiGroup] = useState<string | null>(null);
+  const aiGroupTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [facetFilters, setFacetFilters] = useState<Record<string, string | null>>({});
+  const applyFacetFilter = (field: string, value: string | null) => {
+    setFacetFilters((prev) => ({ ...prev, [field]: value }));
+  };
 
   const collections = useCollectionsStore((s) => s.collections);
   const loadCollections = useCollectionsStore((s) => s.load);
@@ -90,6 +102,45 @@ export const MoviesTab: React.FC = () => {
     return () => window.removeEventListener("htpc:escape", handler);
   }, []);
 
+  /* Auto-generate AI groups when subTab switches to ai-groups and movies are loaded */
+  useEffect(() => {
+    if (subTab !== "ai-groups" || movies.length === 0) return;
+    if (aiGroups.length > 0) return;
+    setAiGroupsLoading(true);
+    if (aiGroupTimeoutRef.current) clearTimeout(aiGroupTimeoutRef.current);
+
+    window.htpc.localAi
+      .groupItems(
+        movies.map((m) => ({
+          id: m.id,
+          title: m.title,
+          genres: m.genres,
+          tags: m.tags,
+          description: m.description,
+        })),
+        Math.min(6, Math.max(2, Math.floor(movies.length / 8))),
+      )
+      .then((groups) => {
+        setAiGroups(groups);
+        setAiGroupsLoading(false);
+      })
+      .catch(() => {
+        setAiGroupsLoading(false);
+        setSubTab("local");
+      });
+
+    aiGroupTimeoutRef.current = setTimeout(() => {
+      if (aiGroupsLoading) {
+        setAiGroupsLoading(false);
+        setSubTab("local");
+      }
+    }, 15000);
+
+    return () => {
+      if (aiGroupTimeoutRef.current) clearTimeout(aiGroupTimeoutRef.current);
+    };
+  }, [subTab, movies]);
+
   const allGenres = useMemo(
     () => [...new Set(movies.flatMap((m) => m.genres ?? []))].sort(),
     [movies],
@@ -105,8 +156,41 @@ export const MoviesTab: React.FC = () => {
     const result = base.filter((m) => collectionItemIds.has(m.id));
     return sortByCollection<Movie>(result, activeCollection);
   }, [filtered, movies, searchQuery, activeGenre, activeCollectionId, collectionItemIds, activeCollection]);
+
+  const displayItems = useMemo(() => {
+    if (subTab !== "ai-groups" || !selectedAiGroup) return items;
+    const group = aiGroups.find((g) => g.label === selectedAiGroup);
+    if (!group) return items;
+    const ids = new Set(group.itemIds);
+    return items.filter((m) => ids.has(m.id));
+  }, [items, subTab, aiGroups, selectedAiGroup]);
+
+  const facetSourceItems = displayItems;
+
+  const gridItems = useMemo(() => {
+    let r = facetSourceItems;
+    for (const [field, value] of Object.entries(facetFilters)) {
+      if (!value) continue;
+      r = r.filter((movie) => {
+        const raw = movie[field as keyof Movie];
+        if (raw === undefined || raw === null) return false;
+        if (Array.isArray(raw)) return raw.some((v) => String(v).toLowerCase() === value.toLowerCase());
+        return String(raw).toLowerCase() === value.toLowerCase();
+      });
+    }
+    return r;
+  }, [facetSourceItems, facetFilters]);
+
+  const movieFacetFields: FacetField[] = useMemo(() => [
+    { key: "genres", label: "Genre", accessor: (m) => (m as Record<string, unknown>).genres as string[] | undefined, sort: "count", maxValues: 10 },
+    { key: "tags", label: "Tag", accessor: (m) => (m as Record<string, unknown>).tags as string[] | undefined, sort: "count", maxValues: 6 },
+    { key: "releaseYear", label: "Year", accessor: (m) => String((m as Record<string, unknown>).releaseYear ?? ""), maxValues: 8 },
+    { key: "director", label: "Director", accessor: (m) => (m as Record<string, unknown>).director as string | undefined, maxValues: 5 },
+    { key: "rating", label: "Rating", accessor: (m) => String((m as Record<string, unknown>).rating ?? ""), maxValues: 5 },
+  ], []);
+
   const { focusedIndex } = useGridFocus({
-    items,
+    items: gridItems,
     columnCount,
     gridRef,
     onConfirm: (movie) => setSelected(movie),
@@ -217,7 +301,7 @@ export const MoviesTab: React.FC = () => {
     <div className="flex flex-col h-full gap-3 p-4">
       <div className="flex gap-3 items-center flex-shrink-0">
         <div className="flex gap-1">
-          {(["local", "streaming"] as SubTab[]).map((t) => (
+          {(["ai-groups", "local", "streaming"] as SubTab[]).map((t) => (
             <button
               key={t}
               className="px-4 py-1.5 rounded-full text-sm font-medium capitalize transition-colors"
@@ -232,7 +316,7 @@ export const MoviesTab: React.FC = () => {
               }}
               onClick={() => setSubTab(t)}
             >
-              {t}
+              {t === "ai-groups" ? "✨ Groups" : t}
             </button>
           ))}
         </div>
@@ -304,6 +388,17 @@ export const MoviesTab: React.FC = () => {
             className="flex-shrink-0"
           />
 
+          {/* Dynamic metadata facets */}
+          {gridItems.length > 0 && (
+            <DynamicFacetFilters
+              items={facetSourceItems as Record<string, unknown>[]}
+              fields={movieFacetFields}
+              activeFilters={facetFilters}
+              onFilter={applyFacetFilter}
+              className="flex-shrink-0"
+            />
+          )}
+
           {loading ? (
             <div
               className="flex-1 flex items-center justify-center"
@@ -347,7 +442,80 @@ export const MoviesTab: React.FC = () => {
             <div className="flex-1 min-h-0 min-w-0 overflow-hidden">
               <VirtualGrid
                 ref={gridRef}
-                items={items}
+                items={gridItems}
+                minItemWidth={200}
+                onColumnCountChange={setColumnCount}
+                rowHeight={300}
+                renderItem={renderItem}
+              />
+            </div>
+          )}
+        </>
+      )}
+
+      {subTab === "ai-groups" && (
+        <>
+          {aiGroupsLoading && (
+            <div className="flex items-center gap-2 flex-shrink-0" style={{ color: "var(--color-text-dim)" }}>
+              <div className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "var(--color-accent)", borderTopColor: "transparent" }} />
+              <span className="text-xs">Generating smart groups…</span>
+            </div>
+          )}
+          {aiGroups.length > 0 && (
+            <div className="flex gap-2 flex-shrink-0 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+              <motion.button
+                onClick={() => setSelectedAiGroup(null)}
+                className="relative flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors focus:outline-none"
+                style={{
+                  backgroundColor: !selectedAiGroup
+                    ? "var(--color-accent)"
+                    : "var(--color-surface-raised)",
+                  color: !selectedAiGroup ? "var(--color-bg)" : "var(--color-text-dim)",
+                  border: `1px solid ${!selectedAiGroup ? "var(--color-accent)" : "var(--color-border)"}`,
+                }}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                All Groups
+              </motion.button>
+              {aiGroups.map((g, i) => (
+                <motion.button
+                  key={`ai-${g.label}-${i}`}
+                  onClick={() => setSelectedAiGroup(g.label)}
+                  className="relative flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors focus:outline-none"
+                  style={{
+                    backgroundColor: selectedAiGroup === g.label
+                      ? "var(--color-accent)"
+                      : "var(--color-surface-raised)",
+                    color: selectedAiGroup === g.label ? "var(--color-bg)" : "var(--color-text-dim)",
+                    border: `1px solid ${selectedAiGroup === g.label ? "var(--color-accent)" : "var(--color-border)"}`,
+                  }}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  {g.label} ({g.itemIds.length})
+                </motion.button>
+              ))}
+            </div>
+          )}
+          {gridItems.length > 0 && (
+            <DynamicFacetFilters
+              items={facetSourceItems as Record<string, unknown>[]}
+              fields={movieFacetFields}
+              activeFilters={facetFilters}
+              onFilter={applyFacetFilter}
+              className="flex-shrink-0"
+            />
+          )}
+          {gridItems.length === 0 ? (
+            <div className="flex-1 flex items-center justify-center" style={{ color: "var(--color-text-dim)" }}>
+              <p>No movies found.</p>
+            </div>
+          ) : (
+            <div className="flex-1 min-h-0 min-w-0 overflow-hidden">
+              <VirtualGrid
+                ref={gridRef}
+                items={gridItems}
                 minItemWidth={200}
                 onColumnCountChange={setColumnCount}
                 rowHeight={300}

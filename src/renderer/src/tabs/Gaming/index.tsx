@@ -29,6 +29,9 @@ import { useSettingsStore } from "../../store/settings.store";
 import { useCollectionsStore, evaluateSmartFilter, sortByCollection } from "../../store/collections.store";
 import { CollectionsBar } from "../../components/CollectionsBar/CollectionsBar";
 import { CollectionManager } from "../../components/CollectionManager/CollectionManager";
+import { Tooltip } from "../../components/Tooltip/Tooltip";
+import { AiGroup } from "../../../../shared/types";
+import { DynamicFacetFilters, FacetField } from "../../components/DynamicFacetFilters/DynamicFacetFilters";
 
 const PLATFORM_FILTERS: ChipFilter<
   GamePlatform | "all" | "couch-coop" | "favorites"
@@ -71,6 +74,14 @@ const PROTON_COLORS: Record<string, string> = {
   borked: "#ff4444",
 };
 
+function getMissingCoreTooltip(game: Game): string | undefined {
+  if (!LIBRETRO_PLATFORMS.includes(game.platform)) return undefined;
+  if (!game.romPath) return undefined;
+  if (window.htpc.libretro.detectCore(game.romPath) !== null) return undefined;
+  const platformLabel = PLATFORM_FILTERS.find((f) => f.id === game.platform)?.label ?? game.platform;
+  return `No ${platformLabel} emulator cores are installed. Install it in settings.`;
+}
+
 const LazyGameCard: React.FC<{
   game: Game;
   index: number;
@@ -88,6 +99,8 @@ const LazyGameCard: React.FC<{
     }
   }, [game.id, game.platform, game.coverUrl, loadThumbnail]);
 
+  const missingCoreTooltip = useMemo(() => getMissingCoreTooltip(game), [game]);
+
   const b = gameBadge(game);
   return (
     <GameCard
@@ -103,6 +116,7 @@ const LazyGameCard: React.FC<{
       isFocused={index === focusedIndex}
       isThumbnailPending={pendingThumbnailIds.has(game.id) || regeneratingIds.has(game.id)}
       corrupt={game.corrupt}
+      missingCoreTooltip={missingCoreTooltip}
       playTime={game.playTime}
       lastPlayed={game.lastPlayed}
       onSelect={onSelect}
@@ -144,6 +158,18 @@ export const GamingTab: React.FC = () => {
   const [showCollectionManager, setShowCollectionManager] = useState(false);
   const [collectionItemIds, setCollectionItemIds] = useState<Set<string>>(new Set());
   const gridRef = useRef<VirtualGridHandle>(null);
+
+  type ViewMode = "all" | "ai-groups" | "by-platform";
+  const [viewMode, setViewMode] = useState<ViewMode>("ai-groups");
+  const [aiGroups, setAiGroups] = useState<AiGroup[]>([]);
+  const [aiGroupsLoading, setAiGroupsLoading] = useState(false);
+  const [selectedAiGroup, setSelectedAiGroup] = useState<string | null>(null);
+  const aiGroupTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [facetFilters, setFacetFilters] = useState<Record<string, string | null>>({});
+  const applyFacetFilter = (field: string, value: string | null) => {
+    setFacetFilters((prev) => ({ ...prev, [field]: value }));
+  };
 
   const collections = useCollectionsStore((s) => s.collections);
   const loadCollections = useCollectionsStore((s) => s.load);
@@ -195,6 +221,47 @@ export const GamingTab: React.FC = () => {
     return () => window.removeEventListener("htpc:escape", handler);
   }, []);
 
+  /* Auto-generate AI groups when viewMode switches to ai-groups and games are loaded */
+  useEffect(() => {
+    if (viewMode !== "ai-groups" || games.length === 0) return;
+    if (aiGroups.length > 0) return; // already computed
+    setAiGroupsLoading(true);
+    if (aiGroupTimeoutRef.current) clearTimeout(aiGroupTimeoutRef.current);
+
+    window.htpc.localAi
+      .groupItems(
+        games.map((g) => ({
+          id: g.id,
+          title: g.title,
+          genres: g.genres,
+          tags: g.tags,
+          description: g.description,
+          platform: g.platform,
+        })),
+        Math.min(6, Math.max(2, Math.floor(games.length / 8))),
+      )
+      .then((groups) => {
+        setAiGroups(groups);
+        setAiGroupsLoading(false);
+      })
+      .catch(() => {
+        setAiGroupsLoading(false);
+        setViewMode("all");
+      });
+
+    // Fallback: if AI takes too long, switch to All view
+    aiGroupTimeoutRef.current = setTimeout(() => {
+      if (aiGroupsLoading) {
+        setAiGroupsLoading(false);
+        setViewMode("all");
+      }
+    }, 15000);
+
+    return () => {
+      if (aiGroupTimeoutRef.current) clearTimeout(aiGroupTimeoutRef.current);
+    };
+  }, [viewMode, games]);
+
   const activeCollection = useMemo(
     () => collections.find((c) => c.id === activeCollectionId),
     [collections, activeCollectionId],
@@ -206,8 +273,41 @@ export const GamingTab: React.FC = () => {
     const result = base.filter((g) => collectionItemIds.has(g.id));
     return sortByCollection<Game>(result, activeCollection);
   }, [filtered, games, activeFilter, searchQuery, activeCollectionId, collectionItemIds, activeCollection]);
+
+  const displayItems = useMemo(() => {
+    if (viewMode !== "ai-groups" || !selectedAiGroup) return items;
+    const group = aiGroups.find((g) => g.label === selectedAiGroup);
+    if (!group) return items;
+    const ids = new Set(group.itemIds);
+    return items.filter((g) => ids.has(g.id));
+  }, [items, viewMode, aiGroups, selectedAiGroup]);
+
+  const facetSourceItems = displayItems;
+
+  const gridItems = useMemo(() => {
+    let r = facetSourceItems;
+    for (const [field, value] of Object.entries(facetFilters)) {
+      if (!value) continue;
+      r = r.filter((game) => {
+        const raw = game[field as keyof Game];
+        if (raw === undefined || raw === null) return false;
+        if (Array.isArray(raw)) return raw.some((v) => String(v).toLowerCase() === value.toLowerCase());
+        return String(raw).toLowerCase() === value.toLowerCase();
+      });
+    }
+    return r;
+  }, [facetSourceItems, facetFilters]);
+
+  const gameFacetFields: FacetField[] = useMemo(() => [
+    { key: "genres", label: "Genre", accessor: (g) => (g as Record<string, unknown>).genres as string[] | undefined, sort: "count", maxValues: 8 },
+    { key: "tags", label: "Tag", accessor: (g) => (g as Record<string, unknown>).tags as string[] | undefined, sort: "count", maxValues: 6 },
+    { key: "platform", label: "Platform", accessor: (g) => (g as Record<string, unknown>).platform as string | undefined, sort: "count", maxValues: 10 },
+    { key: "releaseYear", label: "Year", accessor: (g) => String((g as Record<string, unknown>).releaseYear ?? ""), maxValues: 8 },
+    { key: "developer", label: "Developer", accessor: (g) => (g as Record<string, unknown>).developer as string | undefined, maxValues: 6 },
+  ], []);
+
   const { focusedIndex } = useGridFocus({
-    items,
+    items: gridItems,
     columnCount,
     gridRef,
     onConfirm: (game) => setSelected(game),
@@ -407,7 +507,7 @@ export const GamingTab: React.FC = () => {
         }))}
         onLaunch={(id) => {
           const game = games.find((g) => g.id === id);
-          if (game) launch(game);
+          if (game && !getMissingCoreTooltip(game)) launch(game);
         }}
       />
 
@@ -419,15 +519,101 @@ export const GamingTab: React.FC = () => {
         className="flex-shrink-0"
       />
 
-      <ChipFilters
-        filters={PLATFORM_FILTERS}
-        active={activeFilter}
-        onSelect={(f) => {
-          setActiveCollectionId(null);
-          setFilter(f);
-        }}
-        className="flex-shrink-0"
-      />
+      {/* View-mode sub-tabs */}
+      <div className="flex gap-2 flex-shrink-0 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+        {(["all", "ai-groups", "by-platform"] as ViewMode[]).map((m) => (
+          <motion.button
+            key={m}
+            onClick={() => {
+              setViewMode(m);
+              setSelectedAiGroup(null);
+            }}
+            className="relative flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-colors focus:outline-none"
+            style={{
+              backgroundColor: viewMode === m
+                ? "var(--color-accent)"
+                : "var(--color-surface-raised)",
+              color: viewMode === m ? "var(--color-bg)" : "var(--color-text-dim)",
+              border: `1px solid ${viewMode === m ? "var(--color-accent)" : "var(--color-border)"}`,
+              boxShadow: viewMode === m ? "var(--shadow-glow)" : "none",
+            }}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            {m === "all" ? "All" : m === "ai-groups" ? "✨ Groups" : "By Platform"}
+          </motion.button>
+        ))}
+      </div>
+
+      {/* AI group chips */}
+      {viewMode === "ai-groups" && aiGroups.length > 0 && (
+        <div className="flex gap-2 flex-shrink-0 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+          <motion.button
+            onClick={() => setSelectedAiGroup(null)}
+            className="relative flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors focus:outline-none"
+            style={{
+              backgroundColor: !selectedAiGroup
+                ? "var(--color-accent)"
+                : "var(--color-surface-raised)",
+              color: !selectedAiGroup ? "var(--color-bg)" : "var(--color-text-dim)",
+              border: `1px solid ${!selectedAiGroup ? "var(--color-accent)" : "var(--color-border)"}`,
+            }}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            All Groups
+          </motion.button>
+          {aiGroups.map((g, i) => (
+            <motion.button
+              key={`${g.label}-${i}`}
+              onClick={() => setSelectedAiGroup(g.label)}
+              className="relative flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors focus:outline-none"
+              style={{
+                backgroundColor: selectedAiGroup === g.label
+                  ? "var(--color-accent)"
+                  : "var(--color-surface-raised)",
+                color: selectedAiGroup === g.label ? "var(--color-bg)" : "var(--color-text-dim)",
+                border: `1px solid ${selectedAiGroup === g.label ? "var(--color-accent)" : "var(--color-border)"}`,
+              }}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              {g.label} ({g.itemIds.length})
+            </motion.button>
+          ))}
+        </div>
+      )}
+
+      {viewMode === "ai-groups" && aiGroupsLoading && (
+        <div className="flex items-center gap-2 flex-shrink-0" style={{ color: "var(--color-text-dim)" }}>
+          <div className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "var(--color-accent)", borderTopColor: "transparent" }} />
+          <span className="text-xs">Generating smart groups…</span>
+        </div>
+      )}
+
+      {/* Traditional platform filters when not in AI-groups mode */}
+      {viewMode === "by-platform" && (
+        <ChipFilters
+          filters={PLATFORM_FILTERS}
+          active={activeFilter}
+          onSelect={(f) => {
+            setActiveCollectionId(null);
+            setFilter(f);
+          }}
+          className="flex-shrink-0"
+        />
+      )}
+
+      {/* Dynamic metadata facets based on currently visible items */}
+      {gridItems.length > 0 && (
+        <DynamicFacetFilters
+          items={facetSourceItems as Record<string, unknown>[]}
+          fields={gameFacetFields}
+          activeFilters={facetFilters}
+          onFilter={applyFacetFilter}
+          className="flex-shrink-0"
+        />
+      )}
 
       {loading || scanning ? (
         <div
@@ -467,7 +653,7 @@ export const GamingTab: React.FC = () => {
         <div className="flex-1 min-h-0 min-w-0 overflow-hidden">
           <VirtualGrid
             ref={gridRef}
-            items={items}
+            items={gridItems}
             minItemWidth={200}
             onColumnCountChange={setColumnCount}
             rowHeight={260}
@@ -510,20 +696,24 @@ export const GamingTab: React.FC = () => {
         }
         actions={
           selected && (
-            <motion.button
-              className="px-6 py-2.5 rounded-[var(--radius-card)] font-semibold text-sm"
-              style={{
-                background: "var(--color-accent)",
-                color: "var(--color-bg)",
-              }}
-              onClick={() => {
-                launch(selected);
-                setSelected(null);
-              }}
-              whileTap={{ scale: 0.96 }}
-            >
-              ▶ Launch
-            </motion.button>
+            <Tooltip content={getMissingCoreTooltip(selected) ?? ""}>
+              <motion.button
+                className="px-6 py-2.5 rounded-[var(--radius-card)] font-semibold text-sm"
+                style={{
+                  background: getMissingCoreTooltip(selected) ? "var(--color-surface-raised)" : "var(--color-accent)",
+                  color: getMissingCoreTooltip(selected) ? "var(--color-text-dim)" : "var(--color-bg)",
+                  cursor: getMissingCoreTooltip(selected) ? "not-allowed" : "pointer",
+                }}
+                onClick={() => {
+                  if (getMissingCoreTooltip(selected)) return;
+                  launch(selected);
+                  setSelected(null);
+                }}
+                whileTap={{ scale: getMissingCoreTooltip(selected) ? 1 : 0.96 }}
+              >
+                ▶ Launch
+              </motion.button>
+            </Tooltip>
           )
         }
       >

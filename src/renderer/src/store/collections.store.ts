@@ -5,6 +5,7 @@ import {
   CollectionItemType,
   SmartFilterGroup,
   SmartFilterRule,
+  AiGroup,
 } from "../../../shared/types";
 
 interface CollectionsState {
@@ -19,6 +20,22 @@ interface CollectionsState {
   listItems: (collectionId: string) => Promise<CollectionItem[]>;
   evaluateSmartFilter: (itemType: CollectionItemType, filter: SmartFilterGroup) => Promise<string[]>;
   getCollectionsForType: (itemType: CollectionItemType) => Collection[];
+  isAiAvailable: () => Promise<boolean>;
+  nlToFilter: (query: string, itemType: CollectionItemType) => Promise<SmartFilterGroup | null>;
+  groupItems: (
+    items: Array<{
+      id: string;
+      title: string;
+      genres?: string[];
+      tags?: string[];
+      description?: string;
+      platform?: string;
+      artist?: string;
+      album?: string;
+      genre?: string;
+    }>,
+    groupCount: number,
+  ) => Promise<AiGroup[]>;
 }
 
 export function sortByCollection<T extends object>(
@@ -109,6 +126,18 @@ export const useCollectionsStore = create<CollectionsState>((set, get) => ({
     return get().collections.filter(
       (c) => c.itemType === itemType || c.itemType === "mixed",
     );
+  },
+
+  isAiAvailable: async () => {
+    return window.htpc.localAi.available();
+  },
+
+  nlToFilter: async (query, itemType) => {
+    return window.htpc.localAi.nlToFilter(query, itemType);
+  },
+
+  groupItems: async (items, groupCount) => {
+    return window.htpc.localAi.groupItems(items, groupCount);
   },
 }));
 

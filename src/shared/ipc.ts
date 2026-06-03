@@ -118,4 +118,15 @@ export const IPC_CHANNELS = {
     detectDesktopApp: "streaming:detectDesktopApp",
     launch: "streaming:launch",
   },
+  packages: {
+    list: "packages:list",
+    search: "packages:search",
+    install: "packages:install",
+    uninstall: "packages:uninstall",
+    pin: "packages:pin",
+    setAutoUpdate: "packages:setAutoUpdate",
+    checkUpdates: "packages:checkUpdates",
+    progress: "packages:progress",
+    aptPassword: "packages:apt:password",
+  },
 } as const;

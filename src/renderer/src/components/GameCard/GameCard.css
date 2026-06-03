@@ -397,6 +397,28 @@
   z-index: 10;
 }
 
+.gc-missing-core {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  width: 22px;
+  height: 22px;
+  color: #a855f7;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+  pointer-events: auto;
+}
+
+.gc-missing-core svg {
+  width: 14px;
+  height: 14px;
+}
+
 /* Title details */
 .gc-details {
   position: absolute;

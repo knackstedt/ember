@@ -14,6 +14,8 @@ import {
   CollectionItem,
   SmartFilterGroup,
   StreamingService,
+  ManagedPackage,
+  PackageOperationProgress,
 } from "../shared/types";
 import { libretroApi } from "./libretro";
 
@@ -212,6 +214,18 @@ const htpc = {
     available: (): Promise<boolean> => ipcRenderer.invoke("localAi:available"),
     nlToFilter: (query: string, itemType: string): Promise<SmartFilterGroup | null> =>
       ipcRenderer.invoke("localAi:nlToFilter", query, itemType),
+    groupItems: (items: Array<{
+      id: string;
+      title: string;
+      genres?: string[];
+      tags?: string[];
+      description?: string;
+      platform?: string;
+      artist?: string;
+      album?: string;
+      genre?: string;
+    }>, groupCount: number): Promise<Array<{ label: string; itemIds: string[]; centerItemId: string }>> =>
+      ipcRenderer.invoke("localAi:groupItems", items, groupCount),
   },
 
   streaming: {
@@ -229,6 +243,22 @@ const htpc = {
       ipcRenderer.invoke("streaming:detectDesktopApp", command),
     launch: (service: StreamingService): Promise<void> =>
       ipcRenderer.invoke("streaming:launch", service),
+  },
+
+  packages: {
+    list: (): Promise<ManagedPackage[]> => ipcRenderer.invoke("packages:list"),
+    search: (query: string): Promise<ManagedPackage[]> => ipcRenderer.invoke("packages:search", query),
+    install: (packageId: string): Promise<boolean> => ipcRenderer.invoke("packages:install", packageId),
+    uninstall: (packageId: string): Promise<boolean> => ipcRenderer.invoke("packages:uninstall", packageId),
+    update: (): Promise<void> => ipcRenderer.invoke("packages:update"),
+    setAptPassword: (password: string): Promise<void> => ipcRenderer.invoke("packages:setAptPassword", password),
+    detectCores: (): Promise<{ platform: string; corePath: string; coreName: string; extensions: string[] }[]> =>
+      ipcRenderer.invoke("packages:detectCores"),
+    onProgress: (cb: (progress: PackageOperationProgress) => void) => {
+      const handler = (_: Electron.IpcRendererEvent, p: PackageOperationProgress) => cb(p);
+      ipcRenderer.on("packages:progress", handler);
+      return () => ipcRenderer.removeListener("packages:progress", handler);
+    },
   },
 
   onScanProgress: (cb: (progress: ScanProgress) => void) => {

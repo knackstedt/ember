@@ -17,6 +17,9 @@ import { useCollectionsStore, evaluateSmartFilter, sortByCollection } from "../.
 import { CollectionsBar } from "../../components/CollectionsBar/CollectionsBar";
 import { CollectionManager } from "../../components/CollectionManager/CollectionManager";
 import { useToastStore } from "../../store/toast.store";
+import { AiGroup } from "../../../../shared/types";
+
+type SubTab = "ai-groups" | "all";
 
 export const TVShowsTab: React.FC = () => {
   const shows = useTvStore((s) => s.shows);
@@ -40,6 +43,12 @@ export const TVShowsTab: React.FC = () => {
   const [showCollectionManager, setShowCollectionManager] = useState(false);
   const [collectionItemIds, setCollectionItemIds] = useState<Set<string>>(new Set());
   const gridRef = useRef<VirtualGridHandle>(null);
+
+  const [subTab, setSubTab] = useState<SubTab>("ai-groups");
+  const [aiGroups, setAiGroups] = useState<AiGroup[]>([]);
+  const [aiGroupsLoading, setAiGroupsLoading] = useState(false);
+  const [selectedAiGroup, setSelectedAiGroup] = useState<string | null>(null);
+  const aiGroupTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const collections = useCollectionsStore((s) => s.collections);
   const loadCollections = useCollectionsStore((s) => s.load);
@@ -75,6 +84,45 @@ export const TVShowsTab: React.FC = () => {
     return () => window.removeEventListener("htpc:escape", handler);
   }, []);
 
+  /* Auto-generate AI groups when subTab switches to ai-groups and shows are loaded */
+  useEffect(() => {
+    if (subTab !== "ai-groups" || shows.length === 0) return;
+    if (aiGroups.length > 0) return;
+    setAiGroupsLoading(true);
+    if (aiGroupTimeoutRef.current) clearTimeout(aiGroupTimeoutRef.current);
+
+    window.htpc.localAi
+      .groupItems(
+        shows.map((s) => ({
+          id: s.id,
+          title: s.title,
+          genres: s.genres,
+          tags: s.tags,
+          description: s.description,
+        })),
+        Math.min(6, Math.max(2, Math.floor(shows.length / 8))),
+      )
+      .then((groups) => {
+        setAiGroups(groups);
+        setAiGroupsLoading(false);
+      })
+      .catch(() => {
+        setAiGroupsLoading(false);
+        setSubTab("all");
+      });
+
+    aiGroupTimeoutRef.current = setTimeout(() => {
+      if (aiGroupsLoading) {
+        setAiGroupsLoading(false);
+        setSubTab("all");
+      }
+    }, 15000);
+
+    return () => {
+      if (aiGroupTimeoutRef.current) clearTimeout(aiGroupTimeoutRef.current);
+    };
+  }, [subTab, shows]);
+
   useEffect(() => {
     if (selected?.seasons?.length) {
       setSelectedSeason(selected.seasons[0].seasonNumber);
@@ -100,8 +148,19 @@ export const TVShowsTab: React.FC = () => {
     const result = base.filter((s) => collectionItemIds.has(s.id));
     return sortByCollection<TVShow>(result, activeCollection);
   }, [filtered, shows, searchQuery, activeCollectionId, collectionItemIds, activeCollection]);
+
+  const displayItems = useMemo(() => {
+    if (subTab !== "ai-groups" || !selectedAiGroup) return items;
+    const group = aiGroups.find((g) => g.label === selectedAiGroup);
+    if (!group) return items;
+    const ids = new Set(group.itemIds);
+    return items.filter((s) => ids.has(s.id));
+  }, [items, subTab, aiGroups, selectedAiGroup]);
+
+  const gridItems = subTab === "ai-groups" ? displayItems : items;
+
   const { focusedIndex } = useGridFocus({
-    items,
+    items: gridItems,
     columnCount,
     gridRef,
     onConfirm: (show) => setSelected(show),
@@ -242,6 +301,78 @@ export const TVShowsTab: React.FC = () => {
         className="flex-shrink-0"
       />
 
+      {/* View-mode sub-tabs */}
+      <div className="flex gap-2 flex-shrink-0 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+        {(["ai-groups", "all"] as SubTab[]).map((m) => (
+          <motion.button
+            key={m}
+            onClick={() => {
+              setSubTab(m);
+              setSelectedAiGroup(null);
+            }}
+            className="relative flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-colors focus:outline-none"
+            style={{
+              backgroundColor: subTab === m
+                ? "var(--color-accent)"
+                : "var(--color-surface-raised)",
+              color: subTab === m ? "var(--color-bg)" : "var(--color-text-dim)",
+              border: `1px solid ${subTab === m ? "var(--color-accent)" : "var(--color-border)"}`,
+              boxShadow: subTab === m ? "var(--shadow-glow)" : "none",
+            }}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            {m === "ai-groups" ? "✨ Groups" : "All"}
+          </motion.button>
+        ))}
+      </div>
+
+      {/* AI group chips */}
+      {subTab === "ai-groups" && aiGroups.length > 0 && (
+        <div className="flex gap-2 flex-shrink-0 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+          <motion.button
+            onClick={() => setSelectedAiGroup(null)}
+            className="relative flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors focus:outline-none"
+            style={{
+              backgroundColor: !selectedAiGroup
+                ? "var(--color-accent)"
+                : "var(--color-surface-raised)",
+              color: !selectedAiGroup ? "var(--color-bg)" : "var(--color-text-dim)",
+              border: `1px solid ${!selectedAiGroup ? "var(--color-accent)" : "var(--color-border)"}`,
+            }}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            All Groups
+          </motion.button>
+          {aiGroups.map((g, i) => (
+            <motion.button
+              key={`ai-${g.label}-${i}`}
+              onClick={() => setSelectedAiGroup(g.label)}
+              className="relative flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors focus:outline-none"
+              style={{
+                backgroundColor: selectedAiGroup === g.label
+                  ? "var(--color-accent)"
+                  : "var(--color-surface-raised)",
+                color: selectedAiGroup === g.label ? "var(--color-bg)" : "var(--color-text-dim)",
+                border: `1px solid ${selectedAiGroup === g.label ? "var(--color-accent)" : "var(--color-border)"}`,
+              }}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              {g.label} ({g.itemIds.length})
+            </motion.button>
+          ))}
+        </div>
+      )}
+
+      {subTab === "ai-groups" && aiGroupsLoading && (
+        <div className="flex items-center gap-2 flex-shrink-0" style={{ color: "var(--color-text-dim)" }}>
+          <div className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "var(--color-accent)", borderTopColor: "transparent" }} />
+          <span className="text-xs">Generating smart groups…</span>
+        </div>
+      )}
+
       {loading ? (
         <div
           className="flex-1 flex items-center justify-center"
@@ -285,7 +416,7 @@ export const TVShowsTab: React.FC = () => {
         <div className="flex-1 min-h-0 min-w-0 overflow-hidden">
           <VirtualGrid
             ref={gridRef}
-            items={items}
+            items={gridItems}
             minItemWidth={200}
             onColumnCountChange={setColumnCount}
             rowHeight={300}

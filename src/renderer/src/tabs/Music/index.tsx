@@ -21,6 +21,7 @@ import { useCollectionsStore, evaluateSmartFilter, sortByCollection } from "../.
 import { CollectionsBar } from "../../components/CollectionsBar/CollectionsBar";
 import { CollectionManager } from "../../components/CollectionManager/CollectionManager";
 import { useToastStore } from "../../store/toast.store";
+import { AiGroup } from "../../../../shared/types";
 
 const LazyMusicCard: React.FC<{
   track: MusicTrack;
@@ -55,7 +56,7 @@ const LazyMusicCard: React.FC<{
   );
 });
 
-type SubTab = "local" | "streaming";
+type SubTab = "local" | "streaming" | "ai-groups";
 type BrowseMode = "artists" | "genres" | "tracks";
 
 interface MusicGroup {
@@ -104,6 +105,11 @@ export const MusicTab: React.FC = () => {
   const [streamingServices, setStreamingServices] = useState<StreamingService[]>([]);
   const trackGridRef = useRef<VirtualGridHandle>(null);
   const groupGridRef = useRef<VirtualGridHandle>(null);
+
+  const [aiGroups, setAiGroups] = useState<AiGroup[]>([]);
+  const [aiGroupsLoading, setAiGroupsLoading] = useState(false);
+  const [selectedAiGroup, setSelectedAiGroup] = useState<string | null>(null);
+  const aiGroupTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const collections = useCollectionsStore((s) => s.collections);
   const loadCollections = useCollectionsStore((s) => s.load);
@@ -154,6 +160,46 @@ export const MusicTab: React.FC = () => {
       });
     }
   }, [activeCollectionId, collections, tracks]);
+
+  /* Auto-generate AI groups when subTab switches to ai-groups and tracks are loaded */
+  useEffect(() => {
+    if (subTab !== "ai-groups" || tracks.length === 0) return;
+    if (aiGroups.length > 0) return;
+    setAiGroupsLoading(true);
+    if (aiGroupTimeoutRef.current) clearTimeout(aiGroupTimeoutRef.current);
+
+    window.htpc.localAi
+      .groupItems(
+        tracks.map((t) => ({
+          id: t.id,
+          title: t.title,
+          genres: t.genre ? [t.genre] : undefined,
+          tags: t.tags,
+          artist: t.artist,
+          album: t.album,
+        })),
+        Math.min(6, Math.max(2, Math.floor(tracks.length / 8))),
+      )
+      .then((groups) => {
+        setAiGroups(groups);
+        setAiGroupsLoading(false);
+      })
+      .catch(() => {
+        setAiGroupsLoading(false);
+        setSubTab("local");
+      });
+
+    aiGroupTimeoutRef.current = setTimeout(() => {
+      if (aiGroupsLoading) {
+        setAiGroupsLoading(false);
+        setSubTab("local");
+      }
+    }, 15000);
+
+    return () => {
+      if (aiGroupTimeoutRef.current) clearTimeout(aiGroupTimeoutRef.current);
+    };
+  }, [subTab, tracks]);
 
   const artistGroups = useMemo(() => {
     const map = new Map<string, { name: string; tracks: MusicTrack[] }>();
@@ -252,6 +298,16 @@ export const MusicTab: React.FC = () => {
     return r;
   }, [tracks, selectedGroup, browseMode, activeArtist, activeAlbum, activeGenre, activeYear, searchQuery, activeCollectionId, collectionItemIds]);
 
+  const displayTrackItems = useMemo(() => {
+    if (subTab !== "ai-groups" || !selectedAiGroup) return trackItems;
+    const group = aiGroups.find((g) => g.label === selectedAiGroup);
+    if (!group) return trackItems;
+    const ids = new Set(group.itemIds);
+    return trackItems.filter((t) => ids.has(t.id));
+  }, [trackItems, subTab, aiGroups, selectedAiGroup]);
+
+  const gridTrackItems = subTab === "ai-groups" ? displayTrackItems : trackItems;
+
   const { focusedIndex: groupFocusedIndex } = useGridFocus<MusicGroup>({
     items: groupItems,
     columnCount: groupColumnCount,
@@ -261,11 +317,11 @@ export const MusicTab: React.FC = () => {
   });
 
   const { focusedIndex: trackFocusedIndex } = useGridFocus<MusicTrack>({
-    items: trackItems,
+    items: gridTrackItems,
     columnCount: trackColumnCount,
     gridRef: trackGridRef,
     onConfirm: (track, index) => {
-      play(trackItems, index);
+      play(gridTrackItems, index);
       setSelected(track);
     },
     enabled: subTab === "local" && !selected && (browseMode === "tracks" || !!selectedGroup),
@@ -447,7 +503,7 @@ export const MusicTab: React.FC = () => {
     <div className="flex flex-col h-full gap-3 p-4">
       <div className="flex gap-3 items-center flex-shrink-0">
         <div className="flex gap-1">
-          {(["local", "streaming"] as SubTab[]).map((t) => (
+          {(["ai-groups", "local", "streaming"] as SubTab[]).map((t) => (
             <button
               key={t}
               className="px-4 py-1.5 rounded-full text-sm font-medium capitalize"
@@ -462,11 +518,11 @@ export const MusicTab: React.FC = () => {
               }}
               onClick={() => setSubTab(t)}
             >
-              {t}
+              {t === "ai-groups" ? "✨ Groups" : t}
             </button>
           ))}
         </div>
-        {subTab === "local" && (
+        {(subTab === "local" || subTab === "ai-groups") && (
           <>
             <OskInput
               value={searchQuery}
@@ -635,6 +691,70 @@ export const MusicTab: React.FC = () => {
                 ref={trackGridRef}
                 items={trackItems}
                 minItemWidth={180}
+                onColumnCountChange={setTrackColumnCount}
+                rowHeight={240}
+                renderItem={renderTrackItem}
+              />
+            </div>
+          )}
+        </>
+      )}
+
+      {subTab === "ai-groups" && (
+        <>
+          {aiGroupsLoading && (
+            <div className="flex items-center gap-2 flex-shrink-0" style={{ color: "var(--color-text-dim)" }}>
+              <div className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "var(--color-accent)", borderTopColor: "transparent" }} />
+              <span className="text-xs">Generating smart groups…</span>
+            </div>
+          )}
+          {aiGroups.length > 0 && (
+            <div className="flex gap-2 flex-shrink-0 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+              <motion.button
+                onClick={() => setSelectedAiGroup(null)}
+                className="relative flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors focus:outline-none"
+                style={{
+                  backgroundColor: !selectedAiGroup
+                    ? "var(--color-accent)"
+                    : "var(--color-surface-raised)",
+                  color: !selectedAiGroup ? "var(--color-bg)" : "var(--color-text-dim)",
+                  border: `1px solid ${!selectedAiGroup ? "var(--color-accent)" : "var(--color-border)"}`,
+                }}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                All Groups
+              </motion.button>
+              {aiGroups.map((g, i) => (
+                <motion.button
+                  key={`ai-${g.label}-${i}`}
+                  onClick={() => setSelectedAiGroup(g.label)}
+                  className="relative flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors focus:outline-none"
+                  style={{
+                    backgroundColor: selectedAiGroup === g.label
+                      ? "var(--color-accent)"
+                      : "var(--color-surface-raised)",
+                    color: selectedAiGroup === g.label ? "var(--color-bg)" : "var(--color-text-dim)",
+                    border: `1px solid ${selectedAiGroup === g.label ? "var(--color-accent)" : "var(--color-border)"}`,
+                  }}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  {g.label} ({g.itemIds.length})
+                </motion.button>
+              ))}
+            </div>
+          )}
+          {gridTrackItems.length === 0 ? (
+            <div className="flex-1 flex items-center justify-center" style={{ color: "var(--color-text-dim)" }}>
+              <p>No tracks found.</p>
+            </div>
+          ) : (
+            <div className="flex-1 min-h-0 min-w-0 overflow-hidden">
+              <VirtualGrid
+                ref={trackGridRef}
+                items={gridTrackItems}
+                minItemWidth={160}
                 onColumnCountChange={setTrackColumnCount}
                 rowHeight={240}
                 renderItem={renderTrackItem}

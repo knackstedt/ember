@@ -471,7 +471,13 @@ export const StreamingServiceRepo = {
     const result = await db.query<[StreamingService[]]>(
       "SELECT * FROM streaming_service ORDER BY sortOrder ASC, name ASC",
     );
-    return (result[0] ?? []) as StreamingService[];
+    const services = (result[0] ?? []) as StreamingService[];
+    return services
+      .map((s) => ({
+        ...s,
+        id: typeof s.id === "string" ? s.id : ((s.id as any)?.id ?? String(s.id)),
+      }))
+      .filter((s, i, arr) => arr.findIndex((x) => x.id === s.id) === i);
   },
 
   async listByCategory(category: string): Promise<StreamingService[]> {
@@ -480,7 +486,13 @@ export const StreamingServiceRepo = {
       "SELECT * FROM streaming_service WHERE category = $category AND enabled = true ORDER BY sortOrder ASC, name ASC",
       { category },
     );
-    return (result[0] ?? []) as StreamingService[];
+    const services = (result[0] ?? []) as StreamingService[];
+    return services
+      .map((s) => ({
+        ...s,
+        id: typeof s.id === "string" ? s.id : ((s.id as any)?.id ?? String(s.id)),
+      }))
+      .filter((s, i, arr) => arr.findIndex((x) => x.id === s.id) === i);
   },
 
   async upsert(service: StreamingService): Promise<void> {

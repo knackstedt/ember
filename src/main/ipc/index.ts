@@ -46,7 +46,8 @@ import { searchMovie, searchShow } from "../services/tmdb.service";
 import { listPlugins, reloadPlugins } from "../plugins/loader";
 import { getConnectedDevices } from "../input/evdev";
 import { getXdgVideosDir, getXdgMusicDir } from "../scanners/xdg";
-import { isOllamaAvailable, naturalLanguageToFilter } from "../services/local-ai.service";
+import { isOllamaAvailable, naturalLanguageToFilter, aiGroupItems } from "../services/local-ai.service";
+import { AiGroup } from "../../shared/types";
 import {
   getStreamingServices,
   getAllStreamingServices,
@@ -66,6 +67,15 @@ import {
   StreamingService,
 } from "../../shared/types";
 import { createLogger } from "../util/logger";
+import {
+  listAvailablePackages,
+  searchPackages,
+  installPackage,
+  uninstallPackage,
+  checkUpdates,
+  setAptPassword,
+  detectInstalledCores,
+} from "../services/package-manager.service";
 
 const log = createLogger("info");
 
@@ -782,5 +792,51 @@ export function registerIpcHandlers(window: BrowserWindow): void {
 
   ipcMain.handle("localAi:nlToFilter", async (_e, query: string, itemType: string) => {
     return naturalLanguageToFilter(query, itemType);
+  });
+
+  ipcMain.handle("localAi:groupItems", async (_e, items: Array<{
+    id: string;
+    title: string;
+    genres?: string[];
+    tags?: string[];
+    description?: string;
+    platform?: string;
+    artist?: string;
+    album?: string;
+    genre?: string;
+  }>, groupCount: number) => {
+    return aiGroupItems(items, groupCount);
+  });
+
+  /* ------------------------------------------------------------------ */
+  /*  Package Manager (Libretro cores, emulators, dependencies)         */
+  /* ------------------------------------------------------------------ */
+
+  ipcMain.handle("packages:list", async () => {
+    return listAvailablePackages();
+  });
+
+  ipcMain.handle("packages:search", async (_e, query: string) => {
+    return searchPackages(query);
+  });
+
+  ipcMain.handle("packages:install", async (_e, packageId: string) => {
+    return installPackage(packageId, window);
+  });
+
+  ipcMain.handle("packages:uninstall", async (_e, packageId: string) => {
+    return uninstallPackage(packageId, window);
+  });
+
+  ipcMain.handle("packages:update", async () => {
+    return checkUpdates(window);
+  });
+
+  ipcMain.handle("packages:setAptPassword", async (_e, password: string) => {
+    return setAptPassword(password);
+  });
+
+  ipcMain.handle("packages:detectCores", async () => {
+    return detectInstalledCores();
   });
 }

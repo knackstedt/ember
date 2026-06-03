@@ -657,10 +657,10 @@ function AiFilterBuilder({
 }) {
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
-  const [available, setAvailable] = useState<boolean | null>(null);
+  const [ready, setReady] = useState<boolean | null>(null);
 
   useEffect(() => {
-    window.htpc.localAi.available().then(setAvailable).catch(() => setAvailable(false));
+    window.htpc.localAi.available().then(setReady).catch(() => setReady(false));
   }, []);
 
   const handleGenerate = async () => {
@@ -690,10 +690,10 @@ function AiFilterBuilder({
     }
   };
 
-  if (available === false) {
+  if (ready === false) {
     return (
       <div className="text-xs" style={{ color: "var(--color-text-dim)" }}>
-        Local AI (Ollama) not available. Install Ollama and run a model like llama3.2 to use natural language filters.
+        AI model is loading. First use may take a moment while the embedding model downloads.
       </div>
     );
   }
