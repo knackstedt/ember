@@ -608,7 +608,7 @@ export const GamingTab: React.FC = () => {
               <motion.button
                 className="px-2.5 py-0.5 rounded-full text-xs font-medium"
                 style={{ backgroundColor: "var(--color-accent)", color: "var(--color-bg)" }}
-                onClick={() => setFilter("")}
+                onClick={() => setFilter("all")}
                 whileTap={{ scale: 0.95 }}
                 title="Clear platform filter"
               >
