@@ -107,6 +107,26 @@ async function runMigrations(db: Surreal): Promise<void> {
     DEFINE FIELD IF NOT EXISTS playTime ON game TYPE int DEFAULT 0;
     DEFINE FIELD IF NOT EXISTS rating ON game TYPE option<float>;
     DEFINE FIELD IF NOT EXISTS hidden ON game TYPE bool DEFAULT false;
+    DEFINE FIELD IF NOT EXISTS achievementCount ON game TYPE option<int>;
+    DEFINE FIELD IF NOT EXISTS igdbId ON game TYPE option<int>;
+    DEFINE FIELD IF NOT EXISTS metacriticScore ON game TYPE option<int>;
+    DEFINE FIELD IF NOT EXISTS openCriticScore ON game TYPE option<int>;
+    DEFINE FIELD IF NOT EXISTS steamReviewScore ON game TYPE option<int>;
+    DEFINE FIELD IF NOT EXISTS steamOwnersEstimate ON game TYPE option<int>;
+    DEFINE FIELD IF NOT EXISTS platforms ON game TYPE option<array<string>>;
+    DEFINE FIELD IF NOT EXISTS playtime ON game TYPE option<int>;
+    DEFINE FIELD IF NOT EXISTS romHash ON game TYPE option<string>;
+    DEFINE FIELD IF NOT EXISTS romHashType ON game TYPE option<string>;
+    DEFINE FIELD IF NOT EXISTS serialNumber ON game TYPE option<string>;
+    DEFINE FIELD IF NOT EXISTS region ON game TYPE option<string>;
+    DEFINE FIELD IF NOT EXISTS language ON game TYPE option<string>;
+    DEFINE FIELD IF NOT EXISTS mobyGamesId ON game TYPE option<string>;
+    DEFINE FIELD IF NOT EXISTS theGamesDbId ON game TYPE option<string>;
+    DEFINE FIELD IF NOT EXISTS launchBoxDbId ON game TYPE option<string>;
+    DEFINE FIELD IF NOT EXISTS pcgwEngine ON game TYPE option<string>;
+    DEFINE FIELD IF NOT EXISTS pcgwSeries ON game TYPE option<string>;
+    DEFINE FIELD IF NOT EXISTS wineRunner ON game TYPE option<string>;
+    DEFINE FIELD IF NOT EXISTS videos ON game TYPE option<array<object>>;
 
     DEFINE TABLE IF NOT EXISTS movie SCHEMAFULL;
     DEFINE FIELD IF NOT EXISTS id ON movie TYPE string;

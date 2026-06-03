@@ -296,7 +296,7 @@ export const ControllersTab: React.FC = () => {
         setLearnedRaw(ev.rawCode);
       }
     });
-    return unsub;
+    return () => { unsub(); };
   }, [learningCode]);
 
   const saveMapping = useCallback(

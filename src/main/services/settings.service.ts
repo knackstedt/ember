@@ -16,6 +16,8 @@ const DEFAULTS: AppSettings = {
   dailyBackground: { enabled: false, source: "bing" },
   defaultEmulatorShader: "",
   emulatorShaders: {},
+  commandKeybinds: {},
+  commandControllerMap: {},
 };
 
 export async function getSettings(): Promise<AppSettings> {

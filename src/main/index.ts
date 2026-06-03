@@ -86,6 +86,19 @@ async function createWindow(): Promise<void> {
     if (isDev) mainWindow?.webContents.openDevTools();
   });
 
+  mainWindow.webContents.on("did-fail-load", (_event, errorCode, errorDescription) => {
+    log.error("renderer", `did-fail-load: ${errorCode} — ${errorDescription}`);
+  });
+
+  mainWindow.webContents.on("render-process-gone", (_event, details) => {
+    log.error("renderer", `render-process-gone: ${details.reason} (exitCode=${details.exitCode})`);
+  });
+
+  mainWindow.webContents.on("console-message", (_event, level, message, line, sourceId) => {
+    const labels = ["log", "warn", "error"];
+    log.info("renderer-console", `[${labels[level] ?? level}] ${sourceId}:${line} ${message}`);
+  });
+
   mainWindow.webContents.on("before-input-event", (_event, input) => {
     if (input.type === "keyDown" && input.key === "F12") {
       if (mainWindow?.webContents.isDevToolsOpened()) {
@@ -111,6 +124,12 @@ async function createWindow(): Promise<void> {
       `evdev init failed (user may not be in input group): ${err}`
     );
   }
+
+  const loadUrl = isDev && process.env["ELECTRON_RENDERER_URL"]
+    ? process.env["ELECTRON_RENDERER_URL"]
+    : join(__dirname, "../renderer/index.html");
+  log.info("window", `loading renderer from: ${loadUrl}`);
+  log.info("window", `preload path: ${join(__dirname, "../preload/index.js")}`);
 
   if (isDev && process.env["ELECTRON_RENDERER_URL"]) {
     mainWindow.loadURL(process.env["ELECTRON_RENDERER_URL"]);

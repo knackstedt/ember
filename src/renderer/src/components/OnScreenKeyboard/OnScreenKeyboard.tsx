@@ -111,7 +111,7 @@ export const OnScreenKeyboard: React.FC<OnScreenKeyboardProps> = ({
         onSubmitRef.current?.(valueRef.current);
       }
     });
-    return unsub;
+    return () => { unsub(); };
   }, []);
 
   return (

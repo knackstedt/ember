@@ -4,13 +4,13 @@ import { motion } from "framer-motion";
 export interface FacetField {
   key: string;
   label: string;
-  accessor: (item: Record<string, unknown>) => string | string[] | number | undefined;
+  accessor: (item: unknown) => string | string[] | number | undefined;
   sort?: "asc" | "desc" | "count";
   maxValues?: number;
 }
 
 interface DynamicFacetFiltersProps {
-  items: Record<string, unknown>[];
+  items: unknown[];
   fields: FacetField[];
   activeFilters: Record<string, string | null>;
   onFilter: (field: string, value: string | null) => void;
@@ -18,7 +18,7 @@ interface DynamicFacetFiltersProps {
 }
 
 function extractValues(
-  items: Record<string, unknown>[],
+  items: unknown[],
   accessor: FacetField["accessor"],
 ): string[] {
   const set = new Set<string>();

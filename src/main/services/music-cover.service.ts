@@ -542,6 +542,134 @@ export async function pickCoverImage(
 }
 
 /* ------------------------------------------------------------------ */
+/*  Procedural artist thumbnail (deterministic SVG)                   */
+/* ------------------------------------------------------------------ */
+
+function hashString(str: string): Buffer {
+  return createHash("sha256").update(str).digest();
+}
+
+function initialsFromName(name: string): string {
+  return name
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? "")
+    .join("");
+}
+
+function buildProceduralArtistSVG(hash: Buffer, artist: string): string {
+  const bytes = Array.from(hash);
+  const w = 512;
+  const h = 512;
+
+  const hueBg1 = byteHue(bytes[0]);
+  const hueBg2 = byteHue(bytes[1]);
+  const sat = Math.round(bytePct(bytes[2], 45, 75));
+  const light1 = Math.round(bytePct(bytes[3], 12, 22));
+  const light2 = Math.round(bytePct(bytes[4], 16, 28));
+
+  const hueAccent = byteHue(bytes[5]);
+  const accentSat = Math.round(bytePct(bytes[6], 50, 80));
+  const accentLight = Math.round(bytePct(bytes[7], 45, 65));
+
+  // Background gradient
+  const bg = `hsl(${hueBg1}, ${sat}%, ${light1}%)`;
+  const bg2 = `hsl(${hueBg2}, ${sat}%, ${light2}%)`;
+
+  // Decorative circle behind initials
+  const circleHue = (hueBg1 + 180) % 360;
+  const circleSat = Math.round(bytePct(bytes[8], 30, 60));
+  const circleLight = Math.round(bytePct(bytes[9], 25, 40));
+  const circleR = Math.round(bytePct(bytes[10], 140, 200));
+  const circleCx = 256;
+  const circleCy = 220;
+
+  // Small decorative dots
+  let dots = "";
+  for (let i = 0; i < 6; i++) {
+    const dx = Math.round(bytePct(bytes[(11 + i * 4) % bytes.length], 40, w - 40));
+    const dy = Math.round(bytePct(bytes[(12 + i * 4) % bytes.length], 40, h - 40));
+    const dr = Math.round(bytePct(bytes[(13 + i * 4) % bytes.length], 4, 18));
+    const dOp = bytePct(bytes[(14 + i * 4) % bytes.length], 0.08, 0.25).toFixed(2);
+    const dHue = (hueAccent + Math.floor(bytes[(15 + i * 4) % bytes.length] / 8)) % 360;
+    dots += `<circle cx="${dx}" cy="${dy}" r="${dr}" fill="hsl(${dHue},${accentSat}%,${accentLight}%)" opacity="${dOp}"/>`;
+  }
+
+  // Arc lines
+  let arcs = "";
+  for (let i = 0; i < 3; i++) {
+    const ar = Math.round(bytePct(bytes[(16 + i * 5) % bytes.length], 180, 260));
+    const ax = 256;
+    const ay = 220;
+    const aStart = Math.round(bytePct(bytes[(17 + i * 5) % bytes.length], 0, 360));
+    const aEnd = aStart + Math.round(bytePct(bytes[(18 + i * 5) % bytes.length], 60, 180));
+    const aOp = bytePct(bytes[(19 + i * 5) % bytes.length], 0.06, 0.18).toFixed(2);
+    const aHue = (hueAccent + i * 40) % 360;
+    // Convert polar to cartesian for arc path
+    const radStart = (aStart * Math.PI) / 180;
+    const radEnd = (aEnd * Math.PI) / 180;
+    const x1 = ax + ar * Math.cos(radStart);
+    const y1 = ay + ar * Math.sin(radStart);
+    const x2 = ax + ar * Math.cos(radEnd);
+    const y2 = ay + ar * Math.sin(radEnd);
+    const largeArc = aEnd - aStart > 180 ? 1 : 0;
+    arcs += `<path d="M ${x1} ${y1} A ${ar} ${ar} 0 ${largeArc} 1 ${x2} ${y2}" stroke="hsl(${aHue},${accentSat}%,${accentLight}%)" stroke-width="2" fill="none" opacity="${aOp}" stroke-linecap="round"/>`;
+  }
+
+  const init = initialsFromName(artist);
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="${bg}"/>
+      <stop offset="100%" stop-color="${bg2}"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="28" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <rect width="${w}" height="${h}" fill="url(#bgGrad)"/>
+  <!-- Decorative circle -->
+  <circle cx="${circleCx}" cy="${circleCy}" r="${circleR}" fill="hsl(${circleHue},${circleSat}%,${circleLight}%)" opacity="0.25"/>
+  <!-- Arcs -->
+  <g>${arcs}</g>
+  <!-- Dots -->
+  <g>${dots}</g>
+  <!-- Initials -->
+  <text x="256" y="240" text-anchor="middle" dominant-baseline="central"
+    font-family="system-ui, -apple-system, sans-serif" font-size="96" font-weight="700"
+    fill="hsl(${hueAccent},${accentSat}%,${accentLight}%)" opacity="0.9" filter="url(#glow)">
+    ${init}
+  </text>
+</svg>`;
+}
+
+export async function generateArtistThumbnail(
+  artist: string,
+): Promise<string | undefined> {
+  if (!artist) return undefined;
+  const safeName = artist.toLowerCase().replace(/[^a-z0-9]/g, "_");
+  const dest = join(artistCache, `${safeName}.svg`);
+  if (existsSync(dest)) {
+    return `ember://covers/artists/${safeName}.svg`;
+  }
+  try {
+    const hash = hashString(artist);
+    const svg = buildProceduralArtistSVG(hash, artist);
+    writeFileSync(dest, svg);
+    return `ember://covers/artists/${safeName}.svg`;
+  } catch (err) {
+    log.error("generateArtistThumbnail", String(err));
+    return undefined;
+  }
+}
+
+/* ------------------------------------------------------------------ */
 /*  Online artist thumbnail (Deezer + TheAudioDB fallback)            */
 /* ------------------------------------------------------------------ */
 
@@ -552,9 +680,13 @@ export async function fetchArtistThumbnail(
 ): Promise<string | undefined> {
   if (!artist) return undefined;
   const safeName = artist.toLowerCase().replace(/[^a-z0-9]/g, "_");
-  const dest = join(artistCache, `${safeName}.jpg`);
-  if (existsSync(dest)) {
+  const jpgDest = join(artistCache, `${safeName}.jpg`);
+  const svgDest = join(artistCache, `${safeName}.svg`);
+  if (existsSync(jpgDest)) {
     return `ember://covers/artists/${safeName}.jpg`;
+  }
+  if (existsSync(svgDest)) {
+    return `ember://covers/artists/${safeName}.svg`;
   }
   if (artistInFlight.has(safeName)) return undefined;
   artistInFlight.add(safeName);
@@ -602,16 +734,18 @@ export async function fetchArtistThumbnail(
       }
     }
 
-    if (!imageUrl) return undefined;
+    if (imageUrl) {
+      const imageRes = await fetch(imageUrl, {
+        headers: { "User-Agent": "HTPC-App/0.1.0" },
+      });
+      if (!imageRes.ok) return undefined;
+      const buffer = Buffer.from(await imageRes.arrayBuffer());
+      writeFileSync(jpgDest, buffer);
+      return `ember://covers/artists/${safeName}.jpg`;
+    }
 
-    const imageRes = await fetch(imageUrl, {
-      headers: { "User-Agent": "HTPC-App/0.1.0" },
-    });
-    if (!imageRes.ok) return undefined;
-    const buffer = Buffer.from(await imageRes.arrayBuffer());
-    writeFileSync(dest, buffer);
-
-    return `ember://covers/artists/${safeName}.jpg`;
+    // Final fallback: procedural SVG thumbnail
+    return generateArtistThumbnail(artist);
   } catch (err) {
     log.error("fetchArtistThumbnail", String(err));
     return undefined;

@@ -38,6 +38,6 @@ export function useInputNav(
       const action = ev.action ? ACTION_MAP[ev.action] : undefined;
       if (action) handler(action, ev);
     });
-    return unsub;
+    return () => { unsub(); };
   }, [handler]);
 }

@@ -923,6 +923,27 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     musicDir: getXdgMusicDir(),
   }));
 
+  ipcMain.handle("db:wipe-thumbnails", async () => {
+    const userData = app.getPath("userData");
+    const cacheDirs = [
+      join(userData, "covers", "flash", "screenshots"),
+      join(userData, "covers", "flash", "generated"),
+      join(userData, "covers", "music"),
+      join(userData, "covers", "artists"),
+      join(userData, "thumbnails", "movies"),
+      join(userData, "thumbnails", "tv"),
+    ];
+    for (const dir of cacheDirs) {
+      try {
+        rmSync(dir, { recursive: true, force: true });
+        mkdirSync(dir, { recursive: true });
+      } catch (err) {
+        log.warn("db:wipe-thumbnails", `failed to clear cache dir: ${dir} ${err}`);
+      }
+    }
+    return true;
+  });
+
   ipcMain.handle("db:clear", async () => {
     const db = getDb();
     await db.query(`

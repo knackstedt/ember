@@ -47,6 +47,10 @@ const defaults: AppSettings = {
     stickToMouse: true,
     stickSensitivity: 1.0,
     aiUpscaling: false,
+    filter: "none",
+    filterIntensity: 1.0,
+    pixelateSize: 4,
+    ditherLevels: 4,
   },
 };
 

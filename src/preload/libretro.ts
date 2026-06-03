@@ -9,21 +9,26 @@ const addonPath = join(__dirname, "..", "..", "resources", "libretro-frontend.li
 
 let NativeAddon: any = null;
 let Frontend: any = null;
+let addonLoadAttempted = false;
 
-try {
-  // @ts-ignore — require is available in preload with sandbox: false
-  NativeAddon = require(addonPath);
-  Frontend = new NativeAddon.LibretroFrontend();
-  console.log("[libretro] Native addon loaded directly in renderer process:", addonPath);
-} catch (err) {
-  console.error("[libretro] Failed to load native addon:", err);
+function loadAddon() {
+  if (addonLoadAttempted) return;
+  addonLoadAttempted = true;
+  try {
+    // @ts-ignore — require is available in preload with sandbox: false
+    NativeAddon = require(addonPath);
+    Frontend = new NativeAddon.LibretroFrontend();
+    console.log("[libretro] Native addon loaded directly in renderer process:", addonPath);
+  } catch (err) {
+    console.error("[libretro] Failed to load native addon:", err);
+  }
 }
 
 // ---------------------------------------------------------------------------
 // Core scanning (was in main/services/libretro.service.ts)
 // ---------------------------------------------------------------------------
 
-interface CoreInfo {
+export interface CoreInfo {
   id: number;
   name: string;
   version: string;
@@ -32,7 +37,7 @@ interface CoreInfo {
   path: string;
 }
 
-interface DetectedCore {
+export interface DetectedCore {
   platform: string;
   corePath: string;
   coreName: string;
@@ -215,6 +220,7 @@ export function detectCoreForRom(romPath: string, availableCores: CoreInfo[]): D
 // ---------------------------------------------------------------------------
 
 function ensureFrontend() {
+  loadAddon();
   if (!Frontend) {
     throw new Error("Libretro native addon not loaded. Check console for errors.");
   }

@@ -145,14 +145,14 @@ export const useCollectionsStore = create<CollectionsState>((set, get) => ({
 /*  Smart-filter engine (runs in renderer against loaded data)        */
 /* ------------------------------------------------------------------ */
 
-export function evaluateSmartFilter<T extends Record<string, unknown>>(
+export function evaluateSmartFilter<T extends object>(
   items: T[],
   filter: SmartFilterGroup,
 ): T[] {
   return items.filter((item) => evaluateGroup(item, filter));
 }
 
-function evaluateGroup<T extends Record<string, unknown>>(
+function evaluateGroup<T extends object>(
   item: T,
   group: SmartFilterGroup,
 ): boolean {
@@ -167,11 +167,11 @@ function evaluateGroup<T extends Record<string, unknown>>(
     : results.some(Boolean);
 }
 
-function evaluateRule<T extends Record<string, unknown>>(
+function evaluateRule<T extends object>(
   item: T,
   rule: SmartFilterRule,
 ): boolean {
-  const raw = item[rule.field];
+  const raw = (item as Record<string, unknown>)[rule.field];
   const value = rule.value;
 
   switch (rule.operator) {

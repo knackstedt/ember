@@ -31,6 +31,48 @@ import { useLibretroPlayerStore } from "./store/libretroPlayer.store";
 import { useContextMenuStore } from "./store/contextMenu.store";
 import { QueueBlade } from "./components/QueueBlade/QueueBlade";
 import { ErrorBoundary } from "./components/ErrorBoundary/ErrorBoundary";
+import { CommandPalette } from "./components/CommandPalette/CommandPalette";
+import { useCommands } from "./hooks/useCommands";
+import { useCommandsStore } from "./store/commands.store";
+import { CommandDefinition, COMMAND_DEFINITIONS } from "../../shared/commands";
+
+function normalizeShortcut(e: KeyboardEvent): string {
+  const parts: string[] = [];
+  if (e.ctrlKey) parts.push("Ctrl");
+  if (e.altKey) parts.push("Alt");
+  if (e.shiftKey) parts.push("Shift");
+  if (e.metaKey) parts.push("Meta");
+  const key = e.key;
+  if (key === "Control" || key === "Alt" || key === "Shift" || key === "Meta") {
+    return parts.join("+");
+  }
+  let displayKey = key;
+  if (key.startsWith("F") && key.length > 1 && /^F\d+$/.test(key)) displayKey = key;
+  else if (key === "Escape") displayKey = "Escape";
+  else if (key === "Enter") displayKey = "Enter";
+  else if (key === "Tab") displayKey = "Tab";
+  else if (key === "Backspace") displayKey = "Backspace";
+  else if (key === "Delete") displayKey = "Delete";
+  else if (key === "ArrowUp") displayKey = "ArrowUp";
+  else if (key === "ArrowDown") displayKey = "ArrowDown";
+  else if (key === "ArrowLeft") displayKey = "ArrowLeft";
+  else if (key === "ArrowRight") displayKey = "ArrowRight";
+  else if (key === " ") displayKey = "Space";
+  else if (key.length === 1) displayKey = key.toUpperCase();
+  parts.push(displayKey);
+  return parts.join("+");
+}
+
+function findMatchingCommand(shortcut: string, customBinds: Record<string, string>): CommandDefinition | undefined {
+  // Check custom binds first
+  for (const [cmdId, boundShortcut] of Object.entries(customBinds)) {
+    if (boundShortcut === shortcut) {
+      return COMMAND_DEFINITIONS.find((c) => c.id === cmdId);
+    }
+  }
+  // Fall back to defaults
+  return COMMAND_DEFINITIONS.find((c) => c.defaultShortcut === shortcut);
+}
 
 interface TabDef {
   id: TabId;
@@ -79,6 +121,31 @@ export default function App(): React.ReactElement {
   const activeTabRef = useRef<TabId>(activeTab);
   activeTabRef.current = activeTab;
   const isFullscreenRef = useRef(false);
+
+  /* Command palette context refs */
+  const selectedGameRef = useRef<string | null>(null);
+  const selectedMovieRef = useRef<string | null>(null);
+  const selectedMusicRef = useRef<string | null>(null);
+  const selectedTvRef = useRef<string | null>(null);
+
+  /* Re-assignable keybind refs (keyboard handler captures at mount) */
+  const customKeybindsRef = useRef<Record<string, string>>({});
+  const customControllerMapRef = useRef<Record<string, string>>({});
+  customKeybindsRef.current = settings?.commandKeybinds ?? {};
+  customControllerMapRef.current = settings?.commandControllerMap ?? {};
+  const executeCommandRef = useRef<(cmd: CommandDefinition) => void>(() => {});
+
+  const { executeCommand } = useCommands(
+    {
+      activeTab: activeTabRef.current,
+      selectedGameId: selectedGameRef.current,
+      selectedMovieId: selectedMovieRef.current,
+      selectedMusicId: selectedMusicRef.current,
+      selectedTvId: selectedTvRef.current,
+    },
+    setActiveTab,
+  );
+  executeCommandRef.current = executeCommand;
 
   useEffect(() => {
     load();
@@ -164,6 +231,32 @@ export default function App(): React.ReactElement {
     return () => window.removeEventListener("htpc:switch-tab", handler);
   }, []);
 
+  /* Listen for selection changes from tabs for command palette context */
+  useEffect(() => {
+    const onSelectGame = (e: Event) => {
+      selectedGameRef.current = (e as CustomEvent).detail?.id ?? null;
+    };
+    const onSelectMovie = (e: Event) => {
+      selectedMovieRef.current = (e as CustomEvent).detail?.id ?? null;
+    };
+    const onSelectMusic = (e: Event) => {
+      selectedMusicRef.current = (e as CustomEvent).detail?.id ?? null;
+    };
+    const onSelectTv = (e: Event) => {
+      selectedTvRef.current = (e as CustomEvent).detail?.id ?? null;
+    };
+    window.addEventListener("htpc:select-game", onSelectGame);
+    window.addEventListener("htpc:select-movie", onSelectMovie);
+    window.addEventListener("htpc:select-music", onSelectMusic);
+    window.addEventListener("htpc:select-tv", onSelectTv);
+    return () => {
+      window.removeEventListener("htpc:select-game", onSelectGame);
+      window.removeEventListener("htpc:select-movie", onSelectMovie);
+      window.removeEventListener("htpc:select-music", onSelectMusic);
+      window.removeEventListener("htpc:select-tv", onSelectTv);
+    };
+  }, []);
+
   useEffect(() => {
     const unsubConnect = window.htpc.input.onDeviceConnected(addDevice);
     const unsubDisconnect =
@@ -172,6 +265,17 @@ export default function App(): React.ReactElement {
       useInputStore.getState().setLastEvent(ev);
       if (ev.type !== "button_press") return;
 
+      // Check custom controller mappings first
+      const ctrlMap = customControllerMapRef.current;
+      const mappedCmdId = Object.entries(ctrlMap).find(([, btn]) => btn === ev.action)?.[0];
+      if (mappedCmdId) {
+        const cmd = COMMAND_DEFINITIONS.find((c) => c.id === mappedCmdId);
+        if (cmd) {
+          executeCommandRef.current(cmd);
+          return;
+        }
+      }
+
       if (ev.action === "start") {
         const idx = visibleTabIds.indexOf(activeTabRef.current);
         setActiveTab(visibleTabIds[(idx + 1) % visibleTabIds.length]);
@@ -179,6 +283,10 @@ export default function App(): React.ReactElement {
         window.dispatchEvent(
           new CustomEvent("htpc:contextmenu", { detail: { source: "gamepad" } }),
         );
+      } else if (ev.action === "north") {
+        useCommandsStore.getState().open();
+      } else if (ev.action === "select") {
+        useCommandsStore.getState().toggle();
       } else {
         const actionMap: Record<string, string> = {
           dpad_up: "up",
@@ -231,6 +339,17 @@ export default function App(): React.ReactElement {
           target.tagName === "TEXTAREA" ||
           target.tagName === "SELECT" ||
           target.isContentEditable);
+
+      // Check custom keybinds first (before defaults)
+      if (e.type === "keydown") {
+        const shortcut = normalizeShortcut(e);
+        const matched = findMatchingCommand(shortcut, customKeybindsRef.current);
+        if (matched) {
+          e.preventDefault();
+          executeCommandRef.current(matched);
+          return;
+        }
+      }
 
       if (e.key === "F11") {
         e.preventDefault();
@@ -312,6 +431,34 @@ export default function App(): React.ReactElement {
         e.preventDefault();
         const idx = visibleTabIds.indexOf(activeTabRef.current);
         setActiveTab(visibleTabIds[(idx - 1 + visibleTabIds.length) % visibleTabIds.length]);
+      } else if (e.type === "keydown" && e.key === "F1" && e.ctrlKey) {
+        // Ctrl+F1 — rescan all libraries
+        e.preventDefault();
+        useGamesStore.getState().scan();
+        useMoviesStore.getState().scan();
+        useMusicStore.getState().scan();
+        useTvStore.getState().scan();
+      } else if (e.type === "keydown" && e.key === "F2" && e.ctrlKey) {
+        // Ctrl+F2 — wipe library data then reload
+        e.preventDefault();
+        window.htpc.db.clear().then(() => window.htpc.app.restart());
+      } else if (e.type === "keydown" && e.key === "F3" && e.ctrlKey) {
+        // Ctrl+F3 — wipe thumbnail cache then reload stores
+        e.preventDefault();
+        window.htpc.db.wipeThumbnails().then(() => {
+          useGamesStore.getState().load();
+          useMoviesStore.getState().load();
+          useMusicStore.getState().load();
+          useTvStore.getState().load();
+        });
+      } else if (e.type === "keydown" && e.key === "F5" && e.ctrlKey) {
+        // Ctrl+F5 — reload window
+        e.preventDefault();
+        window.htpc.app.restart();
+      } else if (e.type === "keydown" && e.key === "p" && e.ctrlKey && !e.shiftKey) {
+        // Ctrl+P — open command palette
+        e.preventDefault();
+        useCommandsStore.getState().toggle();
       } else if (e.type === "keydown" && e.key === "F5") {
         e.preventDefault();
         const scanMap: Partial<Record<TabId, () => void>> = {
@@ -434,7 +581,10 @@ export default function App(): React.ReactElement {
                 color: "var(--color-text-dim)",
                 background: "transparent",
               }}
-              onClick={() => window.htpc.app.setFullscreen(true)}
+              onClick={() => {
+                isFullscreenRef.current = !isFullscreenRef.current;
+                window.htpc.app.setFullscreen(isFullscreenRef.current);
+              }}
               title="Fullscreen"
             >
               ⛶
@@ -474,6 +624,9 @@ export default function App(): React.ReactElement {
       <ErrorBoundary>
         <LibretroPlayer />
       </ErrorBoundary>
+
+      {/* Command Palette */}
+      <CommandPalette onExecute={(cmd: CommandDefinition) => executeCommand(cmd)} />
     </div>
   );
 }

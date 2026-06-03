@@ -25,13 +25,15 @@ interface V86Config {
   memory_size?: number;
 }
 
+interface V86Instance {
+  stop: () => void;
+  destroy: () => void;
+  add_listener(event: string, handler: (...args: unknown[]) => void): void;
+}
+
 declare global {
   interface Window {
-    V86?: new (config: V86Config) => {
-      stop: () => void;
-      destroy: () => void;
-      add_listener(event: string, handler: (...args: unknown[]) => void): void;
-    };
+    V86?: new (config: V86Config) => V86Instance;
   }
 }
 
@@ -56,7 +58,7 @@ function isFloppyImage(size: number): boolean {
 export const V86Player: React.FC = () => {
   const { open, romPath, title, close } = useV86PlayerStore();
   const containerRef = useRef<HTMLDivElement>(null);
-  const emulatorRef = useRef<InstanceType<typeof window.V86> | null>(null);
+  const emulatorRef = useRef<V86Instance | null>(null);
   const scriptLoadedRef = useRef(false);
 
   useEffect(() => {

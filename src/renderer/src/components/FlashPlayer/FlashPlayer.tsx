@@ -429,7 +429,7 @@ export const FlashPlayer: React.FC = () => {
 
         if (axis === "left_x") axisState.left_x = norm;
         if (axis === "left_y") axisState.left_y = norm;
-        if (axis === "right_z") axisState.right_x = norm;
+        if (axis === "right_z") axisState.right_z = norm;
         if (axis === "right_y") axisState.right_y = norm;
       }
     };

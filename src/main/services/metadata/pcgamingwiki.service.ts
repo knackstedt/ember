@@ -53,6 +53,20 @@ interface PCGWInfoboxData {
 }
 
 /**
+ * Strip wikitext templates and extract the last pipe-delimited parameter.
+ * Turns `{{Infobox game/row/developer|Studio Name}}` into `Studio Name`.
+ */
+function stripWikiTemplates(value: string): string {
+  return value
+    .replace(/\{\{([^|}]+(?:\|[^}]+)+)\}\}/g, (_, inner) => {
+      const parts = inner.split('|');
+      return parts[parts.length - 1].trim();
+    })
+    .replace(/\{\{[^}]+\}\}/g, '')
+    .trim();
+}
+
+/**
  * Parse PCGamingWiki infobox wikitext to extract structured data
  */
 function parseInfobox(wikitext: string): PCGWInfoboxData {
@@ -71,45 +85,45 @@ function parseInfobox(wikitext: string): PCGWInfoboxData {
   }
 
   // Extract series
-  const seriesMatch = wikitext.match(/\|\s*series\s*=\s*([^\n|]+)/);
+  const seriesMatch = wikitext.match(/\|\s*series\s*=\s*([^\n]+)/);
   if (seriesMatch) {
-    data.series = seriesMatch[1].trim();
+    data.series = stripWikiTemplates(seriesMatch[1]);
   }
 
   // Extract developer
-  const devMatch = wikitext.match(/\|\s*developers\s*=\s*([^\n|]+)/);
+  const devMatch = wikitext.match(/\|\s*developers\s*=\s*([^\n]+)/);
   if (devMatch) {
-    data.developer = devMatch[1].trim().split(',').map(d => d.trim())[0];
+    data.developer = stripWikiTemplates(devMatch[1]).split(',').map(d => d.trim())[0];
   }
 
   // Extract publisher
-  const pubMatch = wikitext.match(/\|\s*publishers\s*=\s*([^\n|]+)/);
+  const pubMatch = wikitext.match(/\|\s*publishers\s*=\s*([^\n]+)/);
   if (pubMatch) {
-    data.publisher = pubMatch[1].trim().split(',').map(p => p.trim())[0];
+    data.publisher = stripWikiTemplates(pubMatch[1]).split(',').map(p => p.trim())[0];
   }
 
   // Extract engine
-  const engineMatch = wikitext.match(/\|\s*engines?\s*=\s*([^\n|]+)/);
+  const engineMatch = wikitext.match(/\|\s*engines?\s*=\s*([^\n]+)/);
   if (engineMatch) {
-    data.engine = engineMatch[1].trim();
+    data.engine = stripWikiTemplates(engineMatch[1]);
   }
 
   // Extract release date
-  const dateMatch = wikitext.match(/\|\s*release_date\s*=\s*([^\n|]+)/);
+  const dateMatch = wikitext.match(/\|\s*release_date\s*=\s*([^\n]+)/);
   if (dateMatch) {
-    data.releaseDate = dateMatch[1].trim();
+    data.releaseDate = stripWikiTemplates(dateMatch[1]);
   }
 
   // Extract genres
-  const genreMatch = wikitext.match(/\|\s*genres\s*=\s*([^\n|]+)/);
+  const genreMatch = wikitext.match(/\|\s*genres\s*=\s*([^\n]+)/);
   if (genreMatch) {
-    data.genres = genreMatch[1].trim().split(',').map(g => g.trim());
+    data.genres = stripWikiTemplates(genreMatch[1]).split(',').map(g => g.trim()).filter(Boolean);
   }
 
   // Extract Linux support
-  const linuxMatch = wikitext.match(/\|\s*wine\s*=\s*([^\n|]+)/);
+  const linuxMatch = wikitext.match(/\|\s*wine\s*=\s*([^\n]+)/);
   if (linuxMatch) {
-    const wineText = linuxMatch[1].toLowerCase();
+    const wineText = stripWikiTemplates(linuxMatch[1]).toLowerCase();
     if (wineText.includes('native')) data.wineSupport = 'native';
     else if (wineText.includes('perfect')) data.wineSupport = 'perfect';
     else if (wineText.includes('playable')) data.wineSupport = 'playable';
@@ -118,9 +132,9 @@ function parseInfobox(wikitext: string): PCGWInfoboxData {
   }
 
   // Extract Proton support
-  const protonMatch = wikitext.match(/\|\s*proton\s*=\s*([^\n|]+)/);
+  const protonMatch = wikitext.match(/\|\s*proton\s*=\s*([^\n]+)/);
   if (protonMatch) {
-    const protonText = protonMatch[1].toLowerCase();
+    const protonText = stripWikiTemplates(protonMatch[1]).toLowerCase();
     if (protonText.includes('native')) data.protonSupport = 'native';
     else if (protonText.includes('platinum')) data.protonSupport = 'perfect';
     else if (protonText.includes('gold')) data.protonSupport = 'playable';

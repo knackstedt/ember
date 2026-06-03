@@ -14,6 +14,7 @@ import {
   ManagedPackage,
   PackageOperationProgress,
 } from "../../../../shared/types";
+import { KeybindEditor } from "../../components/KeybindEditor/KeybindEditor";
 
 const DEFAULT_FLASH_SETTINGS: FlashSettings = {
   aspectRatio: "free",
@@ -38,6 +39,10 @@ const DEFAULT_FLASH_SETTINGS: FlashSettings = {
   stickToMouse: true,
   stickSensitivity: 1.0,
   aiUpscaling: false,
+  filter: "none",
+  filterIntensity: 1.0,
+  pixelateSize: 4,
+  ditherLevels: 4,
 };
 
 function getFlashSettings(settings?: Partial<FlashSettings>): FlashSettings {
@@ -254,6 +259,106 @@ function Toggle({
   );
 }
 
+const TOC_ITEMS = [
+  { id: "appearance", label: "Appearance" },
+  { id: "tabs", label: "Tabs" },
+  { id: "daily-background", label: "Daily Background" },
+  { id: "media-directories", label: "Media Directories" },
+  { id: "api-keys", label: "API Keys" },
+  { id: "general", label: "General" },
+  { id: "flash-player", label: "Flash Player" },
+  { id: "emulators", label: "Emulators" },
+  { id: "streaming-services", label: "Streaming Services" },
+  { id: "danger-zone", label: "Danger Zone" },
+  { id: "plugins", label: "Plugins" },
+  { id: "dependencies-cores", label: "Dependencies & Cores" },
+];
+
+function SettingsTOC(): React.ReactElement {
+  const [activeId, setActiveId] = useState<string>(TOC_ITEMS[0].id);
+
+  useEffect(() => {
+    const container = document.querySelector(".gpu-scroll") as HTMLElement | null;
+    if (!container) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            setActiveId(entry.target.id);
+          }
+        }
+      },
+      {
+        root: container,
+        rootMargin: "-10% 0px -70% 0px",
+        threshold: 0,
+      }
+    );
+
+    for (const item of TOC_ITEMS) {
+      const el = document.getElementById(item.id);
+      if (el) observer.observe(el);
+    }
+
+    return () => observer.disconnect();
+  }, []);
+
+  const handleClick = (id: string) => {
+    const el = document.getElementById(id);
+    const container = document.querySelector(".gpu-scroll") as HTMLElement | null;
+    if (!el || !container) return;
+
+    const target = el.offsetTop - 24;
+    const start = container.scrollTop;
+    const delta = target - start;
+    const duration = 180;
+    const startTime = performance.now();
+
+    const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
+
+    const tick = (now: number) => {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      container.scrollTop = start + delta * easeOutCubic(progress);
+      if (progress < 1) requestAnimationFrame(tick);
+    };
+
+    requestAnimationFrame(tick);
+  };
+
+  return (
+    <nav className="flex flex-col gap-1">
+      <span
+        className="text-xs font-semibold uppercase tracking-wider mb-2"
+        style={{ color: "var(--color-text-dim)" }}
+      >
+        Settings
+      </span>
+      {TOC_ITEMS.map((item) => (
+        <button
+          key={item.id}
+          onClick={() => handleClick(item.id)}
+          className="text-left text-sm px-2 py-1 rounded transition-colors"
+          style={{
+            color:
+              activeId === item.id
+                ? "var(--color-accent)"
+                : "var(--color-text-dim)",
+            background:
+              activeId === item.id
+                ? "var(--color-surface-raised)"
+                : "transparent",
+            fontWeight: activeId === item.id ? 600 : 400,
+          }}
+        >
+          {item.label}
+        </button>
+      ))}
+    </nav>
+  );
+}
+
 export const SettingsTab: React.FC = () => {
   const { settings, update } = useSettingsStore();
   const [clearConfirm, setClearConfirm] = useState(false);
@@ -321,7 +426,7 @@ export const SettingsTab: React.FC = () => {
         setTimeout(() => loadPackages(), 500);
       }
     });
-    return unsubscribe;
+    return () => { unsubscribe(); };
   }, []);
 
   const loadPackages = async () => {
@@ -447,8 +552,9 @@ export const SettingsTab: React.FC = () => {
 
   return (
     <div className="h-full overflow-y-auto gpu-scroll">
-      <div className="max-w-2xl mx-auto p-6 flex flex-col gap-8">
-        <section className="flex flex-col gap-4">
+      <div className="max-w-5xl mx-auto p-6 flex gap-8">
+        <div className="flex-1 min-w-0 max-w-2xl flex flex-col gap-8">
+        <section id="appearance" className="flex flex-col gap-4">
           <h2
             className="text-lg font-semibold"
             style={{ color: "var(--color-text)" }}
@@ -498,7 +604,7 @@ export const SettingsTab: React.FC = () => {
           />
         </section>
 
-        <section className="flex flex-col gap-4">
+        <section id="tabs" className="flex flex-col gap-4">
           <h2
             className="text-lg font-semibold"
             style={{ color: "var(--color-text)" }}
@@ -552,7 +658,7 @@ export const SettingsTab: React.FC = () => {
           })}
         </section>
 
-        <section className="flex flex-col gap-4">
+        <section id="daily-background" className="flex flex-col gap-4">
           <h2
             className="text-lg font-semibold"
             style={{ color: "var(--color-text)" }}
@@ -627,7 +733,7 @@ export const SettingsTab: React.FC = () => {
           )}
         </section>
 
-        <section className="flex flex-col gap-4">
+        <section id="media-directories" className="flex flex-col gap-4">
           <h2
             className="text-lg font-semibold"
             style={{ color: "var(--color-text)" }}
@@ -660,7 +766,7 @@ export const SettingsTab: React.FC = () => {
           />
         </section>
 
-        <section className="flex flex-col gap-4">
+        <section id="api-keys" className="flex flex-col gap-4">
           <h2
             className="text-lg font-semibold"
             style={{ color: "var(--color-text)" }}
@@ -700,7 +806,7 @@ export const SettingsTab: React.FC = () => {
           />
         </section>
 
-        <section className="flex flex-col gap-2">
+        <section id="general" className="flex flex-col gap-2">
           <h2
             className="text-lg font-semibold"
             style={{ color: "var(--color-text)" }}
@@ -719,7 +825,38 @@ export const SettingsTab: React.FC = () => {
           />
         </section>
 
-        <section className="flex flex-col gap-4">
+        <section id="keybinds" className="flex flex-col gap-4">
+          <h2
+            className="text-lg font-semibold"
+            style={{ color: "var(--color-text)" }}
+          >
+            Keybinds & Controller
+          </h2>
+          <p className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+            Click a shortcut to record a new keyboard combination. Click the controller button to assign a gamepad button.
+          </p>
+          <KeybindEditor
+            keybinds={settings.commandKeybinds ?? {}}
+            controllerMap={settings.commandControllerMap ?? {}}
+            onChangeKeybind={(cmdId, shortcut) => {
+              const next = { ...(settings.commandKeybinds ?? {}) };
+              if (shortcut) next[cmdId] = shortcut;
+              else delete next[cmdId];
+              update({ commandKeybinds: next });
+            }}
+            onChangeController={(cmdId, button) => {
+              const next = { ...(settings.commandControllerMap ?? {}) };
+              if (button) next[cmdId] = button;
+              else delete next[cmdId];
+              update({ commandControllerMap: next });
+            }}
+            onResetAll={() => {
+              update({ commandKeybinds: {}, commandControllerMap: {} });
+            }}
+          />
+        </section>
+
+        <section id="flash-player" className="flex flex-col gap-4">
           <h2
             className="text-lg font-semibold"
             style={{ color: "var(--color-text)" }}
@@ -890,7 +1027,7 @@ export const SettingsTab: React.FC = () => {
           </div>
         </section>
 
-        <section className="flex flex-col gap-4">
+        <section id="emulators" className="flex flex-col gap-4">
           <h2
             className="text-lg font-semibold"
             style={{ color: "var(--color-text)" }}
@@ -971,7 +1108,7 @@ export const SettingsTab: React.FC = () => {
           </div>
         </section>
 
-        <section className="flex flex-col gap-4">
+        <section id="streaming-services" className="flex flex-col gap-4">
           <h2
             className="text-lg font-semibold"
             style={{ color: "var(--color-text)" }}
@@ -1147,7 +1284,7 @@ export const SettingsTab: React.FC = () => {
           )}
         </section>
 
-        <section className="flex flex-col gap-4">
+        <section id="danger-zone" className="flex flex-col gap-4">
           <h2
             className="text-lg font-semibold"
             style={{ color: "var(--color-text)" }}
@@ -1220,7 +1357,7 @@ export const SettingsTab: React.FC = () => {
           </AnimatePresence>
         </section>
 
-        <section className="flex flex-col gap-4">
+        <section id="plugins" className="flex flex-col gap-4">
           <h2
             className="text-lg font-semibold"
             style={{ color: "var(--color-text)" }}
@@ -1256,7 +1393,7 @@ export const SettingsTab: React.FC = () => {
           </motion.button>
         </section>
 
-        <section className="flex flex-col gap-4">
+        <section id="dependencies-cores" className="flex flex-col gap-4">
           <h2
             className="text-lg font-semibold"
             style={{ color: "var(--color-text)" }}
@@ -1515,8 +1652,14 @@ export const SettingsTab: React.FC = () => {
           </div>
         </section>
       </div>
+      <aside className="hidden lg:block w-48 flex-shrink-0">
+        <div className="sticky top-6">
+          <SettingsTOC />
+        </div>
+      </aside>
+    </div>
 
-      {/* APT Password Modal */}
+    {/* APT Password Modal */}
       <AnimatePresence>
         {showAptPassword && (
           <motion.div
