@@ -70,7 +70,7 @@ function coverFor(game: HeroicGame, imagesDir: string): string | undefined {
     join(imagesDir, `${game.app_name}.jpg`),
     join(imagesDir, `${game.app_name}.png`),
   ].filter((p): p is string => !!p && existsSync(p));
-  return paths[0] ? `file://${paths[0]}` : undefined;
+  return paths[0] ? `ember://media/${paths[0]}` : undefined;
 }
 
 function parseLibrary(
@@ -150,7 +150,7 @@ export function scanLutrisGames(): Game[] {
         platform: "desktop",
         execPath: data.exe,
         coverUrl: data.banner
-          ? `file://${join(homedir(), ".cache", "lutris", "coverart", `${data.slug}.jpg`)}`
+          ? `ember://media/${join(homedir(), ".cache", "lutris", "coverart", `${data.slug}.jpg`)}`
           : undefined,
         tags: [],
       });

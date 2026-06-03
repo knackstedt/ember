@@ -73,7 +73,7 @@ function findCover(gridDir: string | null, appId: string): string | undefined {
     for (const sfx of suffixes) {
       for (const ext of exts) {
         const candidate = join(gridDir, `${appId}${sfx}.${ext}`);
-        if (existsSync(candidate)) return `file://${candidate}`;
+        if (existsSync(candidate)) return `ember://media/${candidate}`;
       }
     }
   }

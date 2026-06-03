@@ -44,6 +44,7 @@ export const TVShowsTab: React.FC = () => {
   const [showCollectionManager, setShowCollectionManager] = useState(false);
   const [collectionItemIds, setCollectionItemIds] = useState<Set<string>>(new Set());
   const gridRef = useRef<VirtualGridHandle>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const [subTab, setSubTab] = useState<SubTab>("ai-groups");
   const [aiGroups, setAiGroups] = useState<AiGroup[]>([]);
@@ -187,7 +188,7 @@ export const TVShowsTab: React.FC = () => {
     { key: "rating", label: "Rating", accessor: (s) => String((s as Record<string, unknown>).rating ?? ""), maxValues: 5 },
   ], []);
 
-  const { focusedIndex } = useGridFocus({
+  const { focusedIndex, setFocusedIndex } = useGridFocus({
     items: gridItems,
     columnCount,
     gridRef,
@@ -285,174 +286,199 @@ export const TVShowsTab: React.FC = () => {
           isFavorite={show.isFavorite}
           isFocused={index === focusedIndex}
           isLoading={regeneratingIds.has(show.id)}
-          onSelect={() => setSelected(show)}
+          onSelect={() => { setFocusedIndex(index); setSelected(show); }}
           onFavorite={() => toggleFavorite(show.id)}
         />
       </div>
     ),
-    [bindItem, focusedIndex, regeneratingIds, toggleFavorite],
+    [bindItem, focusedIndex, setFocusedIndex, regeneratingIds, toggleFavorite],
   );
 
   return (
-    <div className="flex flex-col h-full gap-3 p-4">
-      <div className="flex gap-3 items-center flex-shrink-0">
-        <OskInput
-          value={searchQuery}
-          onChange={setSearch}
-          placeholder="Search TV shows…"
-          className="text-sm"
-          style={{ maxWidth: 280 } as React.CSSProperties}
-        />
-        <motion.button
-          className="px-4 py-2 rounded-[var(--radius-card)] text-sm"
-          style={{
-            background: "var(--color-surface-raised)",
-            color: "var(--color-text)",
-            border: "1px solid var(--color-border)",
-          }}
-          onClick={scan}
-          whileTap={{ scale: 0.96 }}
-          disabled={scanning}
-        >
-          {scanning ? "⟳ Scanning…" : "↺ Scan"}
-        </motion.button>
-        <span className="text-sm" style={{ color: "var(--color-text-dim)" }}>
-          {items.length} shows
-        </span>
-      </div>
-
-      <CollectionsBar
-        itemType="tv"
-        activeCollectionId={activeCollectionId}
-        onSelect={setActiveCollectionId}
-        onManage={() => setShowCollectionManager(true)}
-        className="flex-shrink-0"
-      />
-
-      {/* View-mode sub-tabs */}
-      <div className="flex gap-2 flex-shrink-0 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
-        {(["ai-groups", "all"] as SubTab[]).map((m) => (
-          <motion.button
-            key={m}
-            onClick={() => {
-              setSubTab(m);
-              setSelectedAiGroupId(null);
-            }}
-            className="relative flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-colors focus:outline-none"
-            style={{
-              backgroundColor: subTab === m
-                ? "var(--color-accent)"
-                : "var(--color-surface-raised)",
-              color: subTab === m ? "var(--color-bg)" : "var(--color-text-dim)",
-              border: `1px solid ${subTab === m ? "var(--color-accent)" : "var(--color-border)"}`,
-              boxShadow: subTab === m ? "var(--shadow-glow)" : "none",
-            }}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            {m === "ai-groups" ? "✨ Groups" : "All"}
-          </motion.button>
-        ))}
-      </div>
-
-      {/* AI group chips */}
-      {subTab === "ai-groups" && aiGroups.length > 0 && (
-        <div className="flex gap-2 flex-shrink-0 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
-          <motion.button
-            onClick={() => setSelectedAiGroupId(null)}
-            className="relative flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors focus:outline-none"
-            style={{
-              backgroundColor: !selectedAiGroupId
-                ? "var(--color-accent)"
-                : "var(--color-surface-raised)",
-              color: !selectedAiGroupId ? "var(--color-bg)" : "var(--color-text-dim)",
-              border: `1px solid ${!selectedAiGroupId ? "var(--color-accent)" : "var(--color-border)"}`,
-            }}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            All Groups
-          </motion.button>
-          {aiGroups.map((g, i) => (
-            <motion.button
-              key={g.id}
-              onClick={() => setSelectedAiGroupId(g.id)}
-              className="relative flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors focus:outline-none"
-              style={{
-                backgroundColor: selectedAiGroupId === g.id
-                  ? "var(--color-accent)"
-                  : "var(--color-surface-raised)",
-                color: selectedAiGroupId === g.id ? "var(--color-bg)" : "var(--color-text-dim)",
-                border: `1px solid ${selectedAiGroupId === g.id ? "var(--color-accent)" : "var(--color-border)"}`,
-              }}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              {g.label} ({g.itemIds.length})
-            </motion.button>
-          ))}
-        </div>
-      )}
-
-      {subTab === "ai-groups" && aiGroupsLoading && (
-        <div className="flex items-center gap-2 flex-shrink-0" style={{ color: "var(--color-text-dim)" }}>
-          <div className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "var(--color-accent)", borderTopColor: "transparent" }} />
-          <span className="text-xs">Generating smart groups…</span>
-        </div>
-      )}
-
-      {/* Dynamic metadata facets */}
-      {gridItems.length > 0 && (
-        <DynamicFacetFilters
-          items={facetSourceItems as Record<string, unknown>[]}
-          fields={tvFacetFields}
-          activeFilters={facetFilters}
-          onFilter={applyFacetFilter}
-          className="flex-shrink-0"
-        />
-      )}
-
-      {loading ? (
-        <div
-          className="flex-1 flex items-center justify-center"
-          style={{ color: "var(--color-text-dim)" }}
-        >
-          Loading TV shows…
-        </div>
-      ) : scanning && items.length === 0 ? (
-        <div
-          className="flex-1 flex flex-col items-center justify-center gap-3"
-          style={{ color: "var(--color-text-dim)" }}
-        >
-          <div
-            className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin"
-            style={{
-              borderColor: "var(--color-accent)",
-              borderTopColor: "transparent",
-            }}
+    <div className="flex flex-col h-full">
+      <div
+        ref={scrollContainerRef}
+        className="flex-1 min-h-0 overflow-y-auto gpu-scroll"
+        style={{ padding: 16 }}
+      >
+        {/* Collapsible content — scrolls out of view */}
+        <div className="flex flex-col gap-3 mb-3">
+          <CollectionsBar
+            itemType="tv"
+            activeCollectionId={activeCollectionId}
+            onSelect={setActiveCollectionId}
+            onManage={() => setShowCollectionManager(true)}
+            className="flex-shrink-0"
           />
-          <span className="text-sm">Scanning for shows…</span>
         </div>
-      ) : items.length === 0 ? (
+
+        {/* Sticky filters — pin at top when scrolled */}
         <div
-          className="flex-1 flex flex-col items-center justify-center gap-4"
-          style={{ color: "var(--color-text-dim)" }}
+          className="flex flex-col gap-3 pb-3"
+          style={{
+            position: "sticky",
+            top: -16,
+            zIndex: 10,
+            background: "var(--color-bg)",
+            paddingTop: 16,
+            marginTop: -16,
+            marginLeft: -16,
+            marginRight: -16,
+            paddingLeft: 16,
+            paddingRight: 16,
+          }}
         >
-          <p>No TV shows found.</p>
-          <motion.button
-            className="px-6 py-2.5 rounded-[var(--radius-card)] font-medium"
-            style={{
-              background: "var(--color-accent)",
-              color: "var(--color-bg)",
-            }}
-            onClick={scan}
-            whileTap={{ scale: 0.96 }}
-          >
-            Scan for shows
-          </motion.button>
+          <div className="flex gap-3 items-center flex-shrink-0">
+            <OskInput
+              value={searchQuery}
+              onChange={setSearch}
+              placeholder="Search TV shows…"
+              className="text-sm"
+              style={{ maxWidth: 280 } as React.CSSProperties}
+            />
+            <motion.button
+              className="px-4 py-2 rounded-[var(--radius-card)] text-sm"
+              style={{
+                background: "var(--color-surface-raised)",
+                color: "var(--color-text)",
+                border: "1px solid var(--color-border)",
+              }}
+              onClick={scan}
+              whileTap={{ scale: 0.96 }}
+              disabled={scanning}
+            >
+              {scanning ? "⟳ Scanning…" : "↺ Scan"}
+            </motion.button>
+            <span className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+              {items.length} shows
+            </span>
+          </div>
+
+          {/* View-mode sub-tabs */}
+          <div className="flex gap-2 flex-shrink-0 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+            {(["ai-groups", "all"] as SubTab[]).map((m) => (
+              <motion.button
+                key={m}
+                onClick={() => {
+                  setSubTab(m);
+                  setSelectedAiGroupId(null);
+                }}
+                className="relative flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-colors focus:outline-none"
+                style={{
+                  backgroundColor: subTab === m
+                    ? "var(--color-accent)"
+                    : "var(--color-surface-raised)",
+                  color: subTab === m ? "var(--color-bg)" : "var(--color-text-dim)",
+                  border: `1px solid ${subTab === m ? "var(--color-accent)" : "var(--color-border)"}`,
+                  boxShadow: subTab === m ? "var(--shadow-glow)" : "none",
+                }}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                {m === "ai-groups" ? "✨ Groups" : "All"}
+              </motion.button>
+            ))}
+          </div>
+
+          {/* AI group chips */}
+          {subTab === "ai-groups" && aiGroups.length > 0 && (
+            <div className="flex gap-2 flex-shrink-0 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+              <motion.button
+                onClick={() => setSelectedAiGroupId(null)}
+                className="relative flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors focus:outline-none"
+                style={{
+                  backgroundColor: !selectedAiGroupId
+                    ? "var(--color-accent)"
+                    : "var(--color-surface-raised)",
+                  color: !selectedAiGroupId ? "var(--color-bg)" : "var(--color-text-dim)",
+                  border: `1px solid ${!selectedAiGroupId ? "var(--color-accent)" : "var(--color-border)"}`,
+                }}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                All Groups
+              </motion.button>
+              {aiGroups.map((g, i) => (
+                <motion.button
+                  key={g.id}
+                  onClick={() => setSelectedAiGroupId(g.id)}
+                  className="relative flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors focus:outline-none"
+                  style={{
+                    backgroundColor: selectedAiGroupId === g.id
+                      ? "var(--color-accent)"
+                      : "var(--color-surface-raised)",
+                    color: selectedAiGroupId === g.id ? "var(--color-bg)" : "var(--color-text-dim)",
+                    border: `1px solid ${selectedAiGroupId === g.id ? "var(--color-accent)" : "var(--color-border)"}`,
+                  }}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  {g.label} ({g.itemIds.length})
+                </motion.button>
+              ))}
+            </div>
+          )}
+
+          {subTab === "ai-groups" && aiGroupsLoading && (
+            <div className="flex items-center gap-2 flex-shrink-0" style={{ color: "var(--color-text-dim)" }}>
+              <div className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "var(--color-accent)", borderTopColor: "transparent" }} />
+              <span className="text-xs">Generating smart groups…</span>
+            </div>
+          )}
+
+          {/* Dynamic metadata facets */}
+          {gridItems.length > 0 && (
+            <DynamicFacetFilters
+              items={facetSourceItems as Record<string, unknown>[]}
+              fields={tvFacetFields}
+              activeFilters={facetFilters}
+              onFilter={applyFacetFilter}
+              className="flex-shrink-0"
+            />
+          )}
         </div>
-      ) : (
-        <div className="flex-1 min-h-0 min-w-0 overflow-hidden">
+
+        {/* Grid content — participates in the outer scroll */}
+        {loading ? (
+          <div
+            className="flex items-center justify-center"
+            style={{ color: "var(--color-text-dim)", minHeight: 200 }}
+          >
+            Loading TV shows…
+          </div>
+        ) : scanning && items.length === 0 ? (
+          <div
+            className="flex flex-col items-center justify-center gap-3"
+            style={{ color: "var(--color-text-dim)", minHeight: 200 }}
+          >
+            <div
+              className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin"
+              style={{
+                borderColor: "var(--color-accent)",
+                borderTopColor: "transparent",
+              }}
+            />
+            <span className="text-sm">Scanning for shows…</span>
+          </div>
+        ) : items.length === 0 ? (
+          <div
+            className="flex flex-col items-center justify-center gap-4"
+            style={{ color: "var(--color-text-dim)", minHeight: 200 }}
+          >
+            <p>No TV shows found.</p>
+            <motion.button
+              className="px-6 py-2.5 rounded-[var(--radius-card)] font-medium"
+              style={{
+                background: "var(--color-accent)",
+                color: "var(--color-bg)",
+              }}
+              onClick={scan}
+              whileTap={{ scale: 0.96 }}
+            >
+              Scan for shows
+            </motion.button>
+          </div>
+        ) : (
           <VirtualGrid
             ref={gridRef}
             items={gridItems}
@@ -460,9 +486,10 @@ export const TVShowsTab: React.FC = () => {
             onColumnCountChange={setColumnCount}
             rowHeight={300}
             renderItem={renderItem}
+            scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
           />
-        </div>
-      )}
+        )}
+      </div>
 
       <DetailPanel
         open={!!selected}

@@ -2,7 +2,8 @@
   "include": [
     "src/renderer/src/**/*",
     "src/shared/**/*",
-    "src/preload/index.ts"
+    "src/preload/index.ts",
+    "src/main/services/metadata/types.ts"
   ],
   "compilerOptions": {
     "composite": true,

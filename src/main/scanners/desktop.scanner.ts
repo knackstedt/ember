@@ -79,7 +79,7 @@ export function scanDesktopGames(): Game[] {
             `/usr/share/icons/hicolor/128x128/apps/${data.Icon}.png`,
           ];
           coverUrl = iconPaths.find(existsSync);
-          if (coverUrl) coverUrl = `file://${coverUrl}`;
+          if (coverUrl) coverUrl = `ember://media/${coverUrl}`;
         }
 
         games.push({
