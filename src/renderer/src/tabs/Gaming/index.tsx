@@ -574,49 +574,6 @@ export const GamingTab: React.FC = () => {
             onManage={() => setShowCollectionManager(true)}
             className="flex-shrink-0"
           />
-        </div>
-
-        {/* Sticky filters — pin at top when scrolled */}
-        <div
-          className="flex flex-col gap-3 pb-3"
-          style={{
-            position: "sticky",
-            top: -16,
-            zIndex: 10,
-            background: "var(--color-bg)",
-            paddingTop: 16,
-            marginTop: -16,
-            marginLeft: -16,
-            marginRight: -16,
-            paddingLeft: 16,
-            paddingRight: 16,
-          }}
-        >
-          <div className="flex items-center gap-3 flex-shrink-0">
-            <OskInput
-              value={searchQuery}
-              onChange={setSearch}
-              placeholder="Search games…"
-              className="text-sm"
-              style={{ maxWidth: 280 } as React.CSSProperties}
-            />
-            <motion.button
-              className="px-4 py-2 rounded-[var(--radius-card)] text-sm font-medium"
-              style={{
-                background: "var(--color-surface-raised)",
-                color: "var(--color-text)",
-                border: "1px solid var(--color-border)",
-              }}
-              onClick={scan}
-              whileTap={{ scale: 0.96 }}
-              disabled={scanning}
-            >
-              {scanning ? "⟳ Scanning…" : "↺ Scan"}
-            </motion.button>
-            <span className="text-sm" style={{ color: "var(--color-text-dim)" }}>
-              {items.length} games
-            </span>
-          </div>
 
           {/* View-mode sub-tabs */}
           <div className="flex gap-2 flex-shrink-0 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
@@ -706,12 +663,111 @@ export const GamingTab: React.FC = () => {
           {/* Dynamic metadata facets based on currently visible items */}
           {gridItems.length > 0 && (
             <DynamicFacetFilters
-              items={facetSourceItems as unknown as Record<string, unknown>[]}
+              items={facetSourceItems}
               fields={gameFacetFields}
               activeFilters={facetFilters}
               onFilter={applyFacetFilter}
               className="flex-shrink-0"
             />
+          )}
+        </div>
+
+        {/* Sticky compact bar — search + active filter summary */}
+        <div
+          className="flex items-center gap-2 pb-3 flex-wrap"
+          style={{
+            position: "sticky",
+            top: -16,
+            zIndex: 10,
+            background: "var(--color-bg)",
+            paddingTop: 16,
+            marginTop: -16,
+            marginLeft: -16,
+            marginRight: -16,
+            paddingLeft: 16,
+            paddingRight: 16,
+          }}
+        >
+          <OskInput
+            value={searchQuery}
+            onChange={setSearch}
+            placeholder="Search games…"
+            className="text-sm"
+            style={{ maxWidth: 220 } as React.CSSProperties}
+          />
+          <motion.button
+            className="px-3 py-1.5 rounded-[var(--radius-card)] text-xs font-medium"
+            style={{
+              background: "var(--color-surface-raised)",
+              color: "var(--color-text)",
+              border: "1px solid var(--color-border)",
+            }}
+            onClick={scan}
+            whileTap={{ scale: 0.96 }}
+            disabled={scanning}
+          >
+            {scanning ? "⟳ Scanning…" : "↺ Scan"}
+          </motion.button>
+          <span className="text-xs" style={{ color: "var(--color-text-dim)" }}>
+            {items.length} games
+          </span>
+          {/* Active filter summary chips */}
+          <span
+            className="px-2.5 py-0.5 rounded-full text-xs font-medium"
+            style={{
+              backgroundColor: "var(--color-accent)",
+              color: "var(--color-bg)",
+            }}
+          >
+            {viewMode === "all" ? "All" : viewMode === "ai-groups" ? "✨ Groups" : "By Platform"}
+          </span>
+          {viewMode === "ai-groups" && selectedAiGroupId && (() => {
+            const group = aiGroups.find((g) => g.id === selectedAiGroupId);
+            return group ? (
+              <motion.button
+                className="px-2.5 py-0.5 rounded-full text-xs font-medium"
+                style={{
+                  backgroundColor: "var(--color-accent)",
+                  color: "var(--color-bg)",
+                }}
+                onClick={() => setSelectedAiGroupId(null)}
+                whileTap={{ scale: 0.95 }}
+                title="Clear group filter"
+              >
+                Group: {group.label} ✕
+              </motion.button>
+            ) : null;
+          })()}
+          {viewMode === "by-platform" && activeFilter && (
+            <motion.button
+              className="px-2.5 py-0.5 rounded-full text-xs font-medium"
+              style={{
+                backgroundColor: "var(--color-accent)",
+                color: "var(--color-bg)",
+              }}
+              onClick={() => setFilter("all")}
+              whileTap={{ scale: 0.95 }}
+              title="Clear platform filter"
+            >
+              Platform: {PLATFORM_FILTERS.find((f) => f.id === activeFilter)?.label ?? activeFilter} ✕
+            </motion.button>
+          )}
+          {Object.entries(facetFilters).map(([key, value]) =>
+            value ? (
+              <motion.button
+                key={key}
+                className="px-2.5 py-0.5 rounded-full text-xs font-medium"
+                style={{
+                  backgroundColor: "var(--color-accent)",
+                  color: "var(--color-bg)",
+                }}
+                onClick={() => applyFacetFilter(key, null)}
+                whileTap={{ scale: 0.95 }}
+                title={`Clear ${key} filter`}
+              >
+                {gameFacetFields.find((f) => f.key === key)?.label ?? key}: {value} ✕
+              </motion.button>
+            ) : null,
           )}
         </div>
 
