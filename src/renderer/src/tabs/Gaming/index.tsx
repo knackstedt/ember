@@ -15,7 +15,6 @@ import { OskInput } from "../../components/OnScreenKeyboard/OnScreenKeyboard";
 import { RecentlyPlayedRow } from "../../components/RecentlyPlayedRow/RecentlyPlayedRow";
 import { CoreSelector } from "../../components/CoreSelector/CoreSelector";
 import { Game, GamePlatform, GameEmulatorConfig } from "../../../../shared/types";
-import { GameMetadata } from "../../../../shared/metadata";
 import { useGridFocus } from "../../hooks/useGridFocus";
 import { useContextMenu } from "../../hooks/useContextMenu";
 import { ContextMenuOption } from "../../components/ContextMenu/ContextMenu";
@@ -238,6 +237,25 @@ export const GamingTab: React.FC = () => {
     const handler = () => setSelected(null);
     window.addEventListener("htpc:escape", handler);
     return () => window.removeEventListener("htpc:escape", handler);
+  }, []);
+
+  /* Dispatch selection changes for command palette context */
+  useEffect(() => {
+    window.dispatchEvent(
+      new CustomEvent("htpc:select-game", { detail: { id: selected?.id ?? null } }),
+    );
+  }, [selected?.id]);
+
+  /* Listen for view-mode commands from command palette */
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as string;
+      if (["all", "ai-groups", "by-platform"].includes(detail)) {
+        setViewMode(detail as ViewMode);
+      }
+    };
+    window.addEventListener("htpc:gaming-view", handler);
+    return () => window.removeEventListener("htpc:gaming-view", handler);
   }, []);
 
   // Lazy metadata loading when detail panel opens
@@ -630,121 +648,7 @@ export const GamingTab: React.FC = () => {
                 </motion.button>
               ) : null,
             )}
-            {/* Expand/collapse filters button */}
-            <motion.button
-              className="px-2.5 py-0.5 rounded-full text-xs font-medium"
-              style={{
-                background: "var(--color-surface-raised)",
-                color: "var(--color-text)",
-                border: "1px solid var(--color-border)",
-              }}
-              onClick={() => setFiltersExpanded((v) => !v)}
-              whileTap={{ scale: 0.95 }}
-            >
-              {filtersExpanded ? "▲ Filters" : "▼ Filters"}
-            </motion.button>
           </div>
-
-          {/* Expanded filter options */}
-          {filtersExpanded && (
-            <div className="flex flex-col gap-3">
-              {/* View-mode sub-tabs */}
-              <div className="flex gap-2 flex-shrink-0 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
-                {(["all", "ai-groups", "by-platform"] as ViewMode[]).map((m) => (
-                  <motion.button
-                    key={m}
-                    onClick={() => {
-                      setViewMode(m);
-                      setSelectedAiGroupId(null);
-                    }}
-                    className="relative flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-colors focus:outline-none"
-                    style={{
-                      backgroundColor: viewMode === m
-                        ? "var(--color-accent)"
-                        : "var(--color-surface-raised)",
-                      color: viewMode === m ? "var(--color-bg)" : "var(--color-text-dim)",
-                      border: `1px solid ${viewMode === m ? "var(--color-accent)" : "var(--color-border)"}`,
-                      boxShadow: viewMode === m ? "var(--shadow-glow)" : "none",
-                    }}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    {m === "all" ? "All" : m === "ai-groups" ? "✨ Groups" : "By Platform"}
-                  </motion.button>
-                ))}
-              </div>
-
-              {/* AI group chips */}
-              {viewMode === "ai-groups" && aiGroups.length > 0 && (
-                <div className="flex gap-2 flex-shrink-0 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
-                  <motion.button
-                    onClick={() => setSelectedAiGroupId(null)}
-                    className="relative flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors focus:outline-none"
-                    style={{
-                      backgroundColor: !selectedAiGroupId
-                        ? "var(--color-accent)"
-                        : "var(--color-surface-raised)",
-                      color: !selectedAiGroupId ? "var(--color-bg)" : "var(--color-text-dim)",
-                      border: `1px solid ${!selectedAiGroupId ? "var(--color-accent)" : "var(--color-border)"}`,
-                    }}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    All Groups
-                  </motion.button>
-                  {aiGroups.map((g) => (
-                    <motion.button
-                      key={g.id}
-                      onClick={() => setSelectedAiGroupId(g.id)}
-                      className="relative flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors focus:outline-none"
-                      style={{
-                        backgroundColor: selectedAiGroupId === g.id
-                          ? "var(--color-accent)"
-                          : "var(--color-surface-raised)",
-                        color: selectedAiGroupId === g.id ? "var(--color-bg)" : "var(--color-text-dim)",
-                        border: `1px solid ${selectedAiGroupId === g.id ? "var(--color-accent)" : "var(--color-border)"}`,
-                      }}
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                    >
-                      {g.label} ({g.itemIds.length})
-                    </motion.button>
-                  ))}
-                </div>
-              )}
-
-              {viewMode === "ai-groups" && aiGroupsLoading && (
-                <div className="flex items-center gap-2 flex-shrink-0" style={{ color: "var(--color-text-dim)" }}>
-                  <div className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "var(--color-accent)", borderTopColor: "transparent" }} />
-                  <span className="text-xs">Generating smart groups…</span>
-                </div>
-              )}
-
-              {/* Traditional platform filters when not in AI-groups mode */}
-              {viewMode === "by-platform" && (
-                <ChipFilters
-                  filters={PLATFORM_FILTERS}
-                  active={activeFilter}
-                  onSelect={(f) => {
-                    setActiveCollectionId(null);
-                    setFilter(f);
-                  }}
-                  className="flex-shrink-0"
-                />
-              )}
-
-              {/* Dynamic metadata facets based on currently visible items */}
-              {gridItems.length > 0 && (
-                <DynamicFacetFilters
-                  items={facetSourceItems}
-                  fields={gameFacetFields}
-                  activeFilters={facetFilters}
-                  onFilter={applyFacetFilter}
-                  className="flex-shrink-0"
-                />
-              )}
-            </div>
-          )}
         </div>
 
         {/* Sticky compact bar — search + active filter summary */}
@@ -844,7 +748,120 @@ export const GamingTab: React.FC = () => {
               </motion.button>
             ) : null,
           )}
+          <motion.button
+            className="px-2.5 py-0.5 rounded-full text-xs font-medium"
+            style={{
+              background: "var(--color-surface-raised)",
+              color: "var(--color-text)",
+              border: "1px solid var(--color-border)",
+            }}
+            onClick={() => setFiltersExpanded((v) => !v)}
+            whileTap={{ scale: 0.95 }}
+          >
+            {filtersExpanded ? "▲ Filters" : "▼ Filters"}
+          </motion.button>
         </div>
+
+        {/* Expanded filters — render below sticky bar so they stay visible */}
+        {filtersExpanded && (
+          <div className="flex flex-col gap-3 pb-3">
+            {/* View-mode sub-tabs */}
+            <div className="flex gap-2 flex-shrink-0 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+              {(["all", "ai-groups", "by-platform"] as ViewMode[]).map((m) => (
+                <motion.button
+                  key={m}
+                  onClick={() => {
+                    setViewMode(m);
+                    setSelectedAiGroupId(null);
+                  }}
+                  className="relative flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-colors focus:outline-none"
+                  style={{
+                    backgroundColor: viewMode === m
+                      ? "var(--color-accent)"
+                      : "var(--color-surface-raised)",
+                    color: viewMode === m ? "var(--color-bg)" : "var(--color-text-dim)",
+                    border: `1px solid ${viewMode === m ? "var(--color-accent)" : "var(--color-border)"}`,
+                    boxShadow: viewMode === m ? "var(--shadow-glow)" : "none",
+                  }}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  {m === "all" ? "All" : m === "ai-groups" ? "✨ Groups" : "By Platform"}
+                </motion.button>
+              ))}
+            </div>
+
+            {/* AI group chips */}
+            {viewMode === "ai-groups" && aiGroups.length > 0 && (
+              <div className="flex gap-2 flex-shrink-0 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+                <motion.button
+                  onClick={() => setSelectedAiGroupId(null)}
+                  className="relative flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors focus:outline-none"
+                  style={{
+                    backgroundColor: !selectedAiGroupId
+                      ? "var(--color-accent)"
+                      : "var(--color-surface-raised)",
+                    color: !selectedAiGroupId ? "var(--color-bg)" : "var(--color-text-dim)",
+                    border: `1px solid ${!selectedAiGroupId ? "var(--color-accent)" : "var(--color-border)"}`,
+                  }}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  All Groups
+                </motion.button>
+                {aiGroups.map((g) => (
+                  <motion.button
+                    key={g.id}
+                    onClick={() => setSelectedAiGroupId(g.id)}
+                    className="relative flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors focus:outline-none"
+                    style={{
+                      backgroundColor: selectedAiGroupId === g.id
+                        ? "var(--color-accent)"
+                        : "var(--color-surface-raised)",
+                      color: selectedAiGroupId === g.id ? "var(--color-bg)" : "var(--color-text-dim)",
+                      border: `1px solid ${selectedAiGroupId === g.id ? "var(--color-accent)" : "var(--color-border)"}`,
+                    }}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    {g.label} ({g.itemIds.length})
+                  </motion.button>
+                ))}
+              </div>
+            )}
+
+            {viewMode === "ai-groups" && aiGroupsLoading && (
+              <div className="flex items-center gap-2 flex-shrink-0" style={{ color: "var(--color-text-dim)" }}>
+                <div className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "var(--color-accent)", borderTopColor: "transparent" }} />
+                <span className="text-xs">Generating smart groups…</span>
+              </div>
+            )}
+
+            {/* Traditional platform filters when not in AI-groups mode */}
+            {viewMode === "by-platform" && (
+              <ChipFilters
+                filters={PLATFORM_FILTERS}
+                active={activeFilter}
+                onSelect={(f) => {
+                  setActiveCollectionId(null);
+                  setFilter(f);
+                }}
+                className="flex-shrink-0"
+              />
+            )}
+
+            {/* Dynamic metadata facets based on currently visible items */}
+            {gridItems.length > 0 && (
+              <DynamicFacetFilters
+                items={facetSourceItems}
+                fields={gameFacetFields}
+                activeFilters={facetFilters}
+                onFilter={applyFacetFilter}
+                className="flex-shrink-0"
+              />
+            )}
+          </div>
+        )}
 
         {/* Grid content — participates in the outer scroll */}
         {loading || scanning ? (
@@ -928,10 +945,10 @@ export const GamingTab: React.FC = () => {
                 detailGameData.achievementCount
                   ? { label: "Achievements", value: String(detailGameData.achievementCount) }
                   : null,
-                detailGameData.playTime
-                  ? { label: "Est. Playtime", value: `${Math.round(detailGameData.playTime / 60)}h` }
+                detailGameData.playtime
+                  ? { label: "Est. Playtime", value: `${Math.round(detailGameData.playtime)}h` }
                   : null,
-                { label: "Platform", value: selected?.platform ?? "" },
+                { label: "Platform", value: detailGameData?.platform ?? "" },
               ].filter(Boolean) as { label: string; value: string }[])
             : []
         }

@@ -133,6 +133,25 @@ export const MusicTab: React.FC = () => {
     return () => window.removeEventListener("htpc:escape", handler);
   }, [selected, selectedGroup]);
 
+  /* Dispatch selection changes for command palette context */
+  useEffect(() => {
+    window.dispatchEvent(
+      new CustomEvent("htpc:select-music", { detail: { id: selected?.id ?? null } }),
+    );
+  }, [selected?.id]);
+
+  /* Listen for view-mode commands from command palette */
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as string;
+      if (["tracks", "ai-groups"].includes(detail)) {
+        setSubTab(detail as SubTab);
+      }
+    };
+    window.addEventListener("htpc:music-view", handler);
+    return () => window.removeEventListener("htpc:music-view", handler);
+  }, []);
+
   const albumTracks = useMemo(() => {
     if (!selected?.album) return [];
     return tracks
@@ -660,7 +679,165 @@ export const MusicTab: React.FC = () => {
               </motion.button>
             ) : null,
           )}
-          {/* Expand/collapse filters button */}
+        </div>
+
+        {/* Sticky compact bar — search + active filter summary */}
+        <div
+          className="flex items-center gap-2 pb-3 flex-wrap"
+          style={{
+            position: "sticky",
+            top: -16,
+            zIndex: 10,
+            background: "var(--color-bg)",
+            paddingTop: 16,
+            marginTop: -16,
+            marginLeft: -16,
+            marginRight: -16,
+            paddingLeft: 16,
+            paddingRight: 16,
+          }}
+        >
+          {(subTab === "local" || subTab === "ai-groups") && (
+            <>
+              <OskInput
+                value={searchQuery}
+                onChange={setSearch}
+                placeholder="Search music…"
+                className="text-sm"
+                style={{ maxWidth: 220 } as React.CSSProperties}
+              />
+              <motion.button
+                className="px-3 py-1.5 rounded-[var(--radius-card)] text-xs font-medium"
+                style={{
+                  background: "var(--color-surface-raised)",
+                  color: "var(--color-text)",
+                  border: "1px solid var(--color-border)",
+                }}
+                onClick={scan}
+                whileTap={{ scale: 0.96 }}
+                disabled={scanning}
+              >
+                {scanning ? "⟳ Scanning…" : "↺ Scan"}
+              </motion.button>
+            </>
+          )}
+          {/* Active tab chip */}
+          <span
+            className="px-2.5 py-0.5 rounded-full text-xs font-medium"
+            style={{
+              backgroundColor: "var(--color-accent)",
+              color: "var(--color-bg)",
+            }}
+          >
+            {subTab === "ai-groups" ? "✨ Groups" : subTab}
+          </span>
+          {/* Active filter summary chips */}
+          {subTab === "local" && (
+            <>
+              <span
+                className="px-2.5 py-0.5 rounded-full text-xs font-medium"
+                style={{
+                  backgroundColor: "var(--color-surface-raised)",
+                  color: "var(--color-text-dim)",
+                  border: "1px solid var(--color-border)",
+                }}
+              >
+                Browse: {browseMode === "artists" ? "Artists" : browseMode === "genres" ? "Genres" : "Tracks"}
+              </span>
+              {selectedGroup && (
+                <motion.button
+                  className="px-2.5 py-0.5 rounded-full text-xs font-medium"
+                  style={{
+                    backgroundColor: "var(--color-accent)",
+                    color: "var(--color-bg)",
+                  }}
+                  onClick={() => setSelectedGroup(null)}
+                  whileTap={{ scale: 0.95 }}
+                  title="Back to groups"
+                >
+                  {selectedGroup} ✕
+                </motion.button>
+              )}
+              {browseMode === "tracks" && activeArtist && (
+                <motion.button
+                  className="px-2.5 py-0.5 rounded-full text-xs font-medium"
+                  style={{ backgroundColor: "var(--color-accent)", color: "var(--color-bg)" }}
+                  onClick={() => setArtist(null)}
+                  whileTap={{ scale: 0.95 }}
+                  title="Clear artist filter"
+                >
+                  Artist: {activeArtist} ✕
+                </motion.button>
+              )}
+              {browseMode === "tracks" && activeAlbum && (
+                <motion.button
+                  className="px-2.5 py-0.5 rounded-full text-xs font-medium"
+                  style={{ backgroundColor: "var(--color-accent)", color: "var(--color-bg)" }}
+                  onClick={() => setAlbum(null)}
+                  whileTap={{ scale: 0.95 }}
+                  title="Clear album filter"
+                >
+                  Album: {activeAlbum} ✕
+                </motion.button>
+              )}
+              {browseMode === "tracks" && activeGenre && (
+                <motion.button
+                  className="px-2.5 py-0.5 rounded-full text-xs font-medium"
+                  style={{ backgroundColor: "var(--color-accent)", color: "var(--color-bg)" }}
+                  onClick={() => setGenre(null)}
+                  whileTap={{ scale: 0.95 }}
+                  title="Clear genre filter"
+                >
+                  Genre: {activeGenre} ✕
+                </motion.button>
+              )}
+              {browseMode === "tracks" && activeYear && (
+                <motion.button
+                  className="px-2.5 py-0.5 rounded-full text-xs font-medium"
+                  style={{ backgroundColor: "var(--color-accent)", color: "var(--color-bg)" }}
+                  onClick={() => setYear(null)}
+                  whileTap={{ scale: 0.95 }}
+                  title="Clear year filter"
+                >
+                  Year: {activeYear} ✕
+                </motion.button>
+              )}
+            </>
+          )}
+          {subTab === "ai-groups" && selectedAiGroupId && (() => {
+            const group = aiGroups.find((g) => g.id === selectedAiGroupId);
+            return group ? (
+              <motion.button
+                className="px-2.5 py-0.5 rounded-full text-xs font-medium"
+                style={{
+                  backgroundColor: "var(--color-accent)",
+                  color: "var(--color-bg)",
+                }}
+                onClick={() => setSelectedAiGroupId(null)}
+                whileTap={{ scale: 0.95 }}
+                title="Clear group filter"
+              >
+                Group: {group.label} ✕
+              </motion.button>
+            ) : null;
+          })()}
+          {Object.entries(facetFilters).map(([key, value]) =>
+            value ? (
+              <motion.button
+                key={key}
+                className="px-2.5 py-0.5 rounded-full text-xs font-medium"
+                style={{
+                  backgroundColor: "var(--color-accent)",
+                  color: "var(--color-bg)",
+                }}
+                onClick={() => applyFacetFilter(key, null)}
+                whileTap={{ scale: 0.95 }}
+                title={`Clear ${key} filter`}
+              >
+                {musicFacetFields.find((f) => f.key === key)?.label ?? key}: {value} ✕
+              </motion.button>
+            ) : null,
+          )}
           <motion.button
             className="px-2.5 py-0.5 rounded-full text-xs font-medium"
             style={{
@@ -675,9 +852,9 @@ export const MusicTab: React.FC = () => {
           </motion.button>
         </div>
 
-        {/* Expanded filter options */}
+        {/* Expanded filters — render below sticky bar so they stay visible */}
         {filtersExpanded && (
-          <div className="flex flex-col gap-3 mb-3">
+          <div className="flex flex-col gap-3 pb-3">
             <div className="flex gap-3 items-center flex-shrink-0">
               <div className="flex gap-1">
                 {(["ai-groups", "local", "streaming"] as SubTab[]).map((t) => (
@@ -849,165 +1026,6 @@ export const MusicTab: React.FC = () => {
             )}
           </div>
         )}
-
-        {/* Sticky compact bar — search + active filter summary */}
-        <div
-          className="flex items-center gap-2 pb-3 flex-wrap"
-          style={{
-            position: "sticky",
-            top: -16,
-            zIndex: 10,
-            background: "var(--color-bg)",
-            paddingTop: 16,
-            marginTop: -16,
-            marginLeft: -16,
-            marginRight: -16,
-            paddingLeft: 16,
-            paddingRight: 16,
-          }}
-        >
-          {(subTab === "local" || subTab === "ai-groups") && (
-            <>
-              <OskInput
-                value={searchQuery}
-                onChange={setSearch}
-                placeholder="Search music…"
-                className="text-sm"
-                style={{ maxWidth: 220 } as React.CSSProperties}
-              />
-              <motion.button
-                className="px-3 py-1.5 rounded-[var(--radius-card)] text-xs font-medium"
-                style={{
-                  background: "var(--color-surface-raised)",
-                  color: "var(--color-text)",
-                  border: "1px solid var(--color-border)",
-                }}
-                onClick={scan}
-                whileTap={{ scale: 0.96 }}
-                disabled={scanning}
-              >
-                {scanning ? "⟳ Scanning…" : "↺ Scan"}
-              </motion.button>
-            </>
-          )}
-          {/* Active tab chip */}
-          <span
-            className="px-2.5 py-0.5 rounded-full text-xs font-medium"
-            style={{
-              backgroundColor: "var(--color-accent)",
-              color: "var(--color-bg)",
-            }}
-          >
-            {subTab === "ai-groups" ? "✨ Groups" : subTab}
-          </span>
-          {/* Active filter summary chips */}
-          {subTab === "local" && (
-            <>
-              <span
-                className="px-2.5 py-0.5 rounded-full text-xs font-medium"
-                style={{
-                  backgroundColor: "var(--color-surface-raised)",
-                  color: "var(--color-text-dim)",
-                  border: "1px solid var(--color-border)",
-                }}
-              >
-                Browse: {browseMode === "artists" ? "Artists" : browseMode === "genres" ? "Genres" : "Tracks"}
-              </span>
-              {selectedGroup && (
-                <motion.button
-                  className="px-2.5 py-0.5 rounded-full text-xs font-medium"
-                  style={{
-                    backgroundColor: "var(--color-accent)",
-                    color: "var(--color-bg)",
-                  }}
-                  onClick={() => setSelectedGroup(null)}
-                  whileTap={{ scale: 0.95 }}
-                  title="Back to groups"
-                >
-                  {selectedGroup} ✕
-                </motion.button>
-              )}
-              {browseMode === "tracks" && activeArtist && (
-                <motion.button
-                  className="px-2.5 py-0.5 rounded-full text-xs font-medium"
-                  style={{ backgroundColor: "var(--color-accent)", color: "var(--color-bg)" }}
-                  onClick={() => setArtist(null)}
-                  whileTap={{ scale: 0.95 }}
-                  title="Clear artist filter"
-                >
-                  Artist: {activeArtist} ✕
-                </motion.button>
-              )}
-              {browseMode === "tracks" && activeAlbum && (
-                <motion.button
-                  className="px-2.5 py-0.5 rounded-full text-xs font-medium"
-                  style={{ backgroundColor: "var(--color-accent)", color: "var(--color-bg)" }}
-                  onClick={() => setAlbum(null)}
-                  whileTap={{ scale: 0.95 }}
-                  title="Clear album filter"
-                >
-                  Album: {activeAlbum} ✕
-                </motion.button>
-              )}
-              {browseMode === "tracks" && activeGenre && (
-                <motion.button
-                  className="px-2.5 py-0.5 rounded-full text-xs font-medium"
-                  style={{ backgroundColor: "var(--color-accent)", color: "var(--color-bg)" }}
-                  onClick={() => setGenre(null)}
-                  whileTap={{ scale: 0.95 }}
-                  title="Clear genre filter"
-                >
-                  Genre: {activeGenre} ✕
-                </motion.button>
-              )}
-              {browseMode === "tracks" && activeYear && (
-                <motion.button
-                  className="px-2.5 py-0.5 rounded-full text-xs font-medium"
-                  style={{ backgroundColor: "var(--color-accent)", color: "var(--color-bg)" }}
-                  onClick={() => setYear(null)}
-                  whileTap={{ scale: 0.95 }}
-                  title="Clear year filter"
-                >
-                  Year: {activeYear} ✕
-                </motion.button>
-              )}
-            </>
-          )}
-          {subTab === "ai-groups" && selectedAiGroupId && (() => {
-            const group = aiGroups.find((g) => g.id === selectedAiGroupId);
-            return group ? (
-              <motion.button
-                className="px-2.5 py-0.5 rounded-full text-xs font-medium"
-                style={{
-                  backgroundColor: "var(--color-accent)",
-                  color: "var(--color-bg)",
-                }}
-                onClick={() => setSelectedAiGroupId(null)}
-                whileTap={{ scale: 0.95 }}
-                title="Clear group filter"
-              >
-                Group: {group.label} ✕
-              </motion.button>
-            ) : null;
-          })()}
-          {Object.entries(facetFilters).map(([key, value]) =>
-            value ? (
-              <motion.button
-                key={key}
-                className="px-2.5 py-0.5 rounded-full text-xs font-medium"
-                style={{
-                  backgroundColor: "var(--color-accent)",
-                  color: "var(--color-bg)",
-                }}
-                onClick={() => applyFacetFilter(key, null)}
-                whileTap={{ scale: 0.95 }}
-                title={`Clear ${key} filter`}
-              >
-                {musicFacetFields.find((f) => f.key === key)?.label ?? key}: {value} ✕
-              </motion.button>
-            ) : null,
-          )}
-        </div>
 
         {/* Grid content — participates in the outer scroll */}
         {subTab === "local" && (

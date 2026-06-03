@@ -92,6 +92,25 @@ export const TVShowsTab: React.FC = () => {
     return () => window.removeEventListener("htpc:escape", handler);
   }, []);
 
+  /* Dispatch selection changes for command palette context */
+  useEffect(() => {
+    window.dispatchEvent(
+      new CustomEvent("htpc:select-tv", { detail: { id: selected?.id ?? null } }),
+    );
+  }, [selected?.id]);
+
+  /* Listen for view-mode commands from command palette */
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as string;
+      if (["all", "ai-groups"].includes(detail)) {
+        setSubTab(detail as SubTab);
+      }
+    };
+    window.addEventListener("htpc:tv-view", handler);
+    return () => window.removeEventListener("htpc:tv-view", handler);
+  }, []);
+
   /* Auto-generate AI groups when subTab switches to ai-groups and shows are loaded */
   useEffect(() => {
     if (subTab !== "ai-groups" || shows.length === 0) return;
@@ -354,108 +373,7 @@ export const TVShowsTab: React.FC = () => {
                 </motion.button>
               ) : null,
             )}
-            {/* Expand/collapse filters button */}
-            <motion.button
-              className="px-2.5 py-0.5 rounded-full text-xs font-medium"
-              style={{
-                background: "var(--color-surface-raised)",
-                color: "var(--color-text)",
-                border: "1px solid var(--color-border)",
-              }}
-              onClick={() => setFiltersExpanded((v) => !v)}
-              whileTap={{ scale: 0.95 }}
-            >
-              {filtersExpanded ? "▲ Filters" : "▼ Filters"}
-            </motion.button>
           </div>
-
-          {/* Expanded filter options */}
-          {filtersExpanded && (
-            <div className="flex flex-col gap-3">
-              {/* View-mode sub-tabs */}
-              <div className="flex gap-2 flex-shrink-0 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
-                {(["ai-groups", "all"] as SubTab[]).map((m) => (
-                  <motion.button
-                    key={m}
-                    onClick={() => {
-                      setSubTab(m);
-                      setSelectedAiGroupId(null);
-                    }}
-                    className="relative flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-colors focus:outline-none"
-                    style={{
-                      backgroundColor: subTab === m
-                        ? "var(--color-accent)"
-                        : "var(--color-surface-raised)",
-                      color: subTab === m ? "var(--color-bg)" : "var(--color-text-dim)",
-                      border: `1px solid ${subTab === m ? "var(--color-accent)" : "var(--color-border)"}`,
-                      boxShadow: subTab === m ? "var(--shadow-glow)" : "none",
-                    }}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    {m === "ai-groups" ? "✨ Groups" : "All"}
-                  </motion.button>
-                ))}
-              </div>
-
-              {/* AI group chips */}
-              {subTab === "ai-groups" && aiGroups.length > 0 && (
-                <div className="flex gap-2 flex-shrink-0 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
-                  <motion.button
-                    onClick={() => setSelectedAiGroupId(null)}
-                    className="relative flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors focus:outline-none"
-                    style={{
-                      backgroundColor: !selectedAiGroupId
-                        ? "var(--color-accent)"
-                        : "var(--color-surface-raised)",
-                      color: !selectedAiGroupId ? "var(--color-bg)" : "var(--color-text-dim)",
-                      border: `1px solid ${!selectedAiGroupId ? "var(--color-accent)" : "var(--color-border)"}`,
-                    }}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    All Groups
-                  </motion.button>
-                  {aiGroups.map((g, i) => (
-                    <motion.button
-                      key={g.id}
-                      onClick={() => setSelectedAiGroupId(g.id)}
-                      className="relative flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors focus:outline-none"
-                      style={{
-                        backgroundColor: selectedAiGroupId === g.id
-                          ? "var(--color-accent)"
-                          : "var(--color-surface-raised)",
-                        color: selectedAiGroupId === g.id ? "var(--color-bg)" : "var(--color-text-dim)",
-                        border: `1px solid ${selectedAiGroupId === g.id ? "var(--color-accent)" : "var(--color-border)"}`,
-                      }}
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                    >
-                      {g.label} ({g.itemIds.length})
-                    </motion.button>
-                  ))}
-                </div>
-              )}
-
-              {subTab === "ai-groups" && aiGroupsLoading && (
-                <div className="flex items-center gap-2 flex-shrink-0" style={{ color: "var(--color-text-dim)" }}>
-                  <div className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "var(--color-accent)", borderTopColor: "transparent" }} />
-                  <span className="text-xs">Generating smart groups…</span>
-                </div>
-              )}
-
-              {/* Dynamic metadata facets */}
-              {gridItems.length > 0 && (
-                <DynamicFacetFilters
-                  items={facetSourceItems}
-                  fields={tvFacetFields}
-                  activeFilters={facetFilters}
-                  onFilter={applyFacetFilter}
-                  className="flex-shrink-0"
-                />
-              )}
-            </div>
-          )}
         </div>
 
         {/* Sticky compact bar — search + active filter summary */}
@@ -542,7 +460,107 @@ export const TVShowsTab: React.FC = () => {
               </motion.button>
             ) : null,
           )}
+          <motion.button
+            className="px-2.5 py-0.5 rounded-full text-xs font-medium"
+            style={{
+              background: "var(--color-surface-raised)",
+              color: "var(--color-text)",
+              border: "1px solid var(--color-border)",
+            }}
+            onClick={() => setFiltersExpanded((v) => !v)}
+            whileTap={{ scale: 0.95 }}
+          >
+            {filtersExpanded ? "▲ Filters" : "▼ Filters"}
+          </motion.button>
         </div>
+
+        {/* Expanded filters — render below sticky bar so they stay visible */}
+        {filtersExpanded && (
+          <div className="flex flex-col gap-3 pb-3">
+            {/* View-mode sub-tabs */}
+            <div className="flex gap-2 flex-shrink-0 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+              {(["ai-groups", "all"] as SubTab[]).map((m) => (
+                <motion.button
+                  key={m}
+                  onClick={() => {
+                    setSubTab(m);
+                    setSelectedAiGroupId(null);
+                  }}
+                  className="relative flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-colors focus:outline-none"
+                  style={{
+                    backgroundColor: subTab === m
+                      ? "var(--color-accent)"
+                      : "var(--color-surface-raised)",
+                    color: subTab === m ? "var(--color-bg)" : "var(--color-text-dim)",
+                    border: `1px solid ${subTab === m ? "var(--color-accent)" : "var(--color-border)"}`,
+                    boxShadow: subTab === m ? "var(--shadow-glow)" : "none",
+                  }}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  {m === "ai-groups" ? "✨ Groups" : "All"}
+                </motion.button>
+              ))}
+            </div>
+
+            {/* AI group chips */}
+            {subTab === "ai-groups" && aiGroups.length > 0 && (
+              <div className="flex gap-2 flex-shrink-0 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+                <motion.button
+                  onClick={() => setSelectedAiGroupId(null)}
+                  className="relative flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors focus:outline-none"
+                  style={{
+                    backgroundColor: !selectedAiGroupId
+                      ? "var(--color-accent)"
+                      : "var(--color-surface-raised)",
+                    color: !selectedAiGroupId ? "var(--color-bg)" : "var(--color-text-dim)",
+                    border: `1px solid ${!selectedAiGroupId ? "var(--color-accent)" : "var(--color-border)"}`,
+                  }}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  All Groups
+                </motion.button>
+                {aiGroups.map((g, i) => (
+                  <motion.button
+                    key={g.id}
+                    onClick={() => setSelectedAiGroupId(g.id)}
+                    className="relative flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors focus:outline-none"
+                    style={{
+                      backgroundColor: selectedAiGroupId === g.id
+                        ? "var(--color-accent)"
+                        : "var(--color-surface-raised)",
+                      color: selectedAiGroupId === g.id ? "var(--color-bg)" : "var(--color-text-dim)",
+                      border: `1px solid ${selectedAiGroupId === g.id ? "var(--color-accent)" : "var(--color-border)"}`,
+                    }}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    {g.label} ({g.itemIds.length})
+                  </motion.button>
+                ))}
+              </div>
+            )}
+
+            {subTab === "ai-groups" && aiGroupsLoading && (
+              <div className="flex items-center gap-2 flex-shrink-0" style={{ color: "var(--color-text-dim)" }}>
+                <div className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "var(--color-accent)", borderTopColor: "transparent" }} />
+                <span className="text-xs">Generating smart groups…</span>
+              </div>
+            )}
+
+            {/* Dynamic metadata facets */}
+            {gridItems.length > 0 && (
+              <DynamicFacetFilters
+                items={facetSourceItems}
+                fields={tvFacetFields}
+                activeFilters={facetFilters}
+                onFilter={applyFacetFilter}
+                className="flex-shrink-0"
+              />
+            )}
+          </div>
+        )}
 
         {/* Grid content — participates in the outer scroll */}
         {loading ? (

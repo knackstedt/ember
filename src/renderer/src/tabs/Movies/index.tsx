@@ -104,6 +104,25 @@ export const MoviesTab: React.FC = () => {
     return () => window.removeEventListener("htpc:escape", handler);
   }, []);
 
+  /* Dispatch selection changes for command palette context */
+  useEffect(() => {
+    window.dispatchEvent(
+      new CustomEvent("htpc:select-movie", { detail: { id: selected?.id ?? null } }),
+    );
+  }, [selected?.id]);
+
+  /* Listen for view-mode commands from command palette */
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as string;
+      if (["all", "ai-groups", "local", "streaming"].includes(detail)) {
+        setSubTab(detail as SubTab);
+      }
+    };
+    window.addEventListener("htpc:movies-view", handler);
+    return () => window.removeEventListener("htpc:movies-view", handler);
+  }, []);
+
   /* Auto-generate AI groups when subTab switches to ai-groups and movies are loaded */
   useEffect(() => {
     if (subTab !== "ai-groups" || movies.length === 0) return;
@@ -392,7 +411,107 @@ export const MoviesTab: React.FC = () => {
               </motion.button>
             ) : null,
           )}
-          {/* Expand/collapse filters button */}
+        </div>
+
+        {/* Sticky compact bar — search + active filter summary */}
+        <div
+          className="flex items-center gap-2 pb-3 flex-wrap"
+          style={{
+            position: "sticky",
+            top: -16,
+            zIndex: 10,
+            background: "var(--color-bg)",
+            paddingTop: 16,
+            marginTop: -16,
+            marginLeft: -16,
+            marginRight: -16,
+            paddingLeft: 16,
+            paddingRight: 16,
+          }}
+        >
+          {subTab === "local" && (
+            <>
+              <OskInput
+                value={searchQuery}
+                onChange={setSearch}
+                placeholder="Search movies…"
+                className="text-sm"
+                style={{ maxWidth: 220 } as React.CSSProperties}
+              />
+              <motion.button
+                className="px-3 py-1.5 rounded-[var(--radius-card)] text-xs font-medium"
+                style={{
+                  background: "var(--color-surface-raised)",
+                  color: "var(--color-text)",
+                  border: "1px solid var(--color-border)",
+                }}
+                onClick={scan}
+                whileTap={{ scale: 0.96 }}
+                disabled={scanning}
+              >
+                {scanning ? "⟳ Scanning…" : "↺ Scan"}
+              </motion.button>
+            </>
+          )}
+          {/* Active tab chip */}
+          <span
+            className="px-2.5 py-0.5 rounded-full text-xs font-medium"
+            style={{
+              backgroundColor: "var(--color-accent)",
+              color: "var(--color-bg)",
+            }}
+          >
+            {subTab === "ai-groups" ? "✨ Groups" : subTab}
+          </span>
+          {/* Active filter summary chips */}
+          {subTab === "local" && activeGenre && (
+            <motion.button
+              className="px-2.5 py-0.5 rounded-full text-xs font-medium"
+              style={{
+                backgroundColor: "var(--color-accent)",
+                color: "var(--color-bg)",
+              }}
+              onClick={() => setGenre(null)}
+              whileTap={{ scale: 0.95 }}
+              title="Clear genre filter"
+            >
+              Genre: {activeGenre} ✕
+            </motion.button>
+          )}
+          {subTab === "ai-groups" && selectedAiGroupId && (() => {
+            const group = aiGroups.find((g) => g.id === selectedAiGroupId);
+            return group ? (
+              <motion.button
+                className="px-2.5 py-0.5 rounded-full text-xs font-medium"
+                style={{
+                  backgroundColor: "var(--color-accent)",
+                  color: "var(--color-bg)",
+                }}
+                onClick={() => setSelectedAiGroupId(null)}
+                whileTap={{ scale: 0.95 }}
+                title="Clear group filter"
+              >
+                Group: {group.label} ✕
+              </motion.button>
+            ) : null;
+          })()}
+          {Object.entries(facetFilters).map(([key, value]) =>
+            value ? (
+              <motion.button
+                key={key}
+                className="px-2.5 py-0.5 rounded-full text-xs font-medium"
+                style={{
+                  backgroundColor: "var(--color-accent)",
+                  color: "var(--color-bg)",
+                }}
+                onClick={() => applyFacetFilter(key, null)}
+                whileTap={{ scale: 0.95 }}
+                title={`Clear ${key} filter`}
+              >
+                {movieFacetFields.find((f) => f.key === key)?.label ?? key}: {value} ✕
+              </motion.button>
+            ) : null,
+          )}
           <motion.button
             className="px-2.5 py-0.5 rounded-full text-xs font-medium"
             style={{
@@ -407,9 +526,9 @@ export const MoviesTab: React.FC = () => {
           </motion.button>
         </div>
 
-        {/* Expanded filter options */}
+        {/* Expanded filters — render below sticky bar so they stay visible */}
         {filtersExpanded && (
-          <div className="flex flex-col gap-3 mb-3">
+          <div className="flex flex-col gap-3 pb-3">
             <div className="flex gap-3 items-center flex-shrink-0">
               <div className="flex gap-1">
                 {(["ai-groups", "local", "streaming"] as SubTab[]).map((t) => (
@@ -519,107 +638,6 @@ export const MoviesTab: React.FC = () => {
             )}
           </div>
         )}
-
-        {/* Sticky compact bar — search + active filter summary */}
-        <div
-          className="flex items-center gap-2 pb-3 flex-wrap"
-          style={{
-            position: "sticky",
-            top: -16,
-            zIndex: 10,
-            background: "var(--color-bg)",
-            paddingTop: 16,
-            marginTop: -16,
-            marginLeft: -16,
-            marginRight: -16,
-            paddingLeft: 16,
-            paddingRight: 16,
-          }}
-        >
-          {subTab === "local" && (
-            <>
-              <OskInput
-                value={searchQuery}
-                onChange={setSearch}
-                placeholder="Search movies…"
-                className="text-sm"
-                style={{ maxWidth: 220 } as React.CSSProperties}
-              />
-              <motion.button
-                className="px-3 py-1.5 rounded-[var(--radius-card)] text-xs font-medium"
-                style={{
-                  background: "var(--color-surface-raised)",
-                  color: "var(--color-text)",
-                  border: "1px solid var(--color-border)",
-                }}
-                onClick={scan}
-                whileTap={{ scale: 0.96 }}
-                disabled={scanning}
-              >
-                {scanning ? "⟳ Scanning…" : "↺ Scan"}
-              </motion.button>
-            </>
-          )}
-          {/* Active tab chip */}
-          <span
-            className="px-2.5 py-0.5 rounded-full text-xs font-medium"
-            style={{
-              backgroundColor: "var(--color-accent)",
-              color: "var(--color-bg)",
-            }}
-          >
-            {subTab === "ai-groups" ? "✨ Groups" : subTab}
-          </span>
-          {/* Active filter summary chips */}
-          {subTab === "local" && activeGenre && (
-            <motion.button
-              className="px-2.5 py-0.5 rounded-full text-xs font-medium"
-              style={{
-                backgroundColor: "var(--color-accent)",
-                color: "var(--color-bg)",
-              }}
-              onClick={() => setGenre(null)}
-              whileTap={{ scale: 0.95 }}
-              title="Clear genre filter"
-            >
-              Genre: {activeGenre} ✕
-            </motion.button>
-          )}
-          {subTab === "ai-groups" && selectedAiGroupId && (() => {
-            const group = aiGroups.find((g) => g.id === selectedAiGroupId);
-            return group ? (
-              <motion.button
-                className="px-2.5 py-0.5 rounded-full text-xs font-medium"
-                style={{
-                  backgroundColor: "var(--color-accent)",
-                  color: "var(--color-bg)",
-                }}
-                onClick={() => setSelectedAiGroupId(null)}
-                whileTap={{ scale: 0.95 }}
-                title="Clear group filter"
-              >
-                Group: {group.label} ✕
-              </motion.button>
-            ) : null;
-          })()}
-          {Object.entries(facetFilters).map(([key, value]) =>
-            value ? (
-              <motion.button
-                key={key}
-                className="px-2.5 py-0.5 rounded-full text-xs font-medium"
-                style={{
-                  backgroundColor: "var(--color-accent)",
-                  color: "var(--color-bg)",
-                }}
-                onClick={() => applyFacetFilter(key, null)}
-                whileTap={{ scale: 0.95 }}
-                title={`Clear ${key} filter`}
-              >
-                {movieFacetFields.find((f) => f.key === key)?.label ?? key}: {value} ✕
-              </motion.button>
-            ) : null,
-          )}
-        </div>
 
         {/* Grid content — participates in the outer scroll */}
         {subTab === "local" && (
@@ -781,38 +799,7 @@ export const MoviesTab: React.FC = () => {
             </>
           )
         }
-      >
-        {selected && (
-          <div>
-            <div
-              className="text-xs font-semibold uppercase tracking-wide mb-2"
-              style={{ color: "var(--color-text-dim)" }}
-            >
-              Cast &amp; Crew
-            </div>
-            <div className="flex flex-col gap-1.5 text-sm">
-              {selected.director && (
-                <div className="flex gap-2">
-                  <span
-                    style={{ color: "var(--color-text-dim)", minWidth: 64 }}
-                  >
-                    Director
-                  </span>
-                  <span style={{ color: "var(--color-text)" }}>
-                    {selected.director}
-                  </span>
-                </div>
-              )}
-              <div className="flex gap-2">
-                <span style={{ color: "var(--color-text-dim)", minWidth: 64 }}>
-                  Cast
-                </span>
-                <span style={{ color: "var(--color-text)" }}>TBD</span>
-              </div>
-            </div>
-          </div>
-        )}
-      </DetailPanel>
+      />
       {subTab === "local" && menu}
       <CollectionManager
         open={showCollectionManager}
