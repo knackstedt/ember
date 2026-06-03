@@ -22,6 +22,7 @@ import { CollectionsBar } from "../../components/CollectionsBar/CollectionsBar";
 import { CollectionManager } from "../../components/CollectionManager/CollectionManager";
 import { useToastStore } from "../../store/toast.store";
 import { AiGroup } from "../../../../shared/types";
+import { DynamicFacetFilters, FacetField } from "../../components/DynamicFacetFilters/DynamicFacetFilters";
 
 const LazyMusicCard: React.FC<{
   track: MusicTrack;
@@ -108,8 +109,13 @@ export const MusicTab: React.FC = () => {
 
   const [aiGroups, setAiGroups] = useState<AiGroup[]>([]);
   const [aiGroupsLoading, setAiGroupsLoading] = useState(false);
-  const [selectedAiGroup, setSelectedAiGroup] = useState<string | null>(null);
+  const [selectedAiGroupId, setSelectedAiGroupId] = useState<string | null>(null);
   const aiGroupTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [facetFilters, setFacetFilters] = useState<Record<string, string | null>>({});
+  const applyFacetFilter = (field: string, value: string | null) => {
+    setFacetFilters((prev) => ({ ...prev, [field]: value }));
+  };
 
   const collections = useCollectionsStore((s) => s.collections);
   const loadCollections = useCollectionsStore((s) => s.load);
@@ -299,14 +305,36 @@ export const MusicTab: React.FC = () => {
   }, [tracks, selectedGroup, browseMode, activeArtist, activeAlbum, activeGenre, activeYear, searchQuery, activeCollectionId, collectionItemIds]);
 
   const displayTrackItems = useMemo(() => {
-    if (subTab !== "ai-groups" || !selectedAiGroup) return trackItems;
-    const group = aiGroups.find((g) => g.label === selectedAiGroup);
+    if (subTab !== "ai-groups" || !selectedAiGroupId) return trackItems;
+    const group = aiGroups.find((g) => g.id === selectedAiGroupId);
     if (!group) return trackItems;
     const ids = new Set(group.itemIds);
     return trackItems.filter((t) => ids.has(t.id));
-  }, [trackItems, subTab, aiGroups, selectedAiGroup]);
+  }, [trackItems, subTab, aiGroups, selectedAiGroupId]);
 
-  const gridTrackItems = subTab === "ai-groups" ? displayTrackItems : trackItems;
+  const facetSourceItems = displayTrackItems;
+
+  const gridTrackItems = useMemo(() => {
+    let r = facetSourceItems;
+    for (const [field, value] of Object.entries(facetFilters)) {
+      if (!value) continue;
+      r = r.filter((track) => {
+        const raw = track[field as keyof MusicTrack];
+        if (raw === undefined || raw === null) return false;
+        if (Array.isArray(raw)) return raw.some((v) => String(v).toLowerCase() === value.toLowerCase());
+        return String(raw).toLowerCase() === value.toLowerCase();
+      });
+    }
+    return r;
+  }, [facetSourceItems, facetFilters]);
+
+  const musicFacetFields: FacetField[] = useMemo(() => [
+    { key: "genre", label: "Genre", accessor: (t) => (t as Record<string, unknown>).genre as string | undefined, sort: "count", maxValues: 8 },
+    { key: "artist", label: "Artist", accessor: (t) => (t as Record<string, unknown>).artist as string | undefined, sort: "count", maxValues: 8 },
+    { key: "album", label: "Album", accessor: (t) => (t as Record<string, unknown>).album as string | undefined, sort: "count", maxValues: 6 },
+    { key: "year", label: "Year", accessor: (t) => String((t as Record<string, unknown>).year ?? ""), maxValues: 8 },
+    { key: "tags", label: "Tag", accessor: (t) => (t as Record<string, unknown>).tags as string[] | undefined, sort: "count", maxValues: 5 },
+  ], []);
 
   const { focusedIndex: groupFocusedIndex } = useGridFocus<MusicGroup>({
     items: groupItems,
@@ -333,7 +361,7 @@ export const MusicTab: React.FC = () => {
   );
 
   const { menu: trackCtxMenu, bindItem: bindTrackItem } = useContextMenu<MusicTrack>({
-    items: trackItems,
+    items: gridTrackItems,
     focusedIndex: trackFocusedIndex,
     enabled: subTab === "local" && (browseMode === "tracks" || !!selectedGroup),
     getOptions: (track): ContextMenuOption[] => {
@@ -689,13 +717,24 @@ export const MusicTab: React.FC = () => {
               <VirtualGrid
                 key="tracks"
                 ref={trackGridRef}
-                items={trackItems}
+                items={gridTrackItems}
                 minItemWidth={180}
                 onColumnCountChange={setTrackColumnCount}
                 rowHeight={240}
                 renderItem={renderTrackItem}
               />
             </div>
+          )}
+
+          {/* Dynamic metadata facets */}
+          {gridTrackItems.length > 0 && browseMode === "tracks" && (
+            <DynamicFacetFilters
+              items={facetSourceItems as Record<string, unknown>[]}
+              fields={musicFacetFields}
+              activeFilters={facetFilters}
+              onFilter={applyFacetFilter}
+              className="flex-shrink-0"
+            />
           )}
         </>
       )}
@@ -711,14 +750,14 @@ export const MusicTab: React.FC = () => {
           {aiGroups.length > 0 && (
             <div className="flex gap-2 flex-shrink-0 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
               <motion.button
-                onClick={() => setSelectedAiGroup(null)}
+                onClick={() => setSelectedAiGroupId(null)}
                 className="relative flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors focus:outline-none"
                 style={{
-                  backgroundColor: !selectedAiGroup
+                  backgroundColor: !selectedAiGroupId
                     ? "var(--color-accent)"
                     : "var(--color-surface-raised)",
-                  color: !selectedAiGroup ? "var(--color-bg)" : "var(--color-text-dim)",
-                  border: `1px solid ${!selectedAiGroup ? "var(--color-accent)" : "var(--color-border)"}`,
+                  color: !selectedAiGroupId ? "var(--color-bg)" : "var(--color-text-dim)",
+                  border: `1px solid ${!selectedAiGroupId ? "var(--color-accent)" : "var(--color-border)"}`,
                 }}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
@@ -727,15 +766,15 @@ export const MusicTab: React.FC = () => {
               </motion.button>
               {aiGroups.map((g, i) => (
                 <motion.button
-                  key={`ai-${g.label}-${i}`}
-                  onClick={() => setSelectedAiGroup(g.label)}
+                  key={g.id}
+                  onClick={() => setSelectedAiGroupId(g.id)}
                   className="relative flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors focus:outline-none"
                   style={{
-                    backgroundColor: selectedAiGroup === g.label
+                    backgroundColor: selectedAiGroupId === g.id
                       ? "var(--color-accent)"
                       : "var(--color-surface-raised)",
-                    color: selectedAiGroup === g.label ? "var(--color-bg)" : "var(--color-text-dim)",
-                    border: `1px solid ${selectedAiGroup === g.label ? "var(--color-accent)" : "var(--color-border)"}`,
+                    color: selectedAiGroupId === g.id ? "var(--color-bg)" : "var(--color-text-dim)",
+                    border: `1px solid ${selectedAiGroupId === g.id ? "var(--color-accent)" : "var(--color-border)"}`,
                   }}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
@@ -744,6 +783,15 @@ export const MusicTab: React.FC = () => {
                 </motion.button>
               ))}
             </div>
+          )}
+          {gridTrackItems.length > 0 && (
+            <DynamicFacetFilters
+              items={facetSourceItems as Record<string, unknown>[]}
+              fields={musicFacetFields}
+              activeFilters={facetFilters}
+              onFilter={applyFacetFilter}
+              className="flex-shrink-0"
+            />
           )}
           {gridTrackItems.length === 0 ? (
             <div className="flex-1 flex items-center justify-center" style={{ color: "var(--color-text-dim)" }}>

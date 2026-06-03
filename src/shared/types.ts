@@ -383,6 +383,7 @@ export interface LocalAiConfig {
 }
 
 export interface AiGroup {
+  id: string;
   label: string;
   itemIds: string[];
   centerItemId: string;

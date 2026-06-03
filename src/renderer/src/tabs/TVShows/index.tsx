@@ -18,6 +18,7 @@ import { CollectionsBar } from "../../components/CollectionsBar/CollectionsBar";
 import { CollectionManager } from "../../components/CollectionManager/CollectionManager";
 import { useToastStore } from "../../store/toast.store";
 import { AiGroup } from "../../../../shared/types";
+import { DynamicFacetFilters, FacetField } from "../../components/DynamicFacetFilters/DynamicFacetFilters";
 
 type SubTab = "ai-groups" | "all";
 
@@ -47,8 +48,13 @@ export const TVShowsTab: React.FC = () => {
   const [subTab, setSubTab] = useState<SubTab>("ai-groups");
   const [aiGroups, setAiGroups] = useState<AiGroup[]>([]);
   const [aiGroupsLoading, setAiGroupsLoading] = useState(false);
-  const [selectedAiGroup, setSelectedAiGroup] = useState<string | null>(null);
+  const [selectedAiGroupId, setSelectedAiGroupId] = useState<string | null>(null);
   const aiGroupTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [facetFilters, setFacetFilters] = useState<Record<string, string | null>>({});
+  const applyFacetFilter = (field: string, value: string | null) => {
+    setFacetFilters((prev) => ({ ...prev, [field]: value }));
+  };
 
   const collections = useCollectionsStore((s) => s.collections);
   const loadCollections = useCollectionsStore((s) => s.load);
@@ -150,14 +156,36 @@ export const TVShowsTab: React.FC = () => {
   }, [filtered, shows, searchQuery, activeCollectionId, collectionItemIds, activeCollection]);
 
   const displayItems = useMemo(() => {
-    if (subTab !== "ai-groups" || !selectedAiGroup) return items;
-    const group = aiGroups.find((g) => g.label === selectedAiGroup);
+    if (subTab !== "ai-groups" || !selectedAiGroupId) return items;
+    const group = aiGroups.find((g) => g.id === selectedAiGroupId);
     if (!group) return items;
     const ids = new Set(group.itemIds);
     return items.filter((s) => ids.has(s.id));
-  }, [items, subTab, aiGroups, selectedAiGroup]);
+  }, [items, subTab, aiGroups, selectedAiGroupId]);
 
-  const gridItems = subTab === "ai-groups" ? displayItems : items;
+  const facetSourceItems = displayItems;
+
+  const gridItems = useMemo(() => {
+    let r = facetSourceItems;
+    for (const [field, value] of Object.entries(facetFilters)) {
+      if (!value) continue;
+      r = r.filter((show) => {
+        const raw = show[field as keyof TVShow];
+        if (raw === undefined || raw === null) return false;
+        if (Array.isArray(raw)) return raw.some((v) => String(v).toLowerCase() === value.toLowerCase());
+        return String(raw).toLowerCase() === value.toLowerCase();
+      });
+    }
+    return r;
+  }, [facetSourceItems, facetFilters]);
+
+  const tvFacetFields: FacetField[] = useMemo(() => [
+    { key: "genres", label: "Genre", accessor: (s) => (s as Record<string, unknown>).genres as string[] | undefined, sort: "count", maxValues: 10 },
+    { key: "tags", label: "Tag", accessor: (s) => (s as Record<string, unknown>).tags as string[] | undefined, sort: "count", maxValues: 6 },
+    { key: "firstAirYear", label: "Year", accessor: (s) => String((s as Record<string, unknown>).firstAirYear ?? ""), maxValues: 8 },
+    { key: "creator", label: "Creator", accessor: (s) => (s as Record<string, unknown>).creator as string | undefined, maxValues: 5 },
+    { key: "rating", label: "Rating", accessor: (s) => String((s as Record<string, unknown>).rating ?? ""), maxValues: 5 },
+  ], []);
 
   const { focusedIndex } = useGridFocus({
     items: gridItems,
@@ -173,7 +201,7 @@ export const TVShowsTab: React.FC = () => {
   );
 
   const { menu, bindItem } = useContextMenu({
-    items,
+    items: gridItems,
     focusedIndex,
     getOptions: (show): ContextMenuOption[] => {
       const opts: ContextMenuOption[] = [
@@ -308,7 +336,7 @@ export const TVShowsTab: React.FC = () => {
             key={m}
             onClick={() => {
               setSubTab(m);
-              setSelectedAiGroup(null);
+              setSelectedAiGroupId(null);
             }}
             className="relative flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-colors focus:outline-none"
             style={{
@@ -331,14 +359,14 @@ export const TVShowsTab: React.FC = () => {
       {subTab === "ai-groups" && aiGroups.length > 0 && (
         <div className="flex gap-2 flex-shrink-0 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
           <motion.button
-            onClick={() => setSelectedAiGroup(null)}
+            onClick={() => setSelectedAiGroupId(null)}
             className="relative flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors focus:outline-none"
             style={{
-              backgroundColor: !selectedAiGroup
+              backgroundColor: !selectedAiGroupId
                 ? "var(--color-accent)"
                 : "var(--color-surface-raised)",
-              color: !selectedAiGroup ? "var(--color-bg)" : "var(--color-text-dim)",
-              border: `1px solid ${!selectedAiGroup ? "var(--color-accent)" : "var(--color-border)"}`,
+              color: !selectedAiGroupId ? "var(--color-bg)" : "var(--color-text-dim)",
+              border: `1px solid ${!selectedAiGroupId ? "var(--color-accent)" : "var(--color-border)"}`,
             }}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
@@ -347,15 +375,15 @@ export const TVShowsTab: React.FC = () => {
           </motion.button>
           {aiGroups.map((g, i) => (
             <motion.button
-              key={`ai-${g.label}-${i}`}
-              onClick={() => setSelectedAiGroup(g.label)}
+              key={g.id}
+              onClick={() => setSelectedAiGroupId(g.id)}
               className="relative flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors focus:outline-none"
               style={{
-                backgroundColor: selectedAiGroup === g.label
+                backgroundColor: selectedAiGroupId === g.id
                   ? "var(--color-accent)"
                   : "var(--color-surface-raised)",
-                color: selectedAiGroup === g.label ? "var(--color-bg)" : "var(--color-text-dim)",
-                border: `1px solid ${selectedAiGroup === g.label ? "var(--color-accent)" : "var(--color-border)"}`,
+                color: selectedAiGroupId === g.id ? "var(--color-bg)" : "var(--color-text-dim)",
+                border: `1px solid ${selectedAiGroupId === g.id ? "var(--color-accent)" : "var(--color-border)"}`,
               }}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -371,6 +399,17 @@ export const TVShowsTab: React.FC = () => {
           <div className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "var(--color-accent)", borderTopColor: "transparent" }} />
           <span className="text-xs">Generating smart groups…</span>
         </div>
+      )}
+
+      {/* Dynamic metadata facets */}
+      {gridItems.length > 0 && (
+        <DynamicFacetFilters
+          items={facetSourceItems as Record<string, unknown>[]}
+          fields={tvFacetFields}
+          activeFilters={facetFilters}
+          onFilter={applyFacetFilter}
+          className="flex-shrink-0"
+        />
       )}
 
       {loading ? (

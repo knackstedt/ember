@@ -54,7 +54,7 @@ export const MoviesTab: React.FC = () => {
 
   const [aiGroups, setAiGroups] = useState<AiGroup[]>([]);
   const [aiGroupsLoading, setAiGroupsLoading] = useState(false);
-  const [selectedAiGroup, setSelectedAiGroup] = useState<string | null>(null);
+  const [selectedAiGroupId, setSelectedAiGroupId] = useState<string | null>(null);
   const aiGroupTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [facetFilters, setFacetFilters] = useState<Record<string, string | null>>({});
@@ -158,12 +158,12 @@ export const MoviesTab: React.FC = () => {
   }, [filtered, movies, searchQuery, activeGenre, activeCollectionId, collectionItemIds, activeCollection]);
 
   const displayItems = useMemo(() => {
-    if (subTab !== "ai-groups" || !selectedAiGroup) return items;
-    const group = aiGroups.find((g) => g.label === selectedAiGroup);
+    if (subTab !== "ai-groups" || !selectedAiGroupId) return items;
+    const group = aiGroups.find((g) => g.id === selectedAiGroupId);
     if (!group) return items;
     const ids = new Set(group.itemIds);
     return items.filter((m) => ids.has(m.id));
-  }, [items, subTab, aiGroups, selectedAiGroup]);
+  }, [items, subTab, aiGroups, selectedAiGroupId]);
 
   const facetSourceItems = displayItems;
 
@@ -464,14 +464,14 @@ export const MoviesTab: React.FC = () => {
           {aiGroups.length > 0 && (
             <div className="flex gap-2 flex-shrink-0 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
               <motion.button
-                onClick={() => setSelectedAiGroup(null)}
+                onClick={() => setSelectedAiGroupId(null)}
                 className="relative flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors focus:outline-none"
                 style={{
-                  backgroundColor: !selectedAiGroup
+                  backgroundColor: !selectedAiGroupId
                     ? "var(--color-accent)"
                     : "var(--color-surface-raised)",
-                  color: !selectedAiGroup ? "var(--color-bg)" : "var(--color-text-dim)",
-                  border: `1px solid ${!selectedAiGroup ? "var(--color-accent)" : "var(--color-border)"}`,
+                  color: !selectedAiGroupId ? "var(--color-bg)" : "var(--color-text-dim)",
+                  border: `1px solid ${!selectedAiGroupId ? "var(--color-accent)" : "var(--color-border)"}`,
                 }}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
@@ -480,15 +480,15 @@ export const MoviesTab: React.FC = () => {
               </motion.button>
               {aiGroups.map((g, i) => (
                 <motion.button
-                  key={`ai-${g.label}-${i}`}
-                  onClick={() => setSelectedAiGroup(g.label)}
+                  key={g.id}
+                  onClick={() => setSelectedAiGroupId(g.id)}
                   className="relative flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors focus:outline-none"
                   style={{
-                    backgroundColor: selectedAiGroup === g.label
+                    backgroundColor: selectedAiGroupId === g.id
                       ? "var(--color-accent)"
                       : "var(--color-surface-raised)",
-                    color: selectedAiGroup === g.label ? "var(--color-bg)" : "var(--color-text-dim)",
-                    border: `1px solid ${selectedAiGroup === g.label ? "var(--color-accent)" : "var(--color-border)"}`,
+                    color: selectedAiGroupId === g.id ? "var(--color-bg)" : "var(--color-text-dim)",
+                    border: `1px solid ${selectedAiGroupId === g.id ? "var(--color-accent)" : "var(--color-border)"}`,
                   }}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}

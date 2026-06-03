@@ -456,8 +456,8 @@ function itemToText(item: EmbeddableItem): string {
   return parts.join(". ");
 }
 
-function extractLabel(items: EmbeddableItem[]): string {
-  // Try to find common genre/tag
+function extractLabel(items: EmbeddableItem[], groupIndex: number): string {
+  // Collect all genres/tags
   const freq = new Map<string, number>();
   for (const item of items) {
     for (const g of item.genres ?? []) {
@@ -479,11 +479,11 @@ function extractLabel(items: EmbeddableItem[]): string {
     if (!best || v > best[1]) best = [k, v];
   }
 
-  if (best && best[1] >= items.length * 0.4) {
+  if (best && best[1] >= Math.max(2, items.length * 0.25)) {
     return best[0].charAt(0).toUpperCase() + best[0].slice(1);
   }
 
-  // Fallback: use the most common platform
+  // Fallback 1: most common platform
   const platforms = new Map<string, number>();
   for (const item of items) {
     if (item.platform) {
@@ -494,11 +494,44 @@ function extractLabel(items: EmbeddableItem[]): string {
   for (const [k, v] of platforms) {
     if (!pbest || v > pbest[1]) pbest = [k, v];
   }
-  if (pbest && pbest[1] >= items.length * 0.5) {
+  if (pbest && pbest[1] >= Math.max(2, items.length * 0.3)) {
     return pbest[0].charAt(0).toUpperCase() + pbest[0].slice(1);
   }
 
-  return "Mixed";
+  // Fallback 2: decade from release year in title or metadata
+  const yearMatch = items
+    .map((i) => i.title.match(/\b(19\d{2}|20\d{2})\b/)?.[1])
+    .filter(Boolean) as string[];
+  if (yearMatch.length >= Math.max(2, items.length * 0.3)) {
+    const decade = `${yearMatch[0].slice(0, 3)}0s`;
+    return decade;
+  }
+
+  // Fallback 3: most common first word of title (skip articles)
+  const stopWords = new Set(["the", "a", "an", "of", "in", "on", "at", "to", "for", "and", "with"]);
+  const firstWords = new Map<string, number>();
+  for (const item of items) {
+    const word = item.title.split(/\s+/)[0]?.toLowerCase().replace(/[^a-z]/g, "");
+    if (word && !stopWords.has(word)) {
+      firstWords.set(word, (firstWords.get(word) ?? 0) + 1);
+    }
+  }
+  let wbest: [string, number] | null = null;
+  for (const [k, v] of firstWords) {
+    if (!wbest || v > wbest[1]) wbest = [k, v];
+  }
+  if (wbest && wbest[1] >= Math.max(2, items.length * 0.3)) {
+    return wbest[0].charAt(0).toUpperCase() + wbest[0].slice(1);
+  }
+
+  // Fallback 4: use center item title as group name
+  if (items[0]?.title) {
+    const short = items[0].title.split(/[:\-–—]/)[0].trim();
+    if (short.length > 0 && short.length <= 25) return short;
+    return `${short.slice(0, 22)}…`;
+  }
+
+  return `Group ${groupIndex + 1}`;
 }
 
 export async function aiGroupItems(
@@ -601,10 +634,20 @@ export async function aiGroupItems(
     });
   }
 
-  return clusters.map((cluster) => {
+  // Deduplicate labels by appending a counter when needed
+  const usedLabels = new Set<string>();
+  return clusters.map((cluster, idx) => {
     const clusterItems = cluster.members.map((i) => items[i]);
+    let label = extractLabel(clusterItems, idx);
+    if (usedLabels.has(label)) {
+      let counter = 2;
+      while (usedLabels.has(`${label} (${counter})`)) counter++;
+      label = `${label} (${counter})`;
+    }
+    usedLabels.add(label);
     return {
-      label: extractLabel(clusterItems),
+      id: `aig_${idx}_${Date.now()}`,
+      label,
       itemIds: clusterItems.map((i) => i.id),
       centerItemId: clusterItems[0].id,
     };

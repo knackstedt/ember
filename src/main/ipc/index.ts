@@ -43,6 +43,15 @@ import { performGameScan } from "../services/game-scan.service";
 import { loadFlashThumbnail, clearInFlight } from "../services/flash-thumbnail.service";
 import { searchGame } from "../services/rawg.service";
 import { searchMovie, searchShow } from "../services/tmdb.service";
+import {
+  searchGameMetadata,
+  fetchGameMetadata,
+  enrichGameMetadata,
+  quickMetadataLookup,
+  getAvailableProviders,
+  getProvidersByType,
+  GameMetadata,
+} from "../services/metadata";
 import { listPlugins, reloadPlugins } from "../plugins/loader";
 import { getConnectedDevices } from "../input/evdev";
 import { getXdgVideosDir, getXdgMusicDir } from "../scanners/xdg";
@@ -164,15 +173,242 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     return url ?? null;
   });
 
+  // Enhanced metadata handlers using unified metadata service
   ipcMain.handle(
     "games:metadata",
     async (_e, title: string, steamAppId?: number) => {
+      // Legacy handler - kept for backwards compatibility
       const settings = await getSettings();
       const [rawg, proton] = await Promise.all([
         searchGame(title, settings.rawgApiKey),
         steamAppId ? getProtonRating(steamAppId) : Promise.resolve("unknown"),
       ]);
       return { rawg, proton };
+    },
+  );
+
+  // New comprehensive metadata search using unified service
+  ipcMain.handle(
+    "games:metadata:search",
+    async (_e, title: string, platform?: string, steamAppId?: number) => {
+      try {
+        const metadata = await searchGameMetadata({ title, platform, steamAppId });
+        return metadata;
+      } catch (err) {
+        log.error("ipc:games:metadata:search", err);
+        return null;
+      }
+    },
+  );
+
+  // Fetch metadata by external IDs
+  ipcMain.handle(
+    "games:metadata:fetch",
+    async (_e, options: {
+      steamAppId?: number;
+      igdbId?: number;
+      rawgSlug?: string;
+      mobyGamesId?: string;
+      theGamesDbId?: string;
+      launchBoxDbId?: string;
+    }) => {
+      try {
+        const metadata = await fetchGameMetadata(options);
+        return metadata;
+      } catch (err) {
+        log.error("ipc:games:metadata:fetch", err);
+        return null;
+      }
+    },
+  );
+
+  // Enrich existing game metadata with all available sources
+  ipcMain.handle(
+    "games:metadata:enrich",
+    async (_e, game: { title: string; platform?: string; steamAppId?: number }) => {
+      try {
+        const metadata = await enrichGameMetadata(game.title, game.platform, game.steamAppId);
+        return metadata;
+      } catch (err) {
+        log.error("ipc:games:metadata:enrich", err);
+        return null;
+      }
+    },
+  );
+
+  // Quick metadata lookup (uses only fast sources)
+  ipcMain.handle(
+    "games:metadata:quick",
+    async (_e, title: string, platform?: string) => {
+      try {
+        const metadata = await quickMetadataLookup(title, platform);
+        return metadata;
+      } catch (err) {
+        log.error("ipc:games:metadata:quick", err);
+        return null;
+      }
+    },
+  );
+
+  // Get list of available metadata providers
+  ipcMain.handle("games:metadata:providers", () => {
+    return {
+      all: getAvailableProviders(),
+      primary: getProvidersByType("primary"),
+      retro: getProvidersByType("retro"),
+      artwork: getProvidersByType("artwork"),
+      video: getProvidersByType("video"),
+      supplementary: getProvidersByType("supplementary"),
+    };
+  });
+
+  // Fetch lazy metadata (artwork, videos, low-rate-limit sources) when viewing game details
+  ipcMain.handle(
+    "games:metadata:lazy",
+    async (_e, options: {
+      gameId: string;
+      title: string;
+      platform?: string;
+      steamAppId?: number;
+      igdbId?: number;
+      rawgSlug?: string;
+      theGamesDbId?: string;
+      launchBoxDbId?: string;
+    }) => {
+      try {
+        // Fetch artwork and video sources (low rate limits)
+        const metadata = await searchGameMetadata(
+          {
+            title: options.title,
+            platform: options.platform,
+            steamAppId: options.steamAppId,
+            igdbId: options.igdbId,
+            rawgSlug: options.rawgSlug,
+            theGamesDbId: options.theGamesDbId,
+            launchBoxDbId: options.launchBoxDbId,
+          },
+          ["artwork", "video"] // Only fetch low-rate-limit sources
+        );
+
+        return metadata;
+      } catch (err) {
+        log.error("ipc:games:metadata:lazy", err);
+        return null;
+      }
+    },
+  );
+
+  // Fetch achievements for a game (lazy loading)
+  ipcMain.handle(
+    "games:metadata:achievements",
+    async (_e, options: {
+      gameId: string;
+      consoleId?: number;
+      steamAppId?: number;
+      retroAchievementsGameId?: number;
+    }) => {
+      try {
+        // Fetch from RetroAchievements if console ID provided
+        if (options.consoleId && options.retroAchievementsGameId) {
+          // This would call the RetroAchievements provider directly
+          // For now, return empty
+          return { achievements: [], count: 0 };
+        }
+
+        // Fetch from Steam API if Steam App ID provided
+        if (options.steamAppId) {
+          const settings = await getSettings();
+          if (settings.steamApiKey) {
+            const { SteamWebAPIProvider } = await import("../services/metadata");
+            const metadata = await SteamWebAPIProvider.fetch(
+              { steamAppId: options.steamAppId },
+              settings.steamApiKey
+            );
+            return {
+              achievements: metadata?.achievements || [],
+              count: metadata?.achievementCount || 0,
+            };
+          }
+        }
+
+        return { achievements: [], count: 0 };
+      } catch (err) {
+        log.error("ipc:games:metadata:achievements", err);
+        return { achievements: [], count: 0 };
+      }
+    },
+  );
+
+  // Fetch artwork specifically (lazy loading for detail view)
+  ipcMain.handle(
+    "games:metadata:artwork",
+    async (_e, options: {
+      gameId: string;
+      steamAppId?: number;
+      theGamesDbId?: string;
+      title?: string;
+    }) => {
+      try {
+        const artworkSources: ("artwork")[] = ["artwork"];
+
+        // Fetch from SteamGridDB and Fanart.tv
+        const metadata = await fetchGameMetadata(
+          {
+            steamAppId: options.steamAppId,
+            theGamesDbId: options.theGamesDbId,
+          },
+          artworkSources
+        );
+
+        return {
+          coverUrl: metadata?.coverUrl,
+          bannerUrl: metadata?.bannerUrl,
+          iconUrl: metadata?.iconUrl,
+          screenshots: metadata?.screenshots,
+        };
+      } catch (err) {
+        log.error("ipc:games:metadata:artwork", err);
+        return null;
+      }
+    },
+  );
+
+  // Fetch videos specifically (lazy loading for detail view)
+  ipcMain.handle(
+    "games:metadata:videos",
+    async (_e, options: {
+      gameId: string;
+      title: string;
+    }) => {
+      try {
+        const videoSources: ("video")[] = ["video"];
+
+        // Fetch from YouTube
+        const metadata = await searchGameMetadata(
+          { title: options.title },
+          videoSources
+        );
+
+        return metadata?.videos || [];
+      } catch (err) {
+        log.error("ipc:games:metadata:videos", err);
+        return [];
+      }
+    },
+  );
+
+  // Fetch Proton rating specifically (lazy loading for detail view)
+  ipcMain.handle(
+    "games:metadata:proton",
+    async (_e, steamAppId: number) => {
+      try {
+        if (!steamAppId) return "unknown";
+        const rating = await getProtonRating(steamAppId);
+        return rating;
+      } catch (err) {
+        log.error("ipc:games:metadata:proton", err);
+        return "unknown";
+      }
     },
   );
 

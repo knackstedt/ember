@@ -27,6 +27,7 @@ import { SHADER_PRESETS } from "../../components/LibretroPlayer/shaders";
 import { useToastStore } from "../../store/toast.store";
 import { useSettingsStore } from "../../store/settings.store";
 import { useCollectionsStore, evaluateSmartFilter, sortByCollection } from "../../store/collections.store";
+import { useGameMetadataStore } from "../../store/gameMetadata.store";
 import { CollectionsBar } from "../../components/CollectionsBar/CollectionsBar";
 import { CollectionManager } from "../../components/CollectionManager/CollectionManager";
 import { Tooltip } from "../../components/Tooltip/Tooltip";
@@ -163,7 +164,7 @@ export const GamingTab: React.FC = () => {
   const [viewMode, setViewMode] = useState<ViewMode>("ai-groups");
   const [aiGroups, setAiGroups] = useState<AiGroup[]>([]);
   const [aiGroupsLoading, setAiGroupsLoading] = useState(false);
-  const [selectedAiGroup, setSelectedAiGroup] = useState<string | null>(null);
+  const [selectedAiGroupId, setSelectedAiGroupId] = useState<string | null>(null);
   const aiGroupTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [facetFilters, setFacetFilters] = useState<Record<string, string | null>>({});
@@ -221,6 +222,29 @@ export const GamingTab: React.FC = () => {
     return () => window.removeEventListener("htpc:escape", handler);
   }, []);
 
+  // Lazy metadata loading when detail panel opens
+  const fetchLazyMetadata = useGameMetadataStore((s) => s.fetchLazyMetadata);
+  const getMetadata = useGameMetadataStore((s) => s.getMetadata);
+  const isLoadingMetadata = useGameMetadataStore((s) => selected ? s.isLoading(selected.id) : false);
+
+  useEffect(() => {
+    if (!selected) return;
+
+    // Fetch lazy metadata (artwork, videos, low-rate-limit sources) when viewing details
+    fetchLazyMetadata(
+      selected.id,
+      selected.title,
+      selected.platform,
+      selected.steamAppId
+    );
+  }, [selected?.id, selected?.title, selected?.platform, selected?.steamAppId, fetchLazyMetadata]);
+
+  // Get cached metadata for the selected game
+  const lazyMetadata = useMemo(() => {
+    if (!selected) return null;
+    return getMetadata(selected.id);
+  }, [selected, getMetadata, isLoadingMetadata]);
+
   /* Auto-generate AI groups when viewMode switches to ai-groups and games are loaded */
   useEffect(() => {
     if (viewMode !== "ai-groups" || games.length === 0) return;
@@ -275,12 +299,12 @@ export const GamingTab: React.FC = () => {
   }, [filtered, games, activeFilter, searchQuery, activeCollectionId, collectionItemIds, activeCollection]);
 
   const displayItems = useMemo(() => {
-    if (viewMode !== "ai-groups" || !selectedAiGroup) return items;
-    const group = aiGroups.find((g) => g.label === selectedAiGroup);
+    if (viewMode !== "ai-groups" || !selectedAiGroupId) return items;
+    const group = aiGroups.find((g) => g.id === selectedAiGroupId);
     if (!group) return items;
     const ids = new Set(group.itemIds);
     return items.filter((g) => ids.has(g.id));
-  }, [items, viewMode, aiGroups, selectedAiGroup]);
+  }, [items, viewMode, aiGroups, selectedAiGroupId]);
 
   const facetSourceItems = displayItems;
 
@@ -414,6 +438,39 @@ export const GamingTab: React.FC = () => {
 
   const badge = selected ? gameBadge(selected) : undefined;
 
+  // Merge base game data with lazy-fetched metadata for detail view
+  const detailGameData = useMemo(() => {
+    if (!selected) return null;
+    if (!lazyMetadata) return selected;
+
+    return {
+      ...selected,
+      // Use lazy metadata if available, otherwise fall back to base data
+      description: lazyMetadata.description ?? selected.description,
+      coverUrl: lazyMetadata.coverUrl ?? selected.coverUrl,
+      bannerUrl: lazyMetadata.bannerUrl ?? selected.bannerUrl,
+      iconUrl: lazyMetadata.iconUrl ?? selected.iconUrl,
+      rating: lazyMetadata.rating ?? selected.rating,
+      metacriticScore: lazyMetadata.metacriticScore ?? selected.metacriticScore,
+      openCriticScore: lazyMetadata.openCriticScore ?? selected.openCriticScore,
+      protonRating: lazyMetadata.protonRating ?? selected.protonRating,
+      developer: lazyMetadata.developer ?? selected.developer,
+      publisher: lazyMetadata.publisher ?? selected.publisher,
+      genres: lazyMetadata.genres ?? selected.genres,
+      tags: lazyMetadata.tags ?? selected.tags,
+      releaseYear: lazyMetadata.releaseYear ?? selected.releaseYear,
+      playerCount: lazyMetadata.playerCount ?? selected.playerCount,
+      playtime: lazyMetadata.playtime ?? selected.playtime,
+      platforms: lazyMetadata.platforms ?? selected.platforms,
+      screenshots: lazyMetadata.screenshots ?? selected.screenshots,
+      videos: lazyMetadata.videos ?? selected.videos,
+      achievementCount: lazyMetadata.achievementCount ?? selected.achievementCount,
+      // Store external IDs for future lazy loading
+      igdbId: lazyMetadata.igdbId ?? selected.igdbId,
+      steamAppId: lazyMetadata.steamAppId ?? selected.steamAppId,
+    };
+  }, [selected, lazyMetadata]);
+
   const resolveShader = async (game: Game): Promise<string> => {
     const perGame = await getEmulatorConfig(game.id);
     if (perGame.shader) return perGame.shader;
@@ -526,7 +583,7 @@ export const GamingTab: React.FC = () => {
             key={m}
             onClick={() => {
               setViewMode(m);
-              setSelectedAiGroup(null);
+              setSelectedAiGroupId(null);
             }}
             className="relative flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-colors focus:outline-none"
             style={{
@@ -549,31 +606,31 @@ export const GamingTab: React.FC = () => {
       {viewMode === "ai-groups" && aiGroups.length > 0 && (
         <div className="flex gap-2 flex-shrink-0 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
           <motion.button
-            onClick={() => setSelectedAiGroup(null)}
+            onClick={() => setSelectedAiGroupId(null)}
             className="relative flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors focus:outline-none"
             style={{
-              backgroundColor: !selectedAiGroup
+              backgroundColor: !selectedAiGroupId
                 ? "var(--color-accent)"
                 : "var(--color-surface-raised)",
-              color: !selectedAiGroup ? "var(--color-bg)" : "var(--color-text-dim)",
-              border: `1px solid ${!selectedAiGroup ? "var(--color-accent)" : "var(--color-border)"}`,
+              color: !selectedAiGroupId ? "var(--color-bg)" : "var(--color-text-dim)",
+              border: `1px solid ${!selectedAiGroupId ? "var(--color-accent)" : "var(--color-border)"}`,
             }}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
             All Groups
           </motion.button>
-          {aiGroups.map((g, i) => (
+          {aiGroups.map((g) => (
             <motion.button
-              key={`${g.label}-${i}`}
-              onClick={() => setSelectedAiGroup(g.label)}
+              key={g.id}
+              onClick={() => setSelectedAiGroupId(g.id)}
               className="relative flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors focus:outline-none"
               style={{
-                backgroundColor: selectedAiGroup === g.label
+                backgroundColor: selectedAiGroupId === g.id
                   ? "var(--color-accent)"
                   : "var(--color-surface-raised)",
-                color: selectedAiGroup === g.label ? "var(--color-bg)" : "var(--color-text-dim)",
-                border: `1px solid ${selectedAiGroup === g.label ? "var(--color-accent)" : "var(--color-border)"}`,
+                color: selectedAiGroupId === g.id ? "var(--color-bg)" : "var(--color-text-dim)",
+                border: `1px solid ${selectedAiGroupId === g.id ? "var(--color-accent)" : "var(--color-border)"}`,
               }}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -665,32 +722,45 @@ export const GamingTab: React.FC = () => {
       <DetailPanel
         open={!!selected}
         onClose={() => setSelected(null)}
-        title={selected?.title ?? ""}
-        coverUrl={selected?.coverUrl}
-        description={selected?.description}
+        title={detailGameData?.title ?? selected?.title ?? ""}
+        coverUrl={detailGameData?.coverUrl ?? selected?.coverUrl}
+        bannerUrl={detailGameData?.bannerUrl}
+        description={detailGameData?.description ?? selected?.description}
         metadata={
-          selected
+          detailGameData || selected
             ? ([
-                selected.developer
-                  ? { label: "Developer", value: selected.developer }
+                (detailGameData ?? selected)?.developer
+                  ? { label: "Developer", value: (detailGameData ?? selected)!.developer! }
                   : null,
-                selected.releaseYear
-                  ? { label: "Year", value: String(selected.releaseYear) }
+                (detailGameData ?? selected)?.releaseYear
+                  ? { label: "Year", value: String((detailGameData ?? selected)!.releaseYear) }
                   : null,
-                selected.protonRating && selected.protonRating !== "unknown"
-                  ? { label: "ProtonDB", value: selected.protonRating }
+                (detailGameData ?? selected)?.metacriticScore
+                  ? { label: "Metacritic", value: String((detailGameData ?? selected)!.metacriticScore) }
                   : null,
-                selected.playerCount
+                (detailGameData ?? selected)?.openCriticScore
+                  ? { label: "OpenCritic", value: String((detailGameData ?? selected)!.openCriticScore) }
+                  : null,
+                (detailGameData ?? selected)?.protonRating && (detailGameData ?? selected)!.protonRating !== "unknown"
+                  ? { label: "ProtonDB", value: (detailGameData ?? selected)!.protonRating! }
+                  : null,
+                (detailGameData ?? selected)?.playerCount
                   ? {
                       label: "Players",
-                      value: `${selected.playerCount.min}–${selected.playerCount.max}`,
+                      value: `${(detailGameData ?? selected)!.playerCount!.min}–${(detailGameData ?? selected)!.playerCount!.max}`,
                     }
                   : null,
-                { label: "Platform", value: selected.platform },
+                (detailGameData ?? selected)?.achievementCount
+                  ? { label: "Achievements", value: String((detailGameData ?? selected)!.achievementCount) }
+                  : null,
+                (detailGameData ?? selected)?.playtime
+                  ? { label: "Est. Playtime", value: `${Math.round((detailGameData ?? selected)!.playtime! / 60)}h` }
+                  : null,
+                { label: "Platform", value: selected?.platform ?? "" },
               ].filter(Boolean) as { label: string; value: string }[])
             : []
         }
-        tags={selected?.tags ?? []}
+        tags={detailGameData?.tags ?? selected?.tags ?? []}
         onTagsChange={
           selected ? (newTags) => setTags(selected.id, newTags) : undefined
         }
@@ -719,7 +789,16 @@ export const GamingTab: React.FC = () => {
       >
         {selected && (
           <div className="flex flex-col gap-4">
-            {(selected.bannerUrl || selected.coverUrl) && (
+            {/* Loading indicator for lazy metadata */}
+            {isLoadingMetadata && (
+              <div className="flex items-center gap-2 text-sm" style={{ color: "var(--color-text-dim)" }}>
+                <div className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "var(--color-accent)", borderTopColor: "transparent" }} />
+                <span>Loading additional metadata...</span>
+              </div>
+            )}
+
+            {/* Screenshots from lazy metadata */}
+            {(detailGameData?.screenshots?.length || detailGameData?.bannerUrl || detailGameData?.coverUrl) && (
               <div>
                 <div
                   className="text-xs font-semibold uppercase tracking-wide mb-2"
@@ -731,7 +810,10 @@ export const GamingTab: React.FC = () => {
                   className="flex gap-2 overflow-x-auto pb-1"
                   style={{ scrollbarWidth: "thin" }}
                 >
-                  {[selected.bannerUrl, selected.coverUrl]
+                  {(detailGameData?.screenshots?.length
+                    ? detailGameData.screenshots.slice(0, 6)
+                    : [detailGameData?.bannerUrl, detailGameData?.coverUrl].filter(Boolean)
+                  )
                     .filter((u): u is string => !!u)
                     .map((url, i) => (
                       <img
@@ -742,6 +824,34 @@ export const GamingTab: React.FC = () => {
                         style={{ maxWidth: 220 }}
                       />
                     ))}
+                </div>
+              </div>
+            )}
+
+            {/* Videos from lazy metadata */}
+            {detailGameData?.videos && detailGameData.videos.length > 0 && (
+              <div>
+                <div
+                  className="text-xs font-semibold uppercase tracking-wide mb-2"
+                  style={{ color: "var(--color-text-dim)" }}
+                >
+                  Videos
+                </div>
+                <div className="flex flex-col gap-2">
+                  {detailGameData.videos.slice(0, 3).map((video, i) => (
+                    <a
+                      key={i}
+                      href={video.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 p-2 rounded hover:bg-white/5 transition-colors"
+                      style={{ background: "var(--color-surface-raised)" }}
+                    >
+                      <span className="text-lg">▶</span>
+                      <span className="text-sm truncate flex-1">{video.title}</span>
+                      <span className="text-xs" style={{ color: "var(--color-text-dim)" }}>{video.type}</span>
+                    </a>
+                  ))}
                 </div>
               </div>
             )}

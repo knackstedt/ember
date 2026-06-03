@@ -17,6 +17,7 @@ import {
   ManagedPackage,
   PackageOperationProgress,
 } from "../shared/types";
+import { GameMetadata } from "../main/services/metadata/types";
 import { libretroApi } from "./libretro";
 
 const htpc = {
@@ -45,8 +46,80 @@ const htpc = {
       ipcRenderer.invoke("games:favorite", id, value),
     tag: (id: string, tags: string[]): Promise<void> =>
       ipcRenderer.invoke("games:tag", id, tags),
+    // Legacy metadata fetcher
     fetchMetadata: (title: string, steamAppId?: number): Promise<unknown> =>
       ipcRenderer.invoke("games:metadata", title, steamAppId),
+
+    // New comprehensive metadata APIs
+    searchMetadata: (title: string, platform?: string, steamAppId?: number): Promise<GameMetadata | null> =>
+      ipcRenderer.invoke("games:metadata:search", title, platform, steamAppId),
+
+    fetchMetadataByIds: (options: {
+      steamAppId?: number;
+      igdbId?: number;
+      rawgSlug?: string;
+      mobyGamesId?: string;
+      theGamesDbId?: string;
+      launchBoxDbId?: string;
+    }): Promise<GameMetadata | null> =>
+      ipcRenderer.invoke("games:metadata:fetch", options),
+
+    enrichMetadata: (game: { title: string; platform?: string; steamAppId?: number }): Promise<GameMetadata | null> =>
+      ipcRenderer.invoke("games:metadata:enrich", game),
+
+    quickMetadata: (title: string, platform?: string): Promise<GameMetadata | null> =>
+      ipcRenderer.invoke("games:metadata:quick", title, platform),
+
+    getMetadataProviders: (): Promise<{
+      all: string[];
+      primary: string[];
+      retro: string[];
+      artwork: string[];
+      video: string[];
+      supplementary: string[];
+    }> => ipcRenderer.invoke("games:metadata:providers"),
+
+    // Lazy loading APIs for detail view
+    fetchLazyMetadata: (options: {
+      gameId: string;
+      title: string;
+      platform?: string;
+      steamAppId?: number;
+      igdbId?: number;
+      rawgSlug?: string;
+      theGamesDbId?: string;
+      launchBoxDbId?: string;
+    }): Promise<GameMetadata | null> =>
+      ipcRenderer.invoke("games:metadata:lazy", options),
+
+    fetchAchievements: (options: {
+      gameId: string;
+      consoleId?: number;
+      steamAppId?: number;
+      retroAchievementsGameId?: number;
+    }): Promise<{ achievements: unknown[]; count: number }> =>
+      ipcRenderer.invoke("games:metadata:achievements", options),
+
+    fetchArtwork: (options: {
+      gameId: string;
+      steamAppId?: number;
+      theGamesDbId?: string;
+      title?: string;
+    }): Promise<{
+      coverUrl?: string;
+      bannerUrl?: string;
+      iconUrl?: string;
+      screenshots?: string[];
+    } | null> => ipcRenderer.invoke("games:metadata:artwork", options),
+
+    fetchVideos: (options: {
+      gameId: string;
+      title: string;
+    }): Promise<unknown[]> =>
+      ipcRenderer.invoke("games:metadata:videos", options),
+
+    fetchProtonRating: (steamAppId: number): Promise<string> =>
+      ipcRenderer.invoke("games:metadata:proton", steamAppId),
     hide: (id: string, value: boolean): Promise<void> =>
       ipcRenderer.invoke("games:hide", id, value),
     emulatorConfig: {
