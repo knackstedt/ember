@@ -331,49 +331,6 @@ export const TVShowsTab: React.FC = () => {
             className="flex-shrink-0"
           />
 
-          {/* Compact filter summary row */}
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* Active tab chip */}
-            <span
-              className="px-2.5 py-0.5 rounded-full text-xs font-medium"
-              style={{
-                backgroundColor: "var(--color-accent)",
-                color: "var(--color-bg)",
-              }}
-            >
-              {subTab === "ai-groups" ? "✨ Groups" : "All"}
-            </span>
-            {/* Active group chip */}
-            {subTab === "ai-groups" && selectedAiGroupId && (() => {
-              const group = aiGroups.find((g) => g.id === selectedAiGroupId);
-              return group ? (
-                <motion.button
-                  className="px-2.5 py-0.5 rounded-full text-xs font-medium"
-                  style={{ backgroundColor: "var(--color-accent)", color: "var(--color-bg)" }}
-                  onClick={() => setSelectedAiGroupId(null)}
-                  whileTap={{ scale: 0.95 }}
-                  title="Clear group filter"
-                >
-                  Group: {group.label} ✕
-                </motion.button>
-              ) : null;
-            })()}
-            {/* Active facet chips */}
-            {Object.entries(facetFilters).map(([key, value]) =>
-              value ? (
-                <motion.button
-                  key={key}
-                  className="px-2.5 py-0.5 rounded-full text-xs font-medium"
-                  style={{ backgroundColor: "var(--color-accent)", color: "var(--color-bg)" }}
-                  onClick={() => applyFacetFilter(key, null)}
-                  whileTap={{ scale: 0.95 }}
-                  title={`Clear ${key} filter`}
-                >
-                  {tvFacetFields.find((f) => f.key === key)?.label ?? key}: {value} ✕
-                </motion.button>
-              ) : null,
-            )}
-          </div>
         </div>
 
         {/* Sticky compact bar — search + active filter summary */}
