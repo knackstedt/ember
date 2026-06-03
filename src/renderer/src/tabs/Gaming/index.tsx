@@ -271,7 +271,7 @@ export const GamingTab: React.FC = () => {
   };
 
   const recentlyPlayed = [...games]
-    .filter((g) => g.lastPlayed !== undefined)
+    .filter((g) => g.lastPlayed && g.lastPlayed > 0)
     .sort((a, b) => (b.lastPlayed ?? 0) - (a.lastPlayed ?? 0))
     .slice(0, 8);
 

@@ -21,10 +21,21 @@ export class FlashFilterEngine {
   private startTime = performance.now();
   private pixelateSize = 4;
   private ditherLevels = 4;
+  private _running = false;
+  private _disposed = false;
+  private _visibilityHandler: (() => void) | null = null;
 
   constructor(targetCanvas: HTMLCanvasElement) {
     this.targetCanvas = targetCanvas;
     this.init();
+    this._visibilityHandler = () => {
+      if (document.hidden) {
+        this.stop();
+      } else if (this._running) {
+        this.start();
+      }
+    };
+    document.addEventListener("visibilitychange", this._visibilityHandler);
   }
 
   private init() {
@@ -217,11 +228,14 @@ export class FlashFilterEngine {
   };
 
   start() {
-    if (this.animationId) return;
+    if (this._disposed) return;
+    this._running = true;
+    if (this.animationId || document.hidden) return;
     this.animationId = requestAnimationFrame(this.loop);
   }
 
   stop() {
+    this._running = false;
     if (this.animationId) {
       cancelAnimationFrame(this.animationId);
       this.animationId = 0;
@@ -229,7 +243,12 @@ export class FlashFilterEngine {
   }
 
   dispose() {
+    this._disposed = true;
     this.stop();
+    if (this._visibilityHandler) {
+      document.removeEventListener("visibilitychange", this._visibilityHandler);
+      this._visibilityHandler = null;
+    }
     const gl = this.gl;
     if (gl) {
       if (this.program) gl.deleteProgram(this.program);

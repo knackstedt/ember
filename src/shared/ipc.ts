@@ -1,0 +1,95 @@
+export const IPC_CHANNELS = {
+  settings: {
+    get: "settings:get",
+    set: "settings:set",
+  },
+  app: {
+    fullscreen: "app:fullscreen",
+    quit: "app:quit",
+    restart: "app:restart",
+    xdgDefaults: "app:xdg-defaults",
+  },
+  games: {
+    scan: "games:scan",
+    list: "games:list",
+    launch: "games:launch",
+    favorite: "games:favorite",
+    tag: "games:tag",
+    hide: "games:hide",
+    metadata: "games:metadata",
+    loadThumbnail: "games:loadThumbnail",
+    regenerateThumbnail: "games:regenerateThumbnail",
+    emulatorConfig: {
+      get: "games:emulatorConfig:get",
+      set: "games:emulatorConfig:set",
+    },
+  },
+  movies: {
+    scan: "movies:scan",
+    list: "movies:list",
+    launch: "movies:launch",
+    favorite: "movies:favorite",
+    tag: "movies:tag",
+    hide: "movies:hide",
+    progressSet: "movies:progress:set",
+    metadata: "movies:metadata",
+    regenerateThumbnail: "movies:regenerateThumbnail",
+  },
+  music: {
+    scan: "music:scan",
+    list: "music:list",
+    launch: "music:launch",
+    favorite: "music:favorite",
+    tag: "music:tag",
+    hide: "music:hide",
+    searchCoverArt: "music:searchCoverArt",
+    pickCoverImage: "music:pickCoverImage",
+    loadThumbnail: "music:loadThumbnail",
+    artistThumbnail: "music:artistThumbnail",
+  },
+  tv: {
+    scan: "tv:scan",
+    list: "tv:list",
+    launch: "tv:launch",
+    favorite: "tv:favorite",
+    tag: "tv:tag",
+    hide: "tv:hide",
+    metadata: "tv:metadata",
+    regenerateThumbnail: "tv:regenerateThumbnail",
+  },
+  input: {
+    devices: "input:devices",
+    mappings: {
+      get: "input:mappings:get",
+      set: "input:mappings:set",
+      reset: "input:mappings:reset",
+    },
+    event: "input:event",
+    deviceConnected: "input:device-connected",
+    deviceDisconnected: "input:device-disconnected",
+  },
+  plugins: {
+    list: "plugins:list",
+    reload: "plugins:reload",
+  },
+  db: {
+    clear: "db:clear",
+  },
+  dialog: {
+    openDirectory: "dialog:open-directory",
+  },
+  shell: {
+    openPath: "shell:openPath",
+    showItemInFolder: "shell:showItemInFolder",
+  },
+  files: {
+    read: "files:read",
+  },
+  flashFilters: {
+    list: "flash-filters:list",
+    openDir: "flash-filters:open-dir",
+  },
+  scan: {
+    progress: "scan:progress",
+  },
+} as const;

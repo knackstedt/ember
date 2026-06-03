@@ -27,6 +27,14 @@ import {
   generateShowThumbnail,
 } from "../scanners/video.scanner";
 import { getDb } from "../db";
+import {
+  GameRepo,
+  MovieRepo,
+  MusicRepo,
+  TVRepo,
+  MappingRepo,
+  BrokenFlashRepo,
+} from "../db/repository";
 import { getProtonRating } from "../services/protondb.service";
 import { performGameScan } from "../services/game-scan.service";
 import { loadFlashThumbnail, clearInFlight } from "../services/flash-thumbnail.service";
@@ -91,16 +99,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
   });
 
   ipcMain.handle("games:list", async () => {
-    const db = getDb();
-    const result = await db.query<[Game[]]>(
-      "SELECT * FROM game ORDER BY title ASC",
-    );
-    const games = (result[0] ?? []) as Game[];
-    return games.map((g) => {
-      const id =
-        typeof g.id === "string" ? g.id : ((g.id as any)?.id ?? String(g.id));
-      return { ...g, id };
-    });
+    return GameRepo.list();
   });
 
   ipcMain.handle("games:launch", (_e, game: Game) => {
@@ -108,35 +107,23 @@ export function registerIpcHandlers(window: BrowserWindow): void {
   });
 
   ipcMain.handle("games:favorite", async (_e, id: string, value: boolean) => {
-    const db = getDb();
-    await db.query(`UPDATE game:⟨${id}⟩ SET isFavorite = $value`, { value });
+    await GameRepo.setFavorite(id, value);
   });
 
   ipcMain.handle("games:tag", async (_e, id: string, tags: string[]) => {
-    const db = getDb();
-    await db.query(`UPDATE game:⟨${id}⟩ SET tags = $tags`, { tags });
+    await GameRepo.setTags(id, tags);
   });
 
   ipcMain.handle("games:hide", async (_e, id: string, value: boolean) => {
-    const db = getDb();
-    await db.query(`UPDATE game:⟨${id}⟩ SET hidden = $value`, { value });
+    await GameRepo.setHidden(id, value);
   });
 
   ipcMain.handle("games:emulatorConfig:get", async (_e, id: string) => {
-    const db = getDb();
-    const rows = await db.query(
-      "SELECT shader FROM game_config:⟨" + id + "⟩",
-    );
-    const row = ((rows as any[])[0] ?? [])[0];
-    return (row ?? {}) as GameEmulatorConfig;
+    return GameRepo.getEmulatorConfig(id);
   });
 
   ipcMain.handle("games:emulatorConfig:set", async (_e, id: string, config: GameEmulatorConfig) => {
-    const db = getDb();
-    await db.query(
-      "UPSERT game_config:⟨" + id + "⟩ CONTENT $config",
-      { config },
-    );
+    await GameRepo.setEmulatorConfig(id, config);
   });
 
   ipcMain.handle("games:loadThumbnail", async (_e, game: Game) => {
@@ -196,13 +183,11 @@ export function registerIpcHandlers(window: BrowserWindow): void {
           } catch {}
         }
         try {
-          const db = getDb();
-          await db.query(`DELETE broken_flash_game:⟨${id}⟩`);
+          await BrokenFlashRepo.delete(id);
           log.info("ipc:games:regenerateThumbnail", `cleared broken record for ${id}`);
         } catch {}
         try {
-          const db = getDb();
-          await db.query(`UPDATE game:⟨${id}⟩ SET corrupt = false`);
+          await GameRepo.setCorrupt(id, false);
           log.info("ipc:games:regenerateThumbnail", `cleared corrupt for ${id}`);
         } catch {}
         clearInFlight(id);
@@ -291,7 +276,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
       if (defined.isFavorite === undefined) defined.isFavorite = false;
       if (defined.tags === undefined) defined.tags = [];
       // Preserve existing playback progress and lastPlayed
-      const existing = await db.query(
+      const existing = await db.query<[{ watchProgress?: number; lastPlayed?: number }[]]>(
         `SELECT watchProgress, lastPlayed FROM movie:⟨${defined.id}⟩`,
       );
       const existingRecord = existing[0]?.[0];
@@ -321,11 +306,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
   });
 
   ipcMain.handle("movies:list", async () => {
-    const db = getDb();
-    const result = await db.query<[Movie[]]>(
-      "SELECT * FROM movie ORDER BY title ASC",
-    );
-    const movies = (result[0] ?? []) as Movie[];
+    const movies = await MovieRepo.list();
     log.info(
       "movies:list",
       `returning ${movies.length} movies, coverUrl samples: ${JSON.stringify(
@@ -337,9 +318,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
       "/",
     );
     return movies.map((m) => {
-      const id =
-        typeof m.id === "string" ? m.id : ((m.id as any)?.id ?? String(m.id));
-      const normalized = { ...m, id };
+      const normalized = { ...m };
       if (!normalized.coverUrl?.startsWith("file://")) return normalized;
       const pathPart = normalized.coverUrl.slice("file://".length);
       if (!pathPart.startsWith(thumbRoot)) return normalized;
@@ -353,36 +332,26 @@ export function registerIpcHandlers(window: BrowserWindow): void {
   });
 
   ipcMain.handle("movies:favorite", async (_e, id: string, value: boolean) => {
-    const db = getDb();
-    await db.query(`UPDATE movie:⟨${id}⟩ SET isFavorite = $value`, { value });
+    await MovieRepo.setFavorite(id, value);
   });
 
   ipcMain.handle("movies:tag", async (_e, id: string, tags: string[]) => {
-    const db = getDb();
-    await db.query(`UPDATE movie:⟨${id}⟩ SET tags = $tags`, { tags });
+    await MovieRepo.setTags(id, tags);
   });
 
   ipcMain.handle("movies:hide", async (_e, id: string, value: boolean) => {
-    const db = getDb();
-    await db.query(`UPDATE movie:⟨${id}⟩ SET hidden = $value`, { value });
+    await MovieRepo.setHidden(id, value);
   });
 
   ipcMain.handle(
     "movies:progress:set",
     async (_e, id: string, progress: number | null) => {
-      const db = getDb();
       const now = Date.now();
-      if (progress === null || progress === undefined) {
-        await db.query(
-          `UPDATE movie:⟨${id}⟩ SET watchProgress = NONE, lastPlayed = $now`,
-          { now },
-        );
-      } else {
-        await db.query(
-          `UPDATE movie:⟨${id}⟩ SET watchProgress = $progress, lastPlayed = $now`,
-          { progress, now },
-        );
-      }
+      await MovieRepo.setProgress(id, progress ?? null);
+      // Also update lastPlayed via repo if needed; currently setProgress handles it
+      // We keep lastPlayed update here for backward compat
+      const db = getDb();
+      await db.query(`UPDATE movie:⟨${id}⟩ SET lastPlayed = $now`, { now });
     },
   );
 
@@ -407,10 +376,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     }
     const coverUrl = await generateMovieThumbnail(movie.filePath, movie.id);
     if (coverUrl) {
-      const db = getDb();
-      await db.query(`UPDATE movie:⟨${movie.id}⟩ SET coverUrl = $url`, {
-        url: coverUrl,
-      });
+      await MovieRepo.setCoverUrl(movie.id, coverUrl);
     }
     return coverUrl ?? null;
   });
@@ -427,21 +393,12 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     const tracks = await scanMusicFiles(extraPaths).finally(() => {
       scanLocks.music = false;
     });
-    const db = getDb();
     log.info("music:scan", `inserting ${tracks.length} tracks into DB...`);
     for (let i = 0; i < tracks.length; i++) {
       const track = tracks[i];
       if (i % 100 === 0)
         log.info("music:scan", `db insert ${i + 1}/${tracks.length}`);
-      const clean = {
-        ...track,
-        isFavorite: track.isFavorite ?? false,
-        tags: track.tags ?? [],
-        hidden: track.hidden ?? false,
-      };
-      await db.query(`UPSERT music_track:⟨${clean.id}⟩ CONTENT $track`, {
-        track: clean,
-      });
+      await MusicRepo.upsert(track);
     }
     log.info("music:scan", "DB insert done");
     window.webContents.send("scan:progress", {
@@ -480,20 +437,15 @@ export function registerIpcHandlers(window: BrowserWindow): void {
   });
 
   ipcMain.handle("music:favorite", async (_e, id: string, value: boolean) => {
-    const db = getDb();
-    await db.query(`UPDATE music_track:⟨${id}⟩ SET isFavorite = $value`, {
-      value,
-    });
+    await MusicRepo.setFavorite(id, value);
   });
 
   ipcMain.handle("music:tag", async (_e, id: string, tags: string[]) => {
-    const db = getDb();
-    await db.query(`UPDATE music_track:⟨${id}⟩ SET tags = $tags`, { tags });
+    await MusicRepo.setTags(id, tags);
   });
 
   ipcMain.handle("music:hide", async (_e, id: string, value: boolean) => {
-    const db = getDb();
-    await db.query(`UPDATE music_track:⟨${id}⟩ SET hidden = $value`, { value });
+    await MusicRepo.setHidden(id, value);
   });
 
   ipcMain.handle("music:searchCoverArt", async (_e, track: MusicTrack) => {
@@ -535,16 +487,8 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     const shows = await scanTvShows(extraPaths).finally(() => {
       scanLocks.tv = false;
     });
-    const db = getDb();
     for (const show of shows) {
-      const clean = {
-        ...show,
-        isFavorite: show.isFavorite ?? false,
-        tags: show.tags ?? [],
-      };
-      await db.query(`UPSERT tv_show:⟨${clean.id}⟩ CONTENT $show`, {
-        show: clean,
-      });
+      await TVRepo.upsert(show);
     }
     window.webContents.send("scan:progress", {
       scanner: "tv",
@@ -556,16 +500,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
   });
 
   ipcMain.handle("tv:list", async () => {
-    const db = getDb();
-    const result = await db.query<[TVShow[]]>(
-      "SELECT * FROM tv_show ORDER BY title ASC",
-    );
-    const shows = (result[0] ?? []) as TVShow[];
-    return shows.map((s) => {
-      const id =
-        typeof s.id === "string" ? s.id : ((s.id as any)?.id ?? String(s.id));
-      return { ...s, id };
-    });
+    return TVRepo.list();
   });
 
   ipcMain.handle("tv:launch", (_e, filePath: string) => {
@@ -573,18 +508,15 @@ export function registerIpcHandlers(window: BrowserWindow): void {
   });
 
   ipcMain.handle("tv:favorite", async (_e, id: string, value: boolean) => {
-    const db = getDb();
-    await db.query(`UPDATE tv_show:⟨${id}⟩ SET isFavorite = $value`, { value });
+    await TVRepo.setFavorite(id, value);
   });
 
   ipcMain.handle("tv:tag", async (_e, id: string, tags: string[]) => {
-    const db = getDb();
-    await db.query(`UPDATE tv_show:⟨${id}⟩ SET tags = $tags`, { tags });
+    await TVRepo.setTags(id, tags);
   });
 
   ipcMain.handle("tv:hide", async (_e, id: string, value: boolean) => {
-    const db = getDb();
-    await db.query(`UPDATE tv_show:⟨${id}⟩ SET hidden = $value`, { value });
+    await TVRepo.setHidden(id, value);
   });
 
   ipcMain.handle("tv:metadata", async (_e, title: string) => {
@@ -616,10 +548,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
       ) ?? [];
     const coverUrl = await generateShowThumbnail(show.dirPath, episodes, show.id);
     if (coverUrl) {
-      const db = getDb();
-      await db.query(`UPDATE tv_show:⟨${show.id}⟩ SET coverUrl = $url`, {
-        url: coverUrl,
-      });
+      await TVRepo.setCoverUrl(show.id, coverUrl);
     }
     return coverUrl ?? null;
   });
@@ -629,31 +558,18 @@ export function registerIpcHandlers(window: BrowserWindow): void {
   });
 
   ipcMain.handle("input:mappings:get", async (_e, deviceId: string) => {
-    const db = getDb();
-    const result = await db.query(
-      "SELECT * FROM controller_mapping WHERE deviceId = $deviceId",
-      { deviceId },
-    );
-    return result[0] ?? [];
+    return MappingRepo.get(deviceId);
   });
 
   ipcMain.handle(
     "input:mappings:set",
     async (_e, deviceId: string, inputCode: string, action: string) => {
-      const db = getDb();
-      await db.query(
-        `INSERT INTO controller_mapping (deviceId, inputCode, action) VALUES ($deviceId, $inputCode, $action)
-       ON DUPLICATE KEY UPDATE action = $action`,
-        { deviceId, inputCode, action },
-      );
+      await MappingRepo.set(deviceId, inputCode, action);
     },
   );
 
   ipcMain.handle("input:mappings:reset", async (_e, deviceId: string) => {
-    const db = getDb();
-    await db.query("DELETE controller_mapping WHERE deviceId = $deviceId", {
-      deviceId,
-    });
+    await MappingRepo.reset(deviceId);
   });
 
   ipcMain.handle("plugins:list", async () => {

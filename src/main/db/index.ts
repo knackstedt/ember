@@ -5,8 +5,14 @@ import { createLogger } from "../util/logger";
 
 const log = createLogger("info");
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Surreal = any;
+interface Surreal {
+  connect(url: string): Promise<unknown>;
+  use(opts: { namespace: string; database: string }): Promise<unknown>;
+  query<T = unknown>(
+    query: string,
+    params?: Record<string, unknown>,
+  ): Promise<T>;
+}
 let db: Surreal | null = null;
 
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {

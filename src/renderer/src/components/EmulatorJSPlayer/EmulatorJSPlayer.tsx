@@ -61,6 +61,13 @@ export const EmulatorJSPlayer: React.FC = () => {
       cancelled = true;
       initedRef.current = false;
 
+      // Always revoke blob URL even if init never completed
+      const blobUrl = romUrlRef.current;
+      romUrlRef.current = "";
+      if (blobUrl) {
+        try { URL.revokeObjectURL(blobUrl); } catch {}
+      }
+
       // Stop the running emulator instance
       const ejs = (window as any).EJS_emulator;
       if (ejs) {
@@ -76,7 +83,7 @@ export const EmulatorJSPlayer: React.FC = () => {
           // Close the Web Audio context to kill audio output
           const al = ejs.Module?.AL;
           if (al?.currentCtx?.audioCtx) {
-            al.currentCtx.audioCtx.close();
+            try { al.currentCtx.audioCtx.close(); } catch {}
           }
           // Disconnect any dangling gain nodes
           if (al?.currentCtx?.sources) {
@@ -113,11 +120,6 @@ export const EmulatorJSPlayer: React.FC = () => {
 
       if (container) {
         container.innerHTML = "";
-      }
-
-      if (romUrlRef.current) {
-        URL.revokeObjectURL(romUrlRef.current);
-        romUrlRef.current = "";
       }
     };
   }, [open, romPath, platform]);

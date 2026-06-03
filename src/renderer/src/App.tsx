@@ -28,6 +28,7 @@ import { V86Player } from "./components/V86Player/V86Player";
 import { useV86PlayerStore } from "./store/v86Player.store";
 import { useContextMenuStore } from "./store/contextMenu.store";
 import { QueueBlade } from "./components/QueueBlade/QueueBlade";
+import { ErrorBoundary } from "./components/ErrorBoundary/ErrorBoundary";
 
 interface TabDef {
   id: TabId;
@@ -370,10 +371,18 @@ export default function App(): React.ReactElement {
       <ThemeBackground />
 
       <AnimatePresence>{videoOpen && <VideoPlayer />}</AnimatePresence>
-      <FlashPlayer />
-      <JsnesPlayer />
-      <EmulatorJSPlayer />
-      <V86Player />
+      <ErrorBoundary>
+        <FlashPlayer />
+      </ErrorBoundary>
+      <ErrorBoundary>
+        <JsnesPlayer />
+      </ErrorBoundary>
+      <ErrorBoundary>
+        <EmulatorJSPlayer />
+      </ErrorBoundary>
+      <ErrorBoundary>
+        <V86Player />
+      </ErrorBoundary>
 
       <div className="relative z-10 flex flex-col h-full">
         {/* Tab bar */}

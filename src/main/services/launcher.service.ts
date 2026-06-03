@@ -1,10 +1,44 @@
 import { spawn, spawnSync, ChildProcess } from "child_process";
 import { Game, Movie, MusicTrack } from "../../shared/types";
 import { createLogger } from "../util/logger";
+import { GameRepo } from "../db/repository";
 
 const log = createLogger("info");
 
 const activeProcesses = new Map<string, ChildProcess>();
+const playTimeTimers = new Map<string, { startTime: number; timer: NodeJS.Timeout }>();
+
+function parseCommand(input: string): string[] {
+  const args: string[] = [];
+  let current = "";
+  let inQuotes = false;
+  let quoteChar = "";
+  let justClosedQuote = false;
+
+  for (let i = 0; i < input.length; i++) {
+    const ch = input[i];
+    if (!inQuotes && (ch === '"' || ch === "'")) {
+      inQuotes = true;
+      quoteChar = ch;
+      justClosedQuote = false;
+    } else if (inQuotes && ch === quoteChar) {
+      inQuotes = false;
+      quoteChar = "";
+      justClosedQuote = true;
+    } else if (!inQuotes && /\s/.test(ch)) {
+      if (current.length > 0 || justClosedQuote) {
+        args.push(current);
+        current = "";
+        justClosedQuote = false;
+      }
+    } else {
+      current += ch;
+      justClosedQuote = false;
+    }
+  }
+  if (current.length > 0 || justClosedQuote) args.push(current);
+  return args;
+}
 
 function isFlatpakDolphinInstalled(): boolean {
   try {
@@ -114,9 +148,10 @@ export function launchGame(game: Game): Promise<void> {
       return Promise.resolve();
     default:
       if (game.execPath) {
-        const parts = game.execPath.split(" ");
-        cmd = parts[0];
-        args = parts.slice(1);
+        // Use a minimal shell-quote parser to respect quoted arguments
+        const parsed = parseCommand(game.execPath);
+        cmd = parsed[0];
+        args = parsed.slice(1);
       } else {
         return Promise.reject(
           new Error(`Cannot launch game: ${game.title}`),
@@ -170,6 +205,7 @@ export function launchGame(game: Game): Promise<void> {
 
     proc.on("exit", (code, signal) => {
       activeProcesses.delete(game.id);
+      stopPlayTimeTracking(game.id);
       if (!settled && spawnOk) {
         settled = true;
         const stderrTail = stderrBuf.trim().slice(-500);
@@ -180,7 +216,37 @@ export function launchGame(game: Game): Promise<void> {
         reject(new Error(reason));
       }
     });
+
+    // Start playtime tracking once the process spawns successfully
+    proc.on("spawn", () => {
+      startPlayTimeTracking(game.id);
+    });
   });
+}
+
+function startPlayTimeTracking(gameId: string): void {
+  stopPlayTimeTracking(gameId);
+  const startTime = Date.now();
+  const timer = setInterval(async () => {
+    const elapsed = Math.floor((Date.now() - startTime) / 1000);
+    if (elapsed > 0) {
+      try {
+        await GameRepo.addPlayTime(gameId, elapsed);
+        await GameRepo.setLastPlayed(gameId, Date.now());
+      } catch (err) {
+        log.warn("launcher", `Failed to update playtime for ${gameId}: ${err}`);
+      }
+    }
+  }, 30000); // Update every 30 seconds to avoid spamming DB
+  playTimeTimers.set(gameId, { startTime, timer });
+}
+
+function stopPlayTimeTracking(gameId: string): void {
+  const entry = playTimeTimers.get(gameId);
+  if (entry) {
+    clearInterval(entry.timer);
+    playTimeTimers.delete(gameId);
+  }
 }
 
 export function launchMovie(movie: Movie): void {
