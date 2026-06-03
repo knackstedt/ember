@@ -19,6 +19,23 @@ export interface GameCardProps {
   onSelect?: () => void;
   onFavorite?: () => void;
   progress?: number;
+  playTime?: number;
+  lastPlayed?: number;
+}
+
+function formatLastPlayed(ts: number): string {
+  const now = Date.now();
+  const diff = now - ts;
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  if (hours < 24) return `${hours}h ago`;
+  if (days < 7) return `${days}d ago`;
+  if (days < 30) return `${Math.floor(days / 7)}w ago`;
+  if (days < 365) return `${Math.floor(days / 30)}mo ago`;
+  return `${Math.floor(days / 365)}y ago`;
 }
 
 const PLACEHOLDER_COLORS = [
@@ -139,6 +156,8 @@ export const GameCard: React.FC<GameCardProps> = React.memo(({
   onSelect,
   onFavorite,
   progress,
+  playTime,
+  lastPlayed,
 }) => {
   const [imgError, setImgError] = useState(false);
   useEffect(() => {
@@ -458,6 +477,23 @@ export const GameCard: React.FC<GameCardProps> = React.memo(({
               <p className="gc-subtitle" title={subtitle || ""}>
                 {subtitle || "\u00A0"}
               </p>
+              {(playTime !== undefined && playTime > 0) || (lastPlayed !== undefined && lastPlayed > 0) ? (
+                <p className="gc-meta">
+                  {playTime !== undefined && playTime > 0 ? (
+                    <span className="gc-playtime">
+                      {playTime >= 60
+                        ? `${Math.floor(playTime / 60)}h ${playTime % 60}m`
+                        : `${playTime}m`}
+                    </span>
+                  ) : null}
+                  {lastPlayed !== undefined && lastPlayed > 0 ? (
+                    <span className="gc-last-played">
+                      {playTime !== undefined && playTime > 0 ? " · " : ""}
+                      {formatLastPlayed(lastPlayed)}
+                    </span>
+                  ) : null}
+                </p>
+              ) : null}
             </div>
           </div>
         </section>

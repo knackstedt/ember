@@ -144,6 +144,14 @@ export function launchGame(game: Game): Promise<void> {
     case "gb":
     case "gba":
     case "dos":
+    case "n64":
+    case "genesis":
+    case "sms":
+    case "gamegear":
+    case "pce":
+    case "psx":
+    case "nds":
+    case "dreamcast":
       // Handled via in-renderer emulator components
       return Promise.resolve();
     default:
@@ -224,9 +232,13 @@ export function launchGame(game: Game): Promise<void> {
   });
 }
 
-function startPlayTimeTracking(gameId: string): void {
+export function startPlayTimeTracking(gameId: string): void {
   stopPlayTimeTracking(gameId);
   const startTime = Date.now();
+  // Immediately update lastPlayed so the recently-played list reflects the launch
+  GameRepo.setLastPlayed(gameId, startTime).catch((err) => {
+    log.warn("launcher", `Failed to set lastPlayed for ${gameId}: ${err}`);
+  });
   const timer = setInterval(async () => {
     const elapsed = Math.floor((Date.now() - startTime) / 1000);
     if (elapsed > 0) {
@@ -241,7 +253,7 @@ function startPlayTimeTracking(gameId: string): void {
   playTimeTimers.set(gameId, { startTime, timer });
 }
 
-function stopPlayTimeTracking(gameId: string): void {
+export function stopPlayTimeTracking(gameId: string): void {
   const entry = playTimeTimers.get(gameId);
   if (entry) {
     clearInterval(entry.timer);

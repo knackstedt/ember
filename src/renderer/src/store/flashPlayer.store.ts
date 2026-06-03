@@ -4,24 +4,31 @@ export interface FlashPlayerStore {
   open: boolean;
   swfPath: string;
   title: string;
+  gameId: string;
   settingsVisible: boolean;
-  launch(swfPath: string, title: string): void;
+  launch(swfPath: string, title: string, gameId: string): void;
   close(): void;
   toggleSettings(): void;
 }
 
-export const useFlashPlayerStore = create<FlashPlayerStore>((set) => ({
+export const useFlashPlayerStore = create<FlashPlayerStore>((set, get) => ({
   open: false,
   swfPath: "",
   title: "",
+  gameId: "",
   settingsVisible: false,
 
-  launch(swfPath, title) {
-    set({ open: true, swfPath, title, settingsVisible: false });
+  launch(swfPath, title, gameId) {
+    set({ open: true, swfPath, title, gameId, settingsVisible: false });
+    window.htpc.games.playTime.start(gameId).catch(() => {});
   },
 
   close() {
-    set({ open: false, swfPath: "", title: "" });
+    const { gameId } = get();
+    if (gameId) {
+      window.htpc.games.playTime.stop(gameId).catch(() => {});
+    }
+    set({ open: false, swfPath: "", title: "", gameId: "" });
   },
 
   toggleSettings() {

@@ -13,6 +13,7 @@ import { GameCard } from "../../components/GameCard/GameCard";
 import { DetailPanel } from "../../components/DetailPanel/DetailPanel";
 import { OskInput } from "../../components/OnScreenKeyboard/OnScreenKeyboard";
 import { RecentlyPlayedRow } from "../../components/RecentlyPlayedRow/RecentlyPlayedRow";
+import { CoreSelector } from "../../components/CoreSelector/CoreSelector";
 import { Game, GamePlatform, GameEmulatorConfig } from "../../../../shared/types";
 import { useGridFocus } from "../../hooks/useGridFocus";
 import { useContextMenu } from "../../hooks/useContextMenu";
@@ -21,8 +22,13 @@ import { useFlashPlayerStore } from "../../store/flashPlayer.store";
 import { useJsnesPlayerStore } from "../../store/jsnesPlayer.store";
 import { useEmulatorjsPlayerStore } from "../../store/emulatorjsPlayer.store";
 import { useV86PlayerStore } from "../../store/v86Player.store";
+import { useLibretroPlayerStore } from "../../store/libretroPlayer.store";
+import { SHADER_PRESETS } from "../../components/LibretroPlayer/shaders";
 import { useToastStore } from "../../store/toast.store";
 import { useSettingsStore } from "../../store/settings.store";
+import { useCollectionsStore, evaluateSmartFilter, sortByCollection } from "../../store/collections.store";
+import { CollectionsBar } from "../../components/CollectionsBar/CollectionsBar";
+import { CollectionManager } from "../../components/CollectionManager/CollectionManager";
 
 const PLATFORM_FILTERS: ChipFilter<
   GamePlatform | "all" | "couch-coop" | "favorites"
@@ -40,9 +46,21 @@ const PLATFORM_FILTERS: ChipFilter<
   { id: "snes", label: "SNES" },
   { id: "gb", label: "Game Boy" },
   { id: "gba", label: "GBA" },
+  { id: "n64", label: "N64" },
+  { id: "genesis", label: "Genesis" },
+  { id: "sms", label: "SMS" },
+  { id: "gamegear", label: "Game Gear" },
+  { id: "pce", label: "PC Engine" },
+  { id: "psx", label: "PlayStation" },
+  { id: "nds", label: "DS" },
+  { id: "dreamcast", label: "Dreamcast" },
   { id: "flash", label: "Flash" },
   { id: "dos", label: "DOS/PC" },
   { id: "desktop", label: "Other" },
+];
+
+const LIBRETRO_PLATFORMS: GamePlatform[] = [
+  "n64", "genesis", "sms", "gamegear", "pce", "psx", "nds", "dreamcast"
 ];
 
 const PROTON_COLORS: Record<string, string> = {
@@ -85,6 +103,8 @@ const LazyGameCard: React.FC<{
       isFocused={index === focusedIndex}
       isThumbnailPending={pendingThumbnailIds.has(game.id) || regeneratingIds.has(game.id)}
       corrupt={game.corrupt}
+      playTime={game.playTime}
+      lastPlayed={game.lastPlayed}
       onSelect={onSelect}
       onFavorite={onFavorite}
     />
@@ -116,10 +136,19 @@ export const GamingTab: React.FC = () => {
   const setTags = useGamesStore((s) => s.setTags);
   const hide = useGamesStore((s) => s.hide);
   const regenerateThumbnail = useGamesStore((s) => s.regenerateThumbnail);
+  const updateLastPlayed = useGamesStore((s) => s.updateLastPlayed);
   const [selected, setSelected] = useState<Game | null>(null);
   const [columnCount, setColumnCount] = useState(6);
   const [selectedEmulatorConfig, setSelectedEmulatorConfig] = useState<GameEmulatorConfig>({});
+  const [activeCollectionId, setActiveCollectionId] = useState<string | null>(null);
+  const [showCollectionManager, setShowCollectionManager] = useState(false);
+  const [collectionItemIds, setCollectionItemIds] = useState<Set<string>>(new Set());
   const gridRef = useRef<VirtualGridHandle>(null);
+
+  const collections = useCollectionsStore((s) => s.collections);
+  const loadCollections = useCollectionsStore((s) => s.load);
+  const addItem = useCollectionsStore((s) => s.addItem);
+  const listItems = useCollectionsStore((s) => s.listItems);
 
   const setEmulatorConfig = useGamesStore((s) => s.setEmulatorConfig);
   const getEmulatorConfig = useGamesStore((s) => s.getEmulatorConfig);
@@ -129,7 +158,8 @@ export const GamingTab: React.FC = () => {
       setSelectedEmulatorConfig({});
       return;
     }
-    if (selected.platform === "nes" || selected.platform === "snes" || selected.platform === "gb" || selected.platform === "gba") {
+    const emulatorPlatforms: GamePlatform[] = ["nes", "snes", "gb", "gba", "n64", "genesis", "sms", "gamegear", "pce", "psx", "nds", "dreamcast"];
+    if (emulatorPlatforms.includes(selected.platform)) {
       getEmulatorConfig(selected.id).then(setSelectedEmulatorConfig).catch(() => setSelectedEmulatorConfig({}));
     } else {
       setSelectedEmulatorConfig({});
@@ -138,7 +168,26 @@ export const GamingTab: React.FC = () => {
 
   useEffect(() => {
     load();
+    loadCollections();
   }, []);
+
+  useEffect(() => {
+    if (!activeCollectionId) {
+      setCollectionItemIds(new Set());
+      return;
+    }
+    const collection = collections.find((c) => c.id === activeCollectionId);
+    if (!collection) return;
+
+    if (collection.type === "smart" && collection.filter) {
+      const result = evaluateSmartFilter(games, collection.filter);
+      setCollectionItemIds(new Set(result.map((g) => g.id)));
+    } else {
+      listItems(activeCollectionId).then((items) => {
+        setCollectionItemIds(new Set(items.map((i) => i.itemId)));
+      });
+    }
+  }, [activeCollectionId, collections, games]);
 
   useEffect(() => {
     const handler = () => setSelected(null);
@@ -146,7 +195,17 @@ export const GamingTab: React.FC = () => {
     return () => window.removeEventListener("htpc:escape", handler);
   }, []);
 
-  const items = useMemo(() => filtered(), [filtered, games, activeFilter, searchQuery]);
+  const activeCollection = useMemo(
+    () => collections.find((c) => c.id === activeCollectionId),
+    [collections, activeCollectionId],
+  );
+
+  const items = useMemo(() => {
+    const base = filtered();
+    if (!activeCollectionId) return base;
+    const result = base.filter((g) => collectionItemIds.has(g.id));
+    return sortByCollection<Game>(result, activeCollection);
+  }, [filtered, games, activeFilter, searchQuery, activeCollectionId, collectionItemIds, activeCollection]);
   const { focusedIndex } = useGridFocus({
     items,
     columnCount,
@@ -154,6 +213,11 @@ export const GamingTab: React.FC = () => {
     onConfirm: (game) => setSelected(game),
     enabled: !selected,
   });
+
+  const gameCollections = useMemo(
+    () => collections.filter((c) => c.itemType === "game" || c.itemType === "mixed"),
+    [collections],
+  );
 
   const { menu, bindItem } = useContextMenu({
     items,
@@ -176,13 +240,32 @@ export const GamingTab: React.FC = () => {
         {
           id: "folder",
           label: "Open containing folder",
-          icon: "📂",
+          icon: "�",
           disabled: !game.execPath && !game.romPath,
         },
       ];
+      if (gameCollections.length > 0) {
+        opts.push({ id: "__sep__", label: "Collections", icon: "", disabled: true });
+        for (const c of gameCollections) {
+          opts.push({
+            id: `add-to-coll:${c.id}`,
+            label: c.name,
+            icon: c.icon || "📁",
+          });
+        }
+      }
       return opts;
     },
     onAction: (game, optionId) => {
+      if (optionId.startsWith("add-to-coll:")) {
+        const collectionId = optionId.slice("add-to-coll:".length);
+        void addItem(collectionId, game.id, "game");
+        useToastStore.getState().push({
+          type: "success",
+          message: `Added to ${gameCollections.find((c) => c.id === collectionId)?.name ?? "collection"}`,
+        });
+        return;
+      }
       switch (optionId) {
         case "favorite":
           toggleFavorite(game.id);
@@ -241,21 +324,33 @@ export const GamingTab: React.FC = () => {
   };
 
   const launch = async (game: Game): Promise<void> => {
+    updateLastPlayed(game.id);
     if (game.platform === "flash" && game.romPath) {
-      useFlashPlayerStore.getState().launch(game.romPath, game.title);
+      useFlashPlayerStore.getState().launch(game.romPath, game.title, game.id);
       return;
     }
     if (game.platform === "nes" && game.romPath) {
-      useJsnesPlayerStore.getState().launch(game.romPath, game.title);
+      useJsnesPlayerStore.getState().launch(game.romPath, game.title, game.id);
       return;
     }
     if ((game.platform === "snes" || game.platform === "gb" || game.platform === "gba") && game.romPath) {
       const shader = await resolveShader(game);
-      useEmulatorjsPlayerStore.getState().launch(game.romPath, game.title, game.platform, shader);
+      useEmulatorjsPlayerStore.getState().launch(game.romPath, game.title, game.platform, game.id, shader);
       return;
     }
     if (game.platform === "dos" && game.romPath) {
-      useV86PlayerStore.getState().launch(game.romPath, game.title);
+      useV86PlayerStore.getState().launch(game.romPath, game.title, game.id);
+      return;
+    }
+    if (LIBRETRO_PLATFORMS.includes(game.platform) && game.romPath) {
+      const shader = await resolveShader(game);
+      await useLibretroPlayerStore.getState().launch({
+        romPath: game.romPath,
+        title: game.title,
+        gameId: game.id,
+        platform: game.platform,
+        shader,
+      });
       return;
     }
     try {
@@ -316,10 +411,21 @@ export const GamingTab: React.FC = () => {
         }}
       />
 
+      <CollectionsBar
+        itemType="game"
+        activeCollectionId={activeCollectionId}
+        onSelect={setActiveCollectionId}
+        onManage={() => setShowCollectionManager(true)}
+        className="flex-shrink-0"
+      />
+
       <ChipFilters
         filters={PLATFORM_FILTERS}
         active={activeFilter}
-        onSelect={setFilter}
+        onSelect={(f) => {
+          setActiveCollectionId(null);
+          setFilter(f);
+        }}
         className="flex-shrink-0"
       />
 
@@ -500,10 +606,60 @@ export const GamingTab: React.FC = () => {
                 </select>
               </div>
             )}
+            {LIBRETRO_PLATFORMS.includes(selected.platform) && (
+              <div>
+                <div
+                  className="text-xs font-semibold uppercase tracking-wide mb-2"
+                  style={{ color: "var(--color-text-dim)" }}
+                >
+                  Libretro Core
+                </div>
+                <CoreSelector
+                  game={selected}
+                  onSelectCore={(corePath) => {
+                    useLibretroPlayerStore.getState().setSelectedCore(corePath);
+                  }}
+                />
+                <div
+                  className="text-xs font-semibold uppercase tracking-wide mb-2 mt-4"
+                  style={{ color: "var(--color-text-dim)" }}
+                >
+                  Shader
+                </div>
+                <select
+                  value={selectedEmulatorConfig.shader ?? ""}
+                  onChange={(e) => {
+                    const shader = e.target.value;
+                    const next = { ...selectedEmulatorConfig, shader: shader || undefined };
+                    setSelectedEmulatorConfig(next);
+                    void setEmulatorConfig(selected.id, next);
+                  }}
+                  className="w-full text-sm px-2 py-1.5 rounded"
+                  style={{
+                    background: "var(--color-surface-raised)",
+                    border: "1px solid var(--color-border)",
+                    color: "var(--color-text)",
+                    outline: "none",
+                  }}
+                >
+                  <option value="">None</option>
+                  {SHADER_PRESETS.filter((s) => s.id !== "none").map((preset) => (
+                    <option key={preset.id} value={preset.id}>
+                      {preset.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
         )}
       </DetailPanel>
       {menu}
+      <CollectionManager
+        open={showCollectionManager}
+        onClose={() => setShowCollectionManager(false)}
+        itemType="game"
+      />
     </div>
   );
 };

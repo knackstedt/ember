@@ -7,22 +7,29 @@ export interface EmulatorJSPlayerStore {
   title: string;
   platform: GamePlatform;
   shader: string;
-  launch(romPath: string, title: string, platform: GamePlatform, shader?: string): void;
+  gameId: string;
+  launch(romPath: string, title: string, platform: GamePlatform, gameId: string, shader?: string): void;
   close(): void;
 }
 
-export const useEmulatorjsPlayerStore = create<EmulatorJSPlayerStore>((set) => ({
+export const useEmulatorjsPlayerStore = create<EmulatorJSPlayerStore>((set, get) => ({
   open: false,
   romPath: "",
   title: "",
   platform: "snes",
   shader: "",
+  gameId: "",
 
-  launch(romPath, title, platform, shader = "") {
-    set({ open: true, romPath, title, platform, shader });
+  launch(romPath, title, platform, gameId, shader = "") {
+    set({ open: true, romPath, title, platform, shader, gameId });
+    window.htpc.games.playTime.start(gameId).catch(() => {});
   },
 
   close() {
-    set({ open: false, romPath: "", title: "", platform: "snes", shader: "" });
+    const { gameId } = get();
+    if (gameId) {
+      window.htpc.games.playTime.stop(gameId).catch(() => {});
+    }
+    set({ open: false, romPath: "", title: "", platform: "snes", shader: "", gameId: "" });
   },
 }));

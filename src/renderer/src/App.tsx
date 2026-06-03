@@ -26,6 +26,8 @@ import { EmulatorJSPlayer } from "./components/EmulatorJSPlayer/EmulatorJSPlayer
 import { useEmulatorjsPlayerStore } from "./store/emulatorjsPlayer.store";
 import { V86Player } from "./components/V86Player/V86Player";
 import { useV86PlayerStore } from "./store/v86Player.store";
+import { LibretroPlayer } from "./components/LibretroPlayer/LibretroPlayer";
+import { useLibretroPlayerStore } from "./store/libretroPlayer.store";
 import { useContextMenuStore } from "./store/contextMenu.store";
 import { QueueBlade } from "./components/QueueBlade/QueueBlade";
 import { ErrorBoundary } from "./components/ErrorBoundary/ErrorBoundary";
@@ -71,7 +73,8 @@ export default function App(): React.ReactElement {
   const jsnesOpen = useJsnesPlayerStore((s) => s.open);
   const emulatorjsOpen = useEmulatorjsPlayerStore((s) => s.open);
   const v86Open = useV86PlayerStore((s) => s.open);
-  const anyEmulatorOpen = flashOpen || jsnesOpen || emulatorjsOpen || v86Open;
+  const libretroOpen = useLibretroPlayerStore((s) => s.open);
+  const anyEmulatorOpen = flashOpen || jsnesOpen || emulatorjsOpen || v86Open || libretroOpen;
   const [activeTab, setActiveTab] = useState<TabId>("gaming");
   const activeTabRef = useRef<TabId>(activeTab);
   activeTabRef.current = activeTab;
@@ -215,7 +218,8 @@ export default function App(): React.ReactElement {
         useFlashPlayerStore.getState().open ||
         useJsnesPlayerStore.getState().open ||
         useEmulatorjsPlayerStore.getState().open ||
-        useV86PlayerStore.getState().open;
+        useV86PlayerStore.getState().open ||
+        useLibretroPlayerStore.getState().open;
       if (emuOpen && !(e.key === "Escape" || e.key === "F11")) {
         return;
       }
@@ -465,6 +469,11 @@ export default function App(): React.ReactElement {
         {/* Music mini-player */}
         <AnimatePresence>{hasPlayer && <MusicPlayer />}</AnimatePresence>
       </div>
+
+      {/* Libretro native core player */}
+      <ErrorBoundary>
+        <LibretroPlayer />
+      </ErrorBoundary>
     </div>
   );
 }

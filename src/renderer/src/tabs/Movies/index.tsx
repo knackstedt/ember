@@ -12,13 +12,15 @@ import { OskInput } from "../../components/OnScreenKeyboard/OnScreenKeyboard";
 import { RecentlyPlayedRow } from "../../components/RecentlyPlayedRow/RecentlyPlayedRow";
 import { Movie } from "../../../../shared/types";
 import { useVideoPlayerStore } from "../../store/videoPlayer.store";
-import {
-  StreamingTile,
-  MOVIE_STREAMING_SERVICES,
-} from "../../components/StreamingTile/StreamingTile";
+import { StreamingTile } from "../../components/StreamingTile/StreamingTile";
+import { StreamingService } from "../../../../shared/types";
 import { useGridFocus } from "../../hooks/useGridFocus";
 import { useContextMenu } from "../../hooks/useContextMenu";
 import { ContextMenuOption } from "../../components/ContextMenu/ContextMenu";
+import { useCollectionsStore, evaluateSmartFilter, sortByCollection } from "../../store/collections.store";
+import { CollectionsBar } from "../../components/CollectionsBar/CollectionsBar";
+import { CollectionManager } from "../../components/CollectionManager/CollectionManager";
+import { useToastStore } from "../../store/toast.store";
 
 type SubTab = "local" | "streaming";
 
@@ -42,11 +44,45 @@ export const MoviesTab: React.FC = () => {
   const [selected, setSelected] = useState<Movie | null>(null);
   const [subTab, setSubTab] = useState<SubTab>("local");
   const [columnCount, setColumnCount] = useState(5);
+  const [activeCollectionId, setActiveCollectionId] = useState<string | null>(null);
+  const [showCollectionManager, setShowCollectionManager] = useState(false);
+  const [collectionItemIds, setCollectionItemIds] = useState<Set<string>>(new Set());
+  const [streamingServices, setStreamingServices] = useState<StreamingService[]>([]);
   const gridRef = useRef<VirtualGridHandle>(null);
+
+  const collections = useCollectionsStore((s) => s.collections);
+  const loadCollections = useCollectionsStore((s) => s.load);
+  const addItem = useCollectionsStore((s) => s.addItem);
+  const listItems = useCollectionsStore((s) => s.listItems);
 
   useEffect(() => {
     load();
+    loadCollections();
   }, []);
+
+  useEffect(() => {
+    if (subTab === "streaming") {
+      window.htpc.streaming.list("video").then(setStreamingServices).catch(() => {});
+    }
+  }, [subTab]);
+
+  useEffect(() => {
+    if (!activeCollectionId) {
+      setCollectionItemIds(new Set());
+      return;
+    }
+    const collection = collections.find((c) => c.id === activeCollectionId);
+    if (!collection) return;
+
+    if (collection.type === "smart" && collection.filter) {
+      const result = evaluateSmartFilter(movies, collection.filter);
+      setCollectionItemIds(new Set(result.map((m) => m.id)));
+    } else {
+      listItems(activeCollectionId).then((items) => {
+        setCollectionItemIds(new Set(items.map((i) => i.itemId)));
+      });
+    }
+  }, [activeCollectionId, collections, movies]);
 
   useEffect(() => {
     const handler = () => setSelected(null);
@@ -58,10 +94,17 @@ export const MoviesTab: React.FC = () => {
     () => [...new Set(movies.flatMap((m) => m.genres ?? []))].sort(),
     [movies],
   );
-  const items = useMemo(
-    () => filtered(),
-    [filtered, movies, searchQuery, activeGenre],
+  const activeCollection = useMemo(
+    () => collections.find((c) => c.id === activeCollectionId),
+    [collections, activeCollectionId],
   );
+
+  const items = useMemo(() => {
+    const base = filtered();
+    if (!activeCollectionId) return base;
+    const result = base.filter((m) => collectionItemIds.has(m.id));
+    return sortByCollection<Movie>(result, activeCollection);
+  }, [filtered, movies, searchQuery, activeGenre, activeCollectionId, collectionItemIds, activeCollection]);
   const { focusedIndex } = useGridFocus({
     items,
     columnCount,
@@ -70,31 +113,58 @@ export const MoviesTab: React.FC = () => {
     enabled: subTab === "local" && !selected,
   });
 
+  const movieCollections = useMemo(
+    () => collections.filter((c) => c.itemType === "movie" || c.itemType === "mixed"),
+    [collections],
+  );
+
   const { menu, bindItem } = useContextMenu({
     items,
     focusedIndex,
-    getOptions: (movie): ContextMenuOption[] => [
-      {
-        id: "favorite",
-        label: movie.isFavorite ? "Unfavorite" : "Favorite",
-        icon: movie.isFavorite ? "★" : "☆",
-      },
-      { id: "hide", label: "Hide", icon: "🙈", destructive: true },
-      { id: "tags", label: "Update metadata / tags", icon: "🏷" },
-      {
-        id: "regenerate",
-        label: "Regenerate thumbnail",
-        icon: "🔄",
-        disabled: !movie.filePath,
-      },
-      {
-        id: "folder",
-        label: "Open containing folder",
-        icon: "📂",
-        disabled: !movie.filePath,
-      },
-    ],
+    getOptions: (movie): ContextMenuOption[] => {
+      const opts: ContextMenuOption[] = [
+        {
+          id: "favorite",
+          label: movie.isFavorite ? "Unfavorite" : "Favorite",
+          icon: movie.isFavorite ? "★" : "☆",
+        },
+        { id: "hide", label: "Hide", icon: "🙈", destructive: true },
+        { id: "tags", label: "Update metadata / tags", icon: "🏷" },
+        {
+          id: "regenerate",
+          label: "Regenerate thumbnail",
+          icon: "🔄",
+          disabled: !movie.filePath,
+        },
+        {
+          id: "folder",
+          label: "Open containing folder",
+          icon: "📂",
+          disabled: !movie.filePath,
+        },
+      ];
+      if (movieCollections.length > 0) {
+        opts.push({ id: "__sep__", label: "Collections", icon: "", disabled: true });
+        for (const c of movieCollections) {
+          opts.push({
+            id: `add-to-coll:${c.id}`,
+            label: c.name,
+            icon: c.icon || "📁",
+          });
+        }
+      }
+      return opts;
+    },
     onAction: (movie, optionId) => {
+      if (optionId.startsWith("add-to-coll:")) {
+        const collectionId = optionId.slice("add-to-coll:".length);
+        void addItem(collectionId, movie.id, "movie");
+        useToastStore.getState().push({
+          type: "success",
+          message: `Added to ${movieCollections.find((c) => c.id === collectionId)?.name ?? "collection"}`,
+        });
+        return;
+      }
       switch (optionId) {
         case "favorite":
           toggleFavorite(movie.id);
@@ -139,7 +209,7 @@ export const MoviesTab: React.FC = () => {
   );
 
   const recentlyPlayed = [...movies]
-    .filter((m) => m.lastPlayed !== undefined)
+    .filter((m) => m.lastPlayed && m.lastPlayed > 0)
     .sort((a, b) => (b.lastPlayed ?? 0) - (a.lastPlayed ?? 0))
     .slice(0, 8);
 
@@ -213,13 +283,24 @@ export const MoviesTab: React.FC = () => {
             }}
           />
 
+          <CollectionsBar
+            itemType="movie"
+            activeCollectionId={activeCollectionId}
+            onSelect={setActiveCollectionId}
+            onManage={() => setShowCollectionManager(true)}
+            className="flex-shrink-0"
+          />
+
           <ChipFilters
             filters={[
               { id: "", label: "All Genres" },
               ...allGenres.map((g) => ({ id: g, label: g })),
             ]}
             active={activeGenre ?? ""}
-            onSelect={(g) => setGenre(g || null)}
+            onSelect={(g) => {
+              setActiveCollectionId(null);
+              setGenre(g || null);
+            }}
             className="flex-shrink-0"
           />
 
@@ -279,7 +360,7 @@ export const MoviesTab: React.FC = () => {
 
       {subTab === "streaming" && (
         <div className="pt-2">
-          <StreamingTile services={MOVIE_STREAMING_SERVICES} />
+          <StreamingTile services={streamingServices} />
         </div>
       )}
 
@@ -393,6 +474,11 @@ export const MoviesTab: React.FC = () => {
         )}
       </DetailPanel>
       {subTab === "local" && menu}
+      <CollectionManager
+        open={showCollectionManager}
+        onClose={() => setShowCollectionManager(false)}
+        itemType="movie"
+      />
     </div>
   );
 };

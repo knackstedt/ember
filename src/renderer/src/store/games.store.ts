@@ -20,6 +20,7 @@ interface GamesState {
   regenerateThumbnail: (id: string) => Promise<void>;
   getEmulatorConfig: (id: string) => Promise<GameEmulatorConfig>;
   setEmulatorConfig: (id: string, config: GameEmulatorConfig) => Promise<void>;
+  updateLastPlayed: (id: string, timestamp?: number) => void;
   filtered: () => Game[];
 }
 
@@ -144,6 +145,14 @@ export const useGamesStore = create<GamesState>((set, get) => ({
 
   setEmulatorConfig: async (id, config) => {
     await window.htpc.games.emulatorConfig.set(id, config);
+  },
+
+  updateLastPlayed: (id, timestamp = Date.now()) => {
+    set((s) => ({
+      games: s.games.map((g) =>
+        g.id === id ? { ...g, lastPlayed: timestamp } : g,
+      ),
+    }));
   },
 
   filtered: () => {

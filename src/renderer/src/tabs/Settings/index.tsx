@@ -10,6 +10,7 @@ import {
   TabId,
   DailyBackgroundSource,
   GamePlatform,
+  StreamingService,
 } from "../../../../shared/types";
 
 const DEFAULT_FLASH_SETTINGS: FlashSettings = {
@@ -258,6 +259,16 @@ export const SettingsTab: React.FC = () => {
     videosDir: string;
     musicDir: string;
   } | null>(null);
+  const [streamingServices, setStreamingServices] = useState<StreamingService[]>([]);
+  const [showAddService, setShowAddService] = useState(false);
+  const [newService, setNewService] = useState({
+    name: "",
+    url: "",
+    category: "music" as "music" | "video",
+    color: "#1DB954",
+    textColor: "#ffffff",
+    icon: "🔗",
+  });
 
   useEffect(() => {
     window.htpc.app
@@ -265,6 +276,52 @@ export const SettingsTab: React.FC = () => {
       .then(setXdgDefaults)
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    window.htpc.streaming.list()
+      .then(setStreamingServices)
+      .catch(() => {});
+  }, []);
+
+  const refreshServices = () => {
+    window.htpc.streaming.list()
+      .then(setStreamingServices)
+      .catch(() => {});
+  };
+
+  const toggleServiceEnabled = async (id: string, enabled: boolean) => {
+    await window.htpc.streaming.setEnabled(id, enabled);
+    refreshServices();
+  };
+
+  const handleAddService = async () => {
+    if (!newService.name.trim() || !newService.url.trim()) return;
+    await window.htpc.streaming.add({
+      id: `custom_${Date.now()}`,
+      name: newService.name.trim(),
+      category: newService.category,
+      url: newService.url.trim(),
+      color: newService.color,
+      textColor: newService.textColor,
+      icon: newService.icon,
+      enabled: true,
+    });
+    setNewService({
+      name: "",
+      url: "",
+      category: "music",
+      color: "#1DB954",
+      textColor: "#ffffff",
+      icon: "🔗",
+    });
+    setShowAddService(false);
+    refreshServices();
+  };
+
+  const handleDeleteService = async (id: string) => {
+    await window.htpc.streaming.delete(id);
+    refreshServices();
+  };
 
   if (!settings) return null;
 
@@ -785,6 +842,182 @@ export const SettingsTab: React.FC = () => {
               </div>
             ))}
           </div>
+        </section>
+
+        <section className="flex flex-col gap-4">
+          <h2
+            className="text-lg font-semibold"
+            style={{ color: "var(--color-text)" }}
+          >
+            Streaming Services
+          </h2>
+          <p className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+            Manage which streaming services appear in the Music and Movies tabs.
+          </p>
+
+          <div className="flex flex-col gap-2">
+            {streamingServices.map((svc) => (
+              <div
+                key={svc.id}
+                className="flex items-center gap-3 px-3 py-2 rounded"
+                style={{
+                  background: "var(--color-surface-raised)",
+                  border: "1px solid var(--color-border)",
+                }}
+              >
+                <span className="text-lg" aria-hidden>{svc.icon}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium truncate">{svc.name}</div>
+                  <div className="text-xs truncate" style={{ color: "var(--color-text-dim)" }}>
+                    {svc.category === "music" ? "Music" : "Video"} · {svc.isBuiltin ? "Built-in" : "Custom"}
+                  </div>
+                </div>
+                <button
+                  onClick={() => toggleServiceEnabled(svc.id, !svc.enabled)}
+                  className="w-11 h-6 rounded-full transition-colors relative flex-shrink-0"
+                  style={{
+                    background: svc.enabled
+                      ? "var(--color-accent)"
+                      : "var(--color-surface-raised)",
+                    border: "1px solid var(--color-border)",
+                  }}
+                >
+                  <span
+                    className="absolute top-0.5 w-5 h-5 rounded-full transition-all"
+                    style={{
+                      background: "white",
+                      left: svc.enabled ? "1.25rem" : "0.125rem",
+                    }}
+                  />
+                </button>
+                {!svc.isBuiltin && (
+                  <button
+                    onClick={() => handleDeleteService(svc.id)}
+                    className="px-2 py-1 text-xs rounded"
+                    style={{
+                      background: "#ff444420",
+                      color: "#ff4444",
+                      border: "1px solid #ff444430",
+                    }}
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <AnimatePresence>
+            {showAddService && (
+              <motion.div
+                className="flex flex-col gap-3 p-4 rounded"
+                style={{
+                  background: "var(--color-surface-raised)",
+                  border: "1px solid var(--color-border)",
+                }}
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+              >
+                <Field
+                  label="Name"
+                  value={newService.name}
+                  onChange={(v) => setNewService((s) => ({ ...s, name: v }))}
+                  placeholder="e.g. My Service"
+                />
+                <Field
+                  label="URL"
+                  value={newService.url}
+                  onChange={(v) => setNewService((s) => ({ ...s, url: v }))}
+                  placeholder="https://example.com"
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setNewService((s) => ({ ...s, category: "music" }))}
+                    className="flex-1 px-3 py-2 rounded text-sm"
+                    style={{
+                      background: newService.category === "music" ? "var(--color-accent)" : "var(--color-surface)",
+                      color: newService.category === "music" ? "var(--color-bg)" : "var(--color-text)",
+                      border: "1px solid var(--color-border)",
+                    }}
+                  >
+                    Music
+                  </button>
+                  <button
+                    onClick={() => setNewService((s) => ({ ...s, category: "video" }))}
+                    className="flex-1 px-3 py-2 rounded text-sm"
+                    style={{
+                      background: newService.category === "video" ? "var(--color-accent)" : "var(--color-surface)",
+                      color: newService.category === "video" ? "var(--color-bg)" : "var(--color-text)",
+                      border: "1px solid var(--color-border)",
+                    }}
+                  >
+                    Video
+                  </button>
+                </div>
+                <div className="flex gap-2">
+                  <div className="flex flex-col gap-1 flex-1">
+                    <label className="text-sm" style={{ color: "var(--color-text)" }}>Color</label>
+                    <input
+                      type="color"
+                      value={newService.color}
+                      onChange={(e) => setNewService((s) => ({ ...s, color: e.target.value }))}
+                      className="w-full h-8 rounded cursor-pointer"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1 flex-1">
+                    <label className="text-sm" style={{ color: "var(--color-text)" }}>Text Color</label>
+                    <input
+                      type="color"
+                      value={newService.textColor}
+                      onChange={(e) => setNewService((s) => ({ ...s, textColor: e.target.value }))}
+                      className="w-full h-8 rounded cursor-pointer"
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <motion.button
+                    className="flex-1 px-4 py-2 rounded text-sm"
+                    style={{
+                      background: "var(--color-accent)",
+                      color: "var(--color-bg)",
+                    }}
+                    onClick={handleAddService}
+                    whileTap={{ scale: 0.96 }}
+                  >
+                    Add Service
+                  </motion.button>
+                  <motion.button
+                    className="px-4 py-2 rounded text-sm"
+                    style={{
+                      background: "var(--color-surface-raised)",
+                      color: "var(--color-text)",
+                      border: "1px solid var(--color-border)",
+                    }}
+                    onClick={() => setShowAddService(false)}
+                    whileTap={{ scale: 0.96 }}
+                  >
+                    Cancel
+                  </motion.button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {!showAddService && (
+            <motion.button
+              className="self-start px-4 py-2 rounded-[var(--radius-card)] text-sm"
+              style={{
+                background: "var(--color-surface-raised)",
+                color: "var(--color-text)",
+                border: "1px solid var(--color-border)",
+              }}
+              onClick={() => setShowAddService(true)}
+              whileTap={{ scale: 0.96 }}
+            >
+              + Add Custom Service
+            </motion.button>
+          )}
         </section>
 
         <section className="flex flex-col gap-4">

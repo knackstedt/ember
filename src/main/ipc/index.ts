@@ -10,6 +10,8 @@ import {
   launchGame,
   launchMovie,
   launchTrack,
+  startPlayTimeTracking,
+  stopPlayTimeTracking,
 } from "../services/launcher.service";
 import { scanMusicFiles } from "../scanners/music.scanner";
 import {
@@ -34,6 +36,7 @@ import {
   TVRepo,
   MappingRepo,
   BrokenFlashRepo,
+  CollectionRepo,
 } from "../db/repository";
 import { getProtonRating } from "../services/protondb.service";
 import { performGameScan } from "../services/game-scan.service";
@@ -43,6 +46,16 @@ import { searchMovie, searchShow } from "../services/tmdb.service";
 import { listPlugins, reloadPlugins } from "../plugins/loader";
 import { getConnectedDevices } from "../input/evdev";
 import { getXdgVideosDir, getXdgMusicDir } from "../scanners/xdg";
+import { isOllamaAvailable, naturalLanguageToFilter } from "../services/local-ai.service";
+import {
+  getStreamingServices,
+  getAllStreamingServices,
+  addCustomService,
+  updateService,
+  deleteService,
+  setServiceEnabled,
+  detectDesktopApp,
+} from "../services/streaming.service";
 import {
   Game,
   Movie,
@@ -50,6 +63,7 @@ import {
   TVShow,
   AppSettings,
   GameEmulatorConfig,
+  StreamingService,
 } from "../../shared/types";
 import { createLogger } from "../util/logger";
 
@@ -124,6 +138,14 @@ export function registerIpcHandlers(window: BrowserWindow): void {
 
   ipcMain.handle("games:emulatorConfig:set", async (_e, id: string, config: GameEmulatorConfig) => {
     await GameRepo.setEmulatorConfig(id, config);
+  });
+
+  ipcMain.handle("games:playTime:start", async (_e, id: string) => {
+    startPlayTimeTracking(id);
+  });
+
+  ipcMain.handle("games:playTime:stop", async (_e, id: string) => {
+    stopPlayTimeTracking(id);
   });
 
   ipcMain.handle("games:loadThumbnail", async (_e, game: Game) => {
@@ -250,6 +272,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
         isFavorite,
         tags,
         rating,
+        hidden,
       } = movie as any;
       const clean = {
         id,
@@ -268,6 +291,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
         isFavorite,
         tags,
         rating,
+        hidden,
       };
       const defined: any = {};
       for (const [k, v] of Object.entries(clean)) {
@@ -275,6 +299,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
       }
       if (defined.isFavorite === undefined) defined.isFavorite = false;
       if (defined.tags === undefined) defined.tags = [];
+      if (defined.hidden === undefined) defined.hidden = false;
       // Preserve existing playback progress and lastPlayed
       const existing = await db.query<[{ watchProgress?: number; lastPlayed?: number }[]]>(
         `SELECT watchProgress, lastPlayed FROM movie:⟨${defined.id}⟩`,
@@ -655,5 +680,107 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     const dir = join(app.getPath("userData"), "flash-filters");
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
     shell.openPath(dir);
+  });
+
+  /* ------------------------------------------------------------------ */
+  /*  Collections                                                        */
+  /* ------------------------------------------------------------------ */
+
+  ipcMain.handle("collections:list", async () => {
+    return CollectionRepo.list();
+  });
+
+  ipcMain.handle("collections:get", async (_e, id: string) => {
+    return CollectionRepo.get(id);
+  });
+
+  ipcMain.handle("collections:create", async (_e, collection: import("../../shared/types").Collection) => {
+    await CollectionRepo.create(collection);
+  });
+
+  ipcMain.handle("collections:update", async (_e, collection: import("../../shared/types").Collection) => {
+    await CollectionRepo.update(collection);
+  });
+
+  ipcMain.handle("collections:delete", async (_e, id: string) => {
+    await CollectionRepo.delete(id);
+  });
+
+  ipcMain.handle("collections:items:list", async (_e, collectionId: string) => {
+    return CollectionRepo.listItems(collectionId);
+  });
+
+  ipcMain.handle("collections:items:add", async (_e, item: import("../../shared/types").CollectionItem) => {
+    await CollectionRepo.addItem(item);
+  });
+
+  ipcMain.handle("collections:items:remove", async (_e, collectionId: string, itemId: string) => {
+    await CollectionRepo.removeItem(collectionId, itemId);
+  });
+
+  ipcMain.handle("collections:smart:evaluate", async (_e, itemType: string, filter: import("../../shared/types").SmartFilterGroup) => {
+    return CollectionRepo.evaluateSmartFilter(itemType, filter);
+  });
+
+  /* ------------------------------------------------------------------ */
+  /*  Streaming Services                                                 */
+  /* ------------------------------------------------------------------ */
+
+  ipcMain.handle("streaming:list", async (_e, category?: string) => {
+    if (category) return getStreamingServices(category);
+    return getAllStreamingServices();
+  });
+
+  ipcMain.handle("streaming:add", async (_e, service: Omit<StreamingService, "isBuiltin" | "sortOrder">) => {
+    return addCustomService(service);
+  });
+
+  ipcMain.handle("streaming:update", async (_e, service: StreamingService) => {
+    return updateService(service);
+  });
+
+  ipcMain.handle("streaming:delete", async (_e, id: string) => {
+    return deleteService(id);
+  });
+
+  ipcMain.handle("streaming:setEnabled", async (_e, id: string, enabled: boolean) => {
+    return setServiceEnabled(id, enabled);
+  });
+
+  ipcMain.handle("streaming:detectDesktopApp", async (_e, command: string) => {
+    return detectDesktopApp(command);
+  });
+
+  ipcMain.handle("streaming:launch", async (_e, service: StreamingService) => {
+    const desktopAvailable = service.desktopApp
+      ? detectDesktopApp(service.desktopApp)
+      : false;
+
+    if (desktopAvailable && service.desktopApp) {
+      const { spawn } = await import("child_process");
+      const args = service.desktopAppArgs ?? [];
+      const proc = spawn(service.desktopApp, args, {
+        detached: true,
+        stdio: "ignore",
+      });
+      proc.on("error", (err) => {
+        log.error("streaming:launch", `Failed to launch ${service.desktopApp}: ${err}`);
+      });
+      proc.unref();
+    } else {
+      await shell.openExternal(service.url);
+    }
+  });
+
+  /* ------------------------------------------------------------------ */
+  /*  Local AI (Ollama)                                                  */
+  /* ------------------------------------------------------------------ */
+
+  ipcMain.handle("localAi:available", async () => {
+    return isOllamaAvailable();
+  });
+
+  ipcMain.handle("localAi:nlToFilter", async (_e, query: string, itemType: string) => {
+    return naturalLanguageToFilter(query, itemType);
   });
 }

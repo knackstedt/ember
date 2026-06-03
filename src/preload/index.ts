@@ -10,7 +10,12 @@ import {
   ControllerDevice,
   ButtonMapping,
   ScanProgress,
+  Collection,
+  CollectionItem,
+  SmartFilterGroup,
+  StreamingService,
 } from "../shared/types";
+import { libretroApi } from "./libretro";
 
 const htpc = {
   settings: {
@@ -47,6 +52,12 @@ const htpc = {
         ipcRenderer.invoke("games:emulatorConfig:get", id),
       set: (id: string, config: GameEmulatorConfig): Promise<void> =>
         ipcRenderer.invoke("games:emulatorConfig:set", id, config),
+    },
+    playTime: {
+      start: (id: string): Promise<void> =>
+        ipcRenderer.invoke("games:playTime:start", id),
+      stop: (id: string): Promise<void> =>
+        ipcRenderer.invoke("games:playTime:stop", id),
     },
     loadThumbnail: (game: Game): Promise<string | null> =>
       ipcRenderer.invoke("games:loadThumbnail", game),
@@ -174,11 +185,50 @@ const htpc = {
       ipcRenderer.invoke("files:read", filePath),
   },
 
+  libretro: libretroApi,
+
   flashFilters: {
     list: (): Promise<{ id: string; name: string; content: string }[]> =>
       ipcRenderer.invoke("flash-filters:list"),
     openDir: (): Promise<void> =>
       ipcRenderer.invoke("flash-filters:open-dir"),
+  },
+
+  collections: {
+    list: (): Promise<Collection[]> => ipcRenderer.invoke("collections:list"),
+    get: (id: string): Promise<Collection | null> => ipcRenderer.invoke("collections:get", id),
+    create: (collection: Collection): Promise<void> => ipcRenderer.invoke("collections:create", collection),
+    update: (collection: Collection): Promise<void> => ipcRenderer.invoke("collections:update", collection),
+    delete: (id: string): Promise<void> => ipcRenderer.invoke("collections:delete", id),
+    items: {
+      list: (collectionId: string): Promise<CollectionItem[]> => ipcRenderer.invoke("collections:items:list", collectionId),
+      add: (item: CollectionItem): Promise<void> => ipcRenderer.invoke("collections:items:add", item),
+      remove: (collectionId: string, itemId: string): Promise<void> => ipcRenderer.invoke("collections:items:remove", collectionId, itemId),
+    },
+    smartEvaluate: (itemType: string, filter: SmartFilterGroup): Promise<string[]> => ipcRenderer.invoke("collections:smart:evaluate", itemType, filter),
+  },
+
+  localAi: {
+    available: (): Promise<boolean> => ipcRenderer.invoke("localAi:available"),
+    nlToFilter: (query: string, itemType: string): Promise<SmartFilterGroup | null> =>
+      ipcRenderer.invoke("localAi:nlToFilter", query, itemType),
+  },
+
+  streaming: {
+    list: (category?: string): Promise<StreamingService[]> =>
+      ipcRenderer.invoke("streaming:list", category),
+    add: (service: Omit<StreamingService, "isBuiltin" | "sortOrder">): Promise<StreamingService> =>
+      ipcRenderer.invoke("streaming:add", service),
+    update: (service: StreamingService): Promise<void> =>
+      ipcRenderer.invoke("streaming:update", service),
+    delete: (id: string): Promise<void> =>
+      ipcRenderer.invoke("streaming:delete", id),
+    setEnabled: (id: string, enabled: boolean): Promise<void> =>
+      ipcRenderer.invoke("streaming:setEnabled", id, enabled),
+    detectDesktopApp: (command: string): Promise<boolean> =>
+      ipcRenderer.invoke("streaming:detectDesktopApp", command),
+    launch: (service: StreamingService): Promise<void> =>
+      ipcRenderer.invoke("streaming:launch", service),
   },
 
   onScanProgress: (cb: (progress: ScanProgress) => void) => {

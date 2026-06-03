@@ -7,6 +7,10 @@ import {
   AppSettings,
   GameEmulatorConfig,
   ButtonMapping,
+  Collection,
+  CollectionItem,
+  SmartFilterGroup,
+  StreamingService,
 } from "../../shared/types";
 
 function escapeId(id: string): string {
@@ -137,6 +141,11 @@ export const MovieRepo = {
     const db = getDb();
     await db.query(`UPDATE movie:⟨${escapeId(id)}⟩ SET coverUrl = $url`, { url });
   },
+
+  async setLastPlayed(id: string, timestamp: number): Promise<void> {
+    const db = getDb();
+    await db.query(`UPDATE movie:⟨${escapeId(id)}⟩ SET lastPlayed = $ts`, { ts: timestamp });
+  },
 };
 
 /* ------------------------------------------------------------------ */
@@ -172,6 +181,11 @@ export const MusicRepo = {
   async setHidden(id: string, value: boolean): Promise<void> {
     const db = getDb();
     await db.query(`UPDATE music_track:⟨${escapeId(id)}⟩ SET hidden = $value`, { value });
+  },
+
+  async setLastPlayed(id: string, timestamp: number): Promise<void> {
+    const db = getDb();
+    await db.query(`UPDATE music_track:⟨${escapeId(id)}⟩ SET lastPlayed = $ts`, { ts: timestamp });
   },
 };
 
@@ -213,6 +227,11 @@ export const TVRepo = {
   async setCoverUrl(id: string, url: string): Promise<void> {
     const db = getDb();
     await db.query(`UPDATE tv_show:⟨${escapeId(id)}⟩ SET coverUrl = $url`, { url });
+  },
+
+  async setLastPlayed(id: string, timestamp: number): Promise<void> {
+    const db = getDb();
+    await db.query(`UPDATE tv_show:⟨${escapeId(id)}⟩ SET lastPlayed = $ts`, { ts: timestamp });
   },
 };
 
@@ -302,5 +321,190 @@ export const BrokenFlashRepo = {
     const rows = await db.query(`SELECT * FROM broken_flash_game:⟨${escapeId(id)}⟩`);
     const row = ((rows as any[])[0] ?? [])[0];
     return row ?? null;
+  },
+};
+
+/* ------------------------------------------------------------------ */
+/*  Collection Repository                                              */
+/* ------------------------------------------------------------------ */
+
+export const CollectionRepo = {
+  async list(): Promise<Collection[]> {
+    const db = getDb();
+    const result = await db.query<[Collection[]]>("SELECT * FROM collection ORDER BY name ASC");
+    return (result[0] ?? []) as Collection[];
+  },
+
+  async get(id: string): Promise<Collection | null> {
+    const db = getDb();
+    const rows = await db.query(`SELECT * FROM collection:⟨${escapeId(id)}⟩`);
+    const row = ((rows as any[])[0] ?? [])[0];
+    return row ?? null;
+  },
+
+  async create(collection: Collection): Promise<void> {
+    const db = getDb();
+    await db.query(
+      `UPSERT collection:⟨${escapeId(collection.id)}⟩ CONTENT $collection`,
+      { collection },
+    );
+  },
+
+  async update(collection: Collection): Promise<void> {
+    const db = getDb();
+    await db.query(
+      `UPSERT collection:⟨${escapeId(collection.id)}⟩ CONTENT $collection`,
+      { collection },
+    );
+  },
+
+  async delete(id: string): Promise<void> {
+    const db = getDb();
+    await db.query(`DELETE collection:⟨${escapeId(id)}⟩`);
+    await db.query("DELETE FROM collection_item WHERE collectionId = $id", { id });
+  },
+
+  async addItem(item: CollectionItem): Promise<void> {
+    const db = getDb();
+    await db.query(
+      `UPSERT collection_item:⟨${escapeId(item.id)}⟩ CONTENT $item`,
+      { item },
+    );
+  },
+
+  async removeItem(collectionId: string, itemId: string): Promise<void> {
+    const db = getDb();
+    await db.query(
+      "DELETE FROM collection_item WHERE collectionId = $collectionId AND itemId = $itemId",
+      { collectionId, itemId },
+    );
+  },
+
+  async listItems(collectionId: string): Promise<CollectionItem[]> {
+    const db = getDb();
+    const result = await db.query<[CollectionItem[]]>(
+      "SELECT * FROM collection_item WHERE collectionId = $collectionId ORDER BY addedAt DESC",
+      { collectionId },
+    );
+    return (result[0] ?? []) as CollectionItem[];
+  },
+
+  async evaluateSmartFilter(
+    itemType: string,
+    filter: SmartFilterGroup,
+  ): Promise<string[]> {
+    const db = getDb();
+    const tableMap: Record<string, string> = {
+      game: "game",
+      movie: "movie",
+      music: "music_track",
+      tv: "tv_show",
+    };
+    const table = tableMap[itemType];
+    if (!table) return [];
+
+    // Build SurrealQL WHERE clause from filter group.
+    // Each rule gets a unique param key so multiple rules on the same field don't collide.
+    let paramCounter = 0;
+    const params: Record<string, unknown> = {};
+
+    const buildWhere = (group: SmartFilterGroup): string => {
+      const parts = group.rules.map((rule) => {
+        if ("logic" in rule) {
+          return `(${buildWhere(rule as SmartFilterGroup)})`;
+        }
+        const r = rule as { field: string; operator: string; value?: unknown };
+        if (r.operator === "exists") {
+          return `${r.field} != NONE`;
+        }
+        const key = `p${paramCounter++}`;
+        params[key] = r.value;
+        switch (r.operator) {
+          case "eq":
+            return `${r.field} = $${key}`;
+          case "ne":
+            return `${r.field} != $${key}`;
+          case "gt":
+            return `${r.field} > $${key}`;
+          case "gte":
+            return `${r.field} >= $${key}`;
+          case "lt":
+            return `${r.field} < $${key}`;
+          case "lte":
+            return `${r.field} <= $${key}`;
+          case "contains":
+            return `${r.field} CONTAINS $${key}`;
+          case "in":
+            return `${r.field} INSIDE $${key}`;
+          case "startsWith":
+            return `string::startsWith(${r.field}, $${key})`;
+          case "endsWith":
+            return `string::endsWith(${r.field}, $${key})`;
+          default:
+            return "true";
+        }
+      });
+      return parts.join(` ${group.logic.toUpperCase()} `);
+    };
+
+    const where = buildWhere(filter);
+
+    const result = await db.query<[Array<{ id: string | { id: string } }>]>(
+      `SELECT id FROM ${table} WHERE ${where}`,
+      params,
+    );
+    const rows = (result[0] ?? []) as Array<{ id: string | { id: string } }>;
+    return rows.map((r) => {
+      if (typeof r.id === "string") return r.id;
+      return (r.id as { id: string }).id ?? String(r.id);
+    });
+  },
+};
+
+/* ------------------------------------------------------------------ */
+/*  Streaming Service Repository                                       */
+/* ------------------------------------------------------------------ */
+
+export const StreamingServiceRepo = {
+  async list(): Promise<StreamingService[]> {
+    const db = getDb();
+    const result = await db.query<[StreamingService[]]>(
+      "SELECT * FROM streaming_service ORDER BY sortOrder ASC, name ASC",
+    );
+    return (result[0] ?? []) as StreamingService[];
+  },
+
+  async listByCategory(category: string): Promise<StreamingService[]> {
+    const db = getDb();
+    const result = await db.query<[StreamingService[]]>(
+      "SELECT * FROM streaming_service WHERE category = $category AND enabled = true ORDER BY sortOrder ASC, name ASC",
+      { category },
+    );
+    return (result[0] ?? []) as StreamingService[];
+  },
+
+  async upsert(service: StreamingService): Promise<void> {
+    const db = getDb();
+    const normalized: Record<string, unknown> = { ...service };
+    if (normalized.enabled === undefined) normalized.enabled = true;
+    if (normalized.isBuiltin === undefined) normalized.isBuiltin = false;
+    if (normalized.sortOrder === undefined) normalized.sortOrder = 0;
+    await db.query(
+      `UPSERT streaming_service:⟨${escapeId(service.id)}⟩ CONTENT $service`,
+      { service: normalized },
+    );
+  },
+
+  async delete(id: string): Promise<void> {
+    const db = getDb();
+    await db.query(`DELETE streaming_service:⟨${escapeId(id)}⟩`);
+  },
+
+  async setEnabled(id: string, value: boolean): Promise<void> {
+    const db = getDb();
+    await db.query(
+      `UPDATE streaming_service:⟨${escapeId(id)}⟩ SET enabled = $value`,
+      { value },
+    );
   },
 };

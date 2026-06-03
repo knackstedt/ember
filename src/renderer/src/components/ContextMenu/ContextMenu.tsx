@@ -99,36 +99,50 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
           exit={{ opacity: 0, scale: 0.96, y: -4 }}
           transition={{ duration: 0.12, ease: "easeOut" }}
         >
-          {options.map((opt, i) => (
-            <button
-              key={opt.id}
-              ref={(el) => { itemRefs.current[i] = el; }}
-              className="flex items-center gap-2.5 px-3 py-2 text-sm text-left transition-colors"
-              style={{
-                background:
-                  i === activeIndex
-                    ? "color-mix(in srgb, var(--color-accent) 18%, transparent)"
-                    : "transparent",
-                color: opt.destructive
-                  ? "#ff6b6b"
-                  : i === activeIndex
-                    ? "var(--color-accent)"
-                    : "var(--color-text)",
-                outline: "none",
-                cursor: opt.disabled ? "not-allowed" : "pointer",
-                opacity: opt.disabled ? 0.4 : 1,
-              }}
-              onClick={() => {
-                if (!opt.disabled) {
-                  onSelect(opt.id);
-                }
-              }}
-              disabled={opt.disabled}
-            >
-              {opt.icon && <span className="text-base">{opt.icon}</span>}
-              <span className="truncate">{opt.label}</span>
-            </button>
-          ))}
+          {options.map((opt, i) => {
+            const isSep = opt.disabled && opt.id.startsWith("__sep");
+            if (isSep) {
+              return (
+                <div
+                  key={opt.id}
+                  className="px-3 py-1.5 text-xs font-medium uppercase tracking-wide"
+                  style={{ color: "var(--color-text-dim)", borderTop: "1px solid var(--color-border)" }}
+                >
+                  {opt.label}
+                </div>
+              );
+            }
+            return (
+              <button
+                key={opt.id}
+                ref={(el) => { itemRefs.current[i] = el; }}
+                className="flex items-center gap-2.5 px-3 py-2 text-sm text-left transition-colors"
+                style={{
+                  background:
+                    i === activeIndex
+                      ? "color-mix(in srgb, var(--color-accent) 18%, transparent)"
+                      : "transparent",
+                  color: opt.destructive
+                    ? "#ff6b6b"
+                    : i === activeIndex
+                      ? "var(--color-accent)"
+                      : "var(--color-text)",
+                  outline: "none",
+                  cursor: opt.disabled ? "not-allowed" : "pointer",
+                  opacity: opt.disabled ? 0.4 : 1,
+                }}
+                onClick={() => {
+                  if (!opt.disabled) {
+                    onSelect(opt.id);
+                  }
+                }}
+                disabled={opt.disabled}
+              >
+                {opt.icon && <span className="text-base">{opt.icon}</span>}
+                <span className="truncate">{opt.label}</span>
+              </button>
+            );
+          })}
         </motion.div>
       )}
     </AnimatePresence>

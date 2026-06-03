@@ -89,6 +89,7 @@ export async function scanMusicFiles(
         trackNumber: track?.no ?? undefined,
         duration: meta.format.duration,
         tags: [],
+        hidden: false,
       });
     } catch (err: any) {
       log.error(

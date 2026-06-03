@@ -289,6 +289,7 @@ export async function scanMovieFiles(
         resolution: probe?.resolution,
         codec: probe?.codec,
         tags: [],
+        hidden: false,
       });
     } catch (err) {
       log.error(

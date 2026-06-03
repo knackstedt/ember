@@ -24,6 +24,14 @@ export type GamePlatform =
   | "snes"
   | "gb"
   | "gba"
+  | "n64"
+  | "genesis"
+  | "sms"
+  | "gamegear"
+  | "pce"
+  | "psx"
+  | "nds"
+  | "dreamcast"
   | "flash"
   | "dos"
   | "desktop"
@@ -311,6 +319,86 @@ export interface ScanProgress {
   message?: string;
 }
 
+export type CollectionItemType = "game" | "movie" | "music" | "tv" | "mixed";
+export type CollectionType = "manual" | "smart";
+export type SortOrder = "title" | "releaseYear" | "lastPlayed" | "rating" | "playTime" | "added";
+export type SortDirection = "asc" | "desc";
+
+export type FilterOperator =
+  | "eq"
+  | "ne"
+  | "gt"
+  | "gte"
+  | "lt"
+  | "lte"
+  | "contains"
+  | "in"
+  | "startsWith"
+  | "endsWith"
+  | "exists";
+
+export interface SmartFilterRule {
+  field: string;
+  operator: FilterOperator;
+  value?: unknown;
+}
+
+export interface SmartFilterGroup {
+  logic: "and" | "or";
+  rules: (SmartFilterRule | SmartFilterGroup)[];
+}
+
+export interface Collection {
+  id: string;
+  name: string;
+  icon?: string;
+  color?: string;
+  description?: string;
+  itemType: CollectionItemType;
+  type: CollectionType;
+  filter?: SmartFilterGroup;
+  sortOrder?: SortOrder;
+  sortDirection?: SortDirection;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface CollectionItem {
+  id: string;
+  collectionId: string;
+  itemId: string;
+  itemType: CollectionItemType;
+  addedAt: number;
+}
+
+export interface CollectionWithItems extends Collection {
+  items: CollectionItem[];
+}
+
+export interface LocalAiConfig {
+  enabled: boolean;
+  provider: "ollama" | "lmstudio" | "custom";
+  baseUrl: string;
+  model: string;
+}
+
+export type StreamingServiceCategory = "music" | "video";
+
+export interface StreamingService {
+  id: string;
+  name: string;
+  category: StreamingServiceCategory;
+  url: string;
+  color: string;
+  textColor: string;
+  icon: string;
+  desktopApp?: string;
+  desktopAppArgs?: string[];
+  enabled: boolean;
+  isBuiltin: boolean;
+  sortOrder: number;
+}
+
 export type IpcChannel =
   | "settings:get"
   | "settings:set"
@@ -356,4 +444,33 @@ export type IpcChannel =
   | "tv:regenerateThumbnail"
   | "games:regenerateThumbnail"
   | "shell:openPath"
-  | "shell:showItemInFolder";
+  | "shell:showItemInFolder"
+  | "libretro:cores:list"
+  | "libretro:cores:detect"
+  | "libretro:core:load"
+  | "libretro:game:load"
+  | "libretro:start"
+  | "libretro:stop"
+  | "libretro:reset"
+  | "libretro:unload"
+  | "libretro:unloadAll"
+  | "libretro:frame:get"
+  | "libretro:avinfo:get"
+  | "libretro:input:set"
+  | "libretro:analog:set"
+  | "collections:list"
+  | "collections:get"
+  | "collections:create"
+  | "collections:update"
+  | "collections:delete"
+  | "collections:items:add"
+  | "collections:items:remove"
+  | "collections:items:list"
+  | "collections:smart:evaluate"
+  | "streaming:list"
+  | "streaming:add"
+  | "streaming:update"
+  | "streaming:delete"
+  | "streaming:setEnabled"
+  | "streaming:detectDesktopApp"
+  | "streaming:launch";

@@ -36,6 +36,23 @@ const PLATFORM_EXTS: Record<string, GamePlatform> = {
   ".gb": "gb",
   ".gbc": "gb",
   ".gba": "gba",
+  ".z64": "n64",
+  ".n64": "n64",
+  ".v64": "n64",
+  ".md": "genesis",
+  ".smd": "genesis",
+  ".gen": "genesis",
+  ".sms": "sms",
+  ".gg": "gamegear",
+  ".pce": "pce",
+  ".cue": "psx",
+  ".bin": "psx",
+  ".iso": "psx",
+  ".pbp": "psx",
+  ".nds": "nds",
+  ".chd": "dreamcast",
+  ".gdi": "dreamcast",
+  ".cdi": "dreamcast",
 };
 
 function titleFromFilename(filename: string): string {

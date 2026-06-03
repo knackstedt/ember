@@ -27,6 +27,58 @@ function normalizeGame(game: Game): Record<string, unknown> {
   return n;
 }
 
+async function preserveExistingFields(
+  db: ReturnType<typeof getDb>,
+  game: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  const rows = await db.query<
+    [
+      {
+        playTime?: number;
+        lastPlayed?: number;
+        isFavorite?: boolean;
+        tags?: string[];
+        rating?: number;
+        hidden?: boolean;
+        coverUrl?: string;
+        coverSource?: string;
+        corrupt?: boolean;
+      }[],
+    ]
+  >(`SELECT playTime, lastPlayed, isFavorite, tags, rating, hidden, coverUrl, coverSource, corrupt FROM game:⟨${game.id}⟩`);
+  const existing = rows[0]?.[0];
+  if (existing) {
+    if (existing.playTime !== undefined && existing.playTime !== null) {
+      game.playTime = existing.playTime;
+    }
+    if (existing.lastPlayed !== undefined && existing.lastPlayed !== null) {
+      game.lastPlayed = existing.lastPlayed;
+    }
+    if (existing.isFavorite !== undefined && existing.isFavorite !== null) {
+      game.isFavorite = existing.isFavorite;
+    }
+    if (existing.tags !== undefined && existing.tags !== null) {
+      game.tags = existing.tags;
+    }
+    if (existing.rating !== undefined && existing.rating !== null) {
+      game.rating = existing.rating;
+    }
+    if (existing.hidden !== undefined && existing.hidden !== null) {
+      game.hidden = existing.hidden;
+    }
+    if (existing.coverUrl !== undefined && existing.coverUrl !== null) {
+      game.coverUrl = existing.coverUrl;
+    }
+    if (existing.coverSource !== undefined && existing.coverSource !== null) {
+      game.coverSource = existing.coverSource;
+    }
+    if (existing.corrupt !== undefined && existing.corrupt !== null) {
+      game.corrupt = existing.corrupt;
+    }
+  }
+  return game;
+}
+
 async function scanInMainThread(
   window: BrowserWindow | null,
   extraPaths?: string[],
@@ -69,8 +121,9 @@ async function scanInMainThread(
   const db = getDb();
   for (const game of all) {
     try {
+      const normalized = await preserveExistingFields(db, normalizeGame(game));
       await db.query(`UPSERT game:⟨${game.id}⟩ CONTENT $game`, {
-        game: normalizeGame(game),
+        game: normalized,
       });
     } catch (err) {
       log.warn("scan", `Failed to upsert ${game.id}: ${err}`);
@@ -109,8 +162,9 @@ export async function performGameScan(
             const db = getDb();
             for (const game of games) {
               try {
+                const normalized = await preserveExistingFields(db, normalizeGame(game));
                 await db.query(`UPSERT game:⟨${game.id}⟩ CONTENT $game`, {
-                  game: normalizeGame(game),
+                  game: normalized,
                 });
               } catch (err) {
                 log.warn("scan", `Failed to upsert ${game.id}: ${err}`);

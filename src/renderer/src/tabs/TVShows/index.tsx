@@ -13,6 +13,10 @@ import { useVideoPlayerStore } from "../../store/videoPlayer.store";
 import { useGridFocus } from "../../hooks/useGridFocus";
 import { useContextMenu } from "../../hooks/useContextMenu";
 import { ContextMenuOption } from "../../components/ContextMenu/ContextMenu";
+import { useCollectionsStore, evaluateSmartFilter, sortByCollection } from "../../store/collections.store";
+import { CollectionsBar } from "../../components/CollectionsBar/CollectionsBar";
+import { CollectionManager } from "../../components/CollectionManager/CollectionManager";
+import { useToastStore } from "../../store/toast.store";
 
 export const TVShowsTab: React.FC = () => {
   const shows = useTvStore((s) => s.shows);
@@ -32,11 +36,38 @@ export const TVShowsTab: React.FC = () => {
   const [selected, setSelected] = useState<TVShow | null>(null);
   const [selectedSeason, setSelectedSeason] = useState<number>(1);
   const [columnCount, setColumnCount] = useState(5);
+  const [activeCollectionId, setActiveCollectionId] = useState<string | null>(null);
+  const [showCollectionManager, setShowCollectionManager] = useState(false);
+  const [collectionItemIds, setCollectionItemIds] = useState<Set<string>>(new Set());
   const gridRef = useRef<VirtualGridHandle>(null);
+
+  const collections = useCollectionsStore((s) => s.collections);
+  const loadCollections = useCollectionsStore((s) => s.load);
+  const addItem = useCollectionsStore((s) => s.addItem);
+  const listItems = useCollectionsStore((s) => s.listItems);
 
   useEffect(() => {
     load();
+    loadCollections();
   }, []);
+
+  useEffect(() => {
+    if (!activeCollectionId) {
+      setCollectionItemIds(new Set());
+      return;
+    }
+    const collection = collections.find((c) => c.id === activeCollectionId);
+    if (!collection) return;
+
+    if (collection.type === "smart" && collection.filter) {
+      const result = evaluateSmartFilter(shows, collection.filter);
+      setCollectionItemIds(new Set(result.map((s) => s.id)));
+    } else {
+      listItems(activeCollectionId).then((items) => {
+        setCollectionItemIds(new Set(items.map((i) => i.itemId)));
+      });
+    }
+  }, [activeCollectionId, collections, shows]);
 
   useEffect(() => {
     const handler = () => setSelected(null);
@@ -58,7 +89,17 @@ export const TVShowsTab: React.FC = () => {
     );
   }, [selected, selectedSeason]);
 
-  const items = useMemo(() => filtered(), [filtered, shows, searchQuery]);
+  const activeCollection = useMemo(
+    () => collections.find((c) => c.id === activeCollectionId),
+    [collections, activeCollectionId],
+  );
+
+  const items = useMemo(() => {
+    const base = filtered();
+    if (!activeCollectionId) return base;
+    const result = base.filter((s) => collectionItemIds.has(s.id));
+    return sortByCollection<TVShow>(result, activeCollection);
+  }, [filtered, shows, searchQuery, activeCollectionId, collectionItemIds, activeCollection]);
   const { focusedIndex } = useGridFocus({
     items,
     columnCount,
@@ -67,31 +108,58 @@ export const TVShowsTab: React.FC = () => {
     enabled: !selected,
   });
 
+  const tvCollections = useMemo(
+    () => collections.filter((c) => c.itemType === "tv" || c.itemType === "mixed"),
+    [collections],
+  );
+
   const { menu, bindItem } = useContextMenu({
     items,
     focusedIndex,
-    getOptions: (show): ContextMenuOption[] => [
-      {
-        id: "favorite",
-        label: show.isFavorite ? "Unfavorite" : "Favorite",
-        icon: show.isFavorite ? "★" : "☆",
-      },
-      { id: "hide", label: "Hide", icon: "🙈", destructive: true },
-      { id: "tags", label: "Update metadata / tags", icon: "🏷" },
-      {
-        id: "regenerate",
-        label: "Regenerate thumbnail",
-        icon: "🔄",
-        disabled: !show.dirPath,
-      },
-      {
-        id: "folder",
-        label: "Open containing folder",
-        icon: "📂",
-        disabled: !show.dirPath,
-      },
-    ],
+    getOptions: (show): ContextMenuOption[] => {
+      const opts: ContextMenuOption[] = [
+        {
+          id: "favorite",
+          label: show.isFavorite ? "Unfavorite" : "Favorite",
+          icon: show.isFavorite ? "★" : "☆",
+        },
+        { id: "hide", label: "Hide", icon: "🙈", destructive: true },
+        { id: "tags", label: "Update metadata / tags", icon: "🏷" },
+        {
+          id: "regenerate",
+          label: "Regenerate thumbnail",
+          icon: "🔄",
+          disabled: !show.dirPath,
+        },
+        {
+          id: "folder",
+          label: "Open containing folder",
+          icon: "📂",
+          disabled: !show.dirPath,
+        },
+      ];
+      if (tvCollections.length > 0) {
+        opts.push({ id: "__sep__", label: "Collections", icon: "", disabled: true });
+        for (const c of tvCollections) {
+          opts.push({
+            id: `add-to-coll:${c.id}`,
+            label: c.name,
+            icon: c.icon || "📁",
+          });
+        }
+      }
+      return opts;
+    },
     onAction: (show, optionId) => {
+      if (optionId.startsWith("add-to-coll:")) {
+        const collectionId = optionId.slice("add-to-coll:".length);
+        void addItem(collectionId, show.id, "tv");
+        useToastStore.getState().push({
+          type: "success",
+          message: `Added to ${tvCollections.find((c) => c.id === collectionId)?.name ?? "collection"}`,
+        });
+        return;
+      }
       switch (optionId) {
         case "favorite":
           toggleFavorite(show.id);
@@ -165,6 +233,14 @@ export const TVShowsTab: React.FC = () => {
           {items.length} shows
         </span>
       </div>
+
+      <CollectionsBar
+        itemType="tv"
+        activeCollectionId={activeCollectionId}
+        onSelect={setActiveCollectionId}
+        onManage={() => setShowCollectionManager(true)}
+        className="flex-shrink-0"
+      />
 
       {loading ? (
         <div
@@ -338,6 +414,11 @@ export const TVShowsTab: React.FC = () => {
         )}
       </DetailPanel>
       {menu}
+      <CollectionManager
+        open={showCollectionManager}
+        onClose={() => setShowCollectionManager(false)}
+        itemType="tv"
+      />
     </div>
   );
 };

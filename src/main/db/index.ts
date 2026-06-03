@@ -180,5 +180,42 @@ async function runMigrations(db: Surreal): Promise<void> {
     DEFINE TABLE IF NOT EXISTS game_config SCHEMAFULL;
     DEFINE FIELD IF NOT EXISTS id ON game_config TYPE string;
     DEFINE FIELD IF NOT EXISTS shader ON game_config TYPE option<string>;
+
+    DEFINE TABLE IF NOT EXISTS collection SCHEMAFULL;
+    DEFINE FIELD IF NOT EXISTS id ON collection TYPE string;
+    DEFINE FIELD IF NOT EXISTS name ON collection TYPE string;
+    DEFINE FIELD IF NOT EXISTS icon ON collection TYPE option<string>;
+    DEFINE FIELD IF NOT EXISTS color ON collection TYPE option<string>;
+    DEFINE FIELD IF NOT EXISTS description ON collection TYPE option<string>;
+    DEFINE FIELD IF NOT EXISTS itemType ON collection TYPE string;
+    DEFINE FIELD IF NOT EXISTS type ON collection TYPE string;
+    DEFINE FIELD IF NOT EXISTS filter ON collection TYPE option<object>;
+    DEFINE FIELD IF NOT EXISTS sortOrder ON collection TYPE option<string>;
+    DEFINE FIELD IF NOT EXISTS sortDirection ON collection TYPE option<string>;
+    DEFINE FIELD IF NOT EXISTS createdAt ON collection TYPE int;
+    DEFINE FIELD IF NOT EXISTS updatedAt ON collection TYPE int;
+    DEFINE INDEX IF NOT EXISTS collection_name ON collection FIELDS name;
+
+    DEFINE TABLE IF NOT EXISTS collection_item SCHEMAFULL;
+    DEFINE FIELD IF NOT EXISTS id ON collection_item TYPE string;
+    DEFINE FIELD IF NOT EXISTS collectionId ON collection_item TYPE string;
+    DEFINE FIELD IF NOT EXISTS itemId ON collection_item TYPE string;
+    DEFINE FIELD IF NOT EXISTS itemType ON collection_item TYPE string;
+    DEFINE FIELD IF NOT EXISTS addedAt ON collection_item TYPE int;
+    DEFINE INDEX IF NOT EXISTS collection_item_lookup ON collection_item FIELDS collectionId, itemId;
+
+    DEFINE TABLE IF NOT EXISTS streaming_service SCHEMAFULL;
+    DEFINE FIELD IF NOT EXISTS id ON streaming_service TYPE string;
+    DEFINE FIELD IF NOT EXISTS name ON streaming_service TYPE string;
+    DEFINE FIELD IF NOT EXISTS category ON streaming_service TYPE string;
+    DEFINE FIELD IF NOT EXISTS url ON streaming_service TYPE string;
+    DEFINE FIELD IF NOT EXISTS color ON streaming_service TYPE string;
+    DEFINE FIELD IF NOT EXISTS textColor ON streaming_service TYPE string;
+    DEFINE FIELD IF NOT EXISTS icon ON streaming_service TYPE string;
+    DEFINE FIELD IF NOT EXISTS desktopApp ON streaming_service TYPE option<string>;
+    DEFINE FIELD IF NOT EXISTS desktopAppArgs ON streaming_service TYPE option<array<string>>;
+    DEFINE FIELD IF NOT EXISTS enabled ON streaming_service TYPE bool DEFAULT true;
+    DEFINE FIELD IF NOT EXISTS isBuiltin ON streaming_service TYPE bool DEFAULT false;
+    DEFINE FIELD IF NOT EXISTS sortOrder ON streaming_service TYPE int DEFAULT 0;
   `);
 }

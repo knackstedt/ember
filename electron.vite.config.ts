@@ -163,6 +163,39 @@ function emulatorjsStaticPlugin(): Plugin {
   };
 }
 
+function libretroStaticPlugin(): Plugin {
+  const addonPath = resolve("resources/libretro-frontend.linux-x64-gnu.node");
+
+  return {
+    name: "libretro-static",
+    configureServer(server) {
+      server.middlewares.use("/libretro-frontend.node", (req, res, next) => {
+        try {
+          decodeURI(req.url ?? "");
+        } catch {
+          res.statusCode = 400;
+          res.end("Bad Request");
+          return;
+        }
+        if (!existsSync(addonPath)) {
+          res.statusCode = 404;
+          res.end("Native addon not found. Run cargo build in native/libretro-frontend/");
+          return;
+        }
+        res.setHeader("Content-Type", "application/octet-stream");
+        res.end(readFileSync(addonPath));
+      });
+    },
+    writeBundle(options) {
+      const outDir = options.dir;
+      if (!outDir) return;
+      if (existsSync(addonPath)) {
+        copyFileSync(addonPath, resolve(outDir, "libretro-frontend.linux-x64-gnu.node"));
+      }
+    },
+  };
+}
+
 function v86StaticPlugin(): Plugin {
   const v86BuildDir = resolve("node_modules/v86/build");
   const v86BiosDir = resolve("resources/v86-bios");
@@ -215,6 +248,7 @@ export default defineConfig({
   main: {
     plugins: [externalizeDepsPlugin()],
     build: {
+      // @ts-expect-error electron-vite build.rollupOptions typing mismatch
       rollupOptions: {
         input: {
           index: resolve("src/main/index.ts"),
@@ -250,6 +284,6 @@ export default defineConfig({
         "@shared": resolve("src/shared"),
       },
     },
-    plugins: [react(), ruffleStaticPlugin(), emulatorjsStaticPlugin(), v86StaticPlugin()],
+    plugins: [react(), ruffleStaticPlugin(), emulatorjsStaticPlugin(), v86StaticPlugin(), libretroStaticPlugin()],
   },
 });

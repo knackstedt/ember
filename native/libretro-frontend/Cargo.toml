@@ -1,0 +1,19 @@
+[package]
+name = "libretro-frontend"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+napi = { version = "2", features = ["napi9", "async"] }
+napi-derive = "2"
+libloading = "0.8"
+log = "0.4"
+env_logger = "0.11"
+cpal = "0.15"
+parking_lot = "0.12"
+
+[build-dependencies]
+napi-build = "2"

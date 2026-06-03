@@ -11,14 +11,16 @@ import { DetailPanel } from "../../components/DetailPanel/DetailPanel";
 import { OskInput } from "../../components/OnScreenKeyboard/OnScreenKeyboard";
 import { MusicTrack } from "../../../../shared/types";
 import { useMusicPlayerStore } from "../../store/musicPlayer.store";
-import {
-  StreamingTile,
-  MUSIC_STREAMING_SERVICES,
-} from "../../components/StreamingTile/StreamingTile";
+import { StreamingTile } from "../../components/StreamingTile/StreamingTile";
+import { StreamingService } from "../../../../shared/types";
 import { useGridFocus } from "../../hooks/useGridFocus";
 import { useCoverCacheStore } from "../../store/coverCache.store";
 import { useContextMenu } from "../../hooks/useContextMenu";
 import { ContextMenuOption } from "../../components/ContextMenu/ContextMenu";
+import { useCollectionsStore, evaluateSmartFilter, sortByCollection } from "../../store/collections.store";
+import { CollectionsBar } from "../../components/CollectionsBar/CollectionsBar";
+import { CollectionManager } from "../../components/CollectionManager/CollectionManager";
+import { useToastStore } from "../../store/toast.store";
 
 const LazyMusicCard: React.FC<{
   track: MusicTrack;
@@ -96,8 +98,17 @@ export const MusicTab: React.FC = () => {
   >("artist");
   const [trackColumnCount, setTrackColumnCount] = useState(6);
   const [groupColumnCount, setGroupColumnCount] = useState(6);
+  const [activeCollectionId, setActiveCollectionId] = useState<string | null>(null);
+  const [showCollectionManager, setShowCollectionManager] = useState(false);
+  const [collectionItemIds, setCollectionItemIds] = useState<Set<string>>(new Set());
+  const [streamingServices, setStreamingServices] = useState<StreamingService[]>([]);
   const trackGridRef = useRef<VirtualGridHandle>(null);
   const groupGridRef = useRef<VirtualGridHandle>(null);
+
+  const collections = useCollectionsStore((s) => s.collections);
+  const loadCollections = useCollectionsStore((s) => s.load);
+  const addItem = useCollectionsStore((s) => s.addItem);
+  const listItems = useCollectionsStore((s) => s.listItems);
 
   useEffect(() => {
     const handler = () => {
@@ -117,7 +128,32 @@ export const MusicTab: React.FC = () => {
 
   useEffect(() => {
     load();
+    loadCollections();
   }, []);
+
+  useEffect(() => {
+    if (subTab === "streaming") {
+      window.htpc.streaming.list("music").then(setStreamingServices).catch(() => {});
+    }
+  }, [subTab]);
+
+  useEffect(() => {
+    if (!activeCollectionId) {
+      setCollectionItemIds(new Set());
+      return;
+    }
+    const collection = collections.find((c) => c.id === activeCollectionId);
+    if (!collection) return;
+
+    if (collection.type === "smart" && collection.filter) {
+      const result = evaluateSmartFilter(tracks, collection.filter);
+      setCollectionItemIds(new Set(result.map((t) => t.id)));
+    } else {
+      listItems(activeCollectionId).then((items) => {
+        setCollectionItemIds(new Set(items.map((i) => i.itemId)));
+      });
+    }
+  }, [activeCollectionId, collections, tracks]);
 
   const artistGroups = useMemo(() => {
     const map = new Map<string, { name: string; tracks: MusicTrack[] }>();
@@ -197,6 +233,13 @@ export const MusicTab: React.FC = () => {
       if (activeGenre) r = r.filter((t) => t.genre === activeGenre);
       if (activeYear) r = r.filter((t) => t.year === activeYear);
     }
+    if (activeCollectionId) {
+      r = r.filter((t) => collectionItemIds.has(t.id));
+    }
+    const activeCollection = collections.find((c) => c.id === activeCollectionId);
+    if (activeCollection) {
+      r = sortByCollection<MusicTrack>(r, activeCollection);
+    }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       r = r.filter(
@@ -207,7 +250,7 @@ export const MusicTab: React.FC = () => {
       );
     }
     return r;
-  }, [tracks, selectedGroup, browseMode, activeArtist, activeAlbum, activeGenre, activeYear, searchQuery]);
+  }, [tracks, selectedGroup, browseMode, activeArtist, activeAlbum, activeGenre, activeYear, searchQuery, activeCollectionId, collectionItemIds]);
 
   const { focusedIndex: groupFocusedIndex } = useGridFocus<MusicGroup>({
     items: groupItems,
@@ -228,31 +271,58 @@ export const MusicTab: React.FC = () => {
     enabled: subTab === "local" && !selected && (browseMode === "tracks" || !!selectedGroup),
   });
 
+  const musicCollections = useMemo(
+    () => collections.filter((c) => c.itemType === "music" || c.itemType === "mixed"),
+    [collections],
+  );
+
   const { menu: trackCtxMenu, bindItem: bindTrackItem } = useContextMenu<MusicTrack>({
     items: trackItems,
     focusedIndex: trackFocusedIndex,
     enabled: subTab === "local" && (browseMode === "tracks" || !!selectedGroup),
-    getOptions: (track): ContextMenuOption[] => [
-      {
-        id: "favorite",
-        label: track.isFavorite ? "Unfavorite" : "Favorite",
-        icon: track.isFavorite ? "★" : "☆",
-      },
-      { id: "hide", label: "Hide", icon: "🙈", destructive: true },
-      { id: "tags", label: "Update metadata / tags", icon: "🏷" },
-      {
-        id: "searchCover",
-        label: "Search cover art",
-        icon: "🔄",
-      },
-      {
-        id: "folder",
-        label: "Open containing folder",
-        icon: "📂",
-        disabled: !track.filePath,
-      },
-    ],
+    getOptions: (track): ContextMenuOption[] => {
+      const opts: ContextMenuOption[] = [
+        {
+          id: "favorite",
+          label: track.isFavorite ? "Unfavorite" : "Favorite",
+          icon: track.isFavorite ? "★" : "☆",
+        },
+        { id: "hide", label: "Hide", icon: "🙈", destructive: true },
+        { id: "tags", label: "Update metadata / tags", icon: "🏷" },
+        {
+          id: "searchCover",
+          label: "Search cover art",
+          icon: "🔄",
+        },
+        {
+          id: "folder",
+          label: "Open containing folder",
+          icon: "📂",
+          disabled: !track.filePath,
+        },
+      ];
+      if (musicCollections.length > 0) {
+        opts.push({ id: "__sep__", label: "Collections", icon: "", disabled: true });
+        for (const c of musicCollections) {
+          opts.push({
+            id: `add-to-coll:${c.id}`,
+            label: c.name,
+            icon: c.icon || "📁",
+          });
+        }
+      }
+      return opts;
+    },
     onAction: (track, optionId) => {
+      if (optionId.startsWith("add-to-coll:")) {
+        const collectionId = optionId.slice("add-to-coll:".length);
+        void addItem(collectionId, track.id, "music");
+        useToastStore.getState().push({
+          type: "success",
+          message: `Added to ${musicCollections.find((c) => c.id === collectionId)?.name ?? "collection"}`,
+        });
+        return;
+      }
       switch (optionId) {
         case "favorite":
           toggleFavorite(track.id);
@@ -424,6 +494,14 @@ export const MusicTab: React.FC = () => {
 
       {subTab === "local" && (
         <>
+          <CollectionsBar
+            itemType="music"
+            activeCollectionId={activeCollectionId}
+            onSelect={setActiveCollectionId}
+            onManage={() => setShowCollectionManager(true)}
+            className="flex-shrink-0"
+          />
+
           <div className="flex gap-2 flex-shrink-0 items-center">
             <ChipFilters
               filters={[
@@ -433,6 +511,7 @@ export const MusicTab: React.FC = () => {
               ]}
               active={browseMode}
               onSelect={(v) => {
+                setActiveCollectionId(null);
                 setBrowseMode(v as BrowseMode);
                 setSelectedGroup(null);
               }}
@@ -567,7 +646,7 @@ export const MusicTab: React.FC = () => {
 
       {subTab === "streaming" && (
         <div className="pt-2">
-          <StreamingTile services={MUSIC_STREAMING_SERVICES} />
+          <StreamingTile services={streamingServices} />
         </div>
       )}
 
@@ -737,6 +816,11 @@ export const MusicTab: React.FC = () => {
       </DetailPanel>
       {subTab === "local" && trackCtxMenu}
       {subTab === "local" && groupCtxMenu}
+      <CollectionManager
+        open={showCollectionManager}
+        onClose={() => setShowCollectionManager(false)}
+        itemType="music"
+      />
     </div>
   );
 };

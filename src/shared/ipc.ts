@@ -23,6 +23,10 @@ export const IPC_CHANNELS = {
       get: "games:emulatorConfig:get",
       set: "games:emulatorConfig:set",
     },
+    playTime: {
+      start: "games:playTime:start",
+      stop: "games:playTime:stop",
+    },
   },
   movies: {
     scan: "movies:scan",
@@ -91,5 +95,27 @@ export const IPC_CHANNELS = {
   },
   scan: {
     progress: "scan:progress",
+  },
+  collections: {
+    list: "collections:list",
+    get: "collections:get",
+    create: "collections:create",
+    update: "collections:update",
+    delete: "collections:delete",
+    items: {
+      add: "collections:items:add",
+      remove: "collections:items:remove",
+      list: "collections:items:list",
+    },
+    smartEvaluate: "collections:smart:evaluate",
+  },
+  streaming: {
+    list: "streaming:list",
+    add: "streaming:add",
+    update: "streaming:update",
+    delete: "streaming:delete",
+    setEnabled: "streaming:setEnabled",
+    detectDesktopApp: "streaming:detectDesktopApp",
+    launch: "streaming:launch",
   },
 } as const;
