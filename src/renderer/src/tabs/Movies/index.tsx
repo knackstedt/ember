@@ -62,6 +62,7 @@ export const MoviesTab: React.FC = () => {
   const applyFacetFilter = (field: string, value: string | null) => {
     setFacetFilters((prev) => ({ ...prev, [field]: value }));
   };
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
 
   const collections = useCollectionsStore((s) => s.collections);
   const loadCollections = useCollectionsStore((s) => s.load);
@@ -337,116 +338,187 @@ export const MoviesTab: React.FC = () => {
           </div>
         )}
 
-        {/* Expanded filters — scroll out of view */}
-        <div className="flex flex-col gap-3 mb-3">
-          <div className="flex gap-3 items-center flex-shrink-0">
-            <div className="flex gap-1">
-              {(["ai-groups", "local", "streaming"] as SubTab[]).map((t) => (
-                <button
-                  key={t}
-                  className="px-4 py-1.5 rounded-full text-sm font-medium capitalize transition-colors"
-                  style={{
-                    background:
-                      subTab === t
-                        ? "var(--color-accent)"
-                        : "var(--color-surface-raised)",
-                    color:
-                      subTab === t ? "var(--color-bg)" : "var(--color-text-dim)",
-                    border: "1px solid var(--color-border)",
-                  }}
-                  onClick={() => setSubTab(t)}
-                >
-                  {t === "ai-groups" ? "✨ Groups" : t}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {subTab === "local" && (
-            <>
-              <ChipFilters
-                filters={[
-                  { id: "", label: "All Genres" },
-                  ...allGenres.map((g) => ({ id: g, label: g })),
-                ]}
-                active={activeGenre ?? ""}
-                onSelect={(g) => {
-                  setActiveCollectionId(null);
-                  setGenre(g || null);
-                }}
-                className="flex-shrink-0"
-              />
-
-              {/* Dynamic metadata facets */}
-              {gridItems.length > 0 && (
-                <DynamicFacetFilters
-                  items={facetSourceItems}
-                  fields={movieFacetFields}
-                  activeFilters={facetFilters}
-                  onFilter={applyFacetFilter}
-                  className="flex-shrink-0"
-                />
-              )}
-            </>
+        {/* Compact filter summary row */}
+        <div className="flex items-center gap-2 mb-3 flex-wrap">
+          {/* Active tab chip */}
+          <span
+            className="px-2.5 py-0.5 rounded-full text-xs font-medium"
+            style={{
+              backgroundColor: "var(--color-accent)",
+              color: "var(--color-bg)",
+            }}
+          >
+            {subTab === "ai-groups" ? "✨ Groups" : subTab}
+          </span>
+          {/* Active genre chip */}
+          {subTab === "local" && activeGenre && (
+            <motion.button
+              className="px-2.5 py-0.5 rounded-full text-xs font-medium"
+              style={{ backgroundColor: "var(--color-accent)", color: "var(--color-bg)" }}
+              onClick={() => setGenre(null)}
+              whileTap={{ scale: 0.95 }}
+              title="Clear genre filter"
+            >
+              Genre: {activeGenre} ✕
+            </motion.button>
           )}
+          {/* Active group chip */}
+          {subTab === "ai-groups" && selectedAiGroupId && (() => {
+            const group = aiGroups.find((g) => g.id === selectedAiGroupId);
+            return group ? (
+              <motion.button
+                className="px-2.5 py-0.5 rounded-full text-xs font-medium"
+                style={{ backgroundColor: "var(--color-accent)", color: "var(--color-bg)" }}
+                onClick={() => setSelectedAiGroupId(null)}
+                whileTap={{ scale: 0.95 }}
+                title="Clear group filter"
+              >
+                Group: {group.label} ✕
+              </motion.button>
+            ) : null;
+          })()}
+          {/* Active facet chips */}
+          {Object.entries(facetFilters).map(([key, value]) =>
+            value ? (
+              <motion.button
+                key={key}
+                className="px-2.5 py-0.5 rounded-full text-xs font-medium"
+                style={{ backgroundColor: "var(--color-accent)", color: "var(--color-bg)" }}
+                onClick={() => applyFacetFilter(key, null)}
+                whileTap={{ scale: 0.95 }}
+                title={`Clear ${key} filter`}
+              >
+                {movieFacetFields.find((f) => f.key === key)?.label ?? key}: {value} ✕
+              </motion.button>
+            ) : null,
+          )}
+          {/* Expand/collapse filters button */}
+          <motion.button
+            className="px-2.5 py-0.5 rounded-full text-xs font-medium"
+            style={{
+              background: "var(--color-surface-raised)",
+              color: "var(--color-text)",
+              border: "1px solid var(--color-border)",
+            }}
+            onClick={() => setFiltersExpanded((v) => !v)}
+            whileTap={{ scale: 0.95 }}
+          >
+            {filtersExpanded ? "▲ Filters" : "▼ Filters"}
+          </motion.button>
+        </div>
 
-          {subTab === "ai-groups" && (
-            <>
-              {aiGroupsLoading && (
-                <div className="flex items-center gap-2 flex-shrink-0" style={{ color: "var(--color-text-dim)" }}>
-                  <div className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "var(--color-accent)", borderTopColor: "transparent" }} />
-                  <span className="text-xs">Generating smart groups…</span>
-                </div>
-              )}
-              {aiGroups.length > 0 && (
-                <div className="flex gap-2 flex-shrink-0 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
-                  <motion.button
-                    onClick={() => setSelectedAiGroupId(null)}
-                    className="relative flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors focus:outline-none"
+        {/* Expanded filter options */}
+        {filtersExpanded && (
+          <div className="flex flex-col gap-3 mb-3">
+            <div className="flex gap-3 items-center flex-shrink-0">
+              <div className="flex gap-1">
+                {(["ai-groups", "local", "streaming"] as SubTab[]).map((t) => (
+                  <button
+                    key={t}
+                    className="px-4 py-1.5 rounded-full text-sm font-medium capitalize transition-colors"
                     style={{
-                      backgroundColor: !selectedAiGroupId
-                        ? "var(--color-accent)"
-                        : "var(--color-surface-raised)",
-                      color: !selectedAiGroupId ? "var(--color-bg)" : "var(--color-text-dim)",
-                      border: `1px solid ${!selectedAiGroupId ? "var(--color-accent)" : "var(--color-border)"}`,
-                    }}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    All Groups
-                  </motion.button>
-                  {aiGroups.map((g, i) => (
-                    <motion.button
-                      key={g.id}
-                      onClick={() => setSelectedAiGroupId(g.id)}
-                      className="relative flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors focus:outline-none"
-                      style={{
-                        backgroundColor: selectedAiGroupId === g.id
+                      background:
+                        subTab === t
                           ? "var(--color-accent)"
                           : "var(--color-surface-raised)",
-                        color: selectedAiGroupId === g.id ? "var(--color-bg)" : "var(--color-text-dim)",
-                        border: `1px solid ${selectedAiGroupId === g.id ? "var(--color-accent)" : "var(--color-border)"}`,
+                      color:
+                        subTab === t ? "var(--color-bg)" : "var(--color-text-dim)",
+                      border: "1px solid var(--color-border)",
+                    }}
+                    onClick={() => setSubTab(t)}
+                  >
+                    {t === "ai-groups" ? "✨ Groups" : t}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {subTab === "local" && (
+              <>
+                <ChipFilters
+                  filters={[
+                    { id: "", label: "All Genres" },
+                    ...allGenres.map((g) => ({ id: g, label: g })),
+                  ]}
+                  active={activeGenre ?? ""}
+                  onSelect={(g) => {
+                    setActiveCollectionId(null);
+                    setGenre(g || null);
+                  }}
+                  className="flex-shrink-0"
+                />
+
+                {/* Dynamic metadata facets */}
+                {gridItems.length > 0 && (
+                  <DynamicFacetFilters
+                    items={facetSourceItems}
+                    fields={movieFacetFields}
+                    activeFilters={facetFilters}
+                    onFilter={applyFacetFilter}
+                    className="flex-shrink-0"
+                  />
+                )}
+              </>
+            )}
+
+            {subTab === "ai-groups" && (
+              <>
+                {aiGroupsLoading && (
+                  <div className="flex items-center gap-2 flex-shrink-0" style={{ color: "var(--color-text-dim)" }}>
+                    <div className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "var(--color-accent)", borderTopColor: "transparent" }} />
+                    <span className="text-xs">Generating smart groups…</span>
+                  </div>
+                )}
+                {aiGroups.length > 0 && (
+                  <div className="flex gap-2 flex-shrink-0 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+                    <motion.button
+                      onClick={() => setSelectedAiGroupId(null)}
+                      className="relative flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors focus:outline-none"
+                      style={{
+                        backgroundColor: !selectedAiGroupId
+                          ? "var(--color-accent)"
+                          : "var(--color-surface-raised)",
+                        color: !selectedAiGroupId ? "var(--color-bg)" : "var(--color-text-dim)",
+                        border: `1px solid ${!selectedAiGroupId ? "var(--color-accent)" : "var(--color-border)"}`,
                       }}
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
                     >
-                      {g.label} ({g.itemIds.length})
+                      All Groups
                     </motion.button>
-                  ))}
-                </div>
-              )}
-              {gridItems.length > 0 && (
-                <DynamicFacetFilters
-                  items={facetSourceItems}
-                  fields={movieFacetFields}
-                  activeFilters={facetFilters}
-                  onFilter={applyFacetFilter}
-                  className="flex-shrink-0"
-                />
-              )}
-            </>
-          )}
-        </div>
+                    {aiGroups.map((g, i) => (
+                      <motion.button
+                        key={g.id}
+                        onClick={() => setSelectedAiGroupId(g.id)}
+                        className="relative flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors focus:outline-none"
+                        style={{
+                          backgroundColor: selectedAiGroupId === g.id
+                            ? "var(--color-accent)"
+                            : "var(--color-surface-raised)",
+                          color: selectedAiGroupId === g.id ? "var(--color-bg)" : "var(--color-text-dim)",
+                          border: `1px solid ${selectedAiGroupId === g.id ? "var(--color-accent)" : "var(--color-border)"}`,
+                        }}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                      >
+                        {g.label} ({g.itemIds.length})
+                      </motion.button>
+                    ))}
+                  </div>
+                )}
+                {gridItems.length > 0 && (
+                  <DynamicFacetFilters
+                    items={facetSourceItems}
+                    fields={movieFacetFields}
+                    activeFilters={facetFilters}
+                    onFilter={applyFacetFilter}
+                    className="flex-shrink-0"
+                  />
+                )}
+              </>
+            )}
+          </div>
+        )}
 
         {/* Sticky compact bar — search + active filter summary */}
         <div
