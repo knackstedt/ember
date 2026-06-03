@@ -106,6 +106,7 @@ export const MusicTab: React.FC = () => {
   const [streamingServices, setStreamingServices] = useState<StreamingService[]>([]);
   const trackGridRef = useRef<VirtualGridHandle>(null);
   const groupGridRef = useRef<VirtualGridHandle>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const [aiGroups, setAiGroups] = useState<AiGroup[]>([]);
   const [aiGroupsLoading, setAiGroupsLoading] = useState(false);
@@ -336,7 +337,7 @@ export const MusicTab: React.FC = () => {
     { key: "tags", label: "Tag", accessor: (t) => (t as Record<string, unknown>).tags as string[] | undefined, sort: "count", maxValues: 5 },
   ], []);
 
-  const { focusedIndex: groupFocusedIndex } = useGridFocus<MusicGroup>({
+  const { focusedIndex: groupFocusedIndex, setFocusedIndex: setGroupFocusedIndex } = useGridFocus<MusicGroup>({
     items: groupItems,
     columnCount: groupColumnCount,
     gridRef: groupGridRef,
@@ -344,7 +345,7 @@ export const MusicTab: React.FC = () => {
     enabled: subTab === "local" && !selected && !selectedGroup && browseMode !== "tracks",
   });
 
-  const { focusedIndex: trackFocusedIndex } = useGridFocus<MusicTrack>({
+  const { focusedIndex: trackFocusedIndex, setFocusedIndex: setTrackFocusedIndex } = useGridFocus<MusicTrack>({
     items: gridTrackItems,
     columnCount: trackColumnCount,
     gridRef: trackGridRef,
@@ -462,11 +463,11 @@ export const MusicTab: React.FC = () => {
           aspectRatio="1/1"
           isFocused={index === groupFocusedIndex}
           isLoading={browseMode === "artists" && !!artistThumbnailsLoading[group.name]}
-          onSelect={() => setSelectedGroup(group.name)}
+          onSelect={() => { setGroupFocusedIndex(index); setSelectedGroup(group.name); }}
         />
       </div>
     ),
-    [bindGroupItem, groupFocusedIndex, artistThumbnails, artistThumbnailsLoading, browseMode],
+    [bindGroupItem, groupFocusedIndex, setGroupFocusedIndex, artistThumbnails, artistThumbnailsLoading, browseMode],
   );
 
   const renderTrackItem = useCallback(
@@ -477,6 +478,7 @@ export const MusicTab: React.FC = () => {
           index={index}
           focusedIndex={trackFocusedIndex}
           onSelect={() => {
+            setTrackFocusedIndex(index);
             play(trackItems, index);
             setSelected(track);
           }}
@@ -484,7 +486,7 @@ export const MusicTab: React.FC = () => {
         />
       </div>
     ),
-    [bindTrackItem, trackFocusedIndex, play, trackItems, toggleFavorite],
+    [bindTrackItem, trackFocusedIndex, setTrackFocusedIndex, play, trackItems, toggleFavorite],
   );
 
   const artists = [
@@ -528,180 +530,279 @@ export const MusicTab: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-full gap-3 p-4">
-      <div className="flex gap-3 items-center flex-shrink-0">
-        <div className="flex gap-1">
-          {(["ai-groups", "local", "streaming"] as SubTab[]).map((t) => (
-            <button
-              key={t}
-              className="px-4 py-1.5 rounded-full text-sm font-medium capitalize"
-              style={{
-                background:
-                  subTab === t
-                    ? "var(--color-accent)"
-                    : "var(--color-surface-raised)",
-                color:
-                  subTab === t ? "var(--color-bg)" : "var(--color-text-dim)",
-                border: "1px solid var(--color-border)",
-              }}
-              onClick={() => setSubTab(t)}
-            >
-              {t === "ai-groups" ? "✨ Groups" : t}
-            </button>
-          ))}
-        </div>
-        {(subTab === "local" || subTab === "ai-groups") && (
-          <>
-            <OskInput
-              value={searchQuery}
-              onChange={setSearch}
-              placeholder="Search music…"
-              className="text-sm"
-              style={{ maxWidth: 240 } as React.CSSProperties}
+    <div className="flex flex-col h-full">
+      <div
+        ref={scrollContainerRef}
+        className="flex-1 min-h-0 overflow-y-auto gpu-scroll"
+        style={{ padding: 16 }}
+      >
+        {/* Collapsible content — scrolls out of view */}
+        {subTab === "local" && (
+          <div className="flex flex-col gap-3 mb-3">
+            <CollectionsBar
+              itemType="music"
+              activeCollectionId={activeCollectionId}
+              onSelect={setActiveCollectionId}
+              onManage={() => setShowCollectionManager(true)}
+              className="flex-shrink-0"
             />
-            <motion.button
-              className="px-4 py-2 rounded-[var(--radius-card)] text-sm"
-              style={{
-                background: "var(--color-surface-raised)",
-                color: "var(--color-text)",
-                border: "1px solid var(--color-border)",
-              }}
-              onClick={scan}
-              whileTap={{ scale: 0.96 }}
-              disabled={scanning}
-            >
-              {scanning ? "⟳ Scanning…" : "↺ Scan"}
-            </motion.button>
-          </>
+          </div>
         )}
-      </div>
 
-      {subTab === "local" && (
-        <>
-          <CollectionsBar
-            itemType="music"
-            activeCollectionId={activeCollectionId}
-            onSelect={setActiveCollectionId}
-            onManage={() => setShowCollectionManager(true)}
-            className="flex-shrink-0"
-          />
-
-          <div className="flex gap-2 flex-shrink-0 items-center">
-            <ChipFilters
-              filters={[
-                { id: "artists", label: "Artists" },
-                { id: "genres", label: "Genres" },
-                { id: "tracks", label: "All Tracks" },
-              ]}
-              active={browseMode}
-              onSelect={(v) => {
-                setActiveCollectionId(null);
-                setBrowseMode(v as BrowseMode);
-                setSelectedGroup(null);
-              }}
-            />
-            {selectedGroup && (
-              <motion.button
-                className="px-3 py-1.5 rounded-full text-sm font-medium"
-                style={{
-                  background: "var(--color-surface-raised)",
-                  color: "var(--color-text)",
-                  border: "1px solid var(--color-border)",
-                }}
-                onClick={() => setSelectedGroup(null)}
-                whileTap={{ scale: 0.95 }}
-              >
-                ← Back
-              </motion.button>
+        {/* Sticky filters — pin at top when scrolled */}
+        <div
+          className="flex flex-col gap-3 pb-3"
+          style={{
+            position: "sticky",
+            top: -16,
+            zIndex: 10,
+            background: "var(--color-bg)",
+            paddingTop: 16,
+            marginTop: -16,
+            marginLeft: -16,
+            marginRight: -16,
+            paddingLeft: 16,
+            paddingRight: 16,
+          }}
+        >
+          <div className="flex gap-3 items-center flex-shrink-0">
+            <div className="flex gap-1">
+              {(["ai-groups", "local", "streaming"] as SubTab[]).map((t) => (
+                <button
+                  key={t}
+                  className="px-4 py-1.5 rounded-full text-sm font-medium capitalize"
+                  style={{
+                    background:
+                      subTab === t
+                        ? "var(--color-accent)"
+                        : "var(--color-surface-raised)",
+                    color:
+                      subTab === t ? "var(--color-bg)" : "var(--color-text-dim)",
+                    border: "1px solid var(--color-border)",
+                  }}
+                  onClick={() => setSubTab(t)}
+                >
+                  {t === "ai-groups" ? "✨ Groups" : t}
+                </button>
+              ))}
+            </div>
+            {(subTab === "local" || subTab === "ai-groups") && (
+              <>
+                <OskInput
+                  value={searchQuery}
+                  onChange={setSearch}
+                  placeholder="Search music…"
+                  className="text-sm"
+                  style={{ maxWidth: 240 } as React.CSSProperties}
+                />
+                <motion.button
+                  className="px-4 py-2 rounded-[var(--radius-card)] text-sm"
+                  style={{
+                    background: "var(--color-surface-raised)",
+                    color: "var(--color-text)",
+                    border: "1px solid var(--color-border)",
+                  }}
+                  onClick={scan}
+                  whileTap={{ scale: 0.96 }}
+                  disabled={scanning}
+                >
+                  {scanning ? "⟳ Scanning…" : "↺ Scan"}
+                </motion.button>
+              </>
             )}
           </div>
 
-          {browseMode === "tracks" && !selectedGroup && (
+          {subTab === "local" && (
             <>
-              <div className="flex gap-2 flex-shrink-0">
-                {(["artist", "album", "genre", "year"] as const).map((ft) => (
-                  <button
-                    key={ft}
-                    className="px-3 py-1 rounded text-xs font-medium capitalize"
+              <div className="flex gap-2 flex-shrink-0 items-center">
+                <ChipFilters
+                  filters={[
+                    { id: "artists", label: "Artists" },
+                    { id: "genres", label: "Genres" },
+                    { id: "tracks", label: "All Tracks" },
+                  ]}
+                  active={browseMode}
+                  onSelect={(v) => {
+                    setActiveCollectionId(null);
+                    setBrowseMode(v as BrowseMode);
+                    setSelectedGroup(null);
+                  }}
+                />
+                {selectedGroup && (
+                  <motion.button
+                    className="px-3 py-1.5 rounded-full text-sm font-medium"
                     style={{
-                      background:
-                        activeFilterType === ft
-                          ? "var(--color-accent-dim)"
-                          : "var(--color-surface-raised)",
+                      background: "var(--color-surface-raised)",
                       color: "var(--color-text)",
                       border: "1px solid var(--color-border)",
                     }}
-                    onClick={() => setActiveFilterType(ft)}
+                    onClick={() => setSelectedGroup(null)}
+                    whileTap={{ scale: 0.95 }}
                   >
-                    {ft}
-                  </button>
-                ))}
+                    ← Back
+                  </motion.button>
+                )}
               </div>
-              <ChipFilters
-                filters={filterChips[activeFilterType]}
-                active={
-                  activeFilterType === "artist"
-                    ? (activeArtist ?? "")
-                    : activeFilterType === "album"
-                      ? (activeAlbum ?? "")
-                      : activeFilterType === "genre"
-                        ? (activeGenre ?? "")
-                        : activeYear
-                          ? String(activeYear)
-                          : ""
-                }
-                onSelect={(v) => {
-                  if (activeFilterType === "artist") setArtist(v || null);
-                  else if (activeFilterType === "album") setAlbum(v || null);
-                  else if (activeFilterType === "genre") setGenre(v || null);
-                  else setYear(v ? parseInt(v) : null);
-                }}
-                className="flex-shrink-0"
-              />
+
+              {browseMode === "tracks" && !selectedGroup && (
+                <>
+                  <div className="flex gap-2 flex-shrink-0">
+                    {(["artist", "album", "genre", "year"] as const).map((ft) => (
+                      <button
+                        key={ft}
+                        className="px-3 py-1 rounded text-xs font-medium capitalize"
+                        style={{
+                          background:
+                            activeFilterType === ft
+                              ? "var(--color-accent-dim)"
+                              : "var(--color-surface-raised)",
+                          color: "var(--color-text)",
+                          border: "1px solid var(--color-border)",
+                        }}
+                        onClick={() => setActiveFilterType(ft)}
+                      >
+                        {ft}
+                      </button>
+                    ))}
+                  </div>
+                  <ChipFilters
+                    filters={filterChips[activeFilterType]}
+                    active={
+                      activeFilterType === "artist"
+                        ? (activeArtist ?? "")
+                        : activeFilterType === "album"
+                          ? (activeAlbum ?? "")
+                          : activeFilterType === "genre"
+                            ? (activeGenre ?? "")
+                            : activeYear
+                              ? String(activeYear)
+                              : ""
+                    }
+                    onSelect={(v) => {
+                      if (activeFilterType === "artist") setArtist(v || null);
+                      else if (activeFilterType === "album") setAlbum(v || null);
+                      else if (activeFilterType === "genre") setGenre(v || null);
+                      else setYear(v ? parseInt(v) : null);
+                    }}
+                    className="flex-shrink-0"
+                  />
+                </>
+              )}
+
+              {/* Dynamic metadata facets */}
+              {gridTrackItems.length > 0 && browseMode === "tracks" && (
+                <DynamicFacetFilters
+                  items={facetSourceItems as Record<string, unknown>[]}
+                  fields={musicFacetFields}
+                  activeFilters={facetFilters}
+                  onFilter={applyFacetFilter}
+                  className="flex-shrink-0"
+                />
+              )}
             </>
           )}
 
-          {loading ? (
-            <div
-              className="flex-1 flex items-center justify-center"
-              style={{ color: "var(--color-text-dim)" }}
-            >
-              Loading music…
-            </div>
-          ) : scanning && trackItems.length === 0 && groupItems.length === 0 ? (
-            <div
-              className="flex-1 flex flex-col items-center justify-center gap-3"
-              style={{ color: "var(--color-text-dim)" }}
-            >
+          {subTab === "ai-groups" && (
+            <>
+              {aiGroupsLoading && (
+                <div className="flex items-center gap-2 flex-shrink-0" style={{ color: "var(--color-text-dim)" }}>
+                  <div className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "var(--color-accent)", borderTopColor: "transparent" }} />
+                  <span className="text-xs">Generating smart groups…</span>
+                </div>
+              )}
+              {aiGroups.length > 0 && (
+                <div className="flex gap-2 flex-shrink-0 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+                  <motion.button
+                    onClick={() => setSelectedAiGroupId(null)}
+                    className="relative flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors focus:outline-none"
+                    style={{
+                      backgroundColor: !selectedAiGroupId
+                        ? "var(--color-accent)"
+                        : "var(--color-surface-raised)",
+                      color: !selectedAiGroupId ? "var(--color-bg)" : "var(--color-text-dim)",
+                      border: `1px solid ${!selectedAiGroupId ? "var(--color-accent)" : "var(--color-border)"}`,
+                    }}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    All Groups
+                  </motion.button>
+                  {aiGroups.map((g, i) => (
+                    <motion.button
+                      key={g.id}
+                      onClick={() => setSelectedAiGroupId(g.id)}
+                      className="relative flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors focus:outline-none"
+                      style={{
+                        backgroundColor: selectedAiGroupId === g.id
+                          ? "var(--color-accent)"
+                          : "var(--color-surface-raised)",
+                        color: selectedAiGroupId === g.id ? "var(--color-bg)" : "var(--color-text-dim)",
+                        border: `1px solid ${selectedAiGroupId === g.id ? "var(--color-accent)" : "var(--color-border)"}`,
+                      }}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      {g.label} ({g.itemIds.length})
+                    </motion.button>
+                  ))}
+                </div>
+              )}
+              {gridTrackItems.length > 0 && (
+                <DynamicFacetFilters
+                  items={facetSourceItems as Record<string, unknown>[]}
+                  fields={musicFacetFields}
+                  activeFilters={facetFilters}
+                  onFilter={applyFacetFilter}
+                  className="flex-shrink-0"
+                />
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Grid content — participates in the outer scroll */}
+        {subTab === "local" && (
+          <>
+            {loading ? (
               <div
-                className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin"
-                style={{
-                  borderColor: "var(--color-accent)",
-                  borderTopColor: "transparent",
-                }}
-              />
-              <span className="text-sm">Scanning for music…</span>
-            </div>
-          ) : trackItems.length === 0 && groupItems.length === 0 ? (
-            <div
-              className="flex-1 flex flex-col items-center justify-center gap-4"
-              style={{ color: "var(--color-text-dim)" }}
-            >
-              <p>No music found.</p>
-              <motion.button
-                className="px-6 py-2.5 rounded-[var(--radius-card)] font-medium"
-                style={{
-                  background: "var(--color-accent)",
-                  color: "var(--color-bg)",
-                }}
-                onClick={scan}
-                whileTap={{ scale: 0.96 }}
+                className="flex items-center justify-center"
+                style={{ color: "var(--color-text-dim)", minHeight: 200 }}
               >
-                Scan for music
-              </motion.button>
-            </div>
-          ) : browseMode !== "tracks" && !selectedGroup ? (
-            <div className="flex-1 min-h-0 min-w-0 overflow-hidden">
+                Loading music…
+              </div>
+            ) : scanning && trackItems.length === 0 && groupItems.length === 0 ? (
+              <div
+                className="flex flex-col items-center justify-center gap-3"
+                style={{ color: "var(--color-text-dim)", minHeight: 200 }}
+              >
+                <div
+                  className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin"
+                  style={{
+                    borderColor: "var(--color-accent)",
+                    borderTopColor: "transparent",
+                  }}
+                />
+                <span className="text-sm">Scanning for music…</span>
+              </div>
+            ) : trackItems.length === 0 && groupItems.length === 0 ? (
+              <div
+                className="flex flex-col items-center justify-center gap-4"
+                style={{ color: "var(--color-text-dim)", minHeight: 200 }}
+              >
+                <p>No music found.</p>
+                <motion.button
+                  className="px-6 py-2.5 rounded-[var(--radius-card)] font-medium"
+                  style={{
+                    background: "var(--color-accent)",
+                    color: "var(--color-bg)",
+                  }}
+                  onClick={scan}
+                  whileTap={{ scale: 0.96 }}
+                >
+                  Scan for music
+                </motion.button>
+              </div>
+            ) : browseMode !== "tracks" && !selectedGroup ? (
               <VirtualGrid
                 key="groups"
                 ref={groupGridRef}
@@ -710,10 +811,9 @@ export const MusicTab: React.FC = () => {
                 onColumnCountChange={setGroupColumnCount}
                 rowHeight={240}
                 renderItem={renderGroupItem}
+                scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
               />
-            </div>
-          ) : (
-            <div className="flex-1 min-h-0 min-w-0 overflow-hidden">
+            ) : (
               <VirtualGrid
                 key="tracks"
                 ref={trackGridRef}
@@ -722,83 +822,19 @@ export const MusicTab: React.FC = () => {
                 onColumnCountChange={setTrackColumnCount}
                 rowHeight={240}
                 renderItem={renderTrackItem}
+                scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
               />
-            </div>
-          )}
+            )}
+          </>
+        )}
 
-          {/* Dynamic metadata facets */}
-          {gridTrackItems.length > 0 && browseMode === "tracks" && (
-            <DynamicFacetFilters
-              items={facetSourceItems as Record<string, unknown>[]}
-              fields={musicFacetFields}
-              activeFilters={facetFilters}
-              onFilter={applyFacetFilter}
-              className="flex-shrink-0"
-            />
-          )}
-        </>
-      )}
-
-      {subTab === "ai-groups" && (
-        <>
-          {aiGroupsLoading && (
-            <div className="flex items-center gap-2 flex-shrink-0" style={{ color: "var(--color-text-dim)" }}>
-              <div className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "var(--color-accent)", borderTopColor: "transparent" }} />
-              <span className="text-xs">Generating smart groups…</span>
-            </div>
-          )}
-          {aiGroups.length > 0 && (
-            <div className="flex gap-2 flex-shrink-0 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
-              <motion.button
-                onClick={() => setSelectedAiGroupId(null)}
-                className="relative flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors focus:outline-none"
-                style={{
-                  backgroundColor: !selectedAiGroupId
-                    ? "var(--color-accent)"
-                    : "var(--color-surface-raised)",
-                  color: !selectedAiGroupId ? "var(--color-bg)" : "var(--color-text-dim)",
-                  border: `1px solid ${!selectedAiGroupId ? "var(--color-accent)" : "var(--color-border)"}`,
-                }}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                All Groups
-              </motion.button>
-              {aiGroups.map((g, i) => (
-                <motion.button
-                  key={g.id}
-                  onClick={() => setSelectedAiGroupId(g.id)}
-                  className="relative flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors focus:outline-none"
-                  style={{
-                    backgroundColor: selectedAiGroupId === g.id
-                      ? "var(--color-accent)"
-                      : "var(--color-surface-raised)",
-                    color: selectedAiGroupId === g.id ? "var(--color-bg)" : "var(--color-text-dim)",
-                    border: `1px solid ${selectedAiGroupId === g.id ? "var(--color-accent)" : "var(--color-border)"}`,
-                  }}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  {g.label} ({g.itemIds.length})
-                </motion.button>
-              ))}
-            </div>
-          )}
-          {gridTrackItems.length > 0 && (
-            <DynamicFacetFilters
-              items={facetSourceItems as Record<string, unknown>[]}
-              fields={musicFacetFields}
-              activeFilters={facetFilters}
-              onFilter={applyFacetFilter}
-              className="flex-shrink-0"
-            />
-          )}
-          {gridTrackItems.length === 0 ? (
-            <div className="flex-1 flex items-center justify-center" style={{ color: "var(--color-text-dim)" }}>
-              <p>No tracks found.</p>
-            </div>
-          ) : (
-            <div className="flex-1 min-h-0 min-w-0 overflow-hidden">
+        {subTab === "ai-groups" && (
+          <>
+            {gridTrackItems.length === 0 ? (
+              <div className="flex items-center justify-center" style={{ color: "var(--color-text-dim)", minHeight: 200 }}>
+                <p>No tracks found.</p>
+              </div>
+            ) : (
               <VirtualGrid
                 ref={trackGridRef}
                 items={gridTrackItems}
@@ -806,17 +842,18 @@ export const MusicTab: React.FC = () => {
                 onColumnCountChange={setTrackColumnCount}
                 rowHeight={240}
                 renderItem={renderTrackItem}
+                scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
               />
-            </div>
-          )}
-        </>
-      )}
+            )}
+          </>
+        )}
 
-      {subTab === "streaming" && (
-        <div className="pt-2">
-          <StreamingTile services={streamingServices} />
-        </div>
-      )}
+        {subTab === "streaming" && (
+          <div className="pt-2">
+            <StreamingTile services={streamingServices} />
+          </div>
+        )}
+      </div>
 
       <DetailPanel
         open={!!selected}

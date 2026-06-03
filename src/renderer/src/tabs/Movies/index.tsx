@@ -51,6 +51,7 @@ export const MoviesTab: React.FC = () => {
   const [collectionItemIds, setCollectionItemIds] = useState<Set<string>>(new Set());
   const [streamingServices, setStreamingServices] = useState<StreamingService[]>([]);
   const gridRef = useRef<VirtualGridHandle>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const [aiGroups, setAiGroups] = useState<AiGroup[]>([]);
   const [aiGroupsLoading, setAiGroupsLoading] = useState(false);
@@ -189,7 +190,7 @@ export const MoviesTab: React.FC = () => {
     { key: "rating", label: "Rating", accessor: (m) => String((m as Record<string, unknown>).rating ?? ""), maxValues: 5 },
   ], []);
 
-  const { focusedIndex } = useGridFocus({
+  const { focusedIndex, setFocusedIndex } = useGridFocus({
     items: gridItems,
     columnCount,
     gridRef,
@@ -284,12 +285,12 @@ export const MoviesTab: React.FC = () => {
           isFocused={index === focusedIndex}
           isLoading={regeneratingIds.has(movie.id)}
           progress={movie.watchProgress}
-          onSelect={() => setSelected(movie)}
+          onSelect={() => { setFocusedIndex(index); setSelected(movie); }}
           onFavorite={() => toggleFavorite(movie.id)}
         />
       </div>
     ),
-    [bindItem, focusedIndex, regeneratingIds, toggleFavorite],
+    [bindItem, focusedIndex, setFocusedIndex, regeneratingIds, toggleFavorite],
   );
 
   const recentlyPlayed = [...movies]
@@ -298,221 +299,236 @@ export const MoviesTab: React.FC = () => {
     .slice(0, 8);
 
   return (
-    <div className="flex flex-col h-full gap-3 p-4">
-      <div className="flex gap-3 items-center flex-shrink-0">
-        <div className="flex gap-1">
-          {(["ai-groups", "local", "streaming"] as SubTab[]).map((t) => (
-            <button
-              key={t}
-              className="px-4 py-1.5 rounded-full text-sm font-medium capitalize transition-colors"
-              style={{
-                background:
-                  subTab === t
-                    ? "var(--color-accent)"
-                    : "var(--color-surface-raised)",
-                color:
-                  subTab === t ? "var(--color-bg)" : "var(--color-text-dim)",
-                border: "1px solid var(--color-border)",
-              }}
-              onClick={() => setSubTab(t)}
-            >
-              {t === "ai-groups" ? "✨ Groups" : t}
-            </button>
-          ))}
-        </div>
+    <div className="flex flex-col h-full">
+      <div
+        ref={scrollContainerRef}
+        className="flex-1 min-h-0 overflow-y-auto gpu-scroll"
+        style={{ padding: 16 }}
+      >
+        {/* Collapsible content — scrolls out of view */}
         {subTab === "local" && (
-          <>
-            <OskInput
-              value={searchQuery}
-              onChange={setSearch}
-              placeholder="Search movies…"
-              className="text-sm"
-              style={{ maxWidth: 240 } as React.CSSProperties}
-            />
-            <motion.button
-              className="px-4 py-2 rounded-[var(--radius-card)] text-sm"
-              style={{
-                background: "var(--color-surface-raised)",
-                color: "var(--color-text)",
-                border: "1px solid var(--color-border)",
+          <div className="flex flex-col gap-3 mb-3">
+            <RecentlyPlayedRow
+              items={recentlyPlayed.map((m) => ({
+                id: m.id,
+                title: m.title,
+                coverUrl: m.coverUrl,
+                subtitle: m.releaseYear ? String(m.releaseYear) : undefined,
+              }))}
+              onLaunch={(id) => {
+                const movie = movies.find((m) => m.id === id);
+                if (movie)
+                  openVideo(
+                    `file://${movie.filePath}`,
+                    movie.title,
+                    movie.id,
+                    movie.watchProgress,
+                  );
               }}
-              onClick={scan}
-              whileTap={{ scale: 0.96 }}
-              disabled={scanning}
-            >
-              {scanning ? "⟳ Scanning…" : "↺ Scan"}
-            </motion.button>
-          </>
-        )}
-      </div>
+            />
 
-      {subTab === "local" && (
-        <>
-          <RecentlyPlayedRow
-            items={recentlyPlayed.map((m) => ({
-              id: m.id,
-              title: m.title,
-              coverUrl: m.coverUrl,
-              subtitle: m.releaseYear ? String(m.releaseYear) : undefined,
-            }))}
-            onLaunch={(id) => {
-              const movie = movies.find((m) => m.id === id);
-              if (movie)
-                openVideo(
-                  `file://${movie.filePath}`,
-                  movie.title,
-                  movie.id,
-                  movie.watchProgress,
-                );
-            }}
-          />
-
-          <CollectionsBar
-            itemType="movie"
-            activeCollectionId={activeCollectionId}
-            onSelect={setActiveCollectionId}
-            onManage={() => setShowCollectionManager(true)}
-            className="flex-shrink-0"
-          />
-
-          <ChipFilters
-            filters={[
-              { id: "", label: "All Genres" },
-              ...allGenres.map((g) => ({ id: g, label: g })),
-            ]}
-            active={activeGenre ?? ""}
-            onSelect={(g) => {
-              setActiveCollectionId(null);
-              setGenre(g || null);
-            }}
-            className="flex-shrink-0"
-          />
-
-          {/* Dynamic metadata facets */}
-          {gridItems.length > 0 && (
-            <DynamicFacetFilters
-              items={facetSourceItems as Record<string, unknown>[]}
-              fields={movieFacetFields}
-              activeFilters={facetFilters}
-              onFilter={applyFacetFilter}
+            <CollectionsBar
+              itemType="movie"
+              activeCollectionId={activeCollectionId}
+              onSelect={setActiveCollectionId}
+              onManage={() => setShowCollectionManager(true)}
               className="flex-shrink-0"
             />
-          )}
+          </div>
+        )}
 
-          {loading ? (
-            <div
-              className="flex-1 flex items-center justify-center"
-              style={{ color: "var(--color-text-dim)" }}
-            >
-              Loading movies…
-            </div>
-          ) : scanning && items.length === 0 ? (
-            <div
-              className="flex-1 flex flex-col items-center justify-center gap-3"
-              style={{ color: "var(--color-text-dim)" }}
-            >
-              <div
-                className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin"
-                style={{
-                  borderColor: "var(--color-accent)",
-                  borderTopColor: "transparent",
-                }}
-              />
-              <span className="text-sm">Scanning for movies…</span>
-            </div>
-          ) : items.length === 0 ? (
-            <div
-              className="flex-1 flex flex-col items-center justify-center gap-4"
-              style={{ color: "var(--color-text-dim)" }}
-            >
-              <p>No movies found.</p>
-              <motion.button
-                className="px-6 py-2.5 rounded-[var(--radius-card)] font-medium"
-                style={{
-                  background: "var(--color-accent)",
-                  color: "var(--color-bg)",
-                }}
-                onClick={scan}
-                whileTap={{ scale: 0.96 }}
-              >
-                Scan for movies
-              </motion.button>
-            </div>
-          ) : (
-            <div className="flex-1 min-h-0 min-w-0 overflow-hidden">
-              <VirtualGrid
-                ref={gridRef}
-                items={gridItems}
-                minItemWidth={200}
-                onColumnCountChange={setColumnCount}
-                rowHeight={300}
-                renderItem={renderItem}
-              />
-            </div>
-          )}
-        </>
-      )}
-
-      {subTab === "ai-groups" && (
-        <>
-          {aiGroupsLoading && (
-            <div className="flex items-center gap-2 flex-shrink-0" style={{ color: "var(--color-text-dim)" }}>
-              <div className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "var(--color-accent)", borderTopColor: "transparent" }} />
-              <span className="text-xs">Generating smart groups…</span>
-            </div>
-          )}
-          {aiGroups.length > 0 && (
-            <div className="flex gap-2 flex-shrink-0 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
-              <motion.button
-                onClick={() => setSelectedAiGroupId(null)}
-                className="relative flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors focus:outline-none"
-                style={{
-                  backgroundColor: !selectedAiGroupId
-                    ? "var(--color-accent)"
-                    : "var(--color-surface-raised)",
-                  color: !selectedAiGroupId ? "var(--color-bg)" : "var(--color-text-dim)",
-                  border: `1px solid ${!selectedAiGroupId ? "var(--color-accent)" : "var(--color-border)"}`,
-                }}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                All Groups
-              </motion.button>
-              {aiGroups.map((g, i) => (
-                <motion.button
-                  key={g.id}
-                  onClick={() => setSelectedAiGroupId(g.id)}
-                  className="relative flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors focus:outline-none"
+        {/* Sticky filters — pin at top when scrolled */}
+        <div
+          className="flex flex-col gap-3 pb-3"
+          style={{
+            position: "sticky",
+            top: -16,
+            zIndex: 10,
+            background: "var(--color-bg)",
+            paddingTop: 16,
+            marginTop: -16,
+            marginLeft: -16,
+            marginRight: -16,
+            paddingLeft: 16,
+            paddingRight: 16,
+          }}
+        >
+          <div className="flex gap-3 items-center flex-shrink-0">
+            <div className="flex gap-1">
+              {(["ai-groups", "local", "streaming"] as SubTab[]).map((t) => (
+                <button
+                  key={t}
+                  className="px-4 py-1.5 rounded-full text-sm font-medium capitalize transition-colors"
                   style={{
-                    backgroundColor: selectedAiGroupId === g.id
-                      ? "var(--color-accent)"
-                      : "var(--color-surface-raised)",
-                    color: selectedAiGroupId === g.id ? "var(--color-bg)" : "var(--color-text-dim)",
-                    border: `1px solid ${selectedAiGroupId === g.id ? "var(--color-accent)" : "var(--color-border)"}`,
+                    background:
+                      subTab === t
+                        ? "var(--color-accent)"
+                        : "var(--color-surface-raised)",
+                    color:
+                      subTab === t ? "var(--color-bg)" : "var(--color-text-dim)",
+                    border: "1px solid var(--color-border)",
                   }}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setSubTab(t)}
                 >
-                  {g.label} ({g.itemIds.length})
-                </motion.button>
+                  {t === "ai-groups" ? "✨ Groups" : t}
+                </button>
               ))}
             </div>
+            {subTab === "local" && (
+              <>
+                <OskInput
+                  value={searchQuery}
+                  onChange={setSearch}
+                  placeholder="Search movies…"
+                  className="text-sm"
+                  style={{ maxWidth: 240 } as React.CSSProperties}
+                />
+                <motion.button
+                  className="px-4 py-2 rounded-[var(--radius-card)] text-sm"
+                  style={{
+                    background: "var(--color-surface-raised)",
+                    color: "var(--color-text)",
+                    border: "1px solid var(--color-border)",
+                  }}
+                  onClick={scan}
+                  whileTap={{ scale: 0.96 }}
+                  disabled={scanning}
+                >
+                  {scanning ? "⟳ Scanning…" : "↺ Scan"}
+                </motion.button>
+              </>
+            )}
+          </div>
+
+          {subTab === "local" && (
+            <>
+              <ChipFilters
+                filters={[
+                  { id: "", label: "All Genres" },
+                  ...allGenres.map((g) => ({ id: g, label: g })),
+                ]}
+                active={activeGenre ?? ""}
+                onSelect={(g) => {
+                  setActiveCollectionId(null);
+                  setGenre(g || null);
+                }}
+                className="flex-shrink-0"
+              />
+
+              {/* Dynamic metadata facets */}
+              {gridItems.length > 0 && (
+                <DynamicFacetFilters
+                  items={facetSourceItems as Record<string, unknown>[]}
+                  fields={movieFacetFields}
+                  activeFilters={facetFilters}
+                  onFilter={applyFacetFilter}
+                  className="flex-shrink-0"
+                />
+              )}
+            </>
           )}
-          {gridItems.length > 0 && (
-            <DynamicFacetFilters
-              items={facetSourceItems as Record<string, unknown>[]}
-              fields={movieFacetFields}
-              activeFilters={facetFilters}
-              onFilter={applyFacetFilter}
-              className="flex-shrink-0"
-            />
+
+          {subTab === "ai-groups" && (
+            <>
+              {aiGroupsLoading && (
+                <div className="flex items-center gap-2 flex-shrink-0" style={{ color: "var(--color-text-dim)" }}>
+                  <div className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "var(--color-accent)", borderTopColor: "transparent" }} />
+                  <span className="text-xs">Generating smart groups…</span>
+                </div>
+              )}
+              {aiGroups.length > 0 && (
+                <div className="flex gap-2 flex-shrink-0 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+                  <motion.button
+                    onClick={() => setSelectedAiGroupId(null)}
+                    className="relative flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors focus:outline-none"
+                    style={{
+                      backgroundColor: !selectedAiGroupId
+                        ? "var(--color-accent)"
+                        : "var(--color-surface-raised)",
+                      color: !selectedAiGroupId ? "var(--color-bg)" : "var(--color-text-dim)",
+                      border: `1px solid ${!selectedAiGroupId ? "var(--color-accent)" : "var(--color-border)"}`,
+                    }}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    All Groups
+                  </motion.button>
+                  {aiGroups.map((g, i) => (
+                    <motion.button
+                      key={g.id}
+                      onClick={() => setSelectedAiGroupId(g.id)}
+                      className="relative flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors focus:outline-none"
+                      style={{
+                        backgroundColor: selectedAiGroupId === g.id
+                          ? "var(--color-accent)"
+                          : "var(--color-surface-raised)",
+                        color: selectedAiGroupId === g.id ? "var(--color-bg)" : "var(--color-text-dim)",
+                        border: `1px solid ${selectedAiGroupId === g.id ? "var(--color-accent)" : "var(--color-border)"}`,
+                      }}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      {g.label} ({g.itemIds.length})
+                    </motion.button>
+                  ))}
+                </div>
+              )}
+              {gridItems.length > 0 && (
+                <DynamicFacetFilters
+                  items={facetSourceItems as Record<string, unknown>[]}
+                  fields={movieFacetFields}
+                  activeFilters={facetFilters}
+                  onFilter={applyFacetFilter}
+                  className="flex-shrink-0"
+                />
+              )}
+            </>
           )}
-          {gridItems.length === 0 ? (
-            <div className="flex-1 flex items-center justify-center" style={{ color: "var(--color-text-dim)" }}>
-              <p>No movies found.</p>
-            </div>
-          ) : (
-            <div className="flex-1 min-h-0 min-w-0 overflow-hidden">
+        </div>
+
+        {/* Grid content — participates in the outer scroll */}
+        {subTab === "local" && (
+          <>
+            {loading ? (
+              <div
+                className="flex items-center justify-center"
+                style={{ color: "var(--color-text-dim)", minHeight: 200 }}
+              >
+                Loading movies…
+              </div>
+            ) : scanning && items.length === 0 ? (
+              <div
+                className="flex flex-col items-center justify-center gap-3"
+                style={{ color: "var(--color-text-dim)", minHeight: 200 }}
+              >
+                <div
+                  className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin"
+                  style={{
+                    borderColor: "var(--color-accent)",
+                    borderTopColor: "transparent",
+                  }}
+                />
+                <span className="text-sm">Scanning for movies…</span>
+              </div>
+            ) : items.length === 0 ? (
+              <div
+                className="flex flex-col items-center justify-center gap-4"
+                style={{ color: "var(--color-text-dim)", minHeight: 200 }}
+              >
+                <p>No movies found.</p>
+                <motion.button
+                  className="px-6 py-2.5 rounded-[var(--radius-card)] font-medium"
+                  style={{
+                    background: "var(--color-accent)",
+                    color: "var(--color-bg)",
+                  }}
+                  onClick={scan}
+                  whileTap={{ scale: 0.96 }}
+                >
+                  Scan for movies
+                </motion.button>
+              </div>
+            ) : (
               <VirtualGrid
                 ref={gridRef}
                 items={gridItems}
@@ -520,17 +536,38 @@ export const MoviesTab: React.FC = () => {
                 onColumnCountChange={setColumnCount}
                 rowHeight={300}
                 renderItem={renderItem}
+                scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
               />
-            </div>
-          )}
-        </>
-      )}
+            )}
+          </>
+        )}
 
-      {subTab === "streaming" && (
-        <div className="pt-2">
-          <StreamingTile services={streamingServices} />
-        </div>
-      )}
+        {subTab === "ai-groups" && (
+          <>
+            {gridItems.length === 0 ? (
+              <div className="flex items-center justify-center" style={{ color: "var(--color-text-dim)", minHeight: 200 }}>
+                <p>No movies found.</p>
+              </div>
+            ) : (
+              <VirtualGrid
+                ref={gridRef}
+                items={gridItems}
+                minItemWidth={200}
+                onColumnCountChange={setColumnCount}
+                rowHeight={300}
+                renderItem={renderItem}
+                scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
+              />
+            )}
+          </>
+        )}
+
+        {subTab === "streaming" && (
+          <div className="pt-2">
+            <StreamingTile services={streamingServices} />
+          </div>
+        )}
+      </div>
 
       <DetailPanel
         open={!!selected}
