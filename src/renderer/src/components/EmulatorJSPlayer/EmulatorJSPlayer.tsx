@@ -20,122 +20,100 @@ function platformToCore(platform: GamePlatform): string {
 
 export const EmulatorJSPlayer: React.FC = () => {
   const { open, romPath, title, platform, shader, close } = useEmulatorjsPlayerStore();
-  const containerRef = useRef<HTMLDivElement>(null);
-  const initedRef = useRef(false);
-  const romUrlRef = useRef("");
+  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
-    if (!open || !containerRef.current || !romPath || initedRef.current) return;
+    if (!open || !romPath) return;
 
     let cancelled = false;
-    const container = containerRef.current;
+    let ready = false;
+    let romData: Uint8Array | null = null;
 
-    window.htpc.files.read(romPath).then((data) => {
-      if (cancelled || !data) return;
+    const iframe = iframeRef.current;
+    if (!iframe) return;
 
-      const blob = new Blob([data], { type: "application/octet-stream" });
-      romUrlRef.current = URL.createObjectURL(blob);
-      const core = platformToCore(platform);
+    const core = platformToCore(platform);
 
-      // Set EmulatorJS globals
-      (window as any).EJS_player = "#emulatorjs-container";
-      (window as any).EJS_core = core;
-      (window as any).EJS_gameUrl = romUrlRef.current;
-      (window as any).EJS_pathtodata = "/emulatorjs/";
-      (window as any).EJS_startOnLoaded = true;
-      (window as any).EJS_gameID = romPath;
-      if (shader) {
-        (window as any).EJS_Shader = shader;
+    const sendRom = () => {
+      iframe.contentWindow?.postMessage(
+        { type: "ejs-rom", data: romData, core, shader },
+        "*",
+      );
+    };
+
+    const onMessage = (e: MessageEvent) => {
+      if (e.source !== iframe.contentWindow) return;
+      if (e.data?.type === "ejs-close") {
+        close();
+      } else if (e.data?.type === "ejs-ready") {
+        ready = true;
+        if (romData) sendRom();
       }
+    };
+    window.addEventListener("message", onMessage);
 
-      // Inject loader script
-      const script = document.createElement("script");
-      script.id = "emulatorjs-loader";
-      script.src = "/emulatorjs/loader.js";
-      script.async = true;
-      document.head.appendChild(script);
-      initedRef.current = true;
+    const load = async () => {
+      const data = await window.htpc.files.read(romPath);
+      if (cancelled || !data || !iframe.contentWindow) return;
+
+      romData = data instanceof ArrayBuffer ? new Uint8Array(data) : data;
+      if (ready) sendRom();
+    };
+
+    load();
+
+    iframe.srcdoc = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="/emulatorjs/emulator.css">
+  <style>
+    body { margin: 0; background: #000; overflow: hidden; }
+    #emulator { width: 100vw; height: 100vh; }
+  </style>
+</head>
+<body>
+  <div id="emulator"></div>
+  <script>
+    window.EJS_player = "#emulator";
+    window.EJS_pathtodata = "/emulatorjs/";
+    window.EJS_startOnLoaded = true;
+    window.EJS_gameID = ${JSON.stringify(romPath)};
+    ${shader ? `window.EJS_Shader = ${JSON.stringify(shader)};` : ""}
+
+    window.addEventListener("keydown", function(e) {
+      if (e.code === "Escape") {
+        window.parent.postMessage({ type: "ejs-close" }, "*");
+      }
     });
+
+    window.addEventListener("message", function(e) {
+      if (e.data.type === "ejs-rom") {
+        window.EJS_core = e.data.core;
+        const blob = new Blob([e.data.data], { type: "application/octet-stream" });
+        window.EJS_gameUrl = URL.createObjectURL(blob);
+        var script = document.createElement("script");
+        script.src = "/emulatorjs/loader.js";
+        document.head.appendChild(script);
+      }
+    });
+
+    window.parent.postMessage({ type: "ejs-ready" }, "*");
+  </script>
+</body>
+</html>`;
+
+    // Focus the iframe so keyboard and gamepad events reach EmulatorJS
+    setTimeout(() => iframe.focus(), 100);
 
     return () => {
       cancelled = true;
-      initedRef.current = false;
-
-      // Always revoke blob URL even if init never completed
-      const blobUrl = romUrlRef.current;
-      romUrlRef.current = "";
-      if (blobUrl) {
-        try { URL.revokeObjectURL(blobUrl); } catch {}
-      }
-
-      // Stop the running emulator instance
-      const ejs = (window as any).EJS_emulator;
-      if (ejs) {
-        try {
-          // Stop the retroarch main loop
-          if (ejs.gameManager && typeof ejs.gameManager.toggleMainLoop === "function") {
-            ejs.gameManager.toggleMainLoop(0);
-          }
-          // Pause the Emscripten module main loop
-          if (ejs.Module && typeof ejs.Module.pauseMainLoop === "function") {
-            ejs.Module.pauseMainLoop();
-          }
-          // Close the Web Audio context to kill audio output
-          const al = ejs.Module?.AL;
-          if (al?.currentCtx?.audioCtx) {
-            try { al.currentCtx.audioCtx.close(); } catch {}
-          }
-          // Disconnect any dangling gain nodes
-          if (al?.currentCtx?.sources) {
-            for (const src of Object.values(al.currentCtx.sources)) {
-              try { (src as any).gain?.disconnect(); } catch {}
-            }
-          }
-          // Clear internal emulator timeouts
-          if (ejs.resetTimeout) clearTimeout(ejs.resetTimeout);
-          if (ejs.msgTimeout) clearTimeout(ejs.msgTimeout);
-        } catch {}
-      }
-
-      // Remove ALL EmulatorJS injected scripts (loader + dynamically loaded)
-      document.querySelectorAll("script").forEach((s) => {
-        if (s.src.includes("/emulatorjs/")) s.remove();
-      });
-      // Remove injected stylesheets
-      document.querySelectorAll('link[rel="stylesheet"]').forEach((l) => {
-        if ((l as HTMLLinkElement).href.includes("/emulatorjs/")) l.remove();
-      });
-
-      // Clean up globals
-      delete (window as any).EJS_player;
-      delete (window as any).EJS_core;
-      delete (window as any).EJS_gameUrl;
-      delete (window as any).EJS_pathtodata;
-      delete (window as any).EJS_startOnLoaded;
-      delete (window as any).EJS_emulator;
-      delete (window as any).EJS_gameManager;
-      delete (window as any).EJS_gameID;
-      delete (window as any).EJS_adBlocked;
-      delete (window as any).EJS_Shader;
-
-      if (container) {
-        container.innerHTML = "";
-      }
+      window.removeEventListener("message", onMessage);
+      // Removing the iframe destroys the entire EmulatorJS execution context,
+      // including Web Audio contexts, animation frames, and WASM instances.
+      iframe.remove();
     };
-  }, [open, romPath, platform]);
-
-  // Keyboard: only allow Escape to close
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.code === "Escape") {
-        e.stopPropagation();
-        close();
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [open, close]);
+  }, [open, romPath, platform, shader, close]);
 
   if (!open) return null;
 
@@ -156,16 +134,11 @@ export const EmulatorJSPlayer: React.FC = () => {
         justifyContent: "center",
       }}
     >
-      <div
-        id="emulatorjs-container"
-        ref={containerRef}
-        style={{
-          width: "100%",
-          height: "100%",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
+      <iframe
+        ref={iframeRef}
+        style={{ width: "100%", height: "100%", border: "none" }}
+        allow="fullscreen"
+        sandbox="allow-scripts allow-same-origin allow-downloads"
       />
 
       {/* Top bar */}

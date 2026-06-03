@@ -86,8 +86,25 @@ function copyDirRecursive(src: string, dest: string): void {
   }
 }
 
+// Core packages needed for supported platforms
+const CORE_PACKAGES: Record<string, string> = {
+  nestopia: "@emulatorjs/core-nestopia",
+  snes9x: "@emulatorjs/core-snes9x",
+  gambatte: "@emulatorjs/core-gambatte",
+  mgba: "@emulatorjs/core-mgba",
+};
+
+function findCoreFile(fileName: string): string | null {
+  for (const pkgName of Object.values(CORE_PACKAGES)) {
+    const filePath = resolve("node_modules", pkgName, fileName);
+    if (existsSync(filePath) && statSync(filePath).isFile()) {
+      return filePath;
+    }
+  }
+  return null;
+}
+
 function emulatorjsStaticPlugin(): Plugin {
-  const ejsResourceDir = resolve("resources/emulatorjs");
   const ejsNpmDir = resolve("node_modules/@emulatorjs/emulatorjs/data");
 
   return {
@@ -107,10 +124,14 @@ function emulatorjsStaticPlugin(): Plugin {
           res.end("Not found");
           return;
         }
-        // Try resources first, then npm package
-        let filePath = resolve(ejsResourceDir, fileName);
+        // Serve files directly from the @emulatorjs/emulatorjs data directory
+        let filePath = resolve(ejsNpmDir, fileName);
         if (!existsSync(filePath) || !statSync(filePath).isFile()) {
-          filePath = resolve(ejsNpmDir, fileName);
+          // Fall back to core packages for cores/*.data files
+          if (fileName.startsWith("cores/")) {
+            const corePath = findCoreFile(fileName.slice(6));
+            if (corePath) filePath = corePath;
+          }
         }
         if (!existsSync(filePath) || !statSync(filePath).isFile()) {
           next();
@@ -124,9 +145,20 @@ function emulatorjsStaticPlugin(): Plugin {
       const outDir = options.dir;
       if (!outDir) return;
       const destDir = resolve(outDir, "emulatorjs");
-      // Copy npm package first, then resources on top (overwrites)
+      // Copy npm package data (includes src/, localization/, etc.)
       copyDirRecursive(ejsNpmDir, destDir);
-      copyDirRecursive(ejsResourceDir, destDir);
+      // Copy core .data files from the specific core packages we need
+      const coresDestDir = resolve(destDir, "cores");
+      if (!existsSync(coresDestDir)) mkdirSync(coresDestDir, { recursive: true });
+      for (const pkgName of Object.values(CORE_PACKAGES)) {
+        const pkgDir = resolve("node_modules", pkgName);
+        if (!existsSync(pkgDir)) continue;
+        for (const file of readdirSync(pkgDir)) {
+          if (file.endsWith(".data")) {
+            copyFileSync(resolve(pkgDir, file), resolve(coresDestDir, file));
+          }
+        }
+      }
     },
   };
 }

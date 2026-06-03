@@ -6,5 +6,4 @@ dist/
 bun.lockb
 .llm
 public/ruffle
-resources/emulatorjs/
 resources/v86-bios/

@@ -5,12 +5,13 @@
   "license": "PolyForm-Noncommercial-1.0.0",
   "main": "out/main/index.js",
   "scripts": {
-    "postinstall": "node node_modules/electron/install.js && bun scripts/setup-emulatorjs.ts && bun scripts/setup-v86.ts",
-    "setup:emulatorjs": "bun scripts/setup-emulatorjs.ts",
+    "postinstall": "node node_modules/electron/install.js && bun scripts/setup-v86.ts",
     "dev": "bun scripts/dev.ts",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
-    "lint": "eslint src"
+    "lint": "eslint src",
+    "test": "bun test",
+    "test:watch": "bun test --watch"
   },
   "dependencies": {
     "@emulatorjs/emulatorjs": "^4.2.3",
