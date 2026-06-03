@@ -15,7 +15,7 @@ import { OskInput } from "../../components/OnScreenKeyboard/OnScreenKeyboard";
 import { RecentlyPlayedRow } from "../../components/RecentlyPlayedRow/RecentlyPlayedRow";
 import { CoreSelector } from "../../components/CoreSelector/CoreSelector";
 import { Game, GamePlatform, GameEmulatorConfig } from "../../../../shared/types";
-import { GameMetadata } from "../../../../main/services/metadata/types";
+import { GameMetadata } from "../../../../shared/metadata";
 import { useGridFocus } from "../../hooks/useGridFocus";
 import { useContextMenu } from "../../hooks/useContextMenu";
 import { ContextMenuOption } from "../../components/ContextMenu/ContextMenu";
@@ -34,7 +34,7 @@ import { CollectionManager } from "../../components/CollectionManager/Collection
 import { Tooltip } from "../../components/Tooltip/Tooltip";
 import { AiGroup } from "../../../../shared/types";
 import { DynamicFacetFilters, FacetField } from "../../components/DynamicFacetFilters/DynamicFacetFilters";
-import type { GameVideo } from "../../../../main/services/metadata/types";
+import type { GameVideo } from "../../../../shared/metadata";
 
 // Extended game type that includes lazy-loaded metadata properties
 type GameWithMetadata = Game & Partial<{

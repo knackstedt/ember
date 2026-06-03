@@ -17,7 +17,7 @@ import {
   ManagedPackage,
   PackageOperationProgress,
 } from "../shared/types";
-import { GameMetadata } from "../main/services/metadata/types";
+import { GameMetadata } from "../shared/metadata";
 import { libretroApi } from "./libretro";
 
 const htpc = {
@@ -255,6 +255,7 @@ const htpc = {
 
   db: {
     clear: (): Promise<boolean> => ipcRenderer.invoke("db:clear"),
+    wipeThumbnails: (): Promise<boolean> => ipcRenderer.invoke("db:wipe-thumbnails"),
   },
 
   openDirectory: (): Promise<string | null> =>
@@ -309,7 +310,7 @@ const htpc = {
       artist?: string;
       album?: string;
       genre?: string;
-    }>, groupCount: number): Promise<Array<{ label: string; itemIds: string[]; centerItemId: string }>> =>
+    }>, groupCount: number): Promise<Array<{ id: string; label: string; itemIds: string[]; centerItemId: string }>> =>
       ipcRenderer.invoke("localAi:groupItems", items, groupCount),
   },
 

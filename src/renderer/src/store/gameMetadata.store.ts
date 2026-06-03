@@ -5,7 +5,7 @@
  */
 
 import { create } from "zustand";
-import { GameMetadata } from "../../../main/services/metadata/types";
+import { GameMetadata } from "../../../shared/metadata";
 
 // Metadata that should be fetched immediately during scan (high rate limits or no API key required)
 export const IMMEDIATE_METADATA_SOURCES = [
