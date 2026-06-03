@@ -2,8 +2,9 @@ import { existsSync, readdirSync, statSync } from "fs";
 import { join, extname, basename, dirname } from "path";
 import { homedir } from "os";
 import { createHash } from "crypto";
-import { Game } from "../../shared/types";
+import { Game, WineRunner } from "../../shared/types";
 import { createLogger } from "../util/logger";
+import { detectWineRunner } from "../services/package-manager.service";
 
 const log = createLogger("info");
 
@@ -102,9 +103,9 @@ export function scanWindowsGames(): Game[] {
       games.push({
         id,
         title,
-        platform: "desktop",
+        platform: "windows",
         romPath: fullPath,
-        execPath: `wine "${fullPath}"`,
+        // execPath is set at launch time once the preferred runner is resolved
         tags: isUnity ? ["unity"] : [],
       });
     });
@@ -112,4 +113,18 @@ export function scanWindowsGames(): Game[] {
 
   log.info("windows", `total found: ${games.length}`);
   return games;
+}
+
+/**
+ * Resolve the best available wine/proton runner for this machine and return
+ * a ready-to-use execPath string for a given .exe path.
+ */
+export async function resolveWindowsExecPath(exePath: string): Promise<{ execPath: string; wineRunner: WineRunner }> {
+  const runner = await detectWineRunner();
+  if (runner === "proton-ge" || runner === "system-proton") {
+    // buildWineCommand is used at launch time; here we just annotate the runner
+    return { execPath: exePath, wineRunner: runner ?? "wine" };
+  }
+  // Default to wine
+  return { execPath: exePath, wineRunner: "wine" };
 }

@@ -1,12 +1,14 @@
 import { spawn, SpawnOptions, ChildProcess } from "child_process";
 import { join } from "path";
 import { existsSync, mkdirSync, readdirSync, statSync, unlinkSync } from "fs";
+import { homedir } from "os";
 import { app, BrowserWindow } from "electron";
 import { createLogger } from "../util/logger";
 import {
   ManagedPackage,
   PackageManager,
   PackageOperationProgress,
+  WineRunner,
 } from "../../shared/types";
 
 const log = createLogger("info");
@@ -28,6 +30,10 @@ interface PackageDefinition {
   flatpakRef?: string;
   aptName?: string;
   appimageUrl?: string;
+  // winehq: adds the WineHQ apt repo then installs this package name
+  winehqPackage?: string;
+  // proton-ge: fetches latest release from GitHub, downloads tar.gz, extracts to compatibilitytools.d
+  protonGeGithubRepo?: string;
 }
 
 const KNOWN_PACKAGES: PackageDefinition[] = [
@@ -65,6 +71,28 @@ const KNOWN_PACKAGES: PackageDefinition[] = [
   // Dependencies
   { id: "apt-ffmpeg", name: "ffmpeg", displayName: "FFmpeg", manager: "apt", category: "dependency", aptName: "ffmpeg" },
   { id: "apt-xdotool", name: "xdotool", displayName: "xdotool", manager: "apt", category: "dependency", aptName: "xdotool" },
+
+  // Windows compatibility layers
+  {
+    id: "winehq-stable",
+    name: "wine",
+    displayName: "Wine (WineHQ stable)",
+    description: "Run Windows .exe games and apps on Linux via WineHQ's latest stable build.",
+    manager: "winehq",
+    category: "dependency",
+    platforms: ["windows"],
+    winehqPackage: "winehq-stable",
+  },
+  {
+    id: "proton-ge",
+    name: "proton-ge",
+    displayName: "Proton-GE (GloriousEggroll)",
+    description: "Community Proton build with extra patches for better game compatibility. Preferred runner for Windows .exe games.",
+    manager: "proton-ge",
+    category: "dependency",
+    platforms: ["windows"],
+    protonGeGithubRepo: "GloriousEggroll/proton-ge-custom",
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -137,6 +165,9 @@ export async function detectPackageManager(): Promise<PackageManager[]> {
     if (code === 0) results.push(pm);
   }
   results.push("appimage");
+  // winehq and proton-ge are always listed as options on Linux x86_64
+  results.push("winehq");
+  results.push("proton-ge");
   return results;
 }
 
@@ -186,6 +217,261 @@ function getAppimageVersion(name: string): string | undefined {
   } catch {
     return undefined;
   }
+}
+
+// ---------------------------------------------------------------------------
+//  Wine / Proton-GE detection helpers
+// ---------------------------------------------------------------------------
+
+async function isWineInstalled(): Promise<boolean> {
+  // Check system wine first
+  const { code: sysCode } = await runCommand("sh", ["-c", "command -v wine"]);
+  if (sysCode === 0) return true;
+  // Also check WineHQ package directly
+  return isAptInstalled("winehq-stable");
+}
+
+async function getWineVersion(): Promise<string | undefined> {
+  const { stdout, code } = await runCommand("wine", ["--version"]);
+  if (code === 0) return stdout.trim().replace(/^wine-/, "");
+  return getAptVersion("winehq-stable");
+}
+
+function getProtonGeDir(): string {
+  // Steam compatibilitytools.d is the conventional install location
+  const steamDir = join(homedir(), ".steam", "root", "compatibilitytools.d");
+  const steamFlatpak = join(homedir(), ".var", "app", "com.valvesoftware.Steam", "data", "Steam", "compatibilitytools.d");
+  if (existsSync(steamDir)) return steamDir;
+  if (existsSync(steamFlatpak)) return steamFlatpak;
+  // Fallback: create under steam root
+  mkdirSync(steamDir, { recursive: true });
+  return steamDir;
+}
+
+function getInstalledProtonGeVersion(): string | undefined {
+  try {
+    const dir = getProtonGeDir();
+    const entries = readdirSync(dir);
+    // Entries look like "GE-Proton9-27"
+    const ge = entries.filter((e) => /^GE-Proton/i.test(e));
+    if (ge.length === 0) return undefined;
+    // Sort descending to return the newest installed version
+    ge.sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
+    return ge[0];
+  } catch {
+    return undefined;
+  }
+}
+
+async function fetchLatestProtonGeRelease(): Promise<{ tag: string; tarUrl: string } | null> {
+  try {
+    const res = await fetch(
+      "https://api.github.com/repos/GloriousEggroll/proton-ge-custom/releases/latest",
+      { headers: { Accept: "application/vnd.github+json", "User-Agent": "htpc-app" } }
+    );
+    if (!res.ok) return null;
+    const data = await res.json() as { tag_name: string; assets: { name: string; browser_download_url: string }[] };
+    const tarAsset = data.assets.find((a) => a.name.endsWith(".tar.gz") && !a.name.includes("sha512sum"));
+    if (!tarAsset) return null;
+    return { tag: data.tag_name, tarUrl: tarAsset.browser_download_url };
+  } catch {
+    return null;
+  }
+}
+
+async function isProtonGeInstalled(): Promise<boolean> {
+  return getInstalledProtonGeVersion() !== undefined;
+}
+
+// ---------------------------------------------------------------------------
+//  WineHQ apt repo setup + install
+// ---------------------------------------------------------------------------
+
+async function installWineHq(
+  packageId: string,
+  winehqPackage: string,
+  window: BrowserWindow | null
+): Promise<boolean> {
+  // WineHQ requires: i386 arch, their apt key, and their repo added
+  // Steps: add-architecture i386, wget key, add source, apt-get update, apt-get install
+  const steps: Array<{ label: string; cmd: string; args: string[]; percent: number }> = [
+    { label: "Enabling i386 architecture...", cmd: "dpkg", args: ["--add-architecture", "i386"], percent: 10 },
+    { label: "Updating package lists...", cmd: "apt-get", args: ["update", "-y"], percent: 30 },
+    { label: `Installing ${winehqPackage}...`, cmd: "apt-get", args: ["install", "-y", winehqPackage], percent: 60 },
+  ];
+
+  // Add WineHQ repo if not already present
+  const wineSourceFile = "/etc/apt/sources.list.d/winehq.list";
+  if (!existsSync(wineSourceFile)) {
+    // Detect codename
+    const { stdout: codename } = await runCommand("sh", ["-c", "lsb_release -cs 2>/dev/null || echo bookworm"]);
+    const cn = codename.trim() || "bookworm";
+
+    sendProgress(window, { packageId, operation: "install", status: "running", message: "Adding WineHQ apt key...", percent: 5 });
+
+    // Download and add the WineHQ signing key
+    const keyResult = await runCommand("sh", [
+      "-c",
+      `mkdir -p /etc/apt/keyrings && wget -qO /etc/apt/keyrings/winehq-archive.key https://dl.winehq.org/wine-builds/winehq.key`,
+    ]);
+    if (keyResult.code !== 0) {
+      sendProgress(window, { packageId, operation: "install", status: "error", message: "Failed to download WineHQ apt key. Check your internet connection." });
+      return false;
+    }
+
+    // Add the repo source
+    const repoLine = `deb [signed-by=/etc/apt/keyrings/winehq-archive.key] https://dl.winehq.org/wine-builds/ubuntu/ ${cn} main\n`;
+    const writeResult = await runCommand("sh", ["-c", `echo '${repoLine}' > ${wineSourceFile}`]);
+    if (writeResult.code !== 0) {
+      sendProgress(window, { packageId, operation: "install", status: "error", message: "Failed to add WineHQ apt repository. Are you running as root/sudo?" });
+      return false;
+    }
+  }
+
+  for (const step of steps) {
+    sendProgress(window, { packageId, operation: "install", status: "running", message: step.label, percent: step.percent });
+    const useSudo = aptPassword.length > 0;
+    const cmd = useSudo ? "sudo" : step.cmd;
+    const args = useSudo ? ["-S", step.cmd, ...step.args] : step.args;
+    const result = await runCommand(cmd, args, useSudo && aptPassword ? { input: aptPassword + "\n" } : undefined);
+    if (result.code !== 0) {
+      if (result.stderr.toLowerCase().includes("incorrect password") || result.stderr.toLowerCase().includes("sorry, try again")) {
+        aptPassword = "";
+      }
+      sendProgress(window, { packageId, operation: "install", status: "error", message: result.stderr.trim().slice(-300) || `${step.cmd} failed` });
+      return false;
+    }
+  }
+
+  sendProgress(window, { packageId, operation: "install", status: "success", message: "Wine installed successfully.", percent: 100 });
+  return true;
+}
+
+// ---------------------------------------------------------------------------
+//  Proton-GE download + extract install
+// ---------------------------------------------------------------------------
+
+async function installProtonGe(
+  packageId: string,
+  window: BrowserWindow | null
+): Promise<boolean> {
+  sendProgress(window, { packageId, operation: "install", status: "running", message: "Fetching latest Proton-GE release info...", percent: 5 });
+
+  const release = await fetchLatestProtonGeRelease();
+  if (!release) {
+    sendProgress(window, { packageId, operation: "install", status: "error", message: "Could not fetch Proton-GE release info from GitHub. Check your internet connection." });
+    return false;
+  }
+
+  const destDir = getProtonGeDir();
+  const tarName = release.tarUrl.split("/").pop()!;
+  const tarPath = join(destDir, tarName);
+
+  sendProgress(window, { packageId, operation: "install", status: "running", message: `Downloading ${release.tag}...`, percent: 15 });
+
+  // Download with curl, streaming progress
+  const dlResult = await new Promise<boolean>((resolve) => {
+    const proc = spawn("curl", ["-L", "--progress-bar", "-o", tarPath, release.tarUrl], {
+      env: { ...process.env },
+    });
+    activeOperations.set(packageId, proc);
+
+    let lastPercent = 15;
+    proc.stderr?.setEncoding("utf8");
+    proc.stderr?.on("data", (chunk: string) => {
+      // curl --progress-bar emits # chars; rough progress estimate
+      const hashes = (chunk.match(/#/g) || []).length;
+      if (hashes > 0) {
+        lastPercent = Math.min(75, lastPercent + hashes);
+        sendProgress(window, { packageId, operation: "install", status: "running", message: `Downloading ${release.tag}...`, percent: lastPercent });
+      }
+    });
+
+    proc.on("close", (code) => { activeOperations.delete(packageId); resolve(code === 0); });
+    proc.on("error", () => { activeOperations.delete(packageId); resolve(false); });
+  });
+
+  if (!dlResult) {
+    try { unlinkSync(tarPath); } catch {}
+    sendProgress(window, { packageId, operation: "install", status: "error", message: `Failed to download ${release.tag}.` });
+    return false;
+  }
+
+  sendProgress(window, { packageId, operation: "install", status: "running", message: `Extracting ${release.tag}...`, percent: 80 });
+
+  const extractResult = await runCommand("tar", ["-xzf", tarPath, "-C", destDir]);
+  try { unlinkSync(tarPath); } catch {}
+
+  if (extractResult.code !== 0) {
+    sendProgress(window, { packageId, operation: "install", status: "error", message: `Extraction failed: ${extractResult.stderr.slice(-200)}` });
+    return false;
+  }
+
+  sendProgress(window, { packageId, operation: "install", status: "success", message: `${release.tag} installed to ${destDir}`, percent: 100 });
+  log.info("package-manager", `Proton-GE ${release.tag} installed to ${destDir}`);
+  return true;
+}
+
+async function uninstallProtonGe(packageId: string, window: BrowserWindow | null): Promise<boolean> {
+  const version = getInstalledProtonGeVersion();
+  if (!version) return false;
+  const dir = join(getProtonGeDir(), version);
+  sendProgress(window, { packageId, operation: "uninstall", status: "running", message: `Removing ${version}...`, percent: 50 });
+  const result = await runCommand("rm", ["-rf", dir]);
+  if (result.code === 0) {
+    sendProgress(window, { packageId, operation: "uninstall", status: "success", message: "Proton-GE removed.", percent: 100 });
+    return true;
+  }
+  sendProgress(window, { packageId, operation: "uninstall", status: "error", message: result.stderr.slice(-200) });
+  return false;
+}
+
+// ---------------------------------------------------------------------------
+//  Wine runner detection (exported for IPC + scanner use)
+// ---------------------------------------------------------------------------
+
+/**
+ * Detect the best available Windows .exe runner on this system.
+ * Priority: Proton-GE > system Proton (Steam) > Wine.
+ * Returns null if nothing is installed.
+ */
+export async function detectWineRunner(): Promise<WineRunner | null> {
+  if (await isProtonGeInstalled()) return "proton-ge";
+
+  // Check for system Proton bundled with Steam
+  const systemProtonPaths = [
+    join(homedir(), ".steam", "root", "ubuntu12_32", "steam-runtime"),
+    join(homedir(), ".local", "share", "Steam", "ubuntu12_32", "steam-runtime"),
+    "/usr/bin/steam-runtime-launch-client",
+  ];
+  if (systemProtonPaths.some(existsSync)) return "system-proton";
+
+  if (await isWineInstalled()) return "wine";
+  return null;
+}
+
+/**
+ * Build the command + args to launch a Windows .exe with the best available runner.
+ */
+export async function buildWineCommand(exePath: string, preferredRunner?: WineRunner): Promise<{ cmd: string; args: string[] } | null> {
+  const runner = preferredRunner ?? (await detectWineRunner());
+  if (!runner) return null;
+
+  if (runner === "proton-ge" || runner === "system-proton") {
+    const geVersion = getInstalledProtonGeVersion();
+    if (geVersion) {
+      const protonExe = join(getProtonGeDir(), geVersion, "proton");
+      if (existsSync(protonExe)) {
+        return {
+          cmd: protonExe,
+          args: ["run", exePath],
+        };
+      }
+    }
+    // Fall through to wine if proton binary not found
+  }
+
+  return { cmd: "wine", args: [exePath] };
 }
 
 // ---------------------------------------------------------------------------
@@ -532,6 +818,12 @@ export async function listAvailablePackages(): Promise<ManagedPackage[]> {
     } else if (def.manager === "appimage") {
       isInstalled = isAppimageInstalled(def.name);
       if (isInstalled) installedVersion = getAppimageVersion(def.name);
+    } else if (def.manager === "winehq") {
+      isInstalled = await isWineInstalled();
+      if (isInstalled) installedVersion = await getWineVersion();
+    } else if (def.manager === "proton-ge") {
+      isInstalled = await isProtonGeInstalled();
+      if (isInstalled) installedVersion = getInstalledProtonGeVersion();
     }
 
     let platforms = def.platforms;
@@ -620,6 +912,14 @@ export async function installPackage(
     return ok;
   }
 
+  if (def.manager === "winehq" && def.winehqPackage) {
+    return installWineHq(packageId, def.winehqPackage, window);
+  }
+
+  if (def.manager === "proton-ge") {
+    return installProtonGe(packageId, window);
+  }
+
   return false;
 }
 
@@ -644,6 +944,14 @@ export async function uninstallPackage(
 
   if (def.manager === "flatpak" && def.flatpakRef) {
     return execFlatpak("uninstall", packageId, def.flatpakRef, window);
+  }
+
+  if (def.manager === "winehq" && def.aptName) {
+    return execApt("remove", packageId, def.aptName, window);
+  }
+
+  if (def.manager === "proton-ge") {
+    return uninstallProtonGe(packageId, window);
   }
 
   if (def.manager === "appimage") {

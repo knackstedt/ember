@@ -180,6 +180,18 @@ const htpc = {
       ipcRenderer.invoke("music:artistThumbnail", artist),
     hide: (id: string, value: boolean): Promise<void> =>
       ipcRenderer.invoke("music:hide", id, value),
+    enrich: (track: MusicTrack): Promise<{
+      updates: Partial<MusicTrack>;
+      coverArtUrl?: string;
+      artistImageUrl?: string;
+    } | null> => ipcRenderer.invoke("music:enrich", track),
+    enrichBatch: (tracks: MusicTrack[]): Promise<
+      Record<string, {
+        updates: Partial<MusicTrack>;
+        coverArtUrl?: string;
+        artistImageUrl?: string;
+      }>
+    > => ipcRenderer.invoke("music:enrichBatch", tracks),
   },
 
   tv: {
@@ -327,6 +339,8 @@ const htpc = {
     setAptPassword: (password: string): Promise<void> => ipcRenderer.invoke("packages:setAptPassword", password),
     detectCores: (): Promise<{ platform: string; corePath: string; coreName: string; extensions: string[] }[]> =>
       ipcRenderer.invoke("packages:detectCores"),
+    detectWineRunner: (): Promise<import("../shared/types").WineRunner | null> =>
+      ipcRenderer.invoke("packages:detectWineRunner"),
     onProgress: (cb: (progress: PackageOperationProgress) => void) => {
       const handler = (_: Electron.IpcRendererEvent, p: PackageOperationProgress) => cb(p);
       ipcRenderer.on("packages:progress", handler);

@@ -84,7 +84,12 @@ import {
   checkUpdates,
   setAptPassword,
   detectInstalledCores,
+  detectWineRunner,
 } from "../services/package-manager.service";
+import {
+  enrichTrack,
+  enrichTracks,
+} from "../services/music-enrichment.service";
 
 const log = createLogger("info");
 
@@ -746,6 +751,68 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     return url ?? null;
   });
 
+  ipcMain.handle("music:enrich", async (_e, track: MusicTrack) => {
+    const settings = await getSettings();
+    const result = await enrichTrack(track, {
+      tadbApiKey: settings.theaudiodbApiKey,
+    });
+    if (Object.keys(result.updates).length > 0) {
+      const db = getDb();
+      const id =
+        typeof track.id === "string"
+          ? track.id
+          : (track.id as any)?.id ?? String(track.id);
+      const setClauses = Object.entries(result.updates)
+        .map(([key]) => `${key} = $updates.${key}`)
+        .join(", ");
+      await db.query(
+        `UPDATE music_track:⟨${id}⟩ SET ${setClauses}`,
+        { updates: result.updates },
+      );
+    }
+    return result;
+  });
+
+  ipcMain.handle("music:enrichBatch", async (_e, tracks: MusicTrack[]) => {
+    const settings = await getSettings();
+    const results = await enrichTracks(tracks, {
+      tadbApiKey: settings.theaudiodbApiKey,
+      onProgress: (current, total) => {
+        window.webContents.send("scan:progress", {
+          scanner: "music-enrich",
+          current,
+          total,
+          status: current === total ? "done" : "scanning",
+        });
+      },
+    });
+
+    // Persist all enrichment updates to DB
+    const db = getDb();
+    for (const [trackId, result] of results) {
+      if (Object.keys(result.updates).length > 0) {
+        try {
+          const setClauses = Object.entries(result.updates)
+            .map(([key]) => `${key} = $updates.${key}`)
+            .join(", ");
+          await db.query(
+            `UPDATE music_track:⟨${trackId}⟩ SET ${setClauses}`,
+            { updates: result.updates },
+          );
+        } catch (err) {
+          log.error("music:enrichBatch", `DB update failed for ${trackId}: ${err}`);
+        }
+      }
+    }
+
+    // Convert Map to serializable object
+    const serialized: Record<string, { updates: Partial<MusicTrack>; coverArtUrl?: string; artistImageUrl?: string }> = {};
+    for (const [id, result] of results) {
+      serialized[id] = result;
+    }
+    return serialized;
+  });
+
   ipcMain.handle("tv:scan", async (_e, extraPaths?: string[]) => {
     if (scanLocks.tv) return [];
     scanLocks.tv = true;
@@ -1074,5 +1141,9 @@ export function registerIpcHandlers(window: BrowserWindow): void {
 
   ipcMain.handle("packages:detectCores", async () => {
     return detectInstalledCores();
+  });
+
+  ipcMain.handle("packages:detectWineRunner", async () => {
+    return detectWineRunner();
   });
 }

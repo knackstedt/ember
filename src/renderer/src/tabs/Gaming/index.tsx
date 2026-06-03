@@ -15,6 +15,7 @@ import { OskInput } from "../../components/OnScreenKeyboard/OnScreenKeyboard";
 import { RecentlyPlayedRow } from "../../components/RecentlyPlayedRow/RecentlyPlayedRow";
 import { CoreSelector } from "../../components/CoreSelector/CoreSelector";
 import { Game, GamePlatform, GameEmulatorConfig } from "../../../../shared/types";
+import { GameMetadata } from "../../../../main/services/metadata/types";
 import { useGridFocus } from "../../hooks/useGridFocus";
 import { useContextMenu } from "../../hooks/useContextMenu";
 import { ContextMenuOption } from "../../components/ContextMenu/ContextMenu";
@@ -33,6 +34,20 @@ import { CollectionManager } from "../../components/CollectionManager/Collection
 import { Tooltip } from "../../components/Tooltip/Tooltip";
 import { AiGroup } from "../../../../shared/types";
 import { DynamicFacetFilters, FacetField } from "../../components/DynamicFacetFilters/DynamicFacetFilters";
+import type { GameVideo } from "../../../../main/services/metadata/types";
+
+// Extended game type that includes lazy-loaded metadata properties
+type GameWithMetadata = Game & Partial<{
+  iconUrl: string;
+  metacriticScore: number;
+  openCriticScore: number;
+  playtime: number;
+  platforms: string[];
+  screenshots: string[];
+  videos: GameVideo[];
+  achievementCount: number;
+  igdbId: number;
+}>;
 
 const PLATFORM_FILTERS: ChipFilter<
   GamePlatform | "all" | "couch-coop" | "favorites"
@@ -60,6 +75,7 @@ const PLATFORM_FILTERS: ChipFilter<
   { id: "dreamcast", label: "Dreamcast" },
   { id: "flash", label: "Flash" },
   { id: "dos", label: "DOS/PC" },
+  { id: "windows", label: "Windows" },
   { id: "desktop", label: "Other" },
 ];
 
@@ -159,6 +175,7 @@ export const GamingTab: React.FC = () => {
   const [showCollectionManager, setShowCollectionManager] = useState(false);
   const [collectionItemIds, setCollectionItemIds] = useState<Set<string>>(new Set());
   const gridRef = useRef<VirtualGridHandle>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   type ViewMode = "all" | "ai-groups" | "by-platform";
   const [viewMode, setViewMode] = useState<ViewMode>("ai-groups");
@@ -265,7 +282,8 @@ export const GamingTab: React.FC = () => {
         Math.min(6, Math.max(2, Math.floor(games.length / 8))),
       )
       .then((groups) => {
-        setAiGroups(groups);
+        // Add generated IDs to groups since the AI service doesn't provide them
+        setAiGroups(groups.map((g, i) => ({ ...g, id: `ai-group-${i}-${Date.now()}` })));
         setAiGroupsLoading(false);
       })
       .catch(() => {
@@ -330,7 +348,7 @@ export const GamingTab: React.FC = () => {
     { key: "developer", label: "Developer", accessor: (g) => (g as Record<string, unknown>).developer as string | undefined, maxValues: 6 },
   ], []);
 
-  const { focusedIndex } = useGridFocus({
+  const { focusedIndex, setFocusedIndex } = useGridFocus({
     items: gridItems,
     columnCount,
     gridRef,
@@ -423,25 +441,25 @@ export const GamingTab: React.FC = () => {
 
   const renderItem = useCallback(
     (game: Game, index: number) => (
-      <div className="p-1.5 w-full h-full flex flex-col min-w-0" {...bindItem(game, index)}>
+      <div key={game.id} className="p-1.5 w-full h-full flex flex-col min-w-0" {...bindItem(game, index)}>
         <LazyGameCard
           game={game}
           index={index}
           focusedIndex={focusedIndex}
-          onSelect={() => setSelected(game)}
+          onSelect={() => { setFocusedIndex(index); setSelected(game); }}
           onFavorite={() => toggleFavorite(game.id)}
         />
       </div>
     ),
-    [bindItem, focusedIndex, toggleFavorite],
+    [bindItem, focusedIndex, setFocusedIndex, toggleFavorite],
   );
 
   const badge = selected ? gameBadge(selected) : undefined;
 
   // Merge base game data with lazy-fetched metadata for detail view
-  const detailGameData = useMemo(() => {
+  const detailGameData = useMemo<GameWithMetadata | null>(() => {
     if (!selected) return null;
-    if (!lazyMetadata) return selected;
+    if (!lazyMetadata) return selected as GameWithMetadata;
 
     return {
       ...selected,
@@ -449,10 +467,10 @@ export const GamingTab: React.FC = () => {
       description: lazyMetadata.description ?? selected.description,
       coverUrl: lazyMetadata.coverUrl ?? selected.coverUrl,
       bannerUrl: lazyMetadata.bannerUrl ?? selected.bannerUrl,
-      iconUrl: lazyMetadata.iconUrl ?? selected.iconUrl,
+      iconUrl: lazyMetadata.iconUrl,
       rating: lazyMetadata.rating ?? selected.rating,
-      metacriticScore: lazyMetadata.metacriticScore ?? selected.metacriticScore,
-      openCriticScore: lazyMetadata.openCriticScore ?? selected.openCriticScore,
+      metacriticScore: lazyMetadata.metacriticScore,
+      openCriticScore: lazyMetadata.openCriticScore,
       protonRating: lazyMetadata.protonRating ?? selected.protonRating,
       developer: lazyMetadata.developer ?? selected.developer,
       publisher: lazyMetadata.publisher ?? selected.publisher,
@@ -460,15 +478,15 @@ export const GamingTab: React.FC = () => {
       tags: lazyMetadata.tags ?? selected.tags,
       releaseYear: lazyMetadata.releaseYear ?? selected.releaseYear,
       playerCount: lazyMetadata.playerCount ?? selected.playerCount,
-      playtime: lazyMetadata.playtime ?? selected.playtime,
-      platforms: lazyMetadata.platforms ?? selected.platforms,
-      screenshots: lazyMetadata.screenshots ?? selected.screenshots,
-      videos: lazyMetadata.videos ?? selected.videos,
-      achievementCount: lazyMetadata.achievementCount ?? selected.achievementCount,
+      playtime: lazyMetadata.playtime,
+      platforms: lazyMetadata.platforms,
+      screenshots: lazyMetadata.screenshots,
+      videos: lazyMetadata.videos,
+      achievementCount: lazyMetadata.achievementCount,
       // Store external IDs for future lazy loading
-      igdbId: lazyMetadata.igdbId ?? selected.igdbId,
+      igdbId: lazyMetadata.igdbId,
       steamAppId: lazyMetadata.steamAppId ?? selected.steamAppId,
-    };
+    } as GameWithMetadata;
   }, [selected, lazyMetadata]);
 
   const resolveShader = async (game: Game): Promise<string> => {
@@ -528,186 +546,211 @@ export const GamingTab: React.FC = () => {
     .slice(0, 8);
 
   return (
-    <div className="flex flex-col h-full gap-3 p-4">
-      <div className="flex items-center gap-3 flex-shrink-0">
-        <OskInput
-          value={searchQuery}
-          onChange={setSearch}
-          placeholder="Search games…"
-          className="text-sm"
-          style={{ maxWidth: 280 } as React.CSSProperties}
-        />
-        <motion.button
-          className="px-4 py-2 rounded-[var(--radius-card)] text-sm font-medium"
-          style={{
-            background: "var(--color-surface-raised)",
-            color: "var(--color-text)",
-            border: "1px solid var(--color-border)",
-          }}
-          onClick={scan}
-          whileTap={{ scale: 0.96 }}
-          disabled={scanning}
-        >
-          {scanning ? "⟳ Scanning…" : "↺ Scan"}
-        </motion.button>
-        <span className="text-sm" style={{ color: "var(--color-text-dim)" }}>
-          {items.length} games
-        </span>
-      </div>
-
-      <RecentlyPlayedRow
-        items={recentlyPlayed.map((g) => ({
-          id: g.id,
-          title: g.title,
-          coverUrl: g.coverUrl,
-          subtitle: g.developer,
-        }))}
-        onLaunch={(id) => {
-          const game = games.find((g) => g.id === id);
-          if (game && !getMissingCoreTooltip(game)) launch(game);
-        }}
-      />
-
-      <CollectionsBar
-        itemType="game"
-        activeCollectionId={activeCollectionId}
-        onSelect={setActiveCollectionId}
-        onManage={() => setShowCollectionManager(true)}
-        className="flex-shrink-0"
-      />
-
-      {/* View-mode sub-tabs */}
-      <div className="flex gap-2 flex-shrink-0 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
-        {(["all", "ai-groups", "by-platform"] as ViewMode[]).map((m) => (
-          <motion.button
-            key={m}
-            onClick={() => {
-              setViewMode(m);
-              setSelectedAiGroupId(null);
-            }}
-            className="relative flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-colors focus:outline-none"
-            style={{
-              backgroundColor: viewMode === m
-                ? "var(--color-accent)"
-                : "var(--color-surface-raised)",
-              color: viewMode === m ? "var(--color-bg)" : "var(--color-text-dim)",
-              border: `1px solid ${viewMode === m ? "var(--color-accent)" : "var(--color-border)"}`,
-              boxShadow: viewMode === m ? "var(--shadow-glow)" : "none",
-            }}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            {m === "all" ? "All" : m === "ai-groups" ? "✨ Groups" : "By Platform"}
-          </motion.button>
-        ))}
-      </div>
-
-      {/* AI group chips */}
-      {viewMode === "ai-groups" && aiGroups.length > 0 && (
-        <div className="flex gap-2 flex-shrink-0 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
-          <motion.button
-            onClick={() => setSelectedAiGroupId(null)}
-            className="relative flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors focus:outline-none"
-            style={{
-              backgroundColor: !selectedAiGroupId
-                ? "var(--color-accent)"
-                : "var(--color-surface-raised)",
-              color: !selectedAiGroupId ? "var(--color-bg)" : "var(--color-text-dim)",
-              border: `1px solid ${!selectedAiGroupId ? "var(--color-accent)" : "var(--color-border)"}`,
-            }}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            All Groups
-          </motion.button>
-          {aiGroups.map((g) => (
-            <motion.button
-              key={g.id}
-              onClick={() => setSelectedAiGroupId(g.id)}
-              className="relative flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors focus:outline-none"
-              style={{
-                backgroundColor: selectedAiGroupId === g.id
-                  ? "var(--color-accent)"
-                  : "var(--color-surface-raised)",
-                color: selectedAiGroupId === g.id ? "var(--color-bg)" : "var(--color-text-dim)",
-                border: `1px solid ${selectedAiGroupId === g.id ? "var(--color-accent)" : "var(--color-border)"}`,
-              }}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              {g.label} ({g.itemIds.length})
-            </motion.button>
-          ))}
-        </div>
-      )}
-
-      {viewMode === "ai-groups" && aiGroupsLoading && (
-        <div className="flex items-center gap-2 flex-shrink-0" style={{ color: "var(--color-text-dim)" }}>
-          <div className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "var(--color-accent)", borderTopColor: "transparent" }} />
-          <span className="text-xs">Generating smart groups…</span>
-        </div>
-      )}
-
-      {/* Traditional platform filters when not in AI-groups mode */}
-      {viewMode === "by-platform" && (
-        <ChipFilters
-          filters={PLATFORM_FILTERS}
-          active={activeFilter}
-          onSelect={(f) => {
-            setActiveCollectionId(null);
-            setFilter(f);
-          }}
-          className="flex-shrink-0"
-        />
-      )}
-
-      {/* Dynamic metadata facets based on currently visible items */}
-      {gridItems.length > 0 && (
-        <DynamicFacetFilters
-          items={facetSourceItems as Record<string, unknown>[]}
-          fields={gameFacetFields}
-          activeFilters={facetFilters}
-          onFilter={applyFacetFilter}
-          className="flex-shrink-0"
-        />
-      )}
-
-      {loading || scanning ? (
-        <div
-          className="flex-1 flex flex-col items-center justify-center gap-3"
-          style={{ color: "var(--color-text-dim)" }}
-        >
-          <div
-            className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin"
-            style={{
-              borderColor: "var(--color-accent)",
-              borderTopColor: "transparent",
+    <div className="flex flex-col h-full">
+      <div
+        ref={scrollContainerRef}
+        className="flex-1 min-h-0 overflow-y-auto gpu-scroll"
+        style={{ padding: 16 }}
+      >
+        {/* Collapsible content — scrolls out of view */}
+        <div className="flex flex-col gap-3 mb-3">
+          <RecentlyPlayedRow
+            items={recentlyPlayed.map((g) => ({
+              id: g.id,
+              title: g.title,
+              coverUrl: g.coverUrl,
+              subtitle: g.developer,
+            }))}
+            onLaunch={(id) => {
+              const game = games.find((g) => g.id === id);
+              if (game && !getMissingCoreTooltip(game)) launch(game);
             }}
           />
-          <span className="text-sm">
-            {loading ? "Loading games…" : "Scanning for games…"}
-          </span>
+
+          <CollectionsBar
+            itemType="game"
+            activeCollectionId={activeCollectionId}
+            onSelect={setActiveCollectionId}
+            onManage={() => setShowCollectionManager(true)}
+            className="flex-shrink-0"
+          />
         </div>
-      ) : items.length === 0 ? (
+
+        {/* Sticky filters — pin at top when scrolled */}
         <div
-          className="flex-1 flex flex-col items-center justify-center gap-4"
-          style={{ color: "var(--color-text-dim)" }}
+          className="flex flex-col gap-3 pb-3"
+          style={{
+            position: "sticky",
+            top: -16,
+            zIndex: 10,
+            background: "var(--color-bg)",
+            paddingTop: 16,
+            marginTop: -16,
+            marginLeft: -16,
+            marginRight: -16,
+            paddingLeft: 16,
+            paddingRight: 16,
+          }}
         >
-          <p>No games found.</p>
-          <motion.button
-            className="px-6 py-2.5 rounded-[var(--radius-card)] font-medium"
-            style={{
-              background: "var(--color-accent)",
-              color: "var(--color-bg)",
-            }}
-            onClick={scan}
-            whileTap={{ scale: 0.96 }}
-          >
-            Scan for games
-          </motion.button>
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <OskInput
+              value={searchQuery}
+              onChange={setSearch}
+              placeholder="Search games…"
+              className="text-sm"
+              style={{ maxWidth: 280 } as React.CSSProperties}
+            />
+            <motion.button
+              className="px-4 py-2 rounded-[var(--radius-card)] text-sm font-medium"
+              style={{
+                background: "var(--color-surface-raised)",
+                color: "var(--color-text)",
+                border: "1px solid var(--color-border)",
+              }}
+              onClick={scan}
+              whileTap={{ scale: 0.96 }}
+              disabled={scanning}
+            >
+              {scanning ? "⟳ Scanning…" : "↺ Scan"}
+            </motion.button>
+            <span className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+              {items.length} games
+            </span>
+          </div>
+
+          {/* View-mode sub-tabs */}
+          <div className="flex gap-2 flex-shrink-0 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+            {(["all", "ai-groups", "by-platform"] as ViewMode[]).map((m) => (
+              <motion.button
+                key={m}
+                onClick={() => {
+                  setViewMode(m);
+                  setSelectedAiGroupId(null);
+                }}
+                className="relative flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-colors focus:outline-none"
+                style={{
+                  backgroundColor: viewMode === m
+                    ? "var(--color-accent)"
+                    : "var(--color-surface-raised)",
+                  color: viewMode === m ? "var(--color-bg)" : "var(--color-text-dim)",
+                  border: `1px solid ${viewMode === m ? "var(--color-accent)" : "var(--color-border)"}`,
+                  boxShadow: viewMode === m ? "var(--shadow-glow)" : "none",
+                }}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                {m === "all" ? "All" : m === "ai-groups" ? "✨ Groups" : "By Platform"}
+              </motion.button>
+            ))}
+          </div>
+
+          {/* AI group chips */}
+          {viewMode === "ai-groups" && aiGroups.length > 0 && (
+            <div className="flex gap-2 flex-shrink-0 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+              <motion.button
+                onClick={() => setSelectedAiGroupId(null)}
+                className="relative flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors focus:outline-none"
+                style={{
+                  backgroundColor: !selectedAiGroupId
+                    ? "var(--color-accent)"
+                    : "var(--color-surface-raised)",
+                  color: !selectedAiGroupId ? "var(--color-bg)" : "var(--color-text-dim)",
+                  border: `1px solid ${!selectedAiGroupId ? "var(--color-accent)" : "var(--color-border)"}`,
+                }}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                All Groups
+              </motion.button>
+              {aiGroups.map((g) => (
+                <motion.button
+                  key={g.id}
+                  onClick={() => setSelectedAiGroupId(g.id)}
+                  className="relative flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors focus:outline-none"
+                  style={{
+                    backgroundColor: selectedAiGroupId === g.id
+                      ? "var(--color-accent)"
+                      : "var(--color-surface-raised)",
+                    color: selectedAiGroupId === g.id ? "var(--color-bg)" : "var(--color-text-dim)",
+                    border: `1px solid ${selectedAiGroupId === g.id ? "var(--color-accent)" : "var(--color-border)"}`,
+                  }}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  {g.label} ({g.itemIds.length})
+                </motion.button>
+              ))}
+            </div>
+          )}
+
+          {viewMode === "ai-groups" && aiGroupsLoading && (
+            <div className="flex items-center gap-2 flex-shrink-0" style={{ color: "var(--color-text-dim)" }}>
+              <div className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "var(--color-accent)", borderTopColor: "transparent" }} />
+              <span className="text-xs">Generating smart groups…</span>
+            </div>
+          )}
+
+          {/* Traditional platform filters when not in AI-groups mode */}
+          {viewMode === "by-platform" && (
+            <ChipFilters
+              filters={PLATFORM_FILTERS}
+              active={activeFilter}
+              onSelect={(f) => {
+                setActiveCollectionId(null);
+                setFilter(f);
+              }}
+              className="flex-shrink-0"
+            />
+          )}
+
+          {/* Dynamic metadata facets based on currently visible items */}
+          {gridItems.length > 0 && (
+            <DynamicFacetFilters
+              items={facetSourceItems as unknown as Record<string, unknown>[]}
+              fields={gameFacetFields}
+              activeFilters={facetFilters}
+              onFilter={applyFacetFilter}
+              className="flex-shrink-0"
+            />
+          )}
         </div>
-      ) : (
-        <div className="flex-1 min-h-0 min-w-0 overflow-hidden">
+
+        {/* Grid content — participates in the outer scroll */}
+        {loading || scanning ? (
+          <div
+            className="flex flex-col items-center justify-center gap-3"
+            style={{ color: "var(--color-text-dim)", minHeight: 200 }}
+          >
+            <div
+              className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin"
+              style={{
+                borderColor: "var(--color-accent)",
+                borderTopColor: "transparent",
+              }}
+            />
+            <span className="text-sm">
+              {loading ? "Loading games…" : "Scanning for games…"}
+            </span>
+          </div>
+        ) : items.length === 0 ? (
+          <div
+            className="flex flex-col items-center justify-center gap-4"
+            style={{ color: "var(--color-text-dim)", minHeight: 200 }}
+          >
+            <p>No games found.</p>
+            <motion.button
+              className="px-6 py-2.5 rounded-[var(--radius-card)] font-medium"
+              style={{
+                background: "var(--color-accent)",
+                color: "var(--color-bg)",
+              }}
+              onClick={scan}
+              whileTap={{ scale: 0.96 }}
+            >
+              Scan for games
+            </motion.button>
+          </div>
+        ) : (
           <VirtualGrid
             ref={gridRef}
             items={gridItems}
@@ -715,46 +758,47 @@ export const GamingTab: React.FC = () => {
             onColumnCountChange={setColumnCount}
             rowHeight={260}
             renderItem={renderItem}
+            scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
           />
-        </div>
-      )}
+        )}
+      </div>
 
       <DetailPanel
         open={!!selected}
         onClose={() => setSelected(null)}
         title={detailGameData?.title ?? selected?.title ?? ""}
         coverUrl={detailGameData?.coverUrl ?? selected?.coverUrl}
-        bannerUrl={detailGameData?.bannerUrl}
+        backdropUrl={detailGameData?.bannerUrl}
         description={detailGameData?.description ?? selected?.description}
         metadata={
-          detailGameData || selected
+          detailGameData
             ? ([
-                (detailGameData ?? selected)?.developer
-                  ? { label: "Developer", value: (detailGameData ?? selected)!.developer! }
+                detailGameData.developer
+                  ? { label: "Developer", value: detailGameData.developer }
                   : null,
-                (detailGameData ?? selected)?.releaseYear
-                  ? { label: "Year", value: String((detailGameData ?? selected)!.releaseYear) }
+                detailGameData.releaseYear
+                  ? { label: "Year", value: String(detailGameData.releaseYear) }
                   : null,
-                (detailGameData ?? selected)?.metacriticScore
-                  ? { label: "Metacritic", value: String((detailGameData ?? selected)!.metacriticScore) }
+                detailGameData.metacriticScore
+                  ? { label: "Metacritic", value: String(detailGameData.metacriticScore) }
                   : null,
-                (detailGameData ?? selected)?.openCriticScore
-                  ? { label: "OpenCritic", value: String((detailGameData ?? selected)!.openCriticScore) }
+                detailGameData.openCriticScore
+                  ? { label: "OpenCritic", value: String(detailGameData.openCriticScore) }
                   : null,
-                (detailGameData ?? selected)?.protonRating && (detailGameData ?? selected)!.protonRating !== "unknown"
-                  ? { label: "ProtonDB", value: (detailGameData ?? selected)!.protonRating! }
+                detailGameData.protonRating && detailGameData.protonRating !== "unknown"
+                  ? { label: "ProtonDB", value: detailGameData.protonRating }
                   : null,
-                (detailGameData ?? selected)?.playerCount
+                detailGameData.playerCount
                   ? {
                       label: "Players",
-                      value: `${(detailGameData ?? selected)!.playerCount!.min}–${(detailGameData ?? selected)!.playerCount!.max}`,
+                      value: `${detailGameData.playerCount.min}–${detailGameData.playerCount.max}`,
                     }
                   : null,
-                (detailGameData ?? selected)?.achievementCount
-                  ? { label: "Achievements", value: String((detailGameData ?? selected)!.achievementCount) }
+                detailGameData.achievementCount
+                  ? { label: "Achievements", value: String(detailGameData.achievementCount) }
                   : null,
-                (detailGameData ?? selected)?.playtime
-                  ? { label: "Est. Playtime", value: `${Math.round((detailGameData ?? selected)!.playtime! / 60)}h` }
+                detailGameData.playTime
+                  ? { label: "Est. Playtime", value: `${Math.round(detailGameData.playTime / 60)}h` }
                   : null,
                 { label: "Platform", value: selected?.platform ?? "" },
               ].filter(Boolean) as { label: string; value: string }[])
@@ -848,7 +892,7 @@ export const GamingTab: React.FC = () => {
                       style={{ background: "var(--color-surface-raised)" }}
                     >
                       <span className="text-lg">▶</span>
-                      <span className="text-sm truncate flex-1">{video.title}</span>
+                      <span className="text-sm truncate flex-1">{video.name ?? "Video"}</span>
                       <span className="text-xs" style={{ color: "var(--color-text-dim)" }}>{video.type}</span>
                     </a>
                   ))}

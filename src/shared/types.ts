@@ -34,8 +34,11 @@ export type GamePlatform =
   | "dreamcast"
   | "flash"
   | "dos"
+  | "windows"
   | "desktop"
   | "unknown";
+
+export type WineRunner = "wine" | "proton-ge" | "system-proton";
 
 export type ProtonRating =
   | "platinum"
@@ -50,6 +53,7 @@ export interface Game {
   title: string;
   platform: GamePlatform;
   execPath?: string;
+  wineRunner?: WineRunner;
   coverUrl?: string;
   coverSource?: string;
   corrupt?: boolean;
@@ -70,6 +74,11 @@ export interface Game {
   playTime?: number;
   rating?: number;
   hidden?: boolean;
+  // Extended metadata (lazy loaded)
+  metacriticScore?: number;
+  openCriticScore?: number;
+  achievementCount?: number;
+  videos?: { name?: string; url: string; type?: string }[];
 }
 
 export interface GameEmulatorConfig {
@@ -110,6 +119,19 @@ export interface MusicTrack {
   trackNumber?: number;
   duration?: number;
   mbid?: string;
+  artistMbid?: string;
+  releaseMbid?: string;
+  releaseGroupMbid?: string;
+  label?: string;
+  albumArtist?: string;
+  discNumber?: number;
+  totalTracks?: number;
+  biography?: string;
+  mood?: string;
+  style?: string;
+  country?: string;
+  tadbArtistId?: number;
+  tadbAlbumId?: number;
   isFavorite?: boolean;
   tags?: string[];
   hidden?: boolean;
@@ -291,6 +313,7 @@ export interface AppSettings {
   tmdbApiKey?: string;
   rawgApiKey?: string;
   acoustidApiKey?: string;
+  theaudiodbApiKey?: string;
   enableAnalytics: boolean;
   startOnBoot: boolean;
   hardwareAcceleration: boolean;
@@ -406,7 +429,7 @@ export interface StreamingService {
   sortOrder: number;
 }
 
-export type PackageManager = "apt" | "flatpak" | "appimage";
+export type PackageManager = "apt" | "flatpak" | "appimage" | "winehq" | "proton-ge";
 
 export interface ManagedPackage {
   id: string;

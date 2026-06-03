@@ -2,6 +2,7 @@ import { spawn, spawnSync, ChildProcess } from "child_process";
 import { Game, Movie, MusicTrack } from "../../shared/types";
 import { createLogger } from "../util/logger";
 import { GameRepo } from "../db/repository";
+import { buildWineCommand } from "./package-manager.service";
 
 const log = createLogger("info");
 
@@ -107,7 +108,7 @@ function fullscreenDolphinWindow(): void {
   }
 }
 
-export function launchGame(game: Game): Promise<void> {
+export async function launchGame(game: Game): Promise<void> {
   if (!game.execPath && !game.romPath) {
     return Promise.reject(
       new Error(`No executable or ROM path for game: ${game.title}`),
@@ -138,6 +139,22 @@ export function launchGame(game: Game): Promise<void> {
         );
       }
       break;
+    case "windows": {
+      // Resolve the best available runner (Proton-GE > system-proton > wine)
+      const exePath = game.romPath!;
+      const wineCmd = await buildWineCommand(exePath, game.wineRunner);
+      if (!wineCmd) {
+        return Promise.reject(
+          new Error(
+            `No Windows compatibility layer found. Install Wine (via WineHQ) or Proton-GE in Settings → Packages.`,
+          ),
+        );
+      }
+      cmd = wineCmd.cmd;
+      args = wineCmd.args;
+      log.info("launcher", `Launching Windows game "${game.title}" with runner: ${cmd}`);
+      break;
+    }
     case "flash":
     case "nes":
     case "snes":
