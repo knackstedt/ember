@@ -22,6 +22,7 @@ export const EmulatorJSPlayer: React.FC = () => {
   const { open, romPath, title, platform, close } = useEmulatorjsPlayerStore();
   const containerRef = useRef<HTMLDivElement>(null);
   const initedRef = useRef(false);
+  const romUrlRef = useRef("");
 
   useEffect(() => {
     if (!open || !containerRef.current || !romPath || initedRef.current) return;
@@ -33,15 +34,16 @@ export const EmulatorJSPlayer: React.FC = () => {
       if (cancelled || !data) return;
 
       const blob = new Blob([data], { type: "application/octet-stream" });
-      const romUrl = URL.createObjectURL(blob);
+      romUrlRef.current = URL.createObjectURL(blob);
       const core = platformToCore(platform);
 
       // Set EmulatorJS globals
       (window as any).EJS_player = "#emulatorjs-container";
       (window as any).EJS_core = core;
-      (window as any).EJS_gameUrl = romUrl;
+      (window as any).EJS_gameUrl = romUrlRef.current;
       (window as any).EJS_pathtodata = "/emulatorjs/";
       (window as any).EJS_startOnLoaded = true;
+      (window as any).EJS_gameID = romPath;
 
       // Inject loader script
       const script = document.createElement("script");
@@ -56,9 +58,43 @@ export const EmulatorJSPlayer: React.FC = () => {
       cancelled = true;
       initedRef.current = false;
 
-      // Remove loader script
-      const existing = document.getElementById("emulatorjs-loader");
-      if (existing) existing.remove();
+      // Stop the running emulator instance
+      const ejs = (window as any).EJS_emulator;
+      if (ejs) {
+        try {
+          // Stop the retroarch main loop
+          if (ejs.gameManager && typeof ejs.gameManager.toggleMainLoop === "function") {
+            ejs.gameManager.toggleMainLoop(0);
+          }
+          // Pause the Emscripten module main loop
+          if (ejs.Module && typeof ejs.Module.pauseMainLoop === "function") {
+            ejs.Module.pauseMainLoop();
+          }
+          // Close the Web Audio context to kill audio output
+          const al = ejs.Module?.AL;
+          if (al?.currentCtx?.audioCtx) {
+            al.currentCtx.audioCtx.close();
+          }
+          // Disconnect any dangling gain nodes
+          if (al?.currentCtx?.sources) {
+            for (const src of Object.values(al.currentCtx.sources)) {
+              try { (src as any).gain?.disconnect(); } catch {}
+            }
+          }
+          // Clear internal emulator timeouts
+          if (ejs.resetTimeout) clearTimeout(ejs.resetTimeout);
+          if (ejs.msgTimeout) clearTimeout(ejs.msgTimeout);
+        } catch {}
+      }
+
+      // Remove ALL EmulatorJS injected scripts (loader + dynamically loaded)
+      document.querySelectorAll("script").forEach((s) => {
+        if (s.src.includes("/emulatorjs/")) s.remove();
+      });
+      // Remove injected stylesheets
+      document.querySelectorAll('link[rel="stylesheet"]').forEach((l) => {
+        if ((l as HTMLLinkElement).href.includes("/emulatorjs/")) l.remove();
+      });
 
       // Clean up globals
       delete (window as any).EJS_player;
@@ -66,9 +102,18 @@ export const EmulatorJSPlayer: React.FC = () => {
       delete (window as any).EJS_gameUrl;
       delete (window as any).EJS_pathtodata;
       delete (window as any).EJS_startOnLoaded;
+      delete (window as any).EJS_emulator;
+      delete (window as any).EJS_gameManager;
+      delete (window as any).EJS_gameID;
+      delete (window as any).EJS_adBlocked;
 
       if (container) {
         container.innerHTML = "";
+      }
+
+      if (romUrlRef.current) {
+        URL.revokeObjectURL(romUrlRef.current);
+        romUrlRef.current = "";
       }
     };
   }, [open, romPath, platform]);
