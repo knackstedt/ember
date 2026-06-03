@@ -106,7 +106,11 @@ export const MovieRepo = {
 
   async upsert(movie: Movie): Promise<void> {
     const db = getDb();
-    await db.query(`UPSERT movie:⟨${escapeId(movie.id)}⟩ CONTENT $movie`, { movie });
+    const normalized: Record<string, unknown> = { ...movie };
+    if (normalized.isFavorite === undefined) normalized.isFavorite = false;
+    if (normalized.tags === undefined) normalized.tags = [];
+    if (normalized.hidden === undefined) normalized.hidden = false;
+    await db.query(`UPSERT movie:⟨${escapeId(movie.id)}⟩ CONTENT $movie`, { movie: normalized });
   },
 
   async setFavorite(id: string, value: boolean): Promise<void> {
@@ -148,7 +152,11 @@ export const MusicRepo = {
 
   async upsert(track: MusicTrack): Promise<void> {
     const db = getDb();
-    await db.query(`UPSERT music_track:⟨${escapeId(track.id)}⟩ CONTENT $track`, { track });
+    const normalized: Record<string, unknown> = { ...track };
+    if (normalized.isFavorite === undefined) normalized.isFavorite = false;
+    if (normalized.tags === undefined) normalized.tags = [];
+    if (normalized.hidden === undefined) normalized.hidden = false;
+    await db.query(`UPSERT music_track:⟨${escapeId(track.id)}⟩ CONTENT $track`, { track: normalized });
   },
 
   async setFavorite(id: string, value: boolean): Promise<void> {
@@ -180,7 +188,11 @@ export const TVRepo = {
 
   async upsert(show: TVShow): Promise<void> {
     const db = getDb();
-    await db.query(`UPSERT tv_show:⟨${escapeId(show.id)}⟩ CONTENT $show`, { show });
+    const normalized: Record<string, unknown> = { ...show };
+    if (normalized.isFavorite === undefined) normalized.isFavorite = false;
+    if (normalized.tags === undefined) normalized.tags = [];
+    if (normalized.hidden === undefined) normalized.hidden = false;
+    await db.query(`UPSERT tv_show:⟨${escapeId(show.id)}⟩ CONTENT $show`, { show: normalized });
   },
 
   async setFavorite(id: string, value: boolean): Promise<void> {
