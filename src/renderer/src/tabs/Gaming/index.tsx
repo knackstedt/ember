@@ -14,7 +14,8 @@ import { DetailPanel } from "../../components/DetailPanel/DetailPanel";
 import { OskInput } from "../../components/OnScreenKeyboard/OnScreenKeyboard";
 import { RecentlyPlayedRow } from "../../components/RecentlyPlayedRow/RecentlyPlayedRow";
 import { CoreSelector } from "../../components/CoreSelector/CoreSelector";
-import { Game, GamePlatform, GameEmulatorConfig } from "../../../../shared/types";
+import { Dropdown } from "../../components/Dropdown/Dropdown";
+import { Game, GamePlatform, GameEmulatorConfig, WineRunner } from "../../../../shared/types";
 import { useGridFocus } from "../../hooks/useGridFocus";
 import { useContextMenu } from "../../hooks/useContextMenu";
 import { ContextMenuOption } from "../../components/ContextMenu/ContextMenu";
@@ -215,6 +216,9 @@ export const GamingTab: React.FC = () => {
 
   const setEmulatorConfig = useGamesStore((s) => s.setEmulatorConfig);
   const getEmulatorConfig = useGamesStore((s) => s.getEmulatorConfig);
+  const setWineRunner = useGamesStore((s) => s.setWineRunner);
+  const setWineCustomCommand = useGamesStore((s) => s.setWineCustomCommand);
+  const setUmuCustomCommand = useGamesStore((s) => s.setUmuCustomCommand);
 
   useEffect(() => {
     if (!selected) {
@@ -471,7 +475,15 @@ export const GamingTab: React.FC = () => {
           void regenerateThumbnail(game.id);
           break;
         case "folder": {
-          const path = game.romPath || game.execPath;
+          let path = game.romPath;
+          if (!path && game.execPath) {
+            // Strip desktop field codes and extract the actual binary path
+            path = game.execPath
+              .replace(/%[uUfFdDnNickvm]/g, "")
+              .replace(/^"(.+)"$/, "$1")
+              .trim()
+              .split(/\s+/)[0];
+          }
           if (path) {
             void window.htpc.shell.showItemInFolder(path);
           }
@@ -1043,35 +1055,29 @@ export const GamingTab: React.FC = () => {
                 >
                   Emulator Shader
                 </div>
-                <select
+                <Dropdown
                   value={selectedEmulatorConfig.shader ?? ""}
-                  onChange={(e) => {
-                    const shader = e.target.value;
+                  options={[
+                    { value: "", label: "Inherit (use emulator/global default)" },
+                    { value: "2xSal.glsl", label: "2xSal" },
+                    { value: "4xBR.glsl", label: "4xBR" },
+                    { value: "6xBRZ.glsl", label: "6xBRZ" },
+                    { value: "crt-easymode.glsl", label: "CRT Easymode" },
+                    { value: "crt-geom.glsl", label: "CRT Geom" },
+                    { value: "dot.glsl", label: "Dot" },
+                    { value: "lcd.glsl", label: "LCD" },
+                    { value: "ntsc.glsl", label: "NTSC" },
+                    { value: "sharp-bilinear.glsl", label: "Sharp Bilinear" },
+                    { value: "supereagle.glsl", label: "Super Eagle" },
+                    { value: "xbrz.glsl", label: "xBRZ" },
+                  ]}
+                  onChange={(shader) => {
                     const next = { ...selectedEmulatorConfig, shader: shader || undefined };
                     setSelectedEmulatorConfig(next);
                     void setEmulatorConfig(selected.id, next);
                   }}
-                  className="w-full text-sm px-2 py-1.5 rounded"
-                  style={{
-                    background: "var(--color-surface-raised)",
-                    border: "1px solid var(--color-border)",
-                    color: "var(--color-text)",
-                    outline: "none",
-                  }}
-                >
-                  <option value="">Inherit (use emulator/global default)</option>
-                  <option value="2xSal.glsl">2xSal</option>
-                  <option value="4xBR.glsl">4xBR</option>
-                  <option value="6xBRZ.glsl">6xBRZ</option>
-                  <option value="crt-easymode.glsl">CRT Easymode</option>
-                  <option value="crt-geom.glsl">CRT Geom</option>
-                  <option value="dot.glsl">Dot</option>
-                  <option value="lcd.glsl">LCD</option>
-                  <option value="ntsc.glsl">NTSC</option>
-                  <option value="sharp-bilinear.glsl">Sharp Bilinear</option>
-                  <option value="supereagle.glsl">Super Eagle</option>
-                  <option value="xbrz.glsl">xBRZ</option>
-                </select>
+                  className="w-full"
+                />
               </div>
             )}
             {LIBRETRO_PLATFORMS.includes(selected.platform) && (
@@ -1094,29 +1100,97 @@ export const GamingTab: React.FC = () => {
                 >
                   Shader
                 </div>
-                <select
+                <Dropdown
                   value={selectedEmulatorConfig.shader ?? ""}
-                  onChange={(e) => {
-                    const shader = e.target.value;
+                  options={[
+                    { value: "", label: "None" },
+                    ...SHADER_PRESETS.filter((s) => s.id !== "none").map((preset) => ({
+                      value: preset.id,
+                      label: preset.name,
+                    })),
+                  ]}
+                  onChange={(shader) => {
                     const next = { ...selectedEmulatorConfig, shader: shader || undefined };
                     setSelectedEmulatorConfig(next);
                     void setEmulatorConfig(selected.id, next);
                   }}
-                  className="w-full text-sm px-2 py-1.5 rounded"
-                  style={{
-                    background: "var(--color-surface-raised)",
-                    border: "1px solid var(--color-border)",
-                    color: "var(--color-text)",
-                    outline: "none",
-                  }}
-                >
-                  <option value="">None</option>
-                  {SHADER_PRESETS.filter((s) => s.id !== "none").map((preset) => (
-                    <option key={preset.id} value={preset.id}>
-                      {preset.name}
-                    </option>
-                  ))}
-                </select>
+                  className="w-full"
+                />
+              </div>
+            )}
+            {selected.platform === "windows" && (
+              <div className="flex flex-col gap-4">
+                <div>
+                  <div
+                    className="text-xs font-semibold uppercase tracking-wide mb-2"
+                    style={{ color: "var(--color-text-dim)" }}
+                  >
+                    Compatibility Runner
+                  </div>
+                  <Dropdown
+                    value={selected.wineRunner ?? ""}
+                    options={[
+                      { value: "", label: "Auto-detect" },
+                      { value: "umu-run", label: "umu-run" },
+                      { value: "wine", label: "Wine" },
+                      { value: "proton-ge", label: "Proton-GE" },
+                      { value: "system-proton", label: "System Proton" },
+                    ]}
+                    onChange={(runner) => {
+                      const value = runner as WineRunner || undefined;
+                      void setWineRunner(selected.id, value ?? "wine");
+                    }}
+                    className="w-full"
+                  />
+                </div>
+                <div>
+                  <div
+                    className="text-xs font-semibold uppercase tracking-wide mb-2"
+                    style={{ color: "var(--color-text-dim)" }}
+                  >
+                    Wine Custom Command
+                  </div>
+                  <input
+                    type="text"
+                    value={selected.wineCustomCommand ?? ""}
+                    onChange={(e) => void setWineCustomCommand(selected.id, e.target.value || null)}
+                    placeholder="wine {exe} --some-flag"
+                    className="w-full text-sm px-2 py-1.5 rounded"
+                    style={{
+                      background: "var(--color-surface-raised)",
+                      border: "1px solid var(--color-border)",
+                      color: "var(--color-text)",
+                      outline: "none",
+                    }}
+                  />
+                  <p className="text-[10px] mt-1" style={{ color: "var(--color-text-dim)" }}>
+                    Use {"{exe}"} as placeholder for the executable path. Leave empty for default.
+                  </p>
+                </div>
+                <div>
+                  <div
+                    className="text-xs font-semibold uppercase tracking-wide mb-2"
+                    style={{ color: "var(--color-text-dim)" }}
+                  >
+                    umu-run Custom Command
+                  </div>
+                  <input
+                    type="text"
+                    value={selected.umuCustomCommand ?? ""}
+                    onChange={(e) => void setUmuCustomCommand(selected.id, e.target.value || null)}
+                    placeholder="umu-run {exe}"
+                    className="w-full text-sm px-2 py-1.5 rounded"
+                    style={{
+                      background: "var(--color-surface-raised)",
+                      border: "1px solid var(--color-border)",
+                      color: "var(--color-text)",
+                      outline: "none",
+                    }}
+                  />
+                  <p className="text-[10px] mt-1" style={{ color: "var(--color-text-dim)" }}>
+                    Use {"{exe}"} as placeholder for the executable path. Leave empty for default.
+                  </p>
+                </div>
               </div>
             )}
           </div>
