@@ -102,6 +102,17 @@ const scanLocks = {
 const regenerateLocks = new Set<string>();
 
 export function registerIpcHandlers(window: BrowserWindow): void {
+  ipcMain.handle("devtools:is-open", () => {
+    return window.webContents.isDevToolsOpened();
+  });
+
+  window.webContents.on("devtools-opened", () => {
+    window.webContents.send("devtools:changed", true);
+  });
+  window.webContents.on("devtools-closed", () => {
+    window.webContents.send("devtools:changed", false);
+  });
+
   ipcMain.handle("settings:get", async () => {
     return await getSettings();
   });
@@ -200,7 +211,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
         const metadata = await searchGameMetadata({ title, platform, steamAppId });
         return metadata;
       } catch (err) {
-        log.error("ipc:games:metadata:search", err);
+        log.error("ipc:games:metadata:search", String(err));
         return null;
       }
     },
@@ -213,15 +224,15 @@ export function registerIpcHandlers(window: BrowserWindow): void {
       steamAppId?: number;
       igdbId?: number;
       rawgSlug?: string;
-      mobyGamesId?: string;
-      theGamesDbId?: string;
+      mobyGamesId?: number;
+      theGamesDbId?: number;
       launchBoxDbId?: string;
     }) => {
       try {
         const metadata = await fetchGameMetadata(options);
         return metadata;
       } catch (err) {
-        log.error("ipc:games:metadata:fetch", err);
+        log.error("ipc:games:metadata:fetch", String(err));
         return null;
       }
     },
@@ -235,7 +246,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
         const metadata = await enrichGameMetadata(game.title, game.platform, game.steamAppId);
         return metadata;
       } catch (err) {
-        log.error("ipc:games:metadata:enrich", err);
+        log.error("ipc:games:metadata:enrich", String(err));
         return null;
       }
     },
@@ -249,7 +260,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
         const metadata = await quickMetadataLookup(title, platform);
         return metadata;
       } catch (err) {
-        log.error("ipc:games:metadata:quick", err);
+        log.error("ipc:games:metadata:quick", String(err));
         return null;
       }
     },
@@ -277,7 +288,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
       steamAppId?: number;
       igdbId?: number;
       rawgSlug?: string;
-      theGamesDbId?: string;
+      theGamesDbId?: number;
       launchBoxDbId?: string;
     }) => {
       try {
@@ -287,17 +298,13 @@ export function registerIpcHandlers(window: BrowserWindow): void {
             title: options.title,
             platform: options.platform,
             steamAppId: options.steamAppId,
-            igdbId: options.igdbId,
-            rawgSlug: options.rawgSlug,
-            theGamesDbId: options.theGamesDbId,
-            launchBoxDbId: options.launchBoxDbId,
           },
           ["artwork", "video"] // Only fetch low-rate-limit sources
         );
 
         return metadata;
       } catch (err) {
-        log.error("ipc:games:metadata:lazy", err);
+        log.error("ipc:games:metadata:lazy", String(err));
         return null;
       }
     },
@@ -325,6 +332,9 @@ export function registerIpcHandlers(window: BrowserWindow): void {
           const settings = await getSettings();
           if (settings.steamApiKey) {
             const { SteamWebAPIProvider } = await import("../services/metadata");
+            if (!SteamWebAPIProvider.fetch) {
+              return { achievements: [], count: 0 };
+            }
             const metadata = await SteamWebAPIProvider.fetch(
               { steamAppId: options.steamAppId },
               settings.steamApiKey
@@ -338,7 +348,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
 
         return { achievements: [], count: 0 };
       } catch (err) {
-        log.error("ipc:games:metadata:achievements", err);
+        log.error("ipc:games:metadata:achievements", String(err));
         return { achievements: [], count: 0 };
       }
     },
@@ -350,7 +360,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     async (_e, options: {
       gameId: string;
       steamAppId?: number;
-      theGamesDbId?: string;
+      theGamesDbId?: number;
       title?: string;
     }) => {
       try {
@@ -372,7 +382,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
           screenshots: metadata?.screenshots,
         };
       } catch (err) {
-        log.error("ipc:games:metadata:artwork", err);
+        log.error("ipc:games:metadata:artwork", String(err));
         return null;
       }
     },
@@ -396,7 +406,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
 
         return metadata?.videos || [];
       } catch (err) {
-        log.error("ipc:games:metadata:videos", err);
+        log.error("ipc:games:metadata:videos", String(err));
         return [];
       }
     },
@@ -411,7 +421,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
         const rating = await getProtonRating(steamAppId);
         return rating;
       } catch (err) {
-        log.error("ipc:games:metadata:proton", err);
+        log.error("ipc:games:metadata:proton", String(err));
         return "unknown";
       }
     },

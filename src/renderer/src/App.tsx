@@ -67,7 +67,9 @@ function findMatchingCommand(shortcut: string, customBinds: Record<string, strin
   // Check custom binds first
   for (const [cmdId, boundShortcut] of Object.entries(customBinds)) {
     if (boundShortcut === shortcut) {
-      return COMMAND_DEFINITIONS.find((c) => c.id === cmdId);
+      const cmd = COMMAND_DEFINITIONS.find((c) => c.id === cmdId);
+      if (cmd) return cmd;
+      // stale/invalid bind — continue checking other binds & defaults
     }
   }
   // Fall back to defaults
@@ -351,11 +353,11 @@ export default function App(): React.ReactElement {
         }
       }
 
-      if (e.key === "F11") {
+      if (e.type === "keydown" && e.key === "F11") {
         e.preventDefault();
         isFullscreenRef.current = !isFullscreenRef.current;
         window.htpc.app.setFullscreen(isFullscreenRef.current);
-      } else if (e.key === "Escape") {
+      } else if (e.type === "keydown" && e.key === "Escape") {
         useVideoPlayerStore.getState().close();
         window.dispatchEvent(new CustomEvent("htpc:escape"));
       } else if (!isTyping && (e.key === "Enter" || e.key === " ")) {
@@ -431,18 +433,18 @@ export default function App(): React.ReactElement {
         e.preventDefault();
         const idx = visibleTabIds.indexOf(activeTabRef.current);
         setActiveTab(visibleTabIds[(idx - 1 + visibleTabIds.length) % visibleTabIds.length]);
-      } else if (e.type === "keydown" && e.key === "F1" && e.ctrlKey) {
+      } else if (e.type === "keydown" && e.key === "F1") {
         // Ctrl+F1 — rescan all libraries
         e.preventDefault();
         useGamesStore.getState().scan();
         useMoviesStore.getState().scan();
         useMusicStore.getState().scan();
         useTvStore.getState().scan();
-      } else if (e.type === "keydown" && e.key === "F2" && e.ctrlKey) {
+      } else if (e.type === "keydown" && e.key === "F2") {
         // Ctrl+F2 — wipe library data then reload
         e.preventDefault();
         window.htpc.db.clear().then(() => window.htpc.app.restart());
-      } else if (e.type === "keydown" && e.key === "F3" && e.ctrlKey) {
+      } else if (e.type === "keydown" && e.key === "F3") {
         // Ctrl+F3 — wipe thumbnail cache then reload stores
         e.preventDefault();
         window.htpc.db.wipeThumbnails().then(() => {
@@ -451,7 +453,7 @@ export default function App(): React.ReactElement {
           useMusicStore.getState().load();
           useTvStore.getState().load();
         });
-      } else if (e.type === "keydown" && e.key === "F5" && e.ctrlKey) {
+      } else if (e.type === "keydown" && e.key === "F5") {
         // Ctrl+F5 — reload window
         e.preventDefault();
         window.htpc.app.restart();
@@ -459,7 +461,7 @@ export default function App(): React.ReactElement {
         // Ctrl+P — open command palette
         e.preventDefault();
         useCommandsStore.getState().toggle();
-      } else if (e.type === "keydown" && e.key === "F5") {
+      } else if (e.type === "keydown" && e.key === "F6") {
         e.preventDefault();
         const scanMap: Partial<Record<TabId, () => void>> = {
           gaming: () => useGamesStore.getState().scan(),
@@ -468,7 +470,7 @@ export default function App(): React.ReactElement {
           "tv-shows": () => useTvStore.getState().scan(),
         };
         scanMap[activeTabRef.current]?.();
-      } else if (e.key === "f" && e.ctrlKey) {
+      } else if (e.type === "keydown" && e.key === "f" && e.ctrlKey) {
         e.preventDefault();
         document
           .querySelector<HTMLInputElement>('input[placeholder^="Search"]')

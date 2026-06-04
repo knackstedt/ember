@@ -312,6 +312,7 @@ export interface AppSettings {
   gamePaths: string[];
   tmdbApiKey?: string;
   rawgApiKey?: string;
+  steamApiKey?: string;
   acoustidApiKey?: string;
   theaudiodbApiKey?: string;
   enableAnalytics: boolean;

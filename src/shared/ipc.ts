@@ -131,4 +131,8 @@ export const IPC_CHANNELS = {
     progress: "packages:progress",
     aptPassword: "packages:apt:password",
   },
+  devtools: {
+    isOpen: "devtools:is-open",
+    changed: "devtools:changed",
+  },
 } as const;

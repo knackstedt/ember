@@ -105,8 +105,18 @@ export function scanSteamGames(): Game[] {
         const data = parseAcf(content);
         const appId = data["appid"];
         const name = data["name"];
+        const installdir = data["installdir"];
         if (!appId || !name) continue;
         if (isSteamTool(name)) continue;
+
+        const installPath = installdir ? join(lib, "common", installdir) : null;
+        if (!installPath || !existsSync(installPath)) continue;
+        try {
+          const files = readdirSync(installPath);
+          if (files.length === 0) continue;
+        } catch {
+          continue;
+        }
 
         const cover = findCover(gridDir, appId);
 

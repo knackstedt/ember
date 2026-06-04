@@ -354,6 +354,15 @@ const htpc = {
     ipcRenderer.on("scan:progress", handler);
     return () => ipcRenderer.removeListener("scan:progress", handler);
   },
+
+  devtools: {
+    isOpen: (): Promise<boolean> => ipcRenderer.invoke("devtools:is-open"),
+    onChange: (cb: (open: boolean) => void) => {
+      const handler = (_: Electron.IpcRendererEvent, open: boolean) => cb(open);
+      ipcRenderer.on("devtools:changed", handler);
+      return () => ipcRenderer.removeListener("devtools:changed", handler);
+    },
+  },
 };
 
 contextBridge.exposeInMainWorld("htpc", htpc);

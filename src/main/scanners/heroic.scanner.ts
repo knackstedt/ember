@@ -82,16 +82,22 @@ function parseLibrary(
   try {
     const data = JSON.parse(readFileSync(path, "utf-8"));
     const library: HeroicGame[] = data.games ?? data.library ?? [];
-    return library.map((g) => ({
-      id: `heroic_${g.app_name}`,
-      title: g.title,
-      platform,
-      execPath: g.install?.executable,
-      coverUrl: coverFor(g, imagesDir),
-      developer: g.developer,
-      description: g.extra?.about?.longDescription,
-      tags: [],
-    }));
+    return library
+      .filter((g) => {
+        const exe = g.install?.executable;
+        if (!exe) return false;
+        return existsSync(exe);
+      })
+      .map((g) => ({
+        id: `heroic_${g.app_name}`,
+        title: g.title,
+        platform,
+        execPath: g.install?.executable,
+        coverUrl: coverFor(g, imagesDir),
+        developer: g.developer,
+        description: g.extra?.about?.longDescription,
+        tags: [],
+      }));
   } catch {
     log.error("parseLibrary", `Failed to parse Heroic library: ${path}`);
     return [];
@@ -144,6 +150,7 @@ export function scanLutrisGames(): Game[] {
         readFileSync(join(LUTRIS_GAMES_DIR, entry), "utf-8"),
       );
       if (!data.name) continue;
+      if (!data.exe || !existsSync(data.exe)) continue;
       games.push({
         id: `lutris_${data.slug ?? entry}`,
         title: data.name,

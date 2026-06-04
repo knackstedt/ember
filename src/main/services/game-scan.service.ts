@@ -154,6 +154,90 @@ async function enrichGameWithImmediateMetadata(game: Game): Promise<MetadataEnri
 }
 
 /**
+ * Platforms whose games are discovered by scanners and may become stale
+ */
+const MANAGED_PLATFORMS = new Set([
+  "steam", "gog", "heroic", "lutris", "desktop",
+  "dolphin-gc", "dolphin-wii", "nes", "snes", "gb", "gba", "n64",
+  "genesis", "sms", "gamegear", "pce", "psx", "nds", "dreamcast",
+  "flash", "dos", "windows",
+]);
+
+function resolveTargetPath(game: Game): string | undefined {
+  if (game.romPath) return game.romPath;
+  if (!game.execPath) return undefined;
+  // Skip URL schemes (steam://, ember://, etc.)
+  if (/^\w+:\/\//.test(game.execPath)) return undefined;
+  // Strip desktop field codes and extract path
+  const cleaned = game.execPath.replace(/%[uUfFdDnNickvm]/g, "").trim();
+  const quoted = cleaned.match(/^"(.+)"$/);
+  if (quoted) return quoted[1];
+  return cleaned.split(/\s+/)[0];
+}
+
+function extractRecordId(raw: unknown): string | null {
+  if (typeof raw === "string") {
+    // SurrealDB sometimes returns "tb:id" compound strings
+    const colonIdx = raw.indexOf(":");
+    return colonIdx >= 0 ? raw.slice(colonIdx + 1) : raw;
+  }
+  if (raw && typeof raw === "object") {
+    const obj = raw as Record<string, unknown>;
+    if (typeof obj.id === "string") return obj.id;
+    if (typeof obj.id === "object" && obj.id !== null) {
+      return extractRecordId(obj.id);
+    }
+    const str = String(raw);
+    const colonIdx = str.indexOf(":");
+    return colonIdx >= 0 ? str.slice(colonIdx + 1) : str;
+  }
+  return null;
+}
+
+async function cleanupStaleGames(
+  db: ReturnType<typeof getDb>,
+  scannedGames: Game[],
+): Promise<void> {
+  const scannedIds = new Set(scannedGames.map((g) => g.id));
+  const result = await db.query<[Game[]]>("SELECT * FROM game");
+  const existingGames = (result[0] ?? []) as Game[];
+
+  log.info("cleanup", `Checking ${existingGames.length} existing games against ${scannedIds.size} scanned games`);
+
+  for (const game of existingGames) {
+    const id = extractRecordId(game.id);
+    if (!id) {
+      log.warn("cleanup", `Skipping game with unparseable id: ${JSON.stringify(game.id)}`);
+      continue;
+    }
+
+    if (!MANAGED_PLATFORMS.has(game.platform)) continue;
+    if (scannedIds.has(id)) continue;
+
+    let shouldDelete = false;
+
+    if (game.platform === "steam") {
+      // Steam games not found in scan were skipped because install dir is missing or empty
+      shouldDelete = true;
+    } else {
+      const target = resolveTargetPath(game);
+      if (target && target.startsWith("/")) {
+        shouldDelete = !existsSync(target);
+      }
+    }
+
+    if (shouldDelete) {
+      log.info("cleanup", `Removing stale game ${id} (${game.title}) platform=${game.platform}`);
+      try {
+        await db.query(`DELETE game:⟨${id}⟩`);
+      } catch (err) {
+        log.warn("cleanup", `Failed to delete ${id}: ${err}`);
+      }
+    }
+  }
+}
+
+/**
  * Calculate ROM hashes for verification
  */
 async function calculateRomHashes(romPath?: string): Promise<{ crc32?: string; md5?: string; sha1?: string } | null> {
@@ -208,7 +292,13 @@ async function preserveExistingFields(
       game.hidden = existing.hidden;
     }
     if (existing.coverUrl !== undefined && existing.coverUrl !== null) {
-      game.coverUrl = existing.coverUrl;
+      // Don't preserve raw local paths — the scanner now serves them via ember://media/
+      const isRawLocal =
+        existing.coverUrl.startsWith("/") ||
+        existing.coverUrl.startsWith("file://");
+      if (!isRawLocal) {
+        game.coverUrl = existing.coverUrl;
+      }
     }
     if (existing.coverSource !== undefined && existing.coverSource !== null) {
       game.coverSource = existing.coverSource;
@@ -337,6 +427,8 @@ async function scanInMainThread(
       log.warn("scan", `Failed to upsert ${game.id}: ${err}`);
     }
   }
+
+  await cleanupStaleGames(db, enrichedGames);
 
   return enrichedGames;
 }
@@ -469,6 +561,9 @@ export async function performGameScan(
                 log.warn("scan", `Failed to upsert ${game.id}: ${err}`);
               }
             }
+
+            await cleanupStaleGames(db, enrichedGames);
+
             worker.terminate();
             resolve(enrichedGames);
           } catch (err) {

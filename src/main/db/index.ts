@@ -251,4 +251,27 @@ async function runMigrations(db: Surreal): Promise<void> {
     DEFINE FIELD IF NOT EXISTS isBuiltin ON streaming_service TYPE bool DEFAULT false;
     DEFINE FIELD IF NOT EXISTS sortOrder ON streaming_service TYPE int DEFAULT 0;
   `);
+
+  // Migrate old raw local coverUrl paths → ember://media protocol
+  try {
+    const [absPaths] = await db.query<[{ id: string; coverUrl: string }[]]>(
+      `SELECT id, coverUrl FROM game WHERE coverUrl STARTS WITH "/"`,
+    );
+    for (const row of absPaths ?? []) {
+      await db.query(`UPDATE ${row.id} SET coverUrl = $url`, {
+        url: `ember://media/${row.coverUrl}`,
+      });
+    }
+
+    const [fileUrls] = await db.query<[{ id: string; coverUrl: string }[]]>(
+      `SELECT id, coverUrl FROM game WHERE coverUrl STARTS WITH "file://"`,
+    );
+    for (const row of fileUrls ?? []) {
+      await db.query(`UPDATE ${row.id} SET coverUrl = $url`, {
+        url: `ember://media/${row.coverUrl.slice("file://".length)}`,
+      });
+    }
+  } catch (err) {
+    log.warn("db", `raw coverUrl migration failed: ${err}`);
+  }
 }

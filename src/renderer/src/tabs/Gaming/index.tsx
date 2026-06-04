@@ -39,6 +39,8 @@ import {
   RotateCw,
   FolderOpen,
   Gamepad2,
+  Bug,
+  Trash2,
 } from "lucide-react";
 import { AiGroup } from "../../../../shared/types";
 import { DynamicFacetFilters, FacetField } from "../../components/DynamicFacetFilters/DynamicFacetFilters";
@@ -56,6 +58,13 @@ type GameWithMetadata = Game & Partial<{
   achievementCount: number;
   igdbId: number;
 }>;
+
+let devToolsOpen = false;
+window.htpc.devtools
+  ?.isOpen?.()
+  .then((open) => { devToolsOpen = open; })
+  .catch(() => { /* ignore */ });
+window.htpc.devtools?.onChange?.((open) => { devToolsOpen = open; });
 
 const PLATFORM_FILTERS: ChipFilter<
   GamePlatform | "all" | "couch-coop" | "favorites"
@@ -415,6 +424,10 @@ export const GamingTab: React.FC = () => {
           disabled: !game.execPath && !game.romPath,
         },
       ];
+      if (devToolsOpen) {
+        opts.push({ id: "debug", label: "Debug", icon: <Bug size={16} /> });
+      }
+      opts.push({ id: "remove", label: "Remove from library", icon: <Trash2 size={16} />, destructive: true });
       if (gameCollections.length > 0) {
         opts.push({ id: "__sep__", label: "Collections", disabled: true });
         for (const c of gameCollections) {
@@ -462,6 +475,14 @@ export const GamingTab: React.FC = () => {
           if (path) {
             void window.htpc.shell.showItemInFolder(path);
           }
+          break;
+        }
+        case "debug": {
+          console.log("[Debug] Game entry:", game);
+          break;
+        }
+        case "remove": {
+          hide(game.id);
           break;
         }
       }
