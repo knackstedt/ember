@@ -14,7 +14,7 @@ const ROWS = [
   ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"],
   ["a", "s", "d", "f", "g", "h", "j", "k", "l"],
   ["z", "x", "c", "v", "b", "n", "m"],
-  [" ", "⌫", "✓"],
+  [" ", "DEL", "OK"],
 ];
 
 const ROWS_SHIFT = [
@@ -22,7 +22,7 @@ const ROWS_SHIFT = [
   ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],
   ["A", "S", "D", "F", "G", "H", "J", "K", "L"],
   ["Z", "X", "C", "V", "B", "N", "M"],
-  [" ", "⌫", "✓"],
+  [" ", "DEL", "OK"],
 ];
 
 export const OnScreenKeyboard: React.FC<OnScreenKeyboardProps> = ({
@@ -38,9 +38,9 @@ export const OnScreenKeyboard: React.FC<OnScreenKeyboardProps> = ({
 
   const handleKey = useCallback(
     (key: string) => {
-      if (key === "⌫") {
+      if (key === "DEL") {
         onChange(value.slice(0, -1));
-      } else if (key === "✓") {
+      } else if (key === "OK") {
         onClose();
       } else if (key === " ") {
         onChange(value + " ");
@@ -106,7 +106,7 @@ export const OnScreenKeyboard: React.FC<OnScreenKeyboardProps> = ({
           handleKeyRef.current(r[row][keyCol]);
         }
       } else if (ev.action === "east") {
-        handleKeyRef.current("⌫");
+        handleKeyRef.current("DEL");
       } else if (ev.action === "start") {
         onSubmitRef.current?.(valueRef.current);
       }
@@ -165,7 +165,7 @@ export const OnScreenKeyboard: React.FC<OnScreenKeyboardProps> = ({
                 onClick={() => setShift((s) => !s)}
                 whileTap={{ scale: 0.92 }}
               >
-                ⇧
+                SHIFT
               </motion.button>
             )}
             {row.map((key, ki) => {
@@ -178,11 +178,11 @@ export const OnScreenKeyboard: React.FC<OnScreenKeyboardProps> = ({
                   className={`px-3 py-2.5 rounded text-sm font-medium transition-transform${isFocused ? " ring-2 ring-[var(--color-accent)] scale-110" : ""}`}
                   style={{
                     background:
-                      key === "✓"
+                      key === "OK"
                         ? "var(--color-accent)"
                         : "var(--color-surface-raised)",
                     color:
-                      key === "✓" ? "var(--color-bg)" : "var(--color-text)",
+                      key === "OK" ? "var(--color-bg)" : "var(--color-text)",
                     border: "1px solid var(--color-border)",
                     minWidth: key === " " ? "8rem" : "2.5rem",
                   }}

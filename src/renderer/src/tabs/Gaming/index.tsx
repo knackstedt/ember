@@ -42,6 +42,13 @@ import {
   Gamepad2,
   Bug,
   Trash2,
+  Folder,
+  Loader,
+  RotateCw,
+  Sparkles,
+  Play,
+  X,
+  Star,
 } from "lucide-react";
 import { AiGroup } from "../../../../shared/types";
 import { DynamicFacetFilters, FacetField } from "../../components/DynamicFacetFilters/DynamicFacetFilters";
@@ -71,8 +78,8 @@ const PLATFORM_FILTERS: ChipFilter<
   GamePlatform | "all" | "couch-coop" | "favorites"
 >[] = [
   { id: "all", label: "All" },
-  { id: "favorites", label: "★ Favorites" },
-  { id: "couch-coop", label: "🎮 Couch Co-op" },
+  { id: "favorites", label: <><Star size={14} /> Favorites</> },
+  { id: "couch-coop", label: <><Gamepad2 size={14} /> Couch Co-op</> },
   { id: "steam", label: "Steam" },
   { id: "gog", label: "GOG" },
   { id: "heroic", label: "Heroic/Epic" },
@@ -438,7 +445,7 @@ export const GamingTab: React.FC = () => {
           opts.push({
             id: `add-to-coll:${c.id}`,
             label: c.name,
-            icon: c.icon || "📁",
+            icon: c.icon || <Folder size={16} />,
           });
         }
       }
@@ -673,7 +680,7 @@ export const GamingTab: React.FC = () => {
             whileTap={{ scale: 0.96 }}
             disabled={scanning}
           >
-            {scanning ? "⟳ Scanning…" : "↺ Scan"}
+            {scanning ? <><Loader size={14} className="animate-spin" /> Scanning…</> : <><RotateCw size={14} /> Scan</>}
           </motion.button>
           <span className="text-xs" style={{ color: "var(--color-text-dim)" }}>
             {items.length} games
@@ -686,7 +693,7 @@ export const GamingTab: React.FC = () => {
               color: "var(--color-bg)",
             }}
           >
-            {viewMode === "all" ? "All" : viewMode === "ai-groups" ? "✨ Groups" : "By Platform"}
+            {viewMode === "all" ? "All" : viewMode === "ai-groups" ? <><Sparkles size={12} /> Groups</> : "By Platform"}
           </span>
           {viewMode === "ai-groups" && selectedAiGroupId && (() => {
             const group = aiGroups.find((g) => g.id === selectedAiGroupId);
@@ -701,7 +708,7 @@ export const GamingTab: React.FC = () => {
                 whileTap={{ scale: 0.95 }}
                 title="Clear group filter"
               >
-                Group: {group.label} ✕
+                Group: {group.label} <X size={12} />
               </motion.button>
             ) : null;
           })()}
@@ -716,7 +723,7 @@ export const GamingTab: React.FC = () => {
               whileTap={{ scale: 0.95 }}
               title="Clear platform filter"
             >
-              Platform: {PLATFORM_FILTERS.find((f) => f.id === activeFilter)?.label ?? activeFilter} ✕
+              Platform: {PLATFORM_FILTERS.find((f) => f.id === activeFilter)?.label ?? activeFilter} <X size={12} />
             </motion.button>
           )}
           {Object.entries(facetFilters).map(([key, value]) =>
@@ -732,7 +739,7 @@ export const GamingTab: React.FC = () => {
                 whileTap={{ scale: 0.95 }}
                 title={`Clear ${key} filter`}
               >
-                {gameFacetFields.find((f) => f.key === key)?.label ?? key}: {value} ✕
+                {gameFacetFields.find((f) => f.key === key)?.label ?? key}: {value} <X size={12} />
               </motion.button>
             ) : null,
           )}
@@ -961,7 +968,7 @@ export const GamingTab: React.FC = () => {
                 }}
                 whileTap={{ scale: getMissingCoreTooltip(selected) ? 1 : 0.96 }}
               >
-                ▶ Launch
+                <Play size={14} /> Launch
               </motion.button>
             </Tooltip>
           )
@@ -1027,7 +1034,7 @@ export const GamingTab: React.FC = () => {
                       className="flex items-center gap-2 p-2 rounded hover:bg-white/5 transition-colors"
                       style={{ background: "var(--color-surface-raised)" }}
                     >
-                      <span className="text-lg">▶</span>
+                      <Play size={18} />
                       <span className="text-sm truncate flex-1">{video.name ?? "Video"}</span>
                       <span className="text-xs" style={{ color: "var(--color-text-dim)" }}>{video.type}</span>
                     </a>

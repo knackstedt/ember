@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 
 export interface ChipFilter<T extends string = string> {
   id: T;
-  label: string;
+  label: React.ReactNode;
   count?: number;
   color?: string;
 }

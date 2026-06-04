@@ -1,5 +1,18 @@
 import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import {
+  Play,
+  Pause,
+  ChevronUp,
+  ChevronDown,
+  VolumeX,
+  Volume1,
+  Volume2,
+  SkipForward,
+  SkipBack,
+  Shuffle,
+  Repeat,
+} from "lucide-react";
 import { useMusicPlayerStore } from "../../store/musicPlayer.store";
 
 const PLAYER_HEIGHT = 72;
@@ -95,7 +108,7 @@ export const MusicPlayer: React.FC = () => {
           }}
           aria-label={playing ? "Pause" : "Play"}
         >
-          {playing ? "⏸" : "▶"}
+          {playing ? <Pause size={14} /> : <Play size={14} />}
         </button>
         <button
           onClick={() => setCollapsed(false)}
@@ -104,7 +117,7 @@ export const MusicPlayer: React.FC = () => {
           aria-label="Expand player"
           title="Expand"
         >
-          ⌃
+          <ChevronUp size={14} />
         </button>
       </motion.div>
     );
@@ -160,7 +173,7 @@ export const MusicPlayer: React.FC = () => {
           aria-label="Previous"
           title="Previous"
         >
-          ⏮
+          <SkipBack size={16} />
         </button>
         <button
           onClick={playing ? pause : resume}
@@ -171,7 +184,7 @@ export const MusicPlayer: React.FC = () => {
           }}
           aria-label={playing ? "Pause" : "Play"}
         >
-          {playing ? "⏸" : "▶"}
+          {playing ? <Pause size={16} /> : <Play size={16} />}
         </button>
         <button
           onClick={next}
@@ -180,7 +193,7 @@ export const MusicPlayer: React.FC = () => {
           aria-label="Next"
           title="Next"
         >
-          ⏭
+          <SkipForward size={16} />
         </button>
       </div>
 
@@ -217,7 +230,7 @@ export const MusicPlayer: React.FC = () => {
           className="text-sm select-none"
           style={{ color: "var(--color-text-dim)" }}
         >
-          {volume === 0 ? "🔇" : volume < 0.5 ? "🔉" : "🔊"}
+          {volume === 0 ? <VolumeX size={14} /> : volume < 0.5 ? <Volume1 size={14} /> : <Volume2 size={14} />}
         </span>
         <input
           type="range"
@@ -244,7 +257,7 @@ export const MusicPlayer: React.FC = () => {
         aria-label={shuffle ? "Shuffle on" : "Shuffle off"}
         title={shuffle ? "Shuffle on" : "Shuffle off"}
       >
-        ⇄
+        <Shuffle size={16} />
       </button>
 
       {/* Repeat */}
@@ -261,7 +274,7 @@ export const MusicPlayer: React.FC = () => {
         aria-label={`Repeat: ${repeat} → ${REPEAT_NEXT[repeat]}`}
         title={`Repeat: ${repeat}`}
       >
-        {repeat === "one" ? "↻" : "↺"}
+        <Repeat size={16} />
         {repeat === "one" && (
           <span
             className="absolute bottom-0.5 right-0.5 text-[9px] font-bold leading-none"
@@ -280,7 +293,7 @@ export const MusicPlayer: React.FC = () => {
         aria-label="Collapse player"
         title="Collapse"
       >
-        ⌄
+        <ChevronDown size={14} />
       </button>
     </motion.div>
   );

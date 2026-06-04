@@ -25,6 +25,11 @@ import {
   RotateCw,
   FolderOpen,
   Play,
+  Folder,
+  Loader,
+  RotateCw,
+  Sparkles,
+  X,
 } from "lucide-react";
 import { useCollectionsStore, evaluateSmartFilter, sortByCollection } from "../../store/collections.store";
 import { CollectionsBar } from "../../components/CollectionsBar/CollectionsBar";
@@ -421,7 +426,7 @@ export const MusicTab: React.FC = () => {
           opts.push({
             id: `add-to-coll:${c.id}`,
             label: c.name,
-            icon: c.icon || "📁",
+            icon: c.icon || <Folder size={16} />,
           });
         }
       }
@@ -614,7 +619,7 @@ export const MusicTab: React.FC = () => {
                 whileTap={{ scale: 0.96 }}
                 disabled={scanning}
               >
-                {scanning ? "⟳ Scanning…" : "↺ Scan"}
+                {scanning ? <><Loader size={14} className="animate-spin" /> Scanning…</> : <><RotateCw size={14} /> Scan</>}
               </motion.button>
             </>
           )}
@@ -626,7 +631,7 @@ export const MusicTab: React.FC = () => {
               color: "var(--color-bg)",
             }}
           >
-            {subTab === "ai-groups" ? "✨ Groups" : subTab}
+            {subTab === "ai-groups" ? <><Sparkles size={12} /> Groups</> : subTab}
           </span>
           {/* Active filter summary chips */}
           {subTab === "local" && (
@@ -652,7 +657,7 @@ export const MusicTab: React.FC = () => {
                   whileTap={{ scale: 0.95 }}
                   title="Back to groups"
                 >
-                  {selectedGroup} ✕
+                  {selectedGroup} <X size={12} />
                 </motion.button>
               )}
               {browseMode === "tracks" && activeArtist && (
@@ -663,7 +668,7 @@ export const MusicTab: React.FC = () => {
                   whileTap={{ scale: 0.95 }}
                   title="Clear artist filter"
                 >
-                  Artist: {activeArtist} ✕
+                  Artist: {activeArtist} <X size={12} />
                 </motion.button>
               )}
               {browseMode === "tracks" && activeAlbum && (
@@ -674,7 +679,7 @@ export const MusicTab: React.FC = () => {
                   whileTap={{ scale: 0.95 }}
                   title="Clear album filter"
                 >
-                  Album: {activeAlbum} ✕
+                  Album: {activeAlbum} <X size={12} />
                 </motion.button>
               )}
               {browseMode === "tracks" && activeGenre && (
@@ -685,7 +690,7 @@ export const MusicTab: React.FC = () => {
                   whileTap={{ scale: 0.95 }}
                   title="Clear genre filter"
                 >
-                  Genre: {activeGenre} ✕
+                  Genre: {activeGenre} <X size={12} />
                 </motion.button>
               )}
               {browseMode === "tracks" && activeYear && (
@@ -696,7 +701,7 @@ export const MusicTab: React.FC = () => {
                   whileTap={{ scale: 0.95 }}
                   title="Clear year filter"
                 >
-                  Year: {activeYear} ✕
+                  Year: {activeYear} <X size={12} />
                 </motion.button>
               )}
             </>
@@ -714,7 +719,7 @@ export const MusicTab: React.FC = () => {
                 whileTap={{ scale: 0.95 }}
                 title="Clear group filter"
               >
-                Group: {group.label} ✕
+                Group: {group.label} <X size={12} />
               </motion.button>
             ) : null;
           })()}
@@ -731,7 +736,7 @@ export const MusicTab: React.FC = () => {
                 whileTap={{ scale: 0.95 }}
                 title={`Clear ${key} filter`}
               >
-                {musicFacetFields.find((f) => f.key === key)?.label ?? key}: {value} ✕
+                {musicFacetFields.find((f) => f.key === key)?.label ?? key}: {value} <X size={12} />
               </motion.button>
             ) : null,
           )}
@@ -1070,7 +1075,7 @@ export const MusicTab: React.FC = () => {
                 }}
                 whileTap={{ scale: 0.96 }}
               >
-                ▶ Play
+                <Play size={14} /> Play
               </motion.button>
               {albumTracks.length > 1 && (
                 <motion.button
@@ -1086,7 +1091,7 @@ export const MusicTab: React.FC = () => {
                   }}
                   whileTap={{ scale: 0.96 }}
                 >
-                  ▶ Play Album
+                  <Play size={14} /> Play Album
                 </motion.button>
               )}
               <motion.button

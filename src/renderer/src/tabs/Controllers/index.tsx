@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { Gamepad2 } from "lucide-react";
 import { useInputStore } from "../../store/input.store";
 import {
   ControllerDevice,
@@ -10,16 +11,18 @@ import {
 import { XboxController } from "./XboxController";
 import { PS4Controller } from "./PS4Controller";
 
-const CONTROLLER_ICONS: Record<ControllerType, string> = {
-  xbox: "🎮",
-  ps1: "🕹",
-  ps2: "🕹",
-  ps3: "🕹",
-  ps4: "🕹",
-  ps5: "🕹",
-  gamecube: "🟣",
-  wiimote: "📡",
-  generic: "🕹",
+const CONTROLLER_ICON_SIZE = 28;
+
+const CONTROLLER_ICONS: Record<ControllerType, React.ReactNode> = {
+  xbox: <Gamepad2 size={CONTROLLER_ICON_SIZE} />,
+  ps1: <Gamepad2 size={CONTROLLER_ICON_SIZE} />,
+  ps2: <Gamepad2 size={CONTROLLER_ICON_SIZE} />,
+  ps3: <Gamepad2 size={CONTROLLER_ICON_SIZE} />,
+  ps4: <Gamepad2 size={CONTROLLER_ICON_SIZE} />,
+  ps5: <Gamepad2 size={CONTROLLER_ICON_SIZE} />,
+  gamecube: <Gamepad2 size={CONTROLLER_ICON_SIZE} />,
+  wiimote: <Gamepad2 size={CONTROLLER_ICON_SIZE} />,
+  generic: <Gamepad2 size={CONTROLLER_ICON_SIZE} />,
 };
 
 const DEFAULT_ACTIONS = [
@@ -389,7 +392,7 @@ export const ControllersTab: React.FC = () => {
                 onClick={() => setSelectedDevice(dev)}
                 whileTap={{ scale: 0.98 }}
               >
-                <span className="text-2xl">{CONTROLLER_ICONS[dev.type]}</span>
+                {CONTROLLER_ICONS[dev.type]}
                 <div className="flex flex-col min-w-0">
                   <span
                     className="text-sm font-medium truncate"
@@ -444,9 +447,7 @@ export const ControllersTab: React.FC = () => {
             {/* Header */}
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <span className="text-3xl">
-                  {CONTROLLER_ICONS[selectedDevice.type]}
-                </span>
+                {CONTROLLER_ICONS[selectedDevice.type]}
                 <div>
                   <h2
                     className="text-lg font-semibold"

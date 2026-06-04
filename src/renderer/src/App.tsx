@@ -1,5 +1,13 @@
 import React, { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import {
+  Gamepad2,
+  Film,
+  Music,
+  Tv,
+  Settings,
+  Maximize,
+} from "lucide-react";
 import { useSettingsStore } from "./store/settings.store";
 import { useInputStore } from "./store/input.store";
 import { ThemeBackground } from "./components/ThemeBackground/ThemeBackground";
@@ -79,22 +87,22 @@ function findMatchingCommand(shortcut: string, customBinds: Record<string, strin
 interface TabDef {
   id: TabId;
   label: string;
-  icon: string;
+  Icon: React.ComponentType<{ size?: number }>;
   component: React.ComponentType;
 }
 
 const TABS: TabDef[] = [
-  { id: "gaming", label: "Gaming", icon: "🎮", component: GamingTab },
-  { id: "movies", label: "Movies", icon: "🎬", component: MoviesTab },
-  { id: "music", label: "Music", icon: "🎵", component: MusicTab },
-  { id: "tv-shows", label: "TV Shows", icon: "📺", component: TVShowsTab },
+  { id: "gaming", label: "Gaming", Icon: Gamepad2, component: GamingTab },
+  { id: "movies", label: "Movies", Icon: Film, component: MoviesTab },
+  { id: "music", label: "Music", Icon: Music, component: MusicTab },
+  { id: "tv-shows", label: "TV Shows", Icon: Tv, component: TVShowsTab },
   {
     id: "controllers",
     label: "Controllers",
-    icon: "🕹",
+    Icon: Gamepad2,
     component: ControllersTab,
   },
-  { id: "settings", label: "Settings", icon: "⚙", component: SettingsTab },
+  { id: "settings", label: "Settings", Icon: Settings, component: SettingsTab },
 ];
 
 function useVisibleTabs(settings: AppSettings | null) {
@@ -566,7 +574,7 @@ export default function App(): React.ReactElement {
                     : "transparent",
                 }}
               >
-                <span>{tab.icon}</span>
+                <tab.Icon size={16} />
                 <span>{tab.label}</span>
                 {isActive && (
                   <motion.div
@@ -596,7 +604,7 @@ export default function App(): React.ReactElement {
               }}
               title="Fullscreen"
             >
-              ⛶
+              <Maximize size={16} />
             </button>
           </div>
         </nav>

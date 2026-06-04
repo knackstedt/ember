@@ -1,5 +1,6 @@
 import React, { useState, useRef, KeyboardEvent } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { X } from "lucide-react";
 
 interface DetailPanelProps {
   open: boolean;
@@ -161,7 +162,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                           onClick={() => handleRemoveTag(tag)}
                           aria-label={`Remove tag ${tag}`}
                         >
-                          ✕
+                          <X size={12} />
                         </button>
                       </span>
                     ))}

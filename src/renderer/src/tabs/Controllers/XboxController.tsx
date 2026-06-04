@@ -15,15 +15,15 @@ const BUTTON_POSITIONS: Record<
   north: { cx: 302, cy: 102, r: 11, label: "Y", color: "#f0c040" },
   left_bumper: { cx: 120, cy: 62, r: 9, label: "LB", color: undefined },
   right_bumper: { cx: 280, cy: 62, r: 9, label: "RB", color: undefined },
-  select: { cx: 168, cy: 110, r: 8, label: "⧉", color: undefined },
-  start: { cx: 232, cy: 110, r: 8, label: "≡", color: undefined },
-  home: { cx: 200, cy: 108, r: 12, label: "⬤", color: "#3a8cd4" },
+  select: { cx: 168, cy: 110, r: 8, label: "View", color: undefined },
+  start: { cx: 232, cy: 110, r: 8, label: "Menu", color: undefined },
+  home: { cx: 200, cy: 108, r: 12, label: "Home", color: "#3a8cd4" },
   left_thumb: { cx: 140, cy: 148, r: 10, label: "LS", color: undefined },
   right_thumb: { cx: 260, cy: 148, r: 10, label: "RS", color: undefined },
-  dpad_up: { cx: 200, cy: 96, r: 7, label: "▲", color: undefined },
-  dpad_down: { cx: 200, cy: 122, r: 7, label: "▼", color: undefined },
-  dpad_left: { cx: 186, cy: 109, r: 7, label: "◀", color: undefined },
-  dpad_right: { cx: 214, cy: 109, r: 7, label: "▶", color: undefined },
+  dpad_up: { cx: 200, cy: 96, r: 7, label: "Up", color: undefined },
+  dpad_down: { cx: 200, cy: 122, r: 7, label: "Down", color: undefined },
+  dpad_left: { cx: 186, cy: 109, r: 7, label: "Left", color: undefined },
+  dpad_right: { cx: 214, cy: 109, r: 7, label: "Right", color: undefined },
 };
 
 const TRIGGER_POSITIONS: Record<

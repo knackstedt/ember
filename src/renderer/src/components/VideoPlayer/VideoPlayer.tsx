@@ -1,5 +1,14 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import {
+  Play,
+  Pause,
+  VolumeX,
+  Volume1,
+  Volume2,
+  Maximize,
+  X,
+} from "lucide-react";
 import { useVideoPlayerStore } from "../../store/videoPlayer.store";
 import { useInputStore } from "../../store/input.store";
 import { shouldClearProgress } from "../../../../shared/progress";
@@ -397,7 +406,7 @@ export const VideoPlayer: React.FC = () => {
                 aria-label="Close player"
                 title="Close (Esc)"
               >
-                ✕
+                <X size={16} />
               </button>
 
               {/* Play/Pause */}
@@ -412,7 +421,7 @@ export const VideoPlayer: React.FC = () => {
                 aria-label={playing ? "Pause" : "Play"}
                 title={playing ? "Pause (Space)" : "Play (Space)"}
               >
-                {playing ? "⏸" : "▶"}
+                {playing ? <Pause size={18} /> : <Play size={18} />}
               </button>
 
               {/* Time display */}
@@ -467,7 +476,7 @@ export const VideoPlayer: React.FC = () => {
                   aria-label={muted ? "Unmute" : "Mute"}
                   title="Mute (M)"
                 >
-                  {muted || volume === 0 ? "🔇" : volume < 0.5 ? "🔉" : "🔊"}
+                  {muted || volume === 0 ? <VolumeX size={16} /> : volume < 0.5 ? <Volume1 size={16} /> : <Volume2 size={16} />}
                 </button>
                 <input
                   type="range"
@@ -490,7 +499,7 @@ export const VideoPlayer: React.FC = () => {
                 aria-label={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
                 title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
               >
-                {isFullscreen ? "⛶" : "⛶"}
+                <Maximize size={16} />
               </button>
             </div>
           </motion.div>

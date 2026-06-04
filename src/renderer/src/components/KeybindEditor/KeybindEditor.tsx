@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { X, Gamepad2 } from "lucide-react";
 import {
   CommandDefinition,
   CommandCategory,
@@ -31,10 +32,10 @@ const CATEGORY_LABELS: Record<CommandCategory, string> = {
 };
 
 const CONTROLLER_BUTTONS = [
-  { id: "south", label: "A / ✕ / B" },
-  { id: "east", label: "B / ○ / A" },
-  { id: "north", label: "Y / △ / X" },
-  { id: "west", label: "X / □ / Y" },
+  { id: "south", label: "A / X / B" },
+  { id: "east", label: "B / O / A" },
+  { id: "north", label: "Y / Δ / X" },
+  { id: "west", label: "X / [] / Y" },
   { id: "select", label: "Select / Back / View" },
   { id: "start", label: "Start / Menu" },
   { id: "left_bumper", label: "L1 / LB" },
@@ -258,7 +259,7 @@ export const KeybindEditor: React.FC<KeybindEditorProps> = ({
                             style={{ color: "var(--color-text-dim)" }}
                             title="Clear shortcut"
                           >
-                            ✕
+                            <X size={12} />
                           </button>
                         )}
                       </>
@@ -353,7 +354,7 @@ export const KeybindEditor: React.FC<KeybindEditorProps> = ({
                       {customCtrl
                         ? CONTROLLER_BUTTONS.find((b) => b.id === customCtrl)
                             ?.label ?? customCtrl
-                        : "🎮 —"}
+                        : <><Gamepad2 size={14} /> —</>}
                     </button>
                   </div>
                 </div>

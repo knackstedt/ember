@@ -1,5 +1,13 @@
 import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Play,
+  Pause,
+  SkipForward,
+  SkipBack,
+} from "lucide-react";
 import { useMusicPlayerStore } from "../../store/musicPlayer.store";
 
 const BLADE_WIDTH = 280;
@@ -57,7 +65,7 @@ export const QueueBlade: React.FC = () => {
             transform: bladeCollapsed ? undefined : "rotate(180deg)",
           }}
         >
-          {bladeCollapsed ? "◀" : "▶"}
+          {bladeCollapsed ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
         </span>
         {bladeCollapsed && queue.length > 0 && (
           <span
@@ -132,7 +140,7 @@ export const QueueBlade: React.FC = () => {
                     className="text-xs font-medium truncate"
                     style={{ color: "var(--color-accent)" }}
                   >
-                    {playing ? "▶ Now Playing" : "⏸ Paused"}
+                    {playing ? "Now Playing" : "Paused"}
                   </span>
                   <span
                     className="text-sm font-medium truncate"
@@ -162,7 +170,7 @@ export const QueueBlade: React.FC = () => {
                   aria-label="Previous"
                   title="Previous"
                 >
-                  ⏮
+                  <SkipBack size={16} />
                 </button>
                 <button
                   onClick={() => {
@@ -175,7 +183,7 @@ export const QueueBlade: React.FC = () => {
                   }}
                   aria-label={playing ? "Pause" : "Play"}
                 >
-                  {playing ? "⏸" : "▶"}
+                  {playing ? <Pause size={16} /> : <Play size={16} />}
                 </button>
                 <button
                   onClick={next}
@@ -184,7 +192,7 @@ export const QueueBlade: React.FC = () => {
                   aria-label="Next"
                   title="Next"
                 >
-                  ⏭
+                  <SkipForward size={16} />
                 </button>
               </div>
             )}
@@ -210,7 +218,7 @@ export const QueueBlade: React.FC = () => {
                       className="text-xs tabular-nums w-5 flex-shrink-0 text-center"
                       style={{ color: "var(--color-text-dim)" }}
                     >
-                      {isCurrent ? (playing ? "▶" : "⏸") : index + 1}
+                      {isCurrent ? (playing ? <Play size={12} /> : <Pause size={12} />) : index + 1}
                     </span>
                     <div className="flex flex-col min-w-0 flex-1">
                       <span

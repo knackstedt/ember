@@ -20,6 +20,12 @@ import {
   Tag,
   RotateCw,
   FolderOpen,
+  Folder,
+  Loader,
+  RotateCw,
+  Sparkles,
+  Play,
+  X,
 } from "lucide-react";
 import { useCollectionsStore, evaluateSmartFilter, sortByCollection } from "../../store/collections.store";
 import { CollectionsBar } from "../../components/CollectionsBar/CollectionsBar";
@@ -260,7 +266,7 @@ export const TVShowsTab: React.FC = () => {
           opts.push({
             id: `add-to-coll:${c.id}`,
             label: c.name,
-            icon: c.icon || "📁",
+            icon: c.icon || <Folder size={16} />,
           });
         }
       }
@@ -375,7 +381,7 @@ export const TVShowsTab: React.FC = () => {
             whileTap={{ scale: 0.96 }}
             disabled={scanning}
           >
-            {scanning ? "⟳ Scanning…" : "↺ Scan"}
+            {scanning ? <><Loader size={14} className="animate-spin" /> Scanning…</> : <><RotateCw size={14} /> Scan</>}
           </motion.button>
           <span className="text-xs" style={{ color: "var(--color-text-dim)" }}>
             {items.length} shows
@@ -388,7 +394,7 @@ export const TVShowsTab: React.FC = () => {
               color: "var(--color-bg)",
             }}
           >
-            {subTab === "ai-groups" ? "✨ Groups" : "All"}
+            {subTab === "ai-groups" ? <><Sparkles size={12} /> Groups</> : "All"}
           </span>
           {/* Active filter summary chips */}
           {subTab === "ai-groups" && selectedAiGroupId && (() => {
@@ -404,7 +410,7 @@ export const TVShowsTab: React.FC = () => {
                 whileTap={{ scale: 0.95 }}
                 title="Clear group filter"
               >
-                Group: {group.label} ✕
+                Group: {group.label} <X size={12} />
               </motion.button>
             ) : null;
           })()}
@@ -421,7 +427,7 @@ export const TVShowsTab: React.FC = () => {
                 whileTap={{ scale: 0.95 }}
                 title={`Clear ${key} filter`}
               >
-                {tvFacetFields.find((f) => f.key === key)?.label ?? key}: {value} ✕
+                {tvFacetFields.find((f) => f.key === key)?.label ?? key}: {value} <X size={12} />
               </motion.button>
             ) : null,
           )}
@@ -691,7 +697,7 @@ export const TVShowsTab: React.FC = () => {
                       )
                     }
                   >
-                    ▶ Play
+                    <Play size={14} /> Play
                   </button>
                 </div>
               ))}

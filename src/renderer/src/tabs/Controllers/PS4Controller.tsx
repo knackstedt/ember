@@ -9,10 +9,10 @@ const BUTTON_POSITIONS: Record<
   string,
   { cx: number; cy: number; r: number; label: string; color?: string }
 > = {
-  south: { cx: 302, cy: 133, r: 11, label: "✕", color: "#6fa8e0" },
-  east: { cx: 320, cy: 116, r: 11, label: "○", color: "#e05252" },
-  west: { cx: 284, cy: 116, r: 11, label: "□", color: "#d499e8" },
-  north: { cx: 302, cy: 99, r: 11, label: "△", color: "#5bbfaa" },
+  south: { cx: 302, cy: 133, r: 11, label: "X", color: "#6fa8e0" },
+  east: { cx: 320, cy: 116, r: 11, label: "O", color: "#e05252" },
+  west: { cx: 284, cy: 116, r: 11, label: "[]", color: "#d499e8" },
+  north: { cx: 302, cy: 99, r: 11, label: "Δ", color: "#5bbfaa" },
   left_bumper: { cx: 120, cy: 60, r: 9, label: "L1", color: undefined },
   right_bumper: { cx: 280, cy: 60, r: 9, label: "R1", color: undefined },
   select: { cx: 166, cy: 108, r: 8, label: "SH", color: undefined },
@@ -20,11 +20,11 @@ const BUTTON_POSITIONS: Record<
   home: { cx: 200, cy: 106, r: 11, label: "PS", color: "#3a8cd4" },
   left_thumb: { cx: 148, cy: 152, r: 10, label: "L3", color: undefined },
   right_thumb: { cx: 252, cy: 152, r: 10, label: "R3", color: undefined },
-  dpad_up: { cx: 200, cy: 92, r: 7, label: "▲", color: undefined },
-  dpad_down: { cx: 200, cy: 118, r: 7, label: "▼", color: undefined },
-  dpad_left: { cx: 186, cy: 105, r: 7, label: "◀", color: undefined },
-  dpad_right: { cx: 214, cy: 105, r: 7, label: "▶", color: undefined },
-  touchpad: { cx: 200, cy: 120, r: 14, label: "▭", color: "#4a4a5a" },
+  dpad_up: { cx: 200, cy: 92, r: 7, label: "Up", color: undefined },
+  dpad_down: { cx: 200, cy: 118, r: 7, label: "Down", color: undefined },
+  dpad_left: { cx: 186, cy: 105, r: 7, label: "Left", color: undefined },
+  dpad_right: { cx: 214, cy: 105, r: 7, label: "Right", color: undefined },
+  touchpad: { cx: 200, cy: 120, r: 14, label: "Touch", color: "#4a4a5a" },
 };
 
 const TRIGGER_POSITIONS: Record<

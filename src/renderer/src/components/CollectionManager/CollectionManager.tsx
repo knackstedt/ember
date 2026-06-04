@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { Folder, X } from "lucide-react";
 import {
   Collection,
   CollectionItemType,
@@ -227,7 +228,7 @@ export const CollectionManager: React.FC<CollectionManagerProps> = ({
                           border: "1px solid var(--color-border)",
                         }}
                       >
-                        <span className="text-xl">{c.icon || "📁"}</span>
+                        {c.icon ? <span className="text-xl">{c.icon}</span> : <Folder size={20} />}
                         <div className="flex-1 min-w-0">
                           <div className="font-medium text-sm truncate" style={{ color: "var(--color-text)" }}>
                             {c.name}
@@ -344,7 +345,7 @@ function CollectionEditForm({
           <input
             value={collection.icon ?? ""}
             onChange={(e) => update({ icon: e.target.value })}
-            placeholder="📁"
+            placeholder="Icon"
             className="w-full text-center text-lg px-2 py-1.5 rounded outline-none"
             style={{
               background: "var(--color-surface-raised)",
@@ -627,7 +628,7 @@ function SmartFilterEditor({
               style={{ color: "#ff4444" }}
               onClick={() => removeRule(i)}
             >
-              ✕
+              <X size={14} />
             </button>
           </div>
         );

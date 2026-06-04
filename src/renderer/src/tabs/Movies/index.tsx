@@ -24,6 +24,12 @@ import {
   Tag,
   RotateCw,
   FolderOpen,
+  Folder,
+  Loader,
+  RotateCw,
+  Sparkles,
+  Play,
+  X,
 } from "lucide-react";
 import { useCollectionsStore, evaluateSmartFilter, sortByCollection } from "../../store/collections.store";
 import { CollectionsBar } from "../../components/CollectionsBar/CollectionsBar";
@@ -262,7 +268,7 @@ export const MoviesTab: React.FC = () => {
           opts.push({
             id: `add-to-coll:${c.id}`,
             label: c.name,
-            icon: c.icon || "📁",
+            icon: c.icon || <Folder size={16} />,
           });
         }
       }
@@ -401,7 +407,7 @@ export const MoviesTab: React.FC = () => {
                 whileTap={{ scale: 0.96 }}
                 disabled={scanning}
               >
-                {scanning ? "⟳ Scanning…" : "↺ Scan"}
+                {scanning ? <><Loader size={14} className="animate-spin" /> Scanning…</> : <><RotateCw size={14} /> Scan</>}
               </motion.button>
             </>
           )}
@@ -413,7 +419,7 @@ export const MoviesTab: React.FC = () => {
               color: "var(--color-bg)",
             }}
           >
-            {subTab === "ai-groups" ? "✨ Groups" : subTab}
+            {subTab === "ai-groups" ? <><Sparkles size={12} /> Groups</> : subTab}
           </span>
           {/* Active filter summary chips */}
           {subTab === "local" && activeGenre && (
@@ -427,7 +433,7 @@ export const MoviesTab: React.FC = () => {
               whileTap={{ scale: 0.95 }}
               title="Clear genre filter"
             >
-              Genre: {activeGenre} ✕
+              Genre: {activeGenre} <X size={12} />
             </motion.button>
           )}
           {subTab === "ai-groups" && selectedAiGroupId && (() => {
@@ -443,7 +449,7 @@ export const MoviesTab: React.FC = () => {
                 whileTap={{ scale: 0.95 }}
                 title="Clear group filter"
               >
-                Group: {group.label} ✕
+                Group: {group.label} <X size={12} />
               </motion.button>
             ) : null;
           })()}
@@ -460,7 +466,7 @@ export const MoviesTab: React.FC = () => {
                 whileTap={{ scale: 0.95 }}
                 title={`Clear ${key} filter`}
               >
-                {movieFacetFields.find((f) => f.key === key)?.label ?? key}: {value} ✕
+                {movieFacetFields.find((f) => f.key === key)?.label ?? key}: {value} <X size={12} />
               </motion.button>
             ) : null,
           )}
@@ -729,7 +735,7 @@ export const MoviesTab: React.FC = () => {
                 }}
                 whileTap={{ scale: 0.96 }}
               >
-                ▶ Play
+                <Play size={14} /> Play
               </motion.button>
               <motion.button
                 className="px-6 py-2.5 rounded-[var(--radius-card)] font-semibold text-sm"
@@ -746,7 +752,7 @@ export const MoviesTab: React.FC = () => {
                 }}
                 whileTap={{ scale: 0.96 }}
               >
-                ▶ Trailer
+                <Play size={14} /> Trailer
               </motion.button>
             </>
           )
