@@ -1,31 +1,18 @@
-import React, { useEffect, useMemo, useRef, useCallback } from "react";
+import React, { useEffect, useMemo, useRef, useCallback, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCommandsStore } from "../../store/commands.store";
 import { useSettingsStore } from "../../store/settings.store";
 import { CommandDefinition, CommandCategory } from "../../../../shared/commands";
 
 const CATEGORY_ORDER: CommandCategory[] = [
-  "global",
-  "navigation",
-  "gaming",
-  "movies",
-  "music",
-  "tv",
-  "player",
-  "visual",
-  "settings",
+  "global", "navigation", "gaming", "movies", "music",
+  "tv", "player", "visual", "settings",
 ];
 
 const CATEGORY_LABELS: Record<CommandCategory, string> = {
-  global: "Global",
-  navigation: "Navigation",
-  gaming: "Gaming",
-  movies: "Movies",
-  music: "Music",
-  tv: "TV Shows",
-  player: "Player",
-  visual: "Visual",
-  settings: "Settings",
+  global: "Global", navigation: "Navigation", gaming: "Gaming",
+  movies: "Movies", music: "Music", tv: "TV Shows",
+  player: "Player", visual: "Visual", settings: "Settings",
 };
 
 function groupByCategory(commands: CommandDefinition[]): [CommandCategory, CommandDefinition[]][] {
@@ -51,13 +38,7 @@ function highlightMatch(text: string, query: string): React.ReactNode {
   return (
     <>
       {text.slice(0, idx)}
-      <mark
-        style={{
-          backgroundColor: "transparent",
-          color: "var(--color-accent)",
-          fontWeight: 700,
-        }}
-      >
+      <mark style={{ backgroundColor: "transparent", color: "var(--color-accent)", fontWeight: 700 }}>
         {text.slice(idx, idx + q.length)}
       </mark>
       {text.slice(idx + q.length)}
@@ -65,9 +46,71 @@ function highlightMatch(text: string, query: string): React.ReactNode {
   );
 }
 
+/* ─── Memoized row so only the selected row re-renders ─── */
+const CommandRow = React.memo<{
+  cmd: CommandDefinition;
+  query: string;
+  isSelected: boolean;
+  shortcut: string | undefined;
+  onClick: () => void;
+  onMouseEnter: () => void;
+  scrollRef: (el: HTMLButtonElement | null) => void;
+}>(({ cmd, query, isSelected, shortcut, onClick, onMouseEnter, scrollRef }) => (
+  <button
+    ref={scrollRef}
+    onClick={onClick}
+    onMouseEnter={onMouseEnter}
+    style={{
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      width: "100%",
+      padding: "8px 16px",
+      textAlign: "left",
+      border: "none",
+      borderLeft: isSelected ? "3px solid var(--color-accent)" : "3px solid transparent",
+      background: isSelected ? "var(--color-surface-raised)" : "transparent",
+      color: "var(--color-text)",
+      cursor: "pointer",
+      fontSize: 14,
+      fontFamily: "inherit",
+      borderRadius: 0,
+      transition: "background 0.05s",
+    }}
+  >
+    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+      <span style={{ fontWeight: 500 }}>{highlightMatch(cmd.label, query)}</span>
+      {cmd.description && (
+        <span style={{ fontSize: 12, color: "var(--color-text-dim)" }}>
+          {cmd.description}
+        </span>
+      )}
+    </div>
+    {shortcut && (
+      <kbd
+        style={{
+          fontSize: 11,
+          padding: "2px 6px",
+          borderRadius: 4,
+          backgroundColor: isSelected ? "rgba(255,255,255,0.2)" : "var(--color-surface-raised)",
+          border: `1px solid ${isSelected ? "rgba(255,255,255,0.3)" : "var(--color-border)"}`,
+          color: isSelected ? "rgba(255,255,255,0.9)" : "var(--color-text-dim)",
+          fontFamily: "monospace",
+          flexShrink: 0,
+          marginLeft: 8,
+        }}
+      >
+        {shortcut}
+      </kbd>
+    )}
+  </button>
+));
+CommandRow.displayName = "CommandRow";
+
 export const CommandPalette: React.FC<{
   onExecute: (cmd: CommandDefinition) => void;
 }> = ({ onExecute }) => {
+  /* ── subscribe to only what we need ── */
   const isOpen = useCommandsStore((s) => s.isOpen);
   const query = useCommandsStore((s) => s.query);
   const selectedIndex = useCommandsStore((s) => s.selectedIndex);
@@ -77,28 +120,69 @@ export const CommandPalette: React.FC<{
   const setSelectedIndex = useCommandsStore((s) => s.setSelectedIndex);
   const close = useCommandsStore((s) => s.close);
 
-  const inputRef = useRef<HTMLInputElement>(null);
-  const listRef = useRef<HTMLDivElement>(null);
-  const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
-
   const customKeybinds = useSettingsStore((s) => s.settings?.commandKeybinds ?? {});
 
+  /* ── local input state (no store round-trip per keystroke) ── */
+  const [inputValue, setInputValue] = useState(query);
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const pendingQueryRef = useRef(query);
+
+  /* keep local input in sync when palette opens from outside */
+  useEffect(() => {
+    if (isOpen) {
+      setInputValue(query);
+      pendingQueryRef.current = query;
+    }
+  }, [isOpen, query]);
+
+  const handleInputChange = useCallback((value: string) => {
+    setInputValue(value);
+    pendingQueryRef.current = value;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setQuery(value);
+    }, 40); // 40 ms debounce — imperceptible but batches keystrokes
+  }, [setQuery]);
+
+  /* ── stable data ── */
   const grouped = useMemo(() => groupByCategory(visibleCommands), [visibleCommands]);
 
-  const flatIndexToItem = useMemo(() => {
-    const map = new Map<number, { cmd: CommandDefinition; flatIndex: number }>();
+  const flatList = useMemo(() => {
+    const out: { cmd: CommandDefinition; flatIndex: number }[] = [];
     let idx = 0;
     for (const [, cmds] of grouped) {
       for (const cmd of cmds) {
-        map.set(idx, { cmd, flatIndex: idx });
+        out.push({ cmd, flatIndex: idx });
         idx++;
       }
     }
-    return map;
+    return out;
   }, [grouped]);
 
-  const selectedItem = flatIndexToItem.get(selectedIndex);
+  const selectedItem = flatList[selectedIndex];
 
+  /* ── imperative scroll (no useEffect) ── */
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const lastSelectedRef = useRef<number>(-1);
+
+  const setItemRef = useCallback((el: HTMLButtonElement | null, flatIndex: number) => {
+    if (flatIndex === selectedIndex && el && scrollContainerRef.current) {
+      if (lastSelectedRef.current !== selectedIndex) {
+        lastSelectedRef.current = selectedIndex;
+        const container = scrollContainerRef.current;
+        const containerRect = container.getBoundingClientRect();
+        const elRect = el.getBoundingClientRect();
+        const offsetTop = elRect.top - containerRect.top + container.scrollTop;
+        if (offsetTop < container.scrollTop) {
+          container.scrollTop = offsetTop;
+        } else if (offsetTop + elRect.height > container.scrollTop + containerRect.height) {
+          container.scrollTop = offsetTop + elRect.height - containerRect.height;
+        }
+      }
+    }
+  }, [selectedIndex]);
+
+  /* ── keyboard handlers ── */
   const handleExecute = useCallback(
     (cmd: CommandDefinition) => {
       close();
@@ -112,36 +196,50 @@ export const CommandPalette: React.FC<{
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
+        e.stopImmediatePropagation();
         close();
       } else if (e.key === "ArrowDown") {
         e.preventDefault();
+        e.stopImmediatePropagation();
         moveSelection(1);
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
+        e.stopImmediatePropagation();
         moveSelection(-1);
       } else if (e.key === "Enter" && selectedItem) {
         e.preventDefault();
+        e.stopImmediatePropagation();
         handleExecute(selectedItem.cmd);
       }
     };
     window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+
+    /* Controller "cancel" (east / B / ○) also closes the palette */
+    const navHandler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { action?: string };
+      if (detail?.action === "cancel") {
+        close();
+      }
+    };
+    window.addEventListener("htpc:nav", navHandler);
+
+    /* Belt-and-suspenders: also close on the custom escape event */
+    const escapeHandler = () => close();
+    window.addEventListener("htpc:escape", escapeHandler);
+
+    return () => {
+      window.removeEventListener("keydown", handler);
+      window.removeEventListener("htpc:nav", navHandler);
+      window.removeEventListener("htpc:escape", escapeHandler);
+    };
   }, [isOpen, selectedItem, close, moveSelection, handleExecute]);
 
-  // Scroll selected item into view
-  useEffect(() => {
-    const el = itemRefs.current[selectedIndex];
-    if (el) {
-      el.scrollIntoView({ block: "nearest", behavior: "smooth" });
-    }
-  }, [selectedIndex]);
-
-  // Close on click outside
+  /* ── close on click outside ── */
   useEffect(() => {
     if (!isOpen) return;
     const handler = (e: MouseEvent) => {
       const target = e.target as Node;
-      if (listRef.current && !listRef.current.contains(target)) {
+      if (scrollContainerRef.current && !scrollContainerRef.current.contains(target)) {
         close();
       }
     };
@@ -158,7 +256,7 @@ export const CommandPalette: React.FC<{
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.12 }}
+          transition={{ duration: 0.1 }}
           style={{
             position: "fixed",
             inset: 0,
@@ -172,11 +270,10 @@ export const CommandPalette: React.FC<{
           }}
         >
           <motion.div
-            ref={listRef}
-            initial={{ opacity: 0, y: -16, scale: 0.96 }}
+            initial={{ opacity: 0, y: -12, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -16, scale: 0.96 }}
-            transition={{ duration: 0.15, ease: "easeOut" }}
+            exit={{ opacity: 0, y: -12, scale: 0.97 }}
+            transition={{ duration: 0.12, ease: "easeOut" }}
             style={{
               width: "min(640px, 90vw)",
               maxHeight: "60vh",
@@ -199,15 +296,12 @@ export const CommandPalette: React.FC<{
                 gap: 8,
               }}
             >
-              <span style={{ fontSize: 18, color: "var(--color-text-dim)" }}>
-                {"/"}
-              </span>
+              <span style={{ fontSize: 18, color: "var(--color-text-dim)" }}>{"/"}</span>
               <input
-                ref={inputRef}
                 data-command-palette-input
                 type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
+                value={inputValue}
+                onChange={(e) => handleInputChange(e.target.value)}
                 placeholder="Type a command..."
                 style={{
                   flex: 1,
@@ -221,10 +315,7 @@ export const CommandPalette: React.FC<{
                 autoFocus
               />
               {selectedItem && (
-                <span
-                  className="text-xs"
-                  style={{ color: "var(--color-text-dim)", flexShrink: 0 }}
-                >
+                <span className="text-xs" style={{ color: "var(--color-text-dim)", flexShrink: 0 }}>
                   {selectedIndex + 1} / {visibleCommands.length}
                 </span>
               )}
@@ -232,11 +323,8 @@ export const CommandPalette: React.FC<{
 
             {/* Command list */}
             <div
-              style={{
-                overflowY: "auto",
-                flex: 1,
-                padding: "4px 0",
-              }}
+              ref={scrollContainerRef}
+              style={{ overflowY: "auto", flex: 1, padding: "4px 0" }}
             >
               {visibleCommands.length === 0 && (
                 <div
@@ -266,80 +354,18 @@ export const CommandPalette: React.FC<{
                   </div>
                   {cmds.map((cmd) => {
                     const isSelected = flatIdx === selectedIndex;
-                    const myIdx = flatIdx;
-                    flatIdx++;
+                    const myIdx = flatIdx++;
                     return (
-                      <button
+                      <CommandRow
                         key={cmd.id}
-                        ref={(el) => {
-                          itemRefs.current[myIdx] = el;
-                        }}
+                        cmd={cmd}
+                        query={query}
+                        isSelected={isSelected}
+                        shortcut={customKeybinds[cmd.id] ?? cmd.defaultShortcut}
                         onClick={() => handleExecute(cmd)}
                         onMouseEnter={() => setSelectedIndex(myIdx)}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          width: "100%",
-                          padding: "8px 16px",
-                          textAlign: "left",
-                          border: "none",
-                          background: isSelected
-                            ? "var(--color-accent)"
-                            : "transparent",
-                          color: isSelected
-                            ? "var(--color-bg)"
-                            : "var(--color-text)",
-                          cursor: "pointer",
-                          fontSize: 14,
-                          fontFamily: "inherit",
-                          borderRadius: 0,
-                          transition: "background 0.05s",
-                        }}
-                      >
-                        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                          <span style={{ fontWeight: 500 }}>
-                            {highlightMatch(cmd.label, query)}
-                          </span>
-                          {cmd.description && (
-                            <span
-                              style={{
-                                fontSize: 12,
-                                color: isSelected
-                                  ? "rgba(255,255,255,0.75)"
-                                  : "var(--color-text-dim)",
-                              }}
-                            >
-                              {cmd.description}
-                            </span>
-                          )}
-                        </div>
-                        {(() => {
-                          const shortcut = customKeybinds[cmd.id] ?? cmd.defaultShortcut;
-                          if (!shortcut) return null;
-                          return (
-                            <kbd
-                              style={{
-                                fontSize: 11,
-                                padding: "2px 6px",
-                                borderRadius: 4,
-                                backgroundColor: isSelected
-                                  ? "rgba(255,255,255,0.2)"
-                                  : "var(--color-surface-raised)",
-                                border: `1px solid ${isSelected ? "rgba(255,255,255,0.3)" : "var(--color-border)"}`,
-                                color: isSelected
-                                  ? "rgba(255,255,255,0.9)"
-                                  : "var(--color-text-dim)",
-                                fontFamily: "monospace",
-                                flexShrink: 0,
-                                marginLeft: 8,
-                              }}
-                            >
-                              {shortcut}
-                            </kbd>
-                          );
-                        })()}
-                      </button>
+                        scrollRef={(el) => setItemRef(el, myIdx)}
+                      />
                     );
                   })}
                 </div>
@@ -359,9 +385,7 @@ export const CommandPalette: React.FC<{
             >
               <span>Enter to run</span>
               <span>Esc to close</span>
-              <span style={{ marginLeft: "auto" }}>
-                {visibleCommands.length} commands
-              </span>
+              <span style={{ marginLeft: "auto" }}>{visibleCommands.length} commands</span>
             </div>
           </motion.div>
         </motion.div>
