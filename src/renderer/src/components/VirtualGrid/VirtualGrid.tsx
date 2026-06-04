@@ -103,7 +103,7 @@ export const VirtualGrid = React.forwardRef(function VirtualGridInner<T>(
     renderItem,
     className,
     style,
-    overscan = 4,
+    overscan = 8,
     onColumnCountChange,
     scrollRef,
   }: VirtualGridProps<T>,
@@ -195,7 +195,7 @@ export const VirtualGrid = React.forwardRef(function VirtualGridInner<T>(
       <VGrid
         key={`${effectiveColCount}-${items.length}`}
         ref={vgridRef}
-        className={`gpu-scroll ${className ?? ""}`}
+        className={`gpu-scroll vgrid-center ${className ?? ""}`}
         style={{
           height: "100%",
           width: "100%",

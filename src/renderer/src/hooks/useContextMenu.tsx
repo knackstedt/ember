@@ -62,6 +62,9 @@ export function useContextMenu<T>({
   const enabledRef = useRef(enabled);
   enabledRef.current = enabled;
 
+  // Shared timer storage so re-renders don’t lose long-press timers
+  const timersRef = useRef(new WeakMap<object, number>());
+
   // Listen for htpc:contextmenu (gamepad X / long press Enter/Space)
   useEffect(() => {
     const handler = (e: Event) => {
@@ -113,20 +116,20 @@ export function useContextMenu<T>({
   // Long press / right click handler for individual items
   const bindItem = useCallback(
     (item: T, _index: number) => {
-      let longPressTimer: number | null = null;
-
       const startLongPress = (e: React.PointerEvent) => {
         if (e.pointerType !== "mouse" && e.pointerType !== "touch") return;
-        longPressTimer = window.setTimeout(() => {
-          longPressTimer = null;
+        const timer = window.setTimeout(() => {
+          timersRef.current.delete(item as object);
           openMenu(item, { x: e.clientX, y: e.clientY });
         }, 700);
+        timersRef.current.set(item as object, timer);
       };
 
       const cancelLongPress = () => {
-        if (longPressTimer) {
-          clearTimeout(longPressTimer);
-          longPressTimer = null;
+        const timer = timersRef.current.get(item as object);
+        if (timer) {
+          clearTimeout(timer);
+          timersRef.current.delete(item as object);
         }
       };
 

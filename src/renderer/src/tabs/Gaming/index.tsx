@@ -144,6 +144,7 @@ const LazyGameCard: React.FC<{
       missingCoreTooltip={missingCoreTooltip}
       playTime={game.playTime}
       lastPlayed={game.lastPlayed}
+      suppressMountAnimation
       onSelect={onSelect}
       onFavorite={onFavorite}
     />

@@ -129,7 +129,7 @@ html, body, #root {
   scrollbar-gutter: stable;
 }
 
-.gpu-scroll>div {
+.vgrid-center > div {
   transform: translateX(var(--scroll-x, 0));
 }
 

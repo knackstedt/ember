@@ -23,6 +23,7 @@ export interface GameCardProps {
   progress?: number;
   playTime?: number;
   lastPlayed?: number;
+  suppressMountAnimation?: boolean;
 }
 
 function formatLastPlayed(ts: number): string {
@@ -161,6 +162,7 @@ export const GameCard: React.FC<GameCardProps> = React.memo(({
   progress,
   playTime,
   lastPlayed,
+  suppressMountAnimation,
 }) => {
   const [imgError, setImgError] = useState(false);
   useEffect(() => {
@@ -343,11 +345,15 @@ export const GameCard: React.FC<GameCardProps> = React.memo(({
     shell.addEventListener("pointermove", handlePointerMove);
     shell.addEventListener("pointerleave", handlePointerLeave);
 
-    const initialX = (shell.clientWidth || 0) - ANIMATION_CONFIG.INITIAL_X_OFFSET;
-    const initialY = ANIMATION_CONFIG.INITIAL_Y_OFFSET;
-    tiltEngine.setImmediate(initialX, initialY);
-    tiltEngine.toCenter();
-    tiltEngine.beginInitial(ANIMATION_CONFIG.INITIAL_DURATION);
+    if (suppressMountAnimation) {
+      tiltEngine.setImmediate(shell.clientWidth / 2, shell.clientHeight / 2);
+    } else {
+      const initialX = (shell.clientWidth || 0) - ANIMATION_CONFIG.INITIAL_X_OFFSET;
+      const initialY = ANIMATION_CONFIG.INITIAL_Y_OFFSET;
+      tiltEngine.setImmediate(initialX, initialY);
+      tiltEngine.toCenter();
+      tiltEngine.beginInitial(ANIMATION_CONFIG.INITIAL_DURATION);
+    }
 
     return () => {
       shell.removeEventListener("pointerenter", handlePointerEnter);
