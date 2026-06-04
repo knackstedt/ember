@@ -85,8 +85,9 @@ export const useLibretroPlayerStore = create<LibretroPlayerState>((set, get) => 
       let detected: DetectedCore | null = null;
 
       if (!corePath) {
-        detected = await window.htpc.libretro.detectCore(opts.romPath);
-        if (detected) {
+        const allDetected = window.htpc.libretro.detectAllCores(opts.romPath);
+        if (allDetected.length > 0) {
+          detected = allDetected[0];
           corePath = detected.corePath;
         }
       }

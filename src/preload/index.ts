@@ -3,6 +3,7 @@ import {
   AppSettings,
   Game,
   GameEmulatorConfig,
+  WineRunner,
   Movie,
   MusicTrack,
   TVShow,
@@ -127,6 +128,10 @@ const htpc = {
         ipcRenderer.invoke("games:emulatorConfig:get", id),
       set: (id: string, config: GameEmulatorConfig): Promise<void> =>
         ipcRenderer.invoke("games:emulatorConfig:set", id, config),
+    },
+    wineConfig: {
+      set: (id: string, config: { wineRunner?: WineRunner; wineCustomCommand?: string | null; umuCustomCommand?: string | null }): Promise<void> =>
+        ipcRenderer.invoke("games:wineConfig:set", id, config),
     },
     playTime: {
       start: (id: string): Promise<void> =>

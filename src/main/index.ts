@@ -59,6 +59,10 @@ async function createWindow(): Promise<void> {
     },
   });
 
+  // Remove the default application menu so its accelerators don't intercept
+  // renderer-level shortcuts (especially on Linux where Ctrl+Fn combos are
+  // commonly grabbed by the default menu or WM before reaching the page).
+  Menu.setApplicationMenu(null);
 
   const persistBounds = () => {
     if (!mainWindow) return;

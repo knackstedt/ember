@@ -74,6 +74,7 @@ import {
   AppSettings,
   GameEmulatorConfig,
   StreamingService,
+  WineRunner,
 } from "../../shared/types";
 import { createLogger } from "../util/logger";
 import {
@@ -173,6 +174,17 @@ export function registerIpcHandlers(window: BrowserWindow): void {
 
   ipcMain.handle("games:emulatorConfig:set", async (_e, id: string, config: GameEmulatorConfig) => {
     await GameRepo.setEmulatorConfig(id, config);
+  });
+
+  ipcMain.handle("games:wineConfig:set", async (_e, id: string, config: { wineRunner?: WineRunner; wineCustomCommand?: string | null; umuCustomCommand?: string | null }) => {
+    const db = getDb();
+    const updates: string[] = [];
+    if (config.wineRunner !== undefined) updates.push(`wineRunner = ${JSON.stringify(config.wineRunner)}`);
+    if (config.wineCustomCommand !== undefined) updates.push(`wineCustomCommand = ${config.wineCustomCommand === null ? "NONE" : JSON.stringify(config.wineCustomCommand)}`);
+    if (config.umuCustomCommand !== undefined) updates.push(`umuCustomCommand = ${config.umuCustomCommand === null ? "NONE" : JSON.stringify(config.umuCustomCommand)}`);
+    if (updates.length > 0) {
+      await db.query(`UPDATE game:⟨${id}⟩ SET ${updates.join(", ")}`);
+    }
   });
 
   ipcMain.handle("games:playTime:start", async (_e, id: string) => {

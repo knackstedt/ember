@@ -71,8 +71,8 @@ interface MetadataEnrichmentResult {
   // External IDs
   igdbId?: number;
   rawgSlug?: string;
-  mobyGamesId?: string;
-  theGamesDbId?: string;
+  mobyGamesId?: number;
+  theGamesDbId?: number;
   launchBoxDbId?: string;
   // Achievement info (counts only, not full list)
   achievementCount?: number;
@@ -268,9 +268,12 @@ async function preserveExistingFields(
         coverUrl?: string;
         coverSource?: string;
         corrupt?: boolean;
+        wineRunner?: string;
+        wineCustomCommand?: string;
+        umuCustomCommand?: string;
       }[],
     ]
-  >(`SELECT playTime, lastPlayed, isFavorite, tags, rating, hidden, coverUrl, coverSource, corrupt FROM game:⟨${game.id}⟩`);
+  >(`SELECT playTime, lastPlayed, isFavorite, tags, rating, hidden, coverUrl, coverSource, corrupt, wineRunner, wineCustomCommand, umuCustomCommand FROM game:⟨${game.id}⟩`);
   const existing = rows[0]?.[0];
   if (existing) {
     if (existing.playTime !== undefined && existing.playTime !== null) {
@@ -305,6 +308,15 @@ async function preserveExistingFields(
     }
     if (existing.corrupt !== undefined && existing.corrupt !== null) {
       game.corrupt = existing.corrupt;
+    }
+    if (existing.wineRunner !== undefined && existing.wineRunner !== null) {
+      game.wineRunner = existing.wineRunner;
+    }
+    if (existing.wineCustomCommand !== undefined && existing.wineCustomCommand !== null) {
+      game.wineCustomCommand = existing.wineCustomCommand;
+    }
+    if (existing.umuCustomCommand !== undefined && existing.umuCustomCommand !== null) {
+      game.umuCustomCommand = existing.umuCustomCommand;
     }
   }
   return game;

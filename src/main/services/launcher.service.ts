@@ -140,19 +140,31 @@ export async function launchGame(game: Game): Promise<void> {
       }
       break;
     case "windows": {
-      // Resolve the best available runner (Proton-GE > system-proton > wine)
       const exePath = game.romPath!;
-      const wineCmd = await buildWineCommand(exePath, game.wineRunner);
-      if (!wineCmd) {
-        return Promise.reject(
-          new Error(
-            `No Windows compatibility layer found. Install Wine (via WineHQ) or Proton-GE in Settings → Packages.`,
-          ),
-        );
+      const runner = game.wineRunner ?? "wine";
+      const customCommand = runner === "umu-run"
+        ? game.umuCustomCommand
+        : game.wineCustomCommand;
+
+      if (customCommand) {
+        // Parse the custom command and substitute {exe} placeholder
+        const parsed = parseCommand(customCommand.replace(/\{exe\}/g, exePath));
+        cmd = parsed[0];
+        args = parsed.slice(1);
+        log.info("launcher", `Launching Windows game "${game.title}" with custom ${runner} command: ${cmd}`);
+      } else {
+        const wineCmd = await buildWineCommand(exePath, runner);
+        if (!wineCmd) {
+          return Promise.reject(
+            new Error(
+              `No Windows compatibility layer found. Install Wine (via WineHQ), umu-run, or Proton-GE in Settings → Packages.`,
+            ),
+          );
+        }
+        cmd = wineCmd.cmd;
+        args = wineCmd.args;
+        log.info("launcher", `Launching Windows game "${game.title}" with runner: ${cmd}`);
       }
-      cmd = wineCmd.cmd;
-      args = wineCmd.args;
-      log.info("launcher", `Launching Windows game "${game.title}" with runner: ${cmd}`);
       break;
     }
     case "flash":

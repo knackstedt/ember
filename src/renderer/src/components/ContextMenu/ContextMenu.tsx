@@ -39,6 +39,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
 
   // Close on Escape and block htpc:escape from reaching other listeners
   useEffect(() => {
+    if (!isOpen) return;
     const keyHandler = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
@@ -56,10 +57,11 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
       window.removeEventListener("keydown", keyHandler, true);
       window.removeEventListener("htpc:escape", customHandler, true);
     };
-  }, [onClose]);
+  }, [isOpen, onClose]);
 
   // Close on click outside
   useEffect(() => {
+    if (!isOpen) return;
     const handler = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         onClose();
@@ -67,7 +69,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
     };
     window.addEventListener("mousedown", handler);
     return () => window.removeEventListener("mousedown", handler);
-  }, [onClose]);
+  }, [isOpen, onClose]);
 
   // Clamp position to viewport
   const clampedX = Math.min(

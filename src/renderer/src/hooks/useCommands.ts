@@ -30,6 +30,7 @@ const THEME_CYCLE: ThemeName[] = [
 
 export interface CommandContext {
   activeTab: TabId;
+  visibleTabs: TabId[];
   selectedGameId: string | null;
   selectedMovieId: string | null;
   selectedMusicId: string | null;
@@ -140,16 +141,34 @@ export function useCommands(
         case "library.rescan.tv":
           scanTv();
           break;
+        case "library.rescan.current": {
+          const scanMap: Partial<Record<TabId, () => void>> = {
+            gaming: scanGames,
+            movies: scanMovies,
+            music: scanMusic,
+            "tv-shows": scanTv,
+          };
+          scanMap[context.activeTab]?.();
+          break;
+        }
         case "library.wipe.data":
-          window.htpc.db.clear().then(() => window.htpc.app.restart());
+          window.htpc.db
+            .clear()
+            .then(() => window.htpc.app.restart())
+            .catch((err) => console.error("[command] wipe data failed:", err));
           break;
         case "library.wipe.thumbnails":
-          window.htpc.db.wipeThumbnails().then(() => {
-            loadGames();
-            loadMovies();
-            loadMusic();
-            loadTv();
-          });
+          window.htpc.db
+            .wipeThumbnails()
+            .then(() => {
+              loadGames();
+              loadMovies();
+              loadMusic();
+              loadTv();
+            })
+            .catch((err) =>
+              console.error("[command] wipe thumbnails failed:", err),
+            );
           break;
 
         /* Navigation */
@@ -172,13 +191,13 @@ export function useCommands(
           setActiveTab("controllers");
           break;
         case "nav.tab.next": {
-          const tabs: TabId[] = ["gaming", "movies", "music", "tv-shows", "controllers", "settings"];
+          const tabs = context.visibleTabs;
           const idx = tabs.indexOf(context.activeTab);
           setActiveTab(tabs[(idx + 1) % tabs.length]);
           break;
         }
         case "nav.tab.prev": {
-          const tabs: TabId[] = ["gaming", "movies", "music", "tv-shows", "controllers", "settings"];
+          const tabs = context.visibleTabs;
           const idx = tabs.indexOf(context.activeTab);
           setActiveTab(tabs[(idx - 1 + tabs.length) % tabs.length]);
           break;

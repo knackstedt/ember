@@ -38,7 +38,7 @@ export type GamePlatform =
   | "desktop"
   | "unknown";
 
-export type WineRunner = "wine" | "proton-ge" | "system-proton";
+export type WineRunner = "wine" | "proton-ge" | "system-proton" | "umu-run";
 
 export type ProtonRating =
   | "platinum"
@@ -68,6 +68,8 @@ export interface Game {
   steamAppId?: number;
   rawgSlug?: string;
   romPath?: string;
+  wineCustomCommand?: string;
+  umuCustomCommand?: string;
   isFavorite?: boolean;
   tags?: string[];
   lastPlayed?: number;
@@ -79,6 +81,21 @@ export interface Game {
   openCriticScore?: number;
   achievementCount?: number;
   videos?: { name?: string; url: string; type?: string }[];
+  steamReviewScore?: number;
+  steamOwnersEstimate?: number;
+  platforms?: string[];
+  playtime?: number;
+  igdbId?: number;
+  mobyGamesId?: number;
+  theGamesDbId?: number;
+  launchBoxDbId?: string;
+  romHash?: string;
+  romHashType?: string;
+  region?: string;
+  language?: string;
+  serialNumber?: string;
+  pcgwEngine?: string;
+  pcgwSeries?: string;
 }
 
 export interface GameEmulatorConfig {

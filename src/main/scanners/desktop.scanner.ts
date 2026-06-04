@@ -39,6 +39,24 @@ function isGameCategory(categories?: string): boolean {
   return cats.some((c) => c === "game" || c === "games");
 }
 
+function isSteamTool(name: string): boolean {
+  if (/^Proton(?:\s+|-)(?:\d+(?:\.\d+)?|Experimental|Hotfix|EasyAntiCheat|GE)/i.test(name)) return true;
+  if (/Steam Linux Runtime/i.test(name)) return true;
+  if (/Steamworks/i.test(name)) return true;
+  if (/^Steam\s+Runtime/i.test(name)) return true;
+  if (/^Friends$/i.test(name)) return true;
+  if (/^Steam$/i.test(name)) return true;
+  return false;
+}
+
+function isSteamUiAction(exec?: string): boolean {
+  if (!exec) return false;
+  const bin = exec.split(/\s+/)[0]?.toLowerCase();
+  if (!bin) return false;
+  const isSteamBin = /steam$/.test(bin) || bin.includes("steam");
+  return isSteamBin && /steam:\/\//.test(exec);
+}
+
 export function scanDesktopGames(): Game[] {
   const dirs = getXdgDesktopDirs();
   const games: Game[] = [];
@@ -66,6 +84,8 @@ export function scanDesktopGames(): Game[] {
         if (data.NoDisplay === "true" || data.Hidden === "true") continue;
         if (!isGameCategory(data.Categories)) continue;
         if (!data.Name || !data.Exec) continue;
+        if (isSteamTool(data.Name)) continue;
+        if (isSteamUiAction(data.Exec)) continue;
 
         const execBin = resolveExec(data.Exec);
         if (!execBin || !existsSync(execBin)) continue;

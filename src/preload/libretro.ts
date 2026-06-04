@@ -170,49 +170,60 @@ export function scanForCores(): CoreInfo[] {
   return allCores;
 }
 
+// Best cores for each platform, ordered by priority (best first)
+const CORE_PRIORITY: Record<string, string[]> = {
+  nes: ["nestopia", "fceumm", "mesen"],
+  snes: ["bsnes", "snes9x", "mesen"],
+  gb: ["gambatte", "mgba", "mesen"],
+  gbc: ["gambatte", "mgba", "mesen"],
+  gba: ["mgba", "vbam"],
+  genesis: ["genesis_plus_gx", "picodrive"],
+  sms: ["genesis_plus_gx", "picodrive"],
+  gamegear: ["genesis_plus_gx", "picodrive"],
+  n64: ["mupen64plus_next", "parallel_n64"],
+  nds: ["melonds", "desmume"],
+  psx: ["duckstation", "beetle_psx", "pcsx_rearmed"],
+  dreamcast: ["flycast", "redream"],
+  pce: ["beetle_pce", "beetle_pce_fast"],
+};
+
 export function detectCoreForRom(romPath: string, availableCores: CoreInfo[]): DetectedCore | null {
+  const all = detectAllCoresForRom(romPath, availableCores);
+  return all[0] ?? null;
+}
+
+export function detectAllCoresForRom(romPath: string, availableCores: CoreInfo[]): DetectedCore[] {
   const ext = (romPath.match(/\.[^.]+$/)?.[0] ?? "").toLowerCase();
   const platform = PLATFORM_EXTS[ext];
-  if (!platform) return null;
+  if (!platform) return [];
+
+  const compatible: DetectedCore[] = [];
 
   for (const core of availableCores) {
     const exts = core.extensions.split("|").map((e) => e.toLowerCase());
-    if (exts.includes(ext)) {
-      return {
+    if (exts.includes(ext) || exts.includes("")) {
+      compatible.push({
         platform,
         corePath: core.path,
         coreName: core.name,
         extensions: exts,
-      };
+      });
     }
   }
 
-  const platformCoreMap: Record<string, string[]> = {
-    nes: ["nestopia", "fceumm", "mesen"],
-    snes: ["snes9x", "bsnes", "mesen"],
-    gb: ["gambatte", "mgba", "mesen"],
-    gba: ["mgba", "vbam"],
-    genesis: ["genesis_plus_gx", "picodrive"],
-    n64: ["mupen64plus_next", "parallel_n64"],
-    nds: ["melonds", "desmume"],
-    psx: ["pcsx_rearmed", "beetle_psx", "duckstation"],
-    dreamcast: ["flycast", "redream"],
-  };
+  const priorityList = CORE_PRIORITY[platform] ?? [];
 
-  const preferredCores = platformCoreMap[platform] ?? [];
-  for (const preferred of preferredCores) {
-    const core = availableCores.find((c) => c.name === preferred);
-    if (core) {
-      return {
-        platform,
-        corePath: core.path,
-        coreName: core.name,
-        extensions: core.extensions.split("|"),
-      };
-    }
-  }
+  // Sort by priority list first, then alphabetically for unlisted cores
+  compatible.sort((a, b) => {
+    const aIdx = priorityList.indexOf(a.coreName);
+    const bIdx = priorityList.indexOf(b.coreName);
+    if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
+    if (aIdx !== -1) return -1;
+    if (bIdx !== -1) return 1;
+    return a.coreName.localeCompare(b.coreName);
+  });
 
-  return null;
+  return compatible;
 }
 
 // ---------------------------------------------------------------------------
@@ -240,6 +251,11 @@ export const libretroApi = {
   detectCore: (romPath: string): DetectedCore | null => {
     const cores = libretroApi.listCores();
     return detectCoreForRom(romPath, cores);
+  },
+
+  detectAllCores: (romPath: string): DetectedCore[] => {
+    const cores = libretroApi.listCores();
+    return detectAllCoresForRom(romPath, cores);
   },
 
   loadCore: (corePath: string): { id: number; name: string; version: string; extensions: string; needFullpath: boolean } => {

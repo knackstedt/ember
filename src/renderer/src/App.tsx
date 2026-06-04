@@ -140,6 +140,7 @@ export default function App(): React.ReactElement {
   const { executeCommand } = useCommands(
     {
       activeTab: activeTabRef.current,
+      visibleTabs: visibleTabIds,
       selectedGameId: selectedGameRef.current,
       selectedMovieId: selectedMovieRef.current,
       selectedMusicId: selectedMusicRef.current,
@@ -433,18 +434,18 @@ export default function App(): React.ReactElement {
         e.preventDefault();
         const idx = visibleTabIds.indexOf(activeTabRef.current);
         setActiveTab(visibleTabIds[(idx - 1 + visibleTabIds.length) % visibleTabIds.length]);
-      } else if (e.type === "keydown" && e.key === "F1") {
+      } else if (e.type === "keydown" && e.key === "F1" && e.ctrlKey) {
         // Ctrl+F1 — rescan all libraries
         e.preventDefault();
         useGamesStore.getState().scan();
         useMoviesStore.getState().scan();
         useMusicStore.getState().scan();
         useTvStore.getState().scan();
-      } else if (e.type === "keydown" && e.key === "F2") {
+      } else if (e.type === "keydown" && e.key === "F2" && e.ctrlKey) {
         // Ctrl+F2 — wipe library data then reload
         e.preventDefault();
         window.htpc.db.clear().then(() => window.htpc.app.restart());
-      } else if (e.type === "keydown" && e.key === "F3") {
+      } else if (e.type === "keydown" && e.key === "F3" && e.ctrlKey) {
         // Ctrl+F3 — wipe thumbnail cache then reload stores
         e.preventDefault();
         window.htpc.db.wipeThumbnails().then(() => {
@@ -453,7 +454,7 @@ export default function App(): React.ReactElement {
           useMusicStore.getState().load();
           useTvStore.getState().load();
         });
-      } else if (e.type === "keydown" && e.key === "F5") {
+      } else if (e.type === "keydown" && e.key === "F5" && e.ctrlKey) {
         // Ctrl+F5 — reload window
         e.preventDefault();
         window.htpc.app.restart();
@@ -461,7 +462,7 @@ export default function App(): React.ReactElement {
         // Ctrl+P — open command palette
         e.preventDefault();
         useCommandsStore.getState().toggle();
-      } else if (e.type === "keydown" && e.key === "F6") {
+      } else if (e.type === "keydown" && e.key === "F5") {
         e.preventDefault();
         const scanMap: Partial<Record<TabId, () => void>> = {
           gaming: () => useGamesStore.getState().scan(),

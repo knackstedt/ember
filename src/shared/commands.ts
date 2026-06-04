@@ -38,16 +38,17 @@ export const COMMAND_DEFINITIONS: CommandDefinition[] = [
   { id: "palette.open", label: "Open Command Palette", description: "Search and run any command", category: "global", defaultShortcut: "Ctrl+P" },
   { id: "app.fullscreen", label: "Toggle Fullscreen", category: "global", defaultShortcut: "F11" },
   { id: "app.quit", label: "Quit Application", category: "global" },
-  { id: "app.reload", label: "Reload Window", description: "Ctrl+F5 — Reload the application window", category: "global", defaultShortcut: "Ctrl+F5" },
+  { id: "app.reload", label: "Reload Window", description: "Reload the application window", category: "global", defaultShortcut: "F5" },
 
   /* ─── Library Operations ─── */
-  { id: "library.rescan.all", label: "Rescan All Libraries", description: "Ctrl+F1 — Rescan games, movies, music and TV", category: "global", defaultShortcut: "Ctrl+F1" },
+  { id: "library.rescan.all", label: "Rescan All Libraries", description: "Rescan games, movies, music and TV", category: "global", defaultShortcut: "F1" },
   { id: "library.rescan.games", label: "Rescan Games", category: "global" },
   { id: "library.rescan.movies", label: "Rescan Movies", category: "global" },
   { id: "library.rescan.music", label: "Rescan Music", category: "global" },
   { id: "library.rescan.tv", label: "Rescan TV Shows", category: "global" },
-  { id: "library.wipe.data", label: "Wipe Library Data", description: "Ctrl+F2 — Clear all library data and restart", category: "global", defaultShortcut: "Ctrl+F2" },
-  { id: "library.wipe.thumbnails", label: "Wipe Thumbnail Cache", description: "Ctrl+F3 — Clear all thumbnail caches", category: "global", defaultShortcut: "Ctrl+F3" },
+  { id: "library.rescan.current", label: "Rescan Current Library", description: "Rescan the library for the active tab", category: "global", defaultShortcut: "F6" },
+  { id: "library.wipe.data", label: "Wipe Library Data", description: "Clear all library data and restart", category: "global", defaultShortcut: "F2" },
+  { id: "library.wipe.thumbnails", label: "Wipe Thumbnail Cache", description: "Clear all thumbnail caches", category: "global", defaultShortcut: "F3" },
 
   /* ─── Navigation ─── */
   { id: "nav.tab.gaming", label: "Switch to Gaming", category: "navigation" },
@@ -56,11 +57,11 @@ export const COMMAND_DEFINITIONS: CommandDefinition[] = [
   { id: "nav.tab.tv", label: "Switch to TV Shows", category: "navigation" },
   { id: "nav.tab.settings", label: "Switch to Settings", category: "navigation" },
   { id: "nav.tab.controllers", label: "Switch to Controllers", category: "navigation" },
-  { id: "nav.tab.next", label: "Next Tab", category: "navigation" },
-  { id: "nav.tab.prev", label: "Previous Tab", category: "navigation" },
+  { id: "nav.tab.next", label: "Next Tab", category: "navigation", defaultShortcut: "Tab" },
+  { id: "nav.tab.prev", label: "Previous Tab", category: "navigation", defaultShortcut: "Shift+Tab" },
 
   /* ─── Gaming ─── */
-  { id: "gaming.search", label: "Search Games", category: "gaming", requiresContext: "gaming-tab" },
+  { id: "gaming.search", label: "Search Games", category: "gaming", requiresContext: "gaming-tab", defaultShortcut: "Ctrl+F" },
   { id: "gaming.toggle-favorite", label: "Toggle Favorite (Selected Game)", category: "gaming", requiresContext: "game-selected" },
   { id: "gaming.hide", label: "Hide Selected Game", category: "gaming", requiresContext: "game-selected" },
   { id: "gaming.show-hidden", label: "Show Hidden Games", category: "gaming", requiresContext: "gaming-tab" },

@@ -126,6 +126,8 @@ async function runMigrations(db: Surreal): Promise<void> {
     DEFINE FIELD IF NOT EXISTS pcgwEngine ON game TYPE option<string>;
     DEFINE FIELD IF NOT EXISTS pcgwSeries ON game TYPE option<string>;
     DEFINE FIELD IF NOT EXISTS wineRunner ON game TYPE option<string>;
+    DEFINE FIELD IF NOT EXISTS wineCustomCommand ON game TYPE option<string>;
+    DEFINE FIELD IF NOT EXISTS umuCustomCommand ON game TYPE option<string>;
     DEFINE FIELD IF NOT EXISTS videos ON game TYPE option<array<object>>;
 
     DEFINE TABLE IF NOT EXISTS movie SCHEMAFULL;

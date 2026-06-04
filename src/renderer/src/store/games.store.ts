@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { Game, GamePlatform, GameEmulatorConfig } from "../../../shared/types";
+import { Game, GamePlatform, GameEmulatorConfig, WineRunner } from "../../../shared/types";
 
 interface GamesState {
   games: Game[];
@@ -20,6 +20,9 @@ interface GamesState {
   regenerateThumbnail: (id: string) => Promise<void>;
   getEmulatorConfig: (id: string) => Promise<GameEmulatorConfig>;
   setEmulatorConfig: (id: string, config: GameEmulatorConfig) => Promise<void>;
+  setWineRunner: (id: string, runner: WineRunner) => Promise<void>;
+  setWineCustomCommand: (id: string, command: string | null) => Promise<void>;
+  setUmuCustomCommand: (id: string, command: string | null) => Promise<void>;
   updateLastPlayed: (id: string, timestamp?: number) => void;
   filtered: () => Game[];
 }
@@ -145,6 +148,27 @@ export const useGamesStore = create<GamesState>((set, get) => ({
 
   setEmulatorConfig: async (id, config) => {
     await window.htpc.games.emulatorConfig.set(id, config);
+  },
+
+  setWineRunner: async (id, runner) => {
+    await window.htpc.games.wineConfig.set(id, { wineRunner: runner });
+    set((s) => ({
+      games: s.games.map((g) => (g.id === id ? { ...g, wineRunner: runner } : g)),
+    }));
+  },
+
+  setWineCustomCommand: async (id, command) => {
+    await window.htpc.games.wineConfig.set(id, { wineCustomCommand: command });
+    set((s) => ({
+      games: s.games.map((g) => (g.id === id ? { ...g, wineCustomCommand: command ?? undefined } : g)),
+    }));
+  },
+
+  setUmuCustomCommand: async (id, command) => {
+    await window.htpc.games.wineConfig.set(id, { umuCustomCommand: command });
+    set((s) => ({
+      games: s.games.map((g) => (g.id === id ? { ...g, umuCustomCommand: command ?? undefined } : g)),
+    }));
   },
 
   updateLastPlayed: (id, timestamp = Date.now()) => {

@@ -432,10 +432,11 @@ async function uninstallProtonGe(packageId: string, window: BrowserWindow | null
 
 /**
  * Detect the best available Windows .exe runner on this system.
- * Priority: Proton-GE > system Proton (Steam) > Wine.
+ * Priority: umu-run > Proton-GE > system Proton (Steam) > Wine.
  * Returns null if nothing is installed.
  */
 export async function detectWineRunner(): Promise<WineRunner | null> {
+  if (await isUmuRunInstalled()) return "umu-run";
   if (await isProtonGeInstalled()) return "proton-ge";
 
   // Check for system Proton bundled with Steam
@@ -450,12 +451,21 @@ export async function detectWineRunner(): Promise<WineRunner | null> {
   return null;
 }
 
+async function isUmuRunInstalled(): Promise<boolean> {
+  const { code } = await runCommand("sh", ["-c", "command -v umu-run"]);
+  return code === 0;
+}
+
 /**
  * Build the command + args to launch a Windows .exe with the best available runner.
  */
 export async function buildWineCommand(exePath: string, preferredRunner?: WineRunner): Promise<{ cmd: string; args: string[] } | null> {
   const runner = preferredRunner ?? (await detectWineRunner());
   if (!runner) return null;
+
+  if (runner === "umu-run") {
+    return { cmd: "umu-run", args: [exePath] };
+  }
 
   if (runner === "proton-ge" || runner === "system-proton") {
     const geVersion = getInstalledProtonGeVersion();

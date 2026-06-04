@@ -26,18 +26,24 @@ export const CoreSelector: React.FC<CoreSelectorProps> = ({ game, onSelectCore }
       try {
         const allCores = await window.htpc.libretro.listCores();
         if (cancelled) return;
-        // Filter cores that support this game's extension
-        const ext = game.romPath?.split(".").pop()?.toLowerCase() ?? "";
-        const compatible = allCores.filter((c) => {
-          const exts = c.extensions.split("|").map((e) => e.replace(".", "").toLowerCase());
-          return exts.includes(ext) || exts.includes("");
-        });
-        setCores(compatible.length > 0 ? compatible : allCores);
-        // Try to auto-select a detected core
-        const detected = await window.htpc.libretro.detectCore(game.romPath ?? "");
-        if (detected && !cancelled) {
-          setSelected(detected.corePath);
-          onSelectCore(detected.corePath);
+
+        // Use detectAllCores to get all compatible cores sorted by priority (best first)
+        const detectedCores = window.htpc.libretro.detectAllCores(game.romPath ?? "");
+        if (detectedCores.length > 0) {
+          const compatible = detectedCores.map((d) => {
+            const core = allCores.find((c) => c.path === d.corePath);
+            return core ?? { id: -1, name: d.coreName, version: "", extensions: d.extensions.join("|"), needFullpath: false, path: d.corePath };
+          });
+          setCores(compatible);
+          // Pre-select the best (first) core
+          const best = compatible[0];
+          if (best && !cancelled) {
+            setSelected(best.path);
+            onSelectCore(best.path);
+          }
+        } else {
+          // Fallback: show all cores if none are extension-compatible
+          setCores(allCores);
         }
       } catch (err) {
         console.error("[CoreSelector] failed to load cores:", err);
@@ -81,10 +87,9 @@ export const CoreSelector: React.FC<CoreSelectorProps> = ({ game, onSelectCore }
         outline: "none",
       }}
     >
-      <option value="">Auto-detect core</option>
-      {cores.map((core) => (
+      {cores.map((core, index) => (
         <option key={core.path} value={core.path}>
-          {core.name} {core.version ? `(${core.version})` : ""}
+          {core.name} {core.version ? `(${core.version})` : ""} {index === 0 ? "— Recommended" : ""}
         </option>
       ))}
     </select>
