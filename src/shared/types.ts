@@ -464,7 +464,7 @@ export interface ManagedPackage {
   isInstalled: boolean;
   isPinned: boolean;
   autoUpdate: boolean;
-  category: "core" | "emulator" | "dependency" | "game";
+  category: "core" | "emulator" | "dependency" | "media-codec" | "other" | "game";
   platforms?: string[];
   sourceUrl?: string;
   installArgs?: string[];

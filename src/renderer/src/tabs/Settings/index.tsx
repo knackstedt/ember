@@ -380,7 +380,7 @@ export const SettingsTab: React.FC = () => {
   // Package management state
   const [packages, setPackages] = useState<ManagedPackage[]>([]);
   const [packageSearch, setPackageSearch] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<"all" | "core" | "emulator" | "dependency">("all");
+  const [selectedCategory, setSelectedCategory] = useState<"all" | "core" | "emulator" | "dependency" | "media-codec" | "other">("all");
   const [showAptPassword, setShowAptPassword] = useState(false);
   const [aptPassword, setAptPasswordInput] = useState("");
   const [pendingPackageId, setPendingPackageId] = useState<string | null>(null);
@@ -1419,22 +1419,39 @@ export const SettingsTab: React.FC = () => {
                   outline: "none",
                 }}
               />
-              <select
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value as any)}
-                className="px-3 py-2 rounded text-sm"
-                style={{
-                  background: "var(--color-surface-raised)",
-                  color: "var(--color-text)",
-                  border: "1px solid var(--color-border)",
-                  outline: "none",
-                }}
-              >
-                <option value="all">All Categories</option>
-                <option value="core">Cores</option>
-                <option value="emulator">Emulators</option>
-                <option value="dependency">Dependencies</option>
-              </select>
+            </div>
+
+            <div className="flex gap-1 flex-wrap">
+              {[
+                { id: "all", label: "All" },
+                { id: "core", label: "Libretro Cores" },
+                { id: "emulator", label: "Emulators" },
+                { id: "dependency", label: "Dependencies" },
+                { id: "media-codec", label: "Media Codecs" },
+                { id: "other", label: "Other" },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setSelectedCategory(tab.id as any)}
+                  className="px-3 py-1.5 rounded text-sm transition-colors"
+                  style={{
+                    background:
+                      selectedCategory === tab.id
+                        ? "var(--color-accent)"
+                        : "var(--color-surface-raised)",
+                    color:
+                      selectedCategory === tab.id
+                        ? "var(--color-bg)"
+                        : "var(--color-text)",
+                    border: "1px solid var(--color-border)",
+                  }}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex justify-end">
               <motion.button
                 className="px-3 py-2 rounded text-sm flex items-center gap-1.5"
                 style={{

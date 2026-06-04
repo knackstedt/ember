@@ -23,7 +23,7 @@ interface PackageDefinition {
   displayName: string;
   description?: string;
   manager: PackageManager;
-  category: "core" | "emulator" | "dependency" | "game";
+  category: "core" | "emulator" | "dependency" | "media-codec" | "other" | "game";
   platforms?: string[];
   sourceUrl?: string;
   installArgs?: string[];
@@ -71,6 +71,22 @@ const KNOWN_PACKAGES: PackageDefinition[] = [
   // Dependencies
   { id: "apt-ffmpeg", name: "ffmpeg", displayName: "FFmpeg", manager: "apt", category: "dependency", aptName: "ffmpeg" },
   { id: "apt-xdotool", name: "xdotool", displayName: "xdotool", manager: "apt", category: "dependency", aptName: "xdotool" },
+
+  // Bluetooth controller support
+  { id: "apt-bluez", name: "bluez", displayName: "BlueZ (Bluetooth stack)", description: "Official Linux Bluetooth protocol stack.", manager: "apt", category: "dependency", aptName: "bluez" },
+  { id: "apt-bluetooth", name: "bluetooth", displayName: "Bluetooth metapackage", description: "Metapackage for Bluetooth support, daemons, and utilities.", manager: "apt", category: "dependency", aptName: "bluetooth" },
+  { id: "apt-xboxdrv", name: "xboxdrv", displayName: "xboxdrv (Xbox controller driver)", description: "Userspace driver for Xbox and Xbox 360 gamepads.", manager: "apt", category: "dependency", aptName: "xboxdrv" },
+  { id: "apt-joycond", name: "joycond", displayName: "joycond (Nintendo Switch controllers)", description: "Daemon and driver for Nintendo Switch Pro Controller and Joy-Cons.", manager: "apt", category: "dependency", aptName: "joycond" },
+  { id: "apt-steam-devices", name: "steam-devices", displayName: "Steam Devices (udev rules)", description: "udev rules for Steam Controller and other Valve hardware.", manager: "apt", category: "dependency", aptName: "steam-devices" },
+
+  // Wiimote controller support
+  { id: "apt-cwiid", name: "cwiid", displayName: "cwiid (Wii Remote library)", description: "Library and tools to interface with Nintendo Wii Remotes.", manager: "apt", category: "dependency", aptName: "cwiid" },
+  { id: "apt-xwiimote", name: "xwiimote", displayName: "xwiimote (Wii Remote driver)", description: "Linux kernel driver and tools for Nintendo Wii Remotes.", manager: "apt", category: "dependency", aptName: "xwiimote" },
+
+  // Media codecs
+  { id: "apt-gstreamer-libav", name: "gstreamer1.0-libav", displayName: "GStreamer libav plugin", description: "GStreamer plugin for libav/ffmpeg codecs.", manager: "apt", category: "media-codec", aptName: "gstreamer1.0-libav" },
+  { id: "apt-gstreamer-ugly", name: "gstreamer1.0-plugins-ugly", displayName: "GStreamer Ugly Plugins", description: "GStreamer plugins with potential patent issues.", manager: "apt", category: "media-codec", aptName: "gstreamer1.0-plugins-ugly" },
+  { id: "apt-gstreamer-bad", name: "gstreamer1.0-plugins-bad", displayName: "GStreamer Bad Plugins", description: "GStreamer plugins that need more testing.", manager: "apt", category: "media-codec", aptName: "gstreamer1.0-plugins-bad" },
 
   // Windows compatibility layers
   {
