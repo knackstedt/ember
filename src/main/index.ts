@@ -96,7 +96,12 @@ async function createWindow(): Promise<void> {
 
   mainWindow.webContents.on("console-message", (_event, level, message, line, sourceId) => {
     const labels = ["log", "warn", "error"];
-    log.info("renderer-console", `[${labels[level] ?? level}] ${sourceId}:${line} ${message}`);
+    if (labels[level] === "log") {
+      log.info("renderer-console", `${sourceId}:${line} ${message}`);
+    } else {
+      (log[labels[level] as "warn" | "error"])("renderer-console", `${sourceId}:${line} ${message}`);
+    }
+
   });
 
   mainWindow.webContents.on("before-input-event", (_event, input) => {
