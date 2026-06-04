@@ -17,6 +17,15 @@ import { useGridFocus } from "../../hooks/useGridFocus";
 import { useCoverCacheStore } from "../../store/coverCache.store";
 import { useContextMenu } from "../../hooks/useContextMenu";
 import { ContextMenuOption } from "../../components/ContextMenu/ContextMenu";
+import {
+  Star,
+  StarOff,
+  EyeOff,
+  Tag,
+  RotateCw,
+  FolderOpen,
+  Play,
+} from "lucide-react";
 import { useCollectionsStore, evaluateSmartFilter, sortByCollection } from "../../store/collections.store";
 import { CollectionsBar } from "../../components/CollectionsBar/CollectionsBar";
 import { CollectionManager } from "../../components/CollectionManager/CollectionManager";
@@ -390,24 +399,24 @@ export const MusicTab: React.FC = () => {
         {
           id: "favorite",
           label: track.isFavorite ? "Unfavorite" : "Favorite",
-          icon: track.isFavorite ? "★" : "☆",
+          icon: track.isFavorite ? <Star size={16} /> : <StarOff size={16} />,
         },
-        { id: "hide", label: "Hide", icon: "🙈", destructive: true },
-        { id: "tags", label: "Update metadata / tags", icon: "🏷" },
+        { id: "hide", label: "Hide", icon: <EyeOff size={16} />, destructive: true },
+        { id: "tags", label: "Update metadata / tags", icon: <Tag size={16} /> },
         {
           id: "searchCover",
           label: "Search cover art",
-          icon: "🔄",
+          icon: <RotateCw size={16} />,
         },
         {
           id: "folder",
           label: "Open containing folder",
-          icon: "📂",
+          icon: <FolderOpen size={16} />,
           disabled: !track.filePath,
         },
       ];
       if (musicCollections.length > 0) {
-        opts.push({ id: "__sep__", label: "Collections", icon: "", disabled: true });
+        opts.push({ id: "__sep__", label: "Collections", disabled: true });
         for (const c of musicCollections) {
           opts.push({
             id: `add-to-coll:${c.id}`,
@@ -455,7 +464,7 @@ export const MusicTab: React.FC = () => {
     focusedIndex: groupFocusedIndex,
     enabled: subTab === "local" && !selectedGroup && browseMode !== "tracks",
     getOptions: (group): ContextMenuOption[] => [
-      { id: "play", label: "Play All", icon: "▶" },
+      { id: "play", label: "Play All", icon: <Play size={16} /> },
     ],
     onAction: (group, optionId) => {
       if (optionId === "play") {

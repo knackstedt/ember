@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 export interface ContextMenuOption {
   id: string;
   label: string;
-  icon?: string;
+  icon?: React.ReactNode;
   disabled?: boolean;
   destructive?: boolean;
 }
@@ -138,7 +138,11 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
                 }}
                 disabled={opt.disabled}
               >
-                {opt.icon && <span className="text-base">{opt.icon}</span>}
+                {opt.icon && (
+                  <span className="flex-shrink-0 w-4 h-4 flex items-center justify-center">
+                    {opt.icon}
+                  </span>
+                )}
                 <span className="truncate">{opt.label}</span>
               </button>
             );

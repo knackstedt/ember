@@ -1,12 +1,13 @@
 import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { Info, Check, X, Loader } from "lucide-react";
 import { useToastStore, Toast, ToastType } from "../../store/toast.store";
 
-const TYPE_META: Record<ToastType, { icon: string; accent: string }> = {
-  info: { icon: "ℹ", accent: "var(--color-accent)" },
-  success: { icon: "✓", accent: "#22c55e" },
-  error: { icon: "✕", accent: "#ef4444" },
-  progress: { icon: "⋯", accent: "var(--color-accent)" },
+const TYPE_META: Record<ToastType, { icon: React.ReactNode; accent: string }> = {
+  info: { icon: <Info size={16} />, accent: "var(--color-accent)" },
+  success: { icon: <Check size={16} />, accent: "#22c55e" },
+  error: { icon: <X size={16} />, accent: "#ef4444" },
+  progress: { icon: <Loader size={16} />, accent: "var(--color-accent)" },
 };
 
 function ToastItem({ toast }: { toast: Toast }) {
@@ -30,7 +31,7 @@ function ToastItem({ toast }: { toast: Toast }) {
       }}
     >
       <span
-        className="mt-0.5 flex-shrink-0 text-base leading-none"
+        className="mt-0.5 flex-shrink-0 w-4 h-4 flex items-center justify-center"
         style={{ color: meta.accent }}
       >
         {meta.icon}
@@ -45,7 +46,7 @@ function ToastItem({ toast }: { toast: Toast }) {
 
       <button
         onClick={() => dismiss(toast.id)}
-        className="flex-shrink-0 ml-1 text-xs leading-none transition-opacity"
+        className="flex-shrink-0 ml-1 transition-opacity"
         style={{ color: "var(--color-text-dim)", opacity: 0.5 }}
         onMouseEnter={(e) =>
           ((e.currentTarget as HTMLButtonElement).style.opacity = "1")
@@ -55,7 +56,7 @@ function ToastItem({ toast }: { toast: Toast }) {
         }
         aria-label="Dismiss"
       >
-        ✕
+        <X size={14} />
       </button>
 
       {/* Progress bar */}

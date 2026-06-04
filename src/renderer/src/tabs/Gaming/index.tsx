@@ -31,6 +31,15 @@ import { useGameMetadataStore } from "../../store/gameMetadata.store";
 import { CollectionsBar } from "../../components/CollectionsBar/CollectionsBar";
 import { CollectionManager } from "../../components/CollectionManager/CollectionManager";
 import { Tooltip } from "../../components/Tooltip/Tooltip";
+import {
+  Star,
+  StarOff,
+  EyeOff,
+  Tag,
+  RotateCw,
+  FolderOpen,
+  Gamepad2,
+} from "lucide-react";
 import { AiGroup } from "../../../../shared/types";
 import { DynamicFacetFilters, FacetField } from "../../components/DynamicFacetFilters/DynamicFacetFilters";
 import type { GameVideo } from "../../../../shared/metadata";
@@ -388,25 +397,25 @@ export const GamingTab: React.FC = () => {
         {
           id: "favorite",
           label: game.isFavorite ? "Unfavorite" : "Favorite",
-          icon: game.isFavorite ? "★" : "☆",
+          icon: game.isFavorite ? <Star size={16} /> : <StarOff size={16} />,
         },
-        { id: "hide", label: "Hide", icon: "🙈", destructive: true },
-        { id: "tags", label: "Update metadata / tags", icon: "🏷" },
-        { id: "controls", label: "Customize Input controls", icon: "🎮" },
+        { id: "hide", label: "Hide", icon: <EyeOff size={16} />, destructive: true },
+        { id: "tags", label: "Update metadata / tags", icon: <Tag size={16} /> },
+        { id: "controls", label: "Customize Input controls", icon: <Gamepad2 size={16} /> },
         {
           id: "regenerate",
           label: "Regenerate thumbnail",
-          icon: "🔄",
+          icon: <RotateCw size={16} />,
         },
         {
           id: "folder",
           label: "Open containing folder",
-          icon: "�",
+          icon: <FolderOpen size={16} />,
           disabled: !game.execPath && !game.romPath,
         },
       ];
       if (gameCollections.length > 0) {
-        opts.push({ id: "__sep__", label: "Collections", icon: "", disabled: true });
+        opts.push({ id: "__sep__", label: "Collections", disabled: true });
         for (const c of gameCollections) {
           opts.push({
             id: `add-to-coll:${c.id}`,

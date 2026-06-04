@@ -13,6 +13,14 @@ import { useVideoPlayerStore } from "../../store/videoPlayer.store";
 import { useGridFocus } from "../../hooks/useGridFocus";
 import { useContextMenu } from "../../hooks/useContextMenu";
 import { ContextMenuOption } from "../../components/ContextMenu/ContextMenu";
+import {
+  Star,
+  StarOff,
+  EyeOff,
+  Tag,
+  RotateCw,
+  FolderOpen,
+} from "lucide-react";
 import { useCollectionsStore, evaluateSmartFilter, sortByCollection } from "../../store/collections.store";
 import { CollectionsBar } from "../../components/CollectionsBar/CollectionsBar";
 import { CollectionManager } from "../../components/CollectionManager/CollectionManager";
@@ -229,25 +237,25 @@ export const TVShowsTab: React.FC = () => {
         {
           id: "favorite",
           label: show.isFavorite ? "Unfavorite" : "Favorite",
-          icon: show.isFavorite ? "★" : "☆",
+          icon: show.isFavorite ? <Star size={16} /> : <StarOff size={16} />,
         },
-        { id: "hide", label: "Hide", icon: "🙈", destructive: true },
-        { id: "tags", label: "Update metadata / tags", icon: "🏷" },
+        { id: "hide", label: "Hide", icon: <EyeOff size={16} />, destructive: true },
+        { id: "tags", label: "Update metadata / tags", icon: <Tag size={16} /> },
         {
           id: "regenerate",
           label: "Regenerate thumbnail",
-          icon: "🔄",
+          icon: <RotateCw size={16} />,
           disabled: !show.dirPath,
         },
         {
           id: "folder",
           label: "Open containing folder",
-          icon: "📂",
+          icon: <FolderOpen size={16} />,
           disabled: !show.dirPath,
         },
       ];
       if (tvCollections.length > 0) {
-        opts.push({ id: "__sep__", label: "Collections", icon: "", disabled: true });
+        opts.push({ id: "__sep__", label: "Collections", disabled: true });
         for (const c of tvCollections) {
           opts.push({
             id: `add-to-coll:${c.id}`,
