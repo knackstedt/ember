@@ -521,17 +521,23 @@ export default function App(): React.ReactElement {
       <ToastContainer />
       <ThemeBackground />
 
-      <AnimatePresence>{videoOpen && <VideoPlayer />}</AnimatePresence>
-      <ErrorBoundary>
+      <AnimatePresence>
+        {videoOpen && (
+          <ErrorBoundary variant="section">
+            <VideoPlayer />
+          </ErrorBoundary>
+        )}
+      </AnimatePresence>
+      <ErrorBoundary variant="section">
         <FlashPlayer />
       </ErrorBoundary>
-      <ErrorBoundary>
+      <ErrorBoundary variant="section">
         <JsnesPlayer />
       </ErrorBoundary>
-      <ErrorBoundary>
+      <ErrorBoundary variant="section">
         <EmulatorJSPlayer />
       </ErrorBoundary>
-      <ErrorBoundary>
+      <ErrorBoundary variant="section">
         <V86Player />
       </ErrorBoundary>
 
@@ -605,28 +611,42 @@ export default function App(): React.ReactElement {
                 exit={{ opacity: 0, y: -8 }}
                 transition={{ duration: 0.15, ease: "easeOut" }}
               >
-                <ActiveComponent />
+                <ErrorBoundary variant="section">
+                  <ActiveComponent />
+                </ErrorBoundary>
               </motion.div>
             </AnimatePresence>
           </div>
 
           {/* Queue blade */}
           <AnimatePresence>
-            {hasPlayer && <QueueBlade key="queue-blade" />}
+            {hasPlayer && (
+              <ErrorBoundary variant="section" key="queue-blade">
+                <QueueBlade />
+              </ErrorBoundary>
+            )}
           </AnimatePresence>
         </div>
 
         {/* Music mini-player */}
-        <AnimatePresence>{hasPlayer && <MusicPlayer />}</AnimatePresence>
+        <AnimatePresence>
+          {hasPlayer && (
+            <ErrorBoundary variant="section">
+              <MusicPlayer />
+            </ErrorBoundary>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Libretro native core player */}
-      <ErrorBoundary>
+      <ErrorBoundary variant="section">
         <LibretroPlayer />
       </ErrorBoundary>
 
       {/* Command Palette */}
-      <CommandPalette onExecute={(cmd: CommandDefinition) => executeCommand(cmd)} />
+      <ErrorBoundary variant="section">
+        <CommandPalette onExecute={(cmd: CommandDefinition) => executeCommand(cmd)} />
+      </ErrorBoundary>
     </div>
   );
 }

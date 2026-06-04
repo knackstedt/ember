@@ -6,6 +6,7 @@ import { useFlashPlayerStore } from "./store/flashPlayer.store";
 import { useJsnesPlayerStore } from "./store/jsnesPlayer.store";
 import { useEmulatorjsPlayerStore } from "./store/emulatorjsPlayer.store";
 import { useV86PlayerStore } from "./store/v86Player.store";
+import { ErrorBoundary } from "./components/ErrorBoundary/ErrorBoundary";
 
 // Expose stores on window for debugging and automated validation
 (window as any).useFlashPlayerStore = useFlashPlayerStore;
@@ -15,6 +16,8 @@ import { useV86PlayerStore } from "./store/v86Player.store";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <App />
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
   </React.StrictMode>,
 );
