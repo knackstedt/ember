@@ -84,7 +84,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
       {isOpen && (
         <motion.div
           ref={menuRef}
-          className="fixed z-[100] flex flex-col rounded-[var(--radius-card)] overflow-hidden py-1.5"
+          className="context-menu fixed z-[100] flex flex-col rounded-[var(--radius-card)] overflow-hidden py-1.5"
           style={{
             left: clampedX,
             top: clampedY,

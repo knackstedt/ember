@@ -133,6 +133,13 @@ html, body, #root {
   transform: translateX(var(--scroll-x, 0));
 }
 
+/* Glassmorphism context menu background */
+[data-theme="glassmorphism"] .context-menu {
+  background: var(--color-surface-overlay) !important;
+  backdrop-filter: blur(var(--blur-panel));
+  -webkit-backdrop-filter: blur(var(--blur-panel));
+}
+
 /* Glassmorphism panel utility */
 .glass-panel {
   background: var(--color-surface);
