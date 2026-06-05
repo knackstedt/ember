@@ -96,6 +96,10 @@ export interface Game {
   serialNumber?: string;
   pcgwEngine?: string;
   pcgwSeries?: string;
+  /** Path to emulator-compatible compressed ROM (e.g. .chd, .rvz) */
+  compressedRomPath?: string;
+  /** Compression format used for compressedRomPath */
+  compressionFormat?: string;
 }
 
 export interface GameEmulatorConfig {

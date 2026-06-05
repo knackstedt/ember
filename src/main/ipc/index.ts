@@ -92,6 +92,12 @@ import {
   enrichTrack,
   enrichTracks,
 } from "../services/music-enrichment.service";
+import {
+  compressGame,
+  compressAllRoms,
+  getToolAvailability,
+  canCompress,
+} from "../services/compression.service";
 
 const log = createLogger("info");
 
@@ -505,6 +511,25 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     } finally {
       regenerateLocks.delete(game.id);
     }
+  });
+
+  ipcMain.handle("games:compress", async (_e, game: Game) => {
+    return compressGame(game);
+  });
+
+  ipcMain.handle("games:compressAll", async (_e) => {
+    const result = await compressAllRoms((current, total, title) => {
+      window.webContents.send("compression:progress", { current, total, title });
+    });
+    return result;
+  });
+
+  ipcMain.handle("games:compression:tools", async () => {
+    return getToolAvailability();
+  });
+
+  ipcMain.handle("games:compression:canCompress", async (_e, game: Game) => {
+    return canCompress(game);
   });
 
   ipcMain.handle("movies:scan", async (_e, extraPaths?: string[]) => {

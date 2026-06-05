@@ -151,6 +151,14 @@ const htpc = {
       ipcRenderer.invoke("games:loadThumbnail", game),
     regenerateThumbnail: (game: Game): Promise<string | null> =>
       ipcRenderer.invoke("games:regenerateThumbnail", game),
+    compress: (game: Game): Promise<{ success: boolean; outputPath?: string; format?: string; error?: string; originalSize?: number; compressedSize?: number }> =>
+      ipcRenderer.invoke("games:compress", game),
+    compressAll: (): Promise<{ success: number; failed: number; skipped: number; errors: string[] }> =>
+      ipcRenderer.invoke("games:compressAll"),
+    compressionTools: (): Promise<{ chdman: { available: boolean }; dolphinTool: { available: boolean }; maxcso: { available: boolean }; nsz: { available: boolean }; sevenZip: { available: boolean } }> =>
+      ipcRenderer.invoke("games:compression:tools"),
+    canCompress: (game: Game): Promise<{ ok: boolean; reason?: string }> =>
+      ipcRenderer.invoke("games:compression:canCompress", game),
   },
 
   dolphin: {

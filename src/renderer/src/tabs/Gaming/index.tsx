@@ -47,6 +47,7 @@ import {
   Sparkles,
   Play,
   X,
+  Archive,
 } from "lucide-react";
 import { AiGroup } from "../../../../shared/types";
 import { DynamicFacetFilters, FacetField } from "../../components/DynamicFacetFilters/DynamicFacetFilters";
@@ -433,6 +434,20 @@ export const GamingTab: React.FC = () => {
           disabled: !game.execPath && !game.romPath,
         },
       ];
+      if (game.romPath && !game.compressedRomPath) {
+        opts.push({
+          id: "compress",
+          label: "Compress ROM",
+          icon: <Archive size={16} />,
+        });
+      } else if (game.compressedRomPath) {
+        opts.push({
+          id: "compress",
+          label: "Compressed",
+          icon: <Archive size={16} />,
+          disabled: true,
+        });
+      }
       if (devToolsOpen) {
         opts.push({ id: "debug", label: "Debug", icon: <Bug size={16} /> });
       }
@@ -502,6 +517,50 @@ export const GamingTab: React.FC = () => {
           hide(game.id);
           break;
         }
+        case "compress": {
+          const toastId = useToastStore.getState().push({
+            type: "progress",
+            message: `Compressing ${game.title}...`,
+            progress: 0,
+          });
+          window.htpc.games
+            .canCompress(game)
+            .then((check) => {
+              if (!check.ok) {
+                useToastStore.getState().update(toastId, {
+                  type: "error",
+                  message: `Cannot compress ${game.title}: ${check.reason}`,
+                });
+                return;
+              }
+              window.htpc.games.compress(game).then((result) => {
+                if (result.success) {
+                  const saved =
+                    result.originalSize && result.compressedSize
+                      ? ` (${((1 - result.compressedSize / result.originalSize) * 100).toFixed(1)}% smaller)`
+                      : "";
+                  useToastStore.getState().update(toastId, {
+                    type: "success",
+                    message: `Compressed ${game.title}${saved}`,
+                  });
+                  // Refresh games list to show compressed state
+                  void load();
+                } else {
+                  useToastStore.getState().update(toastId, {
+                    type: "error",
+                    message: `Failed to compress ${game.title}: ${result.error}`,
+                  });
+                }
+              });
+            })
+            .catch((err) => {
+              useToastStore.getState().update(toastId, {
+                type: "error",
+                message: `Failed to compress ${game.title}: ${String(err)}`,
+              });
+            });
+          break;
+        }
       }
     },
   });
@@ -565,29 +624,36 @@ export const GamingTab: React.FC = () => {
     return settings?.defaultEmulatorShader ?? "";
   };
 
+  /** Prefer compressed ROM if available and valid, otherwise fall back to romPath */
+  const resolveRomPath = (game: Game): string | undefined => {
+    if (game.compressedRomPath) return game.compressedRomPath;
+    return game.romPath;
+  };
+
   const launch = async (game: Game): Promise<void> => {
     updateLastPlayed(game.id);
-    if (game.platform === "flash" && game.romPath) {
-      useFlashPlayerStore.getState().launch(game.romPath, game.title, game.id);
+    const romPath = resolveRomPath(game);
+    if (game.platform === "flash" && romPath) {
+      useFlashPlayerStore.getState().launch(romPath, game.title, game.id);
       return;
     }
-    if (game.platform === "nes" && game.romPath) {
-      useJsnesPlayerStore.getState().launch(game.romPath, game.title, game.id);
+    if (game.platform === "nes" && romPath) {
+      useJsnesPlayerStore.getState().launch(romPath, game.title, game.id);
       return;
     }
-    if ((game.platform === "snes" || game.platform === "gb" || game.platform === "gba") && game.romPath) {
+    if ((game.platform === "snes" || game.platform === "gb" || game.platform === "gba") && romPath) {
       const shader = await resolveShader(game);
-      useEmulatorjsPlayerStore.getState().launch(game.romPath, game.title, game.platform, game.id, shader);
+      useEmulatorjsPlayerStore.getState().launch(romPath, game.title, game.platform, game.id, shader);
       return;
     }
-    if (game.platform === "dos" && game.romPath) {
-      useV86PlayerStore.getState().launch(game.romPath, game.title, game.id);
+    if (game.platform === "dos" && romPath) {
+      useV86PlayerStore.getState().launch(romPath, game.title, game.id);
       return;
     }
-    if (LIBRETRO_PLATFORMS.includes(game.platform) && game.romPath) {
+    if (LIBRETRO_PLATFORMS.includes(game.platform) && romPath) {
       const shader = await resolveShader(game);
       await useLibretroPlayerStore.getState().launch({
-        romPath: game.romPath,
+        romPath,
         title: game.title,
         gameId: game.id,
         platform: game.platform,
@@ -951,24 +1017,92 @@ export const GamingTab: React.FC = () => {
         }
         actions={
           selected && (
-            <Tooltip content={getMissingCoreTooltip(selected) ?? ""}>
-              <motion.button
-                className="px-6 py-2.5 rounded-[var(--radius-card)] font-semibold text-sm"
-                style={{
-                  background: getMissingCoreTooltip(selected) ? "var(--color-surface-raised)" : "var(--color-accent)",
-                  color: getMissingCoreTooltip(selected) ? "var(--color-text-dim)" : "var(--color-bg)",
-                  cursor: getMissingCoreTooltip(selected) ? "not-allowed" : "pointer",
-                }}
-                onClick={() => {
-                  if (getMissingCoreTooltip(selected)) return;
-                  launch(selected);
-                  setSelected(null);
-                }}
-                whileTap={{ scale: getMissingCoreTooltip(selected) ? 1 : 0.96 }}
-              >
-                <Play size={14} /> Launch
-              </motion.button>
-            </Tooltip>
+            <>
+              <Tooltip content={getMissingCoreTooltip(selected) ?? ""}>
+                <motion.button
+                  className="px-6 py-2.5 rounded-[var(--radius-card)] font-semibold text-sm"
+                  style={{
+                    background: getMissingCoreTooltip(selected) ? "var(--color-surface-raised)" : "var(--color-accent)",
+                    color: getMissingCoreTooltip(selected) ? "var(--color-text-dim)" : "var(--color-bg)",
+                    cursor: getMissingCoreTooltip(selected) ? "not-allowed" : "pointer",
+                  }}
+                  onClick={() => {
+                    if (getMissingCoreTooltip(selected)) return;
+                    launch(selected);
+                    setSelected(null);
+                  }}
+                  whileTap={{ scale: getMissingCoreTooltip(selected) ? 1 : 0.96 }}
+                >
+                  <Play size={14} /> Launch
+                </motion.button>
+              </Tooltip>
+              {selected.romPath && !selected.compressedRomPath && (
+                <Tooltip content="Compress ROM to emulator-compatible format">
+                  <motion.button
+                    className="px-4 py-2.5 rounded-[var(--radius-card)] font-semibold text-sm flex items-center gap-2"
+                    style={{
+                      background: "var(--color-surface-raised)",
+                      color: "var(--color-text)",
+                      border: "1px solid var(--color-border)",
+                    }}
+                    onClick={() => {
+                      const toastId = useToastStore.getState().push({
+                        type: "progress",
+                        message: `Compressing ${selected.title}...`,
+                        progress: 0,
+                      });
+                      window.htpc.games.canCompress(selected).then((check) => {
+                        if (!check.ok) {
+                          useToastStore.getState().update(toastId, {
+                            type: "error",
+                            message: `Cannot compress ${selected.title}: ${check.reason}`,
+                          });
+                          return;
+                        }
+                        window.htpc.games.compress(selected).then((result) => {
+                          if (result.success) {
+                            const saved =
+                              result.originalSize && result.compressedSize
+                                ? ` (${((1 - result.compressedSize / result.originalSize) * 100).toFixed(1)}% smaller)`
+                                : "";
+                            useToastStore.getState().update(toastId, {
+                              type: "success",
+                              message: `Compressed ${selected.title}${saved}`,
+                            });
+                            void load();
+                          } else {
+                            useToastStore.getState().update(toastId, {
+                              type: "error",
+                              message: `Failed to compress ${selected.title}: ${result.error}`,
+                            });
+                          }
+                        });
+                      }).catch((err) => {
+                        useToastStore.getState().update(toastId, {
+                          type: "error",
+                          message: `Failed to compress ${selected.title}: ${String(err)}`,
+                        });
+                      });
+                    }}
+                    whileTap={{ scale: 0.96 }}
+                  >
+                    <Archive size={14} /> Compress
+                  </motion.button>
+                </Tooltip>
+              )}
+              {selected.compressedRomPath && (
+                <span
+                  className="px-4 py-2.5 rounded-[var(--radius-card)] text-sm font-medium flex items-center gap-2"
+                  style={{
+                    background: "color-mix(in srgb, var(--color-accent) 12%, transparent)",
+                    color: "var(--color-accent)",
+                    border: "1px solid color-mix(in srgb, var(--color-accent) 30%, transparent)",
+                  }}
+                >
+                  <Archive size={14} /> Compressed ({selected.compressionFormat})
+                </span>
+              )}
+            </>
           )
         }
       >

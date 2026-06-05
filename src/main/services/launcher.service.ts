@@ -1,4 +1,5 @@
 import { spawn, spawnSync, ChildProcess } from "child_process";
+import { existsSync } from "fs";
 import { Game, Movie, MusicTrack } from "../../shared/types";
 import { createLogger } from "../util/logger";
 import { GameRepo } from "../db/repository";
@@ -8,6 +9,14 @@ const log = createLogger("info");
 
 const activeProcesses = new Map<string, ChildProcess>();
 const playTimeTimers = new Map<string, { startTime: number; timer: NodeJS.Timeout }>();
+
+/** Prefer compressed ROM if available and valid, otherwise fall back to romPath */
+function resolveRomPath(game: Game): string | undefined {
+  if (game.compressedRomPath && existsSync(game.compressedRomPath)) {
+    return game.compressedRomPath;
+  }
+  return game.romPath;
+}
 
 function parseCommand(input: string): string[] {
   const args: string[] = [];
@@ -124,13 +133,14 @@ export async function launchGame(game: Game): Promise<void> {
       args = [`steam://rungameid/${game.steamAppId}`];
       break;
     case "dolphin-gc":
-    case "dolphin-wii":
+    case "dolphin-wii": {
+      const romPath = resolveRomPath(game);
       if (isFlatpakDolphinInstalled()) {
         cmd = "flatpak";
-        args = ["run", "org.DolphinEmu.dolphin-emu", "-e", game.romPath!, "-b"];
+        args = ["run", "org.DolphinEmu.dolphin-emu", "-e", romPath!, "-b"];
       } else if (isSystemDolphinInstalled()) {
         cmd = "dolphin-emu";
-        args = ["-e", game.romPath!, "-b"];
+        args = ["-e", romPath!, "-b"];
       } else {
         return Promise.reject(
           new Error(
@@ -139,6 +149,7 @@ export async function launchGame(game: Game): Promise<void> {
         );
       }
       break;
+    }
     case "windows": {
       const exePath = game.romPath!;
       const runner = game.wineRunner ?? "wine";

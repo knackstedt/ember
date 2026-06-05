@@ -164,6 +164,11 @@ const MANAGED_PLATFORMS = new Set([
 ]);
 
 function resolveTargetPath(game: Game): string | undefined {
+  // Prefer compressed ROM if it still exists, so games aren't removed
+  // from the library when the original file is deleted after compression.
+  if (game.compressedRomPath && existsSync(game.compressedRomPath)) {
+    return game.compressedRomPath;
+  }
   if (game.romPath) return game.romPath;
   if (!game.execPath) return undefined;
   // Skip URL schemes (steam://, ember://, etc.)
@@ -271,9 +276,11 @@ async function preserveExistingFields(
         wineRunner?: string;
         wineCustomCommand?: string;
         umuCustomCommand?: string;
+        compressedRomPath?: string;
+        compressionFormat?: string;
       }[],
     ]
-  >(`SELECT playTime, lastPlayed, isFavorite, tags, rating, hidden, coverUrl, coverSource, corrupt, wineRunner, wineCustomCommand, umuCustomCommand FROM game:⟨${game.id}⟩`);
+  >(`SELECT playTime, lastPlayed, isFavorite, tags, rating, hidden, coverUrl, coverSource, corrupt, wineRunner, wineCustomCommand, umuCustomCommand, compressedRomPath, compressionFormat FROM game:⟨${game.id}⟩`);
   const existing = rows[0]?.[0];
   if (existing) {
     if (existing.playTime !== undefined && existing.playTime !== null) {
@@ -317,6 +324,12 @@ async function preserveExistingFields(
     }
     if (existing.umuCustomCommand !== undefined && existing.umuCustomCommand !== null) {
       game.umuCustomCommand = existing.umuCustomCommand;
+    }
+    if (existing.compressedRomPath !== undefined && existing.compressedRomPath !== null) {
+      game.compressedRomPath = existing.compressedRomPath;
+    }
+    if (existing.compressionFormat !== undefined && existing.compressionFormat !== null) {
+      game.compressionFormat = existing.compressionFormat;
     }
   }
   return game;

@@ -13,7 +13,7 @@ import {
   StreamingService,
 } from "../../shared/types";
 
-function escapeId(id: string): string {
+export function escapeId(id: string): string {
   // SurrealDB record IDs must not contain angle brackets or backticks
   // inside the identifier. We validate and escape aggressively.
   if (!/^[a-zA-Z0-9_\-:.]+$/.test(id)) {
