@@ -7,7 +7,21 @@ import { createLogger } from "../util/logger";
 
 const log = createLogger("info");
 
+const EXCLUDED_PATH_PATTERNS = [
+  /steamapps[\\/]common/i,
+  /steamapps[\\/]compatdata/i,
+  /proton/i,
+  /dosbox/i,
+  /scummvm/i,
+];
+
+function shouldExcludeFlash(fullPath: string): boolean {
+  const lower = fullPath.toLowerCase();
+  return EXCLUDED_PATH_PATTERNS.some((p) => p.test(lower));
+}
+
 function walkDir(dir: string, callback: (filePath: string) => void): void {
+  if (shouldExcludeFlash(dir)) return;
   let entries: string[];
   try {
     entries = readdirSync(dir);
