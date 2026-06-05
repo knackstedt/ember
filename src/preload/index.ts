@@ -41,6 +41,13 @@ const htpc = {
       heroic: string[];
       lutris: string[];
       desktop: string[];
+      retroarch: string[];
+      bottles: string[];
+      itch: string[];
+      kodi: string[];
+      jellyfin: string[];
+      plex: string[];
+      mounts: string[];
     }> =>
       ipcRenderer.invoke("app:xdg-defaults"),
   },

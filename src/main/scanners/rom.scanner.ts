@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, statSync, openSync, readSync, closeSync } from "fs";
+import { existsSync, readdirSync, readFileSync, statSync, openSync, readSync, closeSync } from "fs";
 import { join, extname, basename, dirname } from "path";
 import { homedir } from "os";
 import { createHash } from "crypto";
@@ -139,6 +139,22 @@ function hashId(prefix: string, fullPath: string): string {
   return `${prefix}_${createHash("sha256").update(fullPath).digest("hex").slice(0, 16)}`;
 }
 
+function getRetroarchContentDir(): string | null {
+  const cfgPath = join(homedir(), ".config", "retroarch", "retroarch.cfg");
+  if (!existsSync(cfgPath)) return null;
+  try {
+    const content = readFileSync(cfgPath, "utf-8");
+    const match = content.match(/content_directory\s*=\s*"([^"]+)"/);
+    if (match && match[1]) {
+      const dir = match[1].trim();
+      if (existsSync(dir)) return dir;
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
 export function scanRomGames(): Game[] {
   const roots = [
     join(homedir(), "Roms"),
@@ -146,7 +162,12 @@ export function scanRomGames(): Game[] {
     join(homedir(), "Games"),
     join(homedir(), "games"),
     join(homedir(), "roms"),
+    join(homedir(), "Emulation", "roms"),
+    join(homedir(), "retropie", "roms"),
   ].filter(existsSync);
+
+  const retroarchDir = getRetroarchContentDir();
+  if (retroarchDir) roots.push(retroarchDir);
 
   log.info("rom", `scanning roots: ${roots.join(", ")}`);
   const games: Game[] = [];

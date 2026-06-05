@@ -12,6 +12,13 @@ export const LocalDataTab: React.FC = () => {
     heroic: string[];
     lutris: string[];
     desktop: string[];
+    retroarch: string[];
+    bottles: string[];
+    itch: string[];
+    kodi: string[];
+    jellyfin: string[];
+    plex: string[];
+    mounts: string[];
   } | null>(null);
 
   useEffect(() => {
@@ -59,6 +66,12 @@ export const LocalDataTab: React.FC = () => {
             {xdgDefaults.roms.join(", ")}
           </div>
         )}
+        {xdgDefaults?.retroarch && xdgDefaults.retroarch.length > 0 && (
+          <div className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+            <strong className="block mb-1">RetroArch</strong>
+            {xdgDefaults.retroarch.join(", ")}
+          </div>
+        )}
         <PathList
           label="Game Paths"
           paths={settings.gamePaths}
@@ -92,7 +105,50 @@ export const LocalDataTab: React.FC = () => {
                   {xdgDefaults.desktop.join(", ")}
                 </div>
               )}
+              {xdgDefaults.bottles.length > 0 && (
+                <div>
+                  <strong className="block">Bottles</strong>
+                  {xdgDefaults.bottles.join(", ")}
+                </div>
+              )}
+              {xdgDefaults.itch.length > 0 && (
+                <div>
+                  <strong className="block">Itch.io</strong>
+                  {xdgDefaults.itch.join(", ")}
+                </div>
+              )}
             </div>
+          </div>
+        )}
+        {xdgDefaults && (
+          <div className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+            <strong className="block mb-1">Media Servers</strong>
+            <div className="flex flex-col gap-2 mt-2">
+              {xdgDefaults.kodi.length > 0 && (
+                <div>
+                  <strong className="block">Kodi</strong>
+                  {xdgDefaults.kodi.join(", ")}
+                </div>
+              )}
+              {xdgDefaults.jellyfin.length > 0 && (
+                <div>
+                  <strong className="block">Jellyfin</strong>
+                  {xdgDefaults.jellyfin.join(", ")}
+                </div>
+              )}
+              {xdgDefaults.plex.length > 0 && (
+                <div>
+                  <strong className="block">Plex</strong>
+                  {xdgDefaults.plex.join(", ")}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+        {xdgDefaults?.mounts && xdgDefaults.mounts.length > 0 && (
+          <div className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+            <strong className="block mb-1">Mounts</strong>
+            {xdgDefaults.mounts.join(", ")}
           </div>
         )}
       </section>
