@@ -343,7 +343,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
         if (options.steamAppId) {
           const settings = await getSettings();
           if (settings.steamApiKey) {
-            const { SteamWebAPIProvider } = await import("../services/metadata");
+            const { SteamWebAPIProvider } = await import("../services/metadata/index.js");
             if (!SteamWebAPIProvider.fetch) {
               return { achievements: [], count: 0 };
             }
@@ -992,6 +992,50 @@ export function registerIpcHandlers(window: BrowserWindow): void {
       } catch (err) {
         log.warn("db:clear", `failed to clear cache dir: ${dir} ${err}`);
       }
+    }
+
+    return true;
+  });
+
+  ipcMain.handle("db:clear-all", async () => {
+    const db = getDb();
+    await db.query(`
+      DELETE FROM game;
+      DELETE FROM movie;
+      DELETE FROM music_track;
+      DELETE FROM tv_show;
+      DELETE FROM controller_mapping;
+      DELETE FROM broken_flash_game;
+      DELETE FROM game_config;
+      DELETE FROM collection;
+      DELETE FROM collection_item;
+      DELETE FROM streaming_service;
+      DELETE FROM setting;
+    `);
+
+    const userData = app.getPath("userData");
+    const cacheDirs = [
+      join(userData, "covers", "flash", "screenshots"),
+      join(userData, "covers", "flash", "generated"),
+      join(userData, "covers", "music"),
+      join(userData, "covers", "artists"),
+      join(userData, "thumbnails", "movies"),
+      join(userData, "thumbnails", "tv"),
+    ];
+    for (const dir of cacheDirs) {
+      try {
+        rmSync(dir, { recursive: true, force: true });
+        mkdirSync(dir, { recursive: true });
+      } catch (err) {
+        log.warn("db:clear-all", `failed to clear cache dir: ${dir} ${err}`);
+      }
+    }
+
+    const windowStatePath = join(userData, "window-state.json");
+    try {
+      rmSync(windowStatePath, { force: true });
+    } catch (err) {
+      log.warn("db:clear-all", `failed to remove window-state.json: ${err}`);
     }
 
     return true;

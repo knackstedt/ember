@@ -260,6 +260,7 @@ const htpc = {
 
   db: {
     clear: (): Promise<boolean> => ipcRenderer.invoke("db:clear"),
+    clearAll: (): Promise<boolean> => ipcRenderer.invoke("db:clear-all"),
     wipeThumbnails: (): Promise<boolean> => ipcRenderer.invoke("db:wipe-thumbnails"),
   },
 

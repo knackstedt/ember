@@ -80,6 +80,7 @@ export const IPC_CHANNELS = {
   },
   db: {
     clear: "db:clear",
+    clearAll: "db:clear-all",
   },
   dialog: {
     openDirectory: "dialog:open-directory",
