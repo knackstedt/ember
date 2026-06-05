@@ -226,11 +226,14 @@ export function registerIpcHandlers(window: BrowserWindow): void {
   ipcMain.handle(
     "games:metadata:search",
     async (_e, title: string, platform?: string, steamAppId?: number) => {
+      console.log(`[IPC] games:metadata:search called for "${title}" (platform: ${platform}, steamAppId: ${steamAppId})`);
       try {
         const metadata = await searchGameMetadata({ title, platform, steamAppId });
+        console.log(`[IPC] games:metadata:search completed for "${title}":`, metadata?.sources?.map(s => s.name) || 'no sources');
         return metadata;
       } catch (err) {
         log.error("ipc:games:metadata:search", String(err));
+        console.error(`[IPC] games:metadata:search failed for "${title}":`, err);
         return null;
       }
     },

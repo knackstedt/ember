@@ -111,8 +111,16 @@ export const useGameMetadataStore = create<GameMetadataState>((set, get) => ({
   },
 
   fetchLazyMetadata: async (gameId, title, platform, steamAppId) => {
-    if (get().loadingGames.has(gameId)) return;
-    if (get().fullyLoadedGames.has(gameId)) return;
+    if (get().loadingGames.has(gameId)) {
+      console.log(`[GameMetadata] Already loading ${gameId}, skipping`);
+      return;
+    }
+    if (get().fullyLoadedGames.has(gameId)) {
+      console.log(`[GameMetadata] Already fully loaded ${gameId}, skipping`);
+      return;
+    }
+
+    console.log(`[GameMetadata] Starting lazy metadata fetch for ${gameId}: "${title}"`);
 
     set((s) => {
       const next = new Set(s.loadingGames);
@@ -124,13 +132,19 @@ export const useGameMetadataStore = create<GameMetadataState>((set, get) => ({
       // Fetch full metadata from all sources
       const metadata = await window.htpc.games.searchMetadata(title, platform, steamAppId);
 
+      console.log(`[GameMetadata] Received metadata for ${gameId}:`, metadata ? `sources: ${metadata.sources?.map(s => s.name).join(', ') || 'none'}` : 'null');
+
       if (metadata) {
+        const fields = Object.keys(metadata).filter(k => (metadata as Record<string, unknown>)[k] !== undefined && (metadata as Record<string, unknown>)[k] !== null);
+        console.log(`[GameMetadata] Caching metadata for ${gameId}, fields:`, fields.join(', '));
         set((s) => {
           const newCache = new Map(s.metadataCache);
           const existing = newCache.get(gameId) || {};
           newCache.set(gameId, { ...existing, ...metadata });
           return { metadataCache: newCache };
         });
+      } else {
+        console.log(`[GameMetadata] No metadata returned for ${gameId}`);
       }
 
       set((s) => {
@@ -139,8 +153,9 @@ export const useGameMetadataStore = create<GameMetadataState>((set, get) => ({
         return { fullyLoadedGames: next };
       });
     } catch (err) {
-      console.warn("Failed to fetch lazy metadata:", err);
+      console.warn(`[GameMetadata] Failed to fetch lazy metadata for ${gameId}:`, err);
     } finally {
+      console.log(`[GameMetadata] Clearing loading state for ${gameId}`);
       set((s) => {
         const next = new Set(s.loadingGames);
         next.delete(gameId);

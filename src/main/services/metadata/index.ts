@@ -31,15 +31,13 @@ const RAWGAdapter: MetadataProvider = {
   name: 'RAWG',
   type: 'primary',
   priority: 78,
-  requiresApiKey: true,
+  requiresApiKey: false, // Works without API key (lower rate limits)
 
   isAvailable(apiKey?: string): boolean {
-    return !!apiKey;
+    return true; // Always available - API key just increases rate limits
   },
 
   async search(options: MetadataSearchOptions, apiKey?: string): Promise<GameMetadata | null> {
-    if (!apiKey) return null;
-
     const rawgGame = await rawgSearchGame(options.title, apiKey);
     if (!rawgGame) return null;
 
@@ -69,7 +67,7 @@ const RAWGAdapter: MetadataProvider = {
   },
 
   async fetch(options: MetadataFetchOptions, apiKey?: string): Promise<GameMetadata | null> {
-    if (!apiKey || !options.rawgSlug) return null;
+    if (!options.rawgSlug) return null;
 
     const rawgGame = await rawgGetGameDetail(options.rawgSlug, apiKey);
     if (!rawgGame) return null;
@@ -342,6 +340,7 @@ export async function searchGameMetadata(
   options: MetadataSearchOptions,
   preferredSources?: ('primary' | 'retro' | 'artwork' | 'video' | 'supplementary')[]
 ): Promise<GameMetadata> {
+  console.log(`[MetadataService] Starting search for "${options.title}" (platform: ${options.platform})`);
   const apiKeys = await getApiKeys();
   const compositeKeys = buildCompositeKeys(apiKeys);
 
@@ -419,6 +418,8 @@ export async function searchGameMetadata(
 
   const results = await Promise.all(searchPromises);
   const validResults = results.filter((r): r is GameMetadata => r !== null);
+
+  console.log(`[MetadataService] Search complete for "${options.title}": ${validResults.length} providers returned data`);
 
   return mergeMetadata(validResults);
 }

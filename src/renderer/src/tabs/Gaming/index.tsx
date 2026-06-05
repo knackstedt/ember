@@ -28,7 +28,6 @@ import { SHADER_PRESETS } from "../../components/LibretroPlayer/shaders";
 import { useToastStore } from "../../store/toast.store";
 import { useSettingsStore } from "../../store/settings.store";
 import { useCollectionsStore, evaluateSmartFilter, sortByCollection } from "../../store/collections.store";
-import { useGameMetadataStore } from "../../store/gameMetadata.store";
 import { CollectionsBar } from "../../components/CollectionsBar/CollectionsBar";
 import { CollectionManager } from "../../components/CollectionManager/CollectionManager";
 import { Tooltip } from "../../components/Tooltip/Tooltip";
@@ -287,28 +286,6 @@ export const GamingTab: React.FC = () => {
     return () => window.removeEventListener("htpc:gaming-view", handler);
   }, []);
 
-  // Lazy metadata loading when detail panel opens
-  const fetchLazyMetadata = useGameMetadataStore((s) => s.fetchLazyMetadata);
-  const getMetadata = useGameMetadataStore((s) => s.getMetadata);
-  const isLoadingMetadata = useGameMetadataStore((s) => selected ? s.isLoading(selected.id) : false);
-
-  useEffect(() => {
-    if (!selected) return;
-
-    // Fetch lazy metadata (artwork, videos, low-rate-limit sources) when viewing details
-    fetchLazyMetadata(
-      selected.id,
-      selected.title,
-      selected.platform,
-      selected.steamAppId
-    );
-  }, [selected?.id, selected?.title, selected?.platform, selected?.steamAppId, fetchLazyMetadata]);
-
-  // Get cached metadata for the selected game
-  const lazyMetadata = useMemo(() => {
-    if (!selected) return null;
-    return getMetadata(selected.id);
-  }, [selected, getMetadata, isLoadingMetadata]);
 
   /* Auto-generate AI groups when viewMode switches to ai-groups and games are loaded */
   useEffect(() => {
@@ -582,38 +559,11 @@ export const GamingTab: React.FC = () => {
 
   const badge = selected ? gameBadge(selected) : undefined;
 
-  // Merge base game data with lazy-fetched metadata for detail view
+  // Use selected game data directly (metadata fetching removed)
   const detailGameData = useMemo<GameWithMetadata | null>(() => {
     if (!selected) return null;
-    if (!lazyMetadata) return selected as GameWithMetadata;
-
-    return {
-      ...selected,
-      // Use lazy metadata if available, otherwise fall back to base data
-      description: lazyMetadata.description ?? selected.description,
-      coverUrl: lazyMetadata.coverUrl ?? selected.coverUrl,
-      bannerUrl: lazyMetadata.bannerUrl ?? selected.bannerUrl,
-      iconUrl: lazyMetadata.iconUrl,
-      rating: lazyMetadata.rating ?? selected.rating,
-      metacriticScore: lazyMetadata.metacriticScore,
-      openCriticScore: lazyMetadata.openCriticScore,
-      protonRating: lazyMetadata.protonRating ?? selected.protonRating,
-      developer: lazyMetadata.developer ?? selected.developer,
-      publisher: lazyMetadata.publisher ?? selected.publisher,
-      genres: lazyMetadata.genres ?? selected.genres,
-      tags: lazyMetadata.tags ?? selected.tags,
-      releaseYear: lazyMetadata.releaseYear ?? selected.releaseYear,
-      playerCount: lazyMetadata.playerCount ?? selected.playerCount,
-      playtime: lazyMetadata.playtime,
-      platforms: lazyMetadata.platforms,
-      screenshots: lazyMetadata.screenshots,
-      videos: lazyMetadata.videos,
-      achievementCount: lazyMetadata.achievementCount,
-      // Store external IDs for future lazy loading
-      igdbId: lazyMetadata.igdbId,
-      steamAppId: lazyMetadata.steamAppId ?? selected.steamAppId,
-    } as GameWithMetadata;
-  }, [selected, lazyMetadata]);
+    return selected as GameWithMetadata;
+  }, [selected]);
 
   const resolveShader = async (game: Game): Promise<string> => {
     const perGame = await getEmulatorConfig(game.id);
@@ -1108,15 +1058,7 @@ export const GamingTab: React.FC = () => {
       >
         {selected && (
           <div className="flex flex-col gap-4">
-            {/* Loading indicator for lazy metadata */}
-            {isLoadingMetadata && (
-              <div className="flex items-center gap-2 text-sm" style={{ color: "var(--color-text-dim)" }}>
-                <div className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "var(--color-accent)", borderTopColor: "transparent" }} />
-                <span>Loading additional metadata...</span>
-              </div>
-            )}
-
-            {/* Screenshots from lazy metadata */}
+            {/* Screenshots from game data */}
             {(detailGameData?.screenshots?.length || detailGameData?.bannerUrl || detailGameData?.coverUrl) && (
               <div>
                 <div
