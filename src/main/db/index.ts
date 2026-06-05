@@ -257,7 +257,7 @@ async function runMigrations(db: Surreal): Promise<void> {
   // Migrate old raw local coverUrl paths → ember://media protocol
   try {
     const [absPaths] = await db.query<[{ id: string; coverUrl: string }[]]>(
-      `SELECT id, coverUrl FROM game WHERE coverUrl STARTS WITH "/"`,
+      `SELECT id, coverUrl FROM game WHERE string::starts_with(coverUrl, "/")`,
     );
     for (const row of absPaths ?? []) {
       await db.query(`UPDATE ${row.id} SET coverUrl = $url`, {
@@ -266,7 +266,7 @@ async function runMigrations(db: Surreal): Promise<void> {
     }
 
     const [fileUrls] = await db.query<[{ id: string; coverUrl: string }[]]>(
-      `SELECT id, coverUrl FROM game WHERE coverUrl STARTS WITH "file://"`,
+      `SELECT id, coverUrl FROM game WHERE string::starts_with(coverUrl, "file://")`,
     );
     for (const row of fileUrls ?? []) {
       await db.query(`UPDATE ${row.id} SET coverUrl = $url`, {

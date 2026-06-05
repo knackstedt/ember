@@ -55,6 +55,7 @@ import {
 import { listPlugins, reloadPlugins } from "../plugins/loader";
 import { getConnectedDevices } from "../input/evdev";
 import { getXdgVideosDir, getXdgMusicDir } from "../scanners/xdg";
+import { getDefaultScanSources, getDefaultScanSourcesAsync } from "../scanners/defaults";
 import { isOllamaAvailable, naturalLanguageToFilter, aiGroupItems } from "../services/local-ai.service";
 import { AiGroup } from "../../shared/types";
 import {
@@ -940,10 +941,15 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     return await reloadPlugins();
   });
 
-  ipcMain.handle("app:xdg-defaults", () => ({
-    videosDir: getXdgVideosDir(),
-    musicDir: getXdgMusicDir(),
-  }));
+  ipcMain.handle("app:xdg-defaults", async () => {
+    const sources = await getDefaultScanSourcesAsync();
+    log.info("app:xdg-defaults", `Returning sources: ${JSON.stringify(sources)}`);
+    return {
+      videosDir: getXdgVideosDir(),
+      musicDir: getXdgMusicDir(),
+      ...sources,
+    };
+  });
 
   ipcMain.handle("db:wipe-thumbnails", async () => {
     const userData = app.getPath("userData");
@@ -1232,5 +1238,71 @@ export function registerIpcHandlers(window: BrowserWindow): void {
 
   ipcMain.handle("packages:detectWineRunner", async () => {
     return detectWineRunner();
+  });
+
+  /* ------------------------------------------------------------------ */
+  /*  Emulator Configuration                                             */
+  /* ------------------------------------------------------------------ */
+
+  ipcMain.handle("dolphin:openSettings", async () => {
+    const { spawn } = await import("child_process");
+    const { existsSync } = await import("fs");
+    const { homedir } = await import("os");
+    const { join } = await import("path");
+
+    // Try to detect Dolphin installation and open its settings
+    const dolphinPaths = [
+      "/usr/bin/dolphin-emu",
+      "/var/lib/flatpak/exports/bin/org.DolphinEmu.dolphin-emu",
+    ];
+
+    for (const path of dolphinPaths) {
+      if (existsSync(path)) {
+        if (path.includes("flatpak")) {
+          spawn("flatpak", ["run", "org.DolphinEmu.dolphin-emu", "--settings"], {
+            detached: true,
+            stdio: "ignore",
+          }).unref();
+        } else {
+          spawn(path, ["--settings"], {
+            detached: true,
+            stdio: "ignore",
+          }).unref();
+        }
+        return true;
+      }
+    }
+    return false;
+  });
+
+  ipcMain.handle("dolphin:openConfig", async () => {
+    const { homedir } = await import("os");
+    const { join } = await import("path");
+    const { existsSync } = await import("fs");
+
+    const configPaths = [
+      join(homedir(), ".local/share/dolphin-emu"),
+      join(homedir(), ".var/app/org.DolphinEmu.dolphin-emu/config/dolphin-emu"),
+    ];
+
+    for (const path of configPaths) {
+      if (existsSync(path)) {
+        shell.openPath(path);
+        return true;
+      }
+    }
+    return false;
+  });
+
+  ipcMain.handle("controller:openMapping", async () => {
+    // For now, this will navigate to the Input tab in settings
+    // In the future, this could open a dedicated controller mapping UI
+    return true;
+  });
+
+  ipcMain.handle("controller:resetMappings", async () => {
+    const db = getDb();
+    await db.query("DELETE FROM controller_mapping");
+    return true;
   });
 }

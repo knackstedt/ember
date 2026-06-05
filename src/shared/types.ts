@@ -340,6 +340,8 @@ export interface AppSettings {
   dailyBackground: DailyBackgroundSettings;
   defaultEmulatorShader?: string;
   emulatorShaders?: Partial<Record<GamePlatform, string>>;
+  /** Dolphin emulator post-processing effect */
+  dolphinPostProcessing?: string;
   /** Custom keyboard shortcuts: command id → shortcut string (e.g. "Ctrl+P") */
   commandKeybinds?: Record<string, string>;
   /** Custom controller button mappings: command id → button action (e.g. "north", "select") */

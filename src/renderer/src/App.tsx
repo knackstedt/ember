@@ -343,6 +343,12 @@ export default function App(): React.ReactElement {
         return;
       }
 
+      // Skip command execution if commands are suspended (e.g., during keybind recording)
+      const commandsSuspended = useCommandsStore.getState().commandsSuspended;
+      if (commandsSuspended) {
+        return;
+      }
+
       const target = e.target as HTMLElement | null;
       const isTyping =
         target != null &&

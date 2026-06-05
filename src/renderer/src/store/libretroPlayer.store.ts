@@ -93,7 +93,7 @@ export const useLibretroPlayerStore = create<LibretroPlayerState>((set, get) => 
       }
 
       if (!corePath) {
-        set({ error: "No compatible libretro core found for this ROM. Install cores via RetroArch or select one manually.", isLoading: false });
+        set({ error: "No compatible libretro core found for this ROM. Install libretro cores or select one manually.", isLoading: false });
         return;
       }
 

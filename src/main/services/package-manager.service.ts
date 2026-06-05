@@ -58,7 +58,6 @@ const KNOWN_PACKAGES: PackageDefinition[] = [
   { id: "libretro-ppsspp", name: "ppsspp", displayName: "PPSSPP (PSP)", manager: "apt", category: "core", platforms: ["psp"], aptName: "libretro-ppsspp" },
 
   // Flatpak emulators
-  { id: "flatpak-retroarch", name: "retroarch", displayName: "RetroArch", manager: "flatpak", category: "emulator", platforms: [], flatpakRef: "org.libretro.RetroArch/x86_64/stable" },
   { id: "flatpak-dolphin", name: "dolphin-emu", displayName: "Dolphin (GameCube/Wii)", manager: "flatpak", category: "emulator", platforms: ["dolphin-gc", "dolphin-wii"], flatpakRef: "org.DolphinEmu.dolphin-emu/x86_64/stable" },
   { id: "flatpak-pcsx2", name: "pcsx2", displayName: "PCSX2 (PS2)", manager: "flatpak", category: "emulator", platforms: [], flatpakRef: "net.pcsx2.PCSX2/x86_64/stable" },
   { id: "flatpak-rpcs3", name: "rpcs3", displayName: "RPCS3 (PS3)", manager: "flatpak", category: "emulator", platforms: [], flatpakRef: "net.rpcs3.RPCS3/x86_64/stable" },

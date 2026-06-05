@@ -2,6 +2,7 @@ import React from "react";
 import { useSettingsStore } from "../../store/settings.store";
 import { FlashAspectRatio, FlashCanvasSize, FlashUpscaleStyle, GamePlatform } from "../../../../shared/types";
 import { getFlashSettings } from "./shared";
+import { Settings, ExternalLink } from "lucide-react";
 
 export const EmulatorsTab: React.FC = () => {
   const { settings, update } = useSettingsStore();
@@ -226,6 +227,183 @@ export const EmulatorsTab: React.FC = () => {
               </select>
             </div>
           ))}
+        </div>
+      </section>
+
+      <section className="flex flex-col gap-4">
+        <h2 className="text-lg font-semibold" style={{ color: "var(--color-text)" }}>
+          Dolphin Emulator
+        </h2>
+        <div className="flex flex-col gap-3">
+          <div>
+            <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--color-text-dim)" }}>
+              Dolphin Settings
+            </label>
+            <button
+              onClick={async () => {
+                console.log("Dolphin settings button clicked");
+                try {
+                  if (!window.htpc?.dolphin?.openSettings) {
+                    console.error("window.htpc.dolphin.openSettings is not available");
+                    alert("Dolphin settings function not available. Please restart the application.");
+                    return;
+                  }
+                  const success = await window.htpc.dolphin.openSettings();
+                  console.log("Dolphin settings result:", success);
+                  if (!success) {
+                    alert("Dolphin emulator not found. Please install it via Flatpak (org.DolphinEmu.dolphin-emu) or your system package manager.");
+                  }
+                } catch (error) {
+                  console.error("Failed to open Dolphin settings:", error);
+                  alert("Failed to open Dolphin settings: " + (error as Error).message);
+                }
+              }}
+              className="w-full text-sm px-3 py-2 rounded flex items-center justify-center gap-2"
+              style={{
+                background: "var(--color-surface-raised)",
+                border: "1px solid var(--color-border)",
+                color: "var(--color-text)",
+              }}
+            >
+              <Settings size={16} />
+              <span>Open Dolphin Settings</span>
+            </button>
+          </div>
+          <div>
+            <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--color-text-dim)" }}>
+              Default Post-Processing Effect
+            </label>
+            <select
+              value={settings.dolphinPostProcessing ?? ""}
+              onChange={(e) => update({ dolphinPostProcessing: e.target.value || undefined })}
+              className="w-full text-sm px-2 py-1.5 rounded"
+              style={{
+                background: "var(--color-surface-raised)",
+                border: "1px solid var(--color-border)",
+                color: "var(--color-text)",
+                outline: "none",
+              }}
+            >
+              <option value="">None (Off)</option>
+              <option value="auto">Auto (Recommended)</option>
+              <option value="off">Force Off</option>
+              <option value="ssao">SSAO</option>
+              <option value="ssao">SSAO</option>
+              <option value="anaglyph">Anaglyph 3D</option>
+              <option value="3d">Side-by-Side 3D</option>
+              <option value="top-bottom">Top-and-Bottom 3D</option>
+              <option value="lineart">Lineart</option>
+              <option value="bloom">Bloom</option>
+              <option value="scanlines">Scanlines</option>
+              <option value="ambient">Ambient Occlusion</option>
+              <option value="vignette">Vignette</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--color-text-dim)" }}>
+              Dolphin Configuration
+            </label>
+            <button
+              onClick={async () => {
+                console.log("Dolphin config button clicked");
+                try {
+                  if (!window.htpc?.dolphin?.openConfig) {
+                    console.error("window.htpc.dolphin.openConfig is not available");
+                    alert("Dolphin config function not available. Please restart the application.");
+                    return;
+                  }
+                  const success = await window.htpc.dolphin.openConfig();
+                  console.log("Dolphin config result:", success);
+                  if (!success) {
+                    alert("Dolphin configuration directory not found. Please ensure Dolphin is installed and has been run at least once.");
+                  }
+                } catch (error) {
+                  console.error("Failed to open Dolphin config:", error);
+                  alert("Failed to open Dolphin config: " + (error as Error).message);
+                }
+              }}
+              className="w-full text-sm px-3 py-2 rounded flex items-center justify-center gap-2"
+              style={{
+                background: "var(--color-surface-raised)",
+                border: "1px solid var(--color-border)",
+                color: "var(--color-text)",
+              }}
+            >
+              <ExternalLink size={16} />
+              <span>Open Dolphin Config Directory</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section className="flex flex-col gap-4">
+        <h2 className="text-lg font-semibold" style={{ color: "var(--color-text)" }}>
+          Controller Mappings
+        </h2>
+        <div className="flex flex-col gap-3">
+          <div>
+            <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--color-text-dim)" }}>
+              Controller Mapping Configuration
+            </label>
+            <button
+              onClick={async () => {
+                console.log("Controller mapping button clicked");
+                try {
+                  if (!window.htpc?.controller?.openMapping) {
+                    console.error("window.htpc.controller.openMapping is not available");
+                    alert("Controller mapping function not available. Please restart the application.");
+                    return;
+                  }
+                  await window.htpc.controller.openMapping();
+                  // For now, navigate to Input tab since that's where controller mapping is handled
+                  // In the future, this could open a dedicated controller mapping UI
+                  alert("Controller mapping is configured in the Input tab. Please navigate there to set up your controllers.");
+                } catch (error) {
+                  console.error("Failed to open controller mapping:", error);
+                  alert("Failed to open controller mapping: " + (error as Error).message);
+                }
+              }}
+              className="w-full text-sm px-3 py-2 rounded flex items-center justify-center gap-2"
+              style={{
+                background: "var(--color-surface-raised)",
+                border: "1px solid var(--color-border)",
+                color: "var(--color-text)",
+              }}
+            >
+              <Settings size={16} />
+              <span>Configure Controller Mappings</span>
+            </button>
+          </div>
+          <div>
+            <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--color-text-dim)" }}>
+              Reset Controller Mappings
+            </label>
+            <button
+              onClick={async () => {
+                console.log("Reset controller mappings button clicked");
+                try {
+                  if (!window.htpc?.controller?.resetMappings) {
+                    console.error("window.htpc.controller.resetMappings is not available");
+                    alert("Controller reset function not available. Please restart the application.");
+                    return;
+                  }
+                  await window.htpc.controller.resetMappings();
+                  alert("All controller mappings have been reset.");
+                } catch (error) {
+                  console.error("Failed to reset controller mappings:", error);
+                  alert("Failed to reset controller mappings: " + (error as Error).message);
+                }
+              }}
+              className="w-full text-sm px-3 py-2 rounded"
+              style={{
+                background: "#ff444420",
+                border: "1px solid #ff444430",
+                color: "#ff4444",
+              }}
+            >
+              Reset All Mappings
+            </button>
+          </div>
         </div>
       </section>
     </div>

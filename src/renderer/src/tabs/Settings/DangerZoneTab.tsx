@@ -1,11 +1,10 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSettingsStore } from "../../store/settings.store";
-import { KeybindEditor } from "../../components/KeybindEditor/KeybindEditor";
-import { Toggle } from "./shared";
+import { AlertTriangle, Trash2, RefreshCw } from "lucide-react";
 
 export const DangerZoneTab: React.FC = () => {
-  const { settings, update } = useSettingsStore();
+  const { settings } = useSettingsStore();
   const [clearConfirm, setClearConfirm] = useState(false);
   const [clearAllConfirm, setClearAllConfirm] = useState(false);
 
@@ -13,56 +12,22 @@ export const DangerZoneTab: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-8">
-      <section className="flex flex-col gap-2">
-        <h2 className="text-lg font-semibold" style={{ color: "var(--color-text)" }}>
-          General
-        </h2>
-        <Toggle
-          label="Start on Boot"
-          value={settings.startOnBoot}
-          onChange={(v) => update({ startOnBoot: v })}
-        />
-        <Toggle
-          label="Hardware Acceleration"
-          value={settings.hardwareAcceleration}
-          onChange={(v) => update({ hardwareAcceleration: v })}
-        />
-      </section>
-
       <section className="flex flex-col gap-4">
-        <h2 className="text-lg font-semibold" style={{ color: "var(--color-text)" }}>
-          Keybinds & Controller
-        </h2>
+        <div className="flex items-center gap-2 mb-2">
+          <AlertTriangle size={20} style={{ color: "#ff4444" }} />
+          <h2 className="text-lg font-semibold" style={{ color: "#ff6666" }}>
+            Danger Zone
+          </h2>
+        </div>
         <p className="text-sm" style={{ color: "var(--color-text-dim)" }}>
-          Click a shortcut to record a new keyboard combination. Click the controller button to assign a gamepad button.
+          These actions are destructive and cannot be undone. Please proceed with caution.
         </p>
-        <KeybindEditor
-          keybinds={settings.commandKeybinds ?? {}}
-          controllerMap={settings.commandControllerMap ?? {}}
-          onChangeKeybind={(cmdId, shortcut) => {
-            const next = { ...(settings.commandKeybinds ?? {}) };
-            if (shortcut) next[cmdId] = shortcut;
-            else delete next[cmdId];
-            update({ commandKeybinds: next });
-          }}
-          onChangeController={(cmdId, button) => {
-            const next = { ...(settings.commandControllerMap ?? {}) };
-            if (button) next[cmdId] = button;
-            else delete next[cmdId];
-            update({ commandControllerMap: next });
-          }}
-          onResetAll={() => {
-            update({ commandKeybinds: {}, commandControllerMap: {} });
-          }}
-        />
-      </section>
 
-      <section className="flex flex-col gap-4">
-        <h2 className="text-lg font-semibold" style={{ color: "var(--color-text)" }}>
-          Danger Zone
-        </h2>
-
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-3 p-4 rounded-[var(--radius-card)]" style={{ background: "var(--color-surface-raised)", border: "1px solid var(--color-border)" }}>
+          <div className="flex items-center gap-2 mb-1">
+            <Trash2 size={16} style={{ color: "#ff4444" }} />
+            <span className="font-medium" style={{ color: "var(--color-text)" }}>Clear Library Data</span>
+          </div>
           <p className="text-sm" style={{ color: "var(--color-text-dim)" }}>
             Removes all scanned games, movies, music, and TV shows from the
             database. Your settings and file paths will be preserved.
@@ -100,7 +65,7 @@ export const DangerZoneTab: React.FC = () => {
                   <motion.button
                     className="px-4 py-2 rounded-[var(--radius-card)] text-sm"
                     style={{
-                      background: "var(--color-surface-raised)",
+                      background: "var(--color-surface)",
                       color: "var(--color-text)",
                       border: "1px solid var(--color-border)",
                     }}
@@ -114,7 +79,7 @@ export const DangerZoneTab: React.FC = () => {
             ) : (
               <motion.button
                 key="clear"
-                className="self-start px-4 py-2 rounded-[var(--radius-card)] text-sm"
+                className="self-start px-4 py-2 rounded-[var(--radius-card)] text-sm flex items-center gap-2"
                 style={{
                   background: "#ff444420",
                   color: "#ff4444",
@@ -123,13 +88,18 @@ export const DangerZoneTab: React.FC = () => {
                 onClick={() => setClearConfirm(true)}
                 whileTap={{ scale: 0.96 }}
               >
+                <Trash2 size={14} />
                 Clear Game Data
               </motion.button>
             )}
           </AnimatePresence>
         </div>
 
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-3 p-4 rounded-[var(--radius-card)]" style={{ background: "var(--color-surface-raised)", border: "1px solid var(--color-border)" }}>
+          <div className="flex items-center gap-2 mb-1">
+            <RefreshCw size={16} style={{ color: "#ff4444" }} />
+            <span className="font-medium" style={{ color: "var(--color-text)" }}>Factory Reset</span>
+          </div>
           <p className="text-sm" style={{ color: "var(--color-text-dim)" }}>
             Resets all configuration, keybinds, controller mappings, collections,
             and library data. Your actual game and media files will not be touched.
@@ -167,7 +137,7 @@ export const DangerZoneTab: React.FC = () => {
                   <motion.button
                     className="px-4 py-2 rounded-[var(--radius-card)] text-sm"
                     style={{
-                      background: "var(--color-surface-raised)",
+                      background: "var(--color-surface)",
                       color: "var(--color-text)",
                       border: "1px solid var(--color-border)",
                     }}
@@ -181,7 +151,7 @@ export const DangerZoneTab: React.FC = () => {
             ) : (
               <motion.button
                 key="clear-all"
-                className="self-start px-4 py-2 rounded-[var(--radius-card)] text-sm"
+                className="self-start px-4 py-2 rounded-[var(--radius-card)] text-sm flex items-center gap-2"
                 style={{
                   background: "#ff444420",
                   color: "#ff4444",
@@ -190,6 +160,7 @@ export const DangerZoneTab: React.FC = () => {
                 onClick={() => setClearAllConfirm(true)}
                 whileTap={{ scale: 0.96 }}
               >
+                <RefreshCw size={14} />
                 Clear All Data
               </motion.button>
             )}

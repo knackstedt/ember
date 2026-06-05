@@ -217,18 +217,27 @@ export function Field({
 
 export function Toggle({
   label,
+  description,
   value,
   onChange,
 }: {
   label: string;
+  description?: string;
   value: boolean;
   onChange: (v: boolean) => void;
 }): React.ReactElement {
   return (
     <div className="flex items-center justify-between py-2">
-      <span className="text-sm" style={{ color: "var(--color-text)" }}>
-        {label}
-      </span>
+      <div className="flex flex-col gap-0.5">
+        <span className="text-sm" style={{ color: "var(--color-text)" }}>
+          {label}
+        </span>
+        {description && (
+          <span className="text-xs" style={{ color: "var(--color-text-dim)" }}>
+            {description}
+          </span>
+        )}
+      </div>
       <button
         onClick={() => onChange(!value)}
         className="w-11 h-6 rounded-full transition-colors relative"

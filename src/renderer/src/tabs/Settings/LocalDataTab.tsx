@@ -7,13 +7,23 @@ export const LocalDataTab: React.FC = () => {
   const [xdgDefaults, setXdgDefaults] = useState<{
     videosDir: string;
     musicDir: string;
+    roms: string[];
+    steam: string[];
+    heroic: string[];
+    lutris: string[];
+    desktop: string[];
   } | null>(null);
 
   useEffect(() => {
     window.htpc.app
       .getXdgDefaults()
-      .then(setXdgDefaults)
-      .catch(() => {});
+      .then((data) => {
+        console.log("Received xdgDefaults:", data);
+        setXdgDefaults(data);
+      })
+      .catch((err) => {
+        console.error("Failed to get xdgDefaults:", err);
+      });
   }, []);
 
   if (!settings) return null;
@@ -43,11 +53,48 @@ export const LocalDataTab: React.FC = () => {
           paths={settings.romPaths}
           onChange={(p) => update({ romPaths: p })}
         />
+        {xdgDefaults?.roms && xdgDefaults.roms.length > 0 && (
+          <div className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+            <strong className="block mb-1">Default ROM directories</strong>
+            {xdgDefaults.roms.join(", ")}
+          </div>
+        )}
         <PathList
           label="Game Paths"
           paths={settings.gamePaths}
           onChange={(p) => update({ gamePaths: p })}
         />
+        {xdgDefaults && (
+          <div className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+            <strong className="block mb-1">Auto-discovered game sources</strong>
+            <div className="flex flex-col gap-2 mt-2">
+              {xdgDefaults.steam.length > 0 && (
+                <div>
+                  <strong className="block">Steam</strong>
+                  {xdgDefaults.steam.join(", ")}
+                </div>
+              )}
+              {xdgDefaults.heroic.length > 0 && (
+                <div>
+                  <strong className="block">Heroic</strong>
+                  {xdgDefaults.heroic.join(", ")}
+                </div>
+              )}
+              {xdgDefaults.lutris.length > 0 && (
+                <div>
+                  <strong className="block">Lutris</strong>
+                  {xdgDefaults.lutris.join(", ")}
+                </div>
+              )}
+              {xdgDefaults.desktop.length > 0 && (
+                <div>
+                  <strong className="block">Desktop</strong>
+                  {xdgDefaults.desktop.join(", ")}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </section>
     </div>
   );

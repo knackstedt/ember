@@ -33,7 +33,15 @@ const htpc = {
       ipcRenderer.invoke("app:fullscreen", value),
     quit: (): Promise<void> => ipcRenderer.invoke("app:quit"),
     restart: (): Promise<void> => ipcRenderer.invoke("app:restart"),
-    getXdgDefaults: (): Promise<{ videosDir: string; musicDir: string }> =>
+    getXdgDefaults: (): Promise<{
+      videosDir: string;
+      musicDir: string;
+      roms: string[];
+      steam: string[];
+      heroic: string[];
+      lutris: string[];
+      desktop: string[];
+    }> =>
       ipcRenderer.invoke("app:xdg-defaults"),
   },
 
@@ -143,6 +151,20 @@ const htpc = {
       ipcRenderer.invoke("games:loadThumbnail", game),
     regenerateThumbnail: (game: Game): Promise<string | null> =>
       ipcRenderer.invoke("games:regenerateThumbnail", game),
+  },
+
+  dolphin: {
+    openSettings: (): Promise<boolean> =>
+      ipcRenderer.invoke("dolphin:openSettings"),
+    openConfig: (): Promise<boolean> =>
+      ipcRenderer.invoke("dolphin:openConfig"),
+  },
+
+  controller: {
+    openMapping: (): Promise<boolean> =>
+      ipcRenderer.invoke("controller:openMapping"),
+    resetMappings: (): Promise<boolean> =>
+      ipcRenderer.invoke("controller:resetMappings"),
   },
 
   movies: {

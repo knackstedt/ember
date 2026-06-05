@@ -6,6 +6,7 @@ interface CommandsState {
   query: string;
   selectedIndex: number;
   visibleCommands: CommandDefinition[];
+  commandsSuspended: boolean;
   open: () => void;
   close: () => void;
   toggle: () => void;
@@ -13,6 +14,8 @@ interface CommandsState {
   setSelectedIndex: (index: number) => void;
   moveSelection: (delta: number) => void;
   setVisibleCommands: (commands: CommandDefinition[]) => void;
+  suspendCommands: () => void;
+  resumeCommands: () => void;
 }
 
 function matchesQuery(cmd: CommandDefinition, query: string): boolean {
@@ -29,6 +32,7 @@ export const useCommandsStore = create<CommandsState>((set, get) => ({
   query: "",
   selectedIndex: 0,
   visibleCommands: COMMAND_DEFINITIONS,
+  commandsSuspended: false,
 
   open: () => {
     set({ isOpen: true, query: "", selectedIndex: 0 });
@@ -67,4 +71,7 @@ export const useCommandsStore = create<CommandsState>((set, get) => ({
   },
 
   setVisibleCommands: (visibleCommands) => set({ visibleCommands, selectedIndex: 0 }),
+
+  suspendCommands: () => set({ commandsSuspended: true }),
+  resumeCommands: () => set({ commandsSuspended: false }),
 }));

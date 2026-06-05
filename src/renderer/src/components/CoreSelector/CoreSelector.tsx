@@ -66,7 +66,7 @@ export const CoreSelector: React.FC<CoreSelectorProps> = ({ game, onSelectCore }
   if (cores.length === 0) {
     return (
       <div className="text-sm" style={{ color: "var(--color-text-dim)" }}>
-        No libretro cores found. Install RetroArch cores to enable native emulation.
+        No libretro cores found. Install libretro cores to enable native emulation.
       </div>
     );
   }
