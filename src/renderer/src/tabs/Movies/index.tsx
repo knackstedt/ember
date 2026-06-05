@@ -22,7 +22,6 @@ import {
   StarOff,
   EyeOff,
   Tag,
-  RotateCw,
   FolderOpen,
   Folder,
   Loader,

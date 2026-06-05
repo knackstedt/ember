@@ -27,7 +27,6 @@ import {
   Play,
   Folder,
   Loader,
-  RotateCw,
   Sparkles,
   X,
 } from "lucide-react";

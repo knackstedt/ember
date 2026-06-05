@@ -44,11 +44,9 @@ import {
   Trash2,
   Folder,
   Loader,
-  RotateCw,
   Sparkles,
   Play,
   X,
-  Star,
 } from "lucide-react";
 import { AiGroup } from "../../../../shared/types";
 import { DynamicFacetFilters, FacetField } from "../../components/DynamicFacetFilters/DynamicFacetFilters";

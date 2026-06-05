@@ -87,7 +87,7 @@ function findMatchingCommand(shortcut: string, customBinds: Record<string, strin
 interface TabDef {
   id: TabId;
   label: string;
-  Icon: React.ComponentType<{ size?: number }>;
+  Icon: React.ComponentType<any>;
   component: React.ComponentType;
 }
 

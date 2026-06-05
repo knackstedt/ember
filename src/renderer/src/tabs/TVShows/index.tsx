@@ -22,7 +22,6 @@ import {
   FolderOpen,
   Folder,
   Loader,
-  RotateCw,
   Sparkles,
   Play,
   X,
