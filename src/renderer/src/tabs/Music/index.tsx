@@ -243,9 +243,19 @@ export const MusicTab: React.FC = () => {
   }, [subTab, tracks]);
 
   const artistGroups = useMemo(() => {
+    let source = tracks.filter((t) => !t.hidden);
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      source = source.filter(
+        (t) =>
+          t.title.toLowerCase().includes(q) ||
+          t.artist?.toLowerCase().includes(q) ||
+          t.album?.toLowerCase().includes(q),
+      );
+    }
     const map = new Map<string, { name: string; tracks: MusicTrack[] }>();
-    for (const t of tracks) {
-      if (!t.artist || t.hidden) continue;
+    for (const t of source) {
+      if (!t.artist) continue;
       const key = t.artist.toLowerCase();
       if (!map.has(key)) map.set(key, { name: t.artist, tracks: [] });
       map.get(key)!.tracks.push(t);
@@ -257,12 +267,22 @@ export const MusicTab: React.FC = () => {
         coverUrl: g.tracks.find((t) => t.albumArtUrl)?.albumArtUrl,
       }))
       .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
-  }, [tracks]);
+  }, [tracks, searchQuery]);
 
   const genreGroups = useMemo(() => {
+    let source = tracks.filter((t) => !t.hidden);
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      source = source.filter(
+        (t) =>
+          t.title.toLowerCase().includes(q) ||
+          t.artist?.toLowerCase().includes(q) ||
+          t.album?.toLowerCase().includes(q),
+      );
+    }
     const map = new Map<string, { name: string; tracks: MusicTrack[] }>();
-    for (const t of tracks) {
-      if (!t.genre || t.hidden) continue;
+    for (const t of source) {
+      if (!t.genre) continue;
       const key = t.genre.toLowerCase();
       if (!map.has(key)) map.set(key, { name: t.genre, tracks: [] });
       map.get(key)!.tracks.push(t);
@@ -273,7 +293,7 @@ export const MusicTab: React.FC = () => {
         trackCount: g.tracks.length,
       }))
       .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
-  }, [tracks]);
+  }, [tracks, searchQuery]);
 
   const groupItems: MusicGroup[] = useMemo(() => {
     if (browseMode === "artists") return artistGroups;

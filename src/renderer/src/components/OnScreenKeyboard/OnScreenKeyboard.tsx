@@ -224,6 +224,7 @@ export const OskInput: React.FC<OskInputProps> = ({
   return (
     <>
       <input
+        type="text"
         className={className}
         value={value}
         onChange={(e) => onChange(e.target.value)}
