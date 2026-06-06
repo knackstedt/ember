@@ -132,6 +132,7 @@ async function createWindow(): Promise<void> {
       contextIsolation: true,
       nodeIntegration: false,
       devTools: true,
+      autoplayPolicy: "no-user-gesture-required",
     },
   });
 
@@ -274,6 +275,15 @@ app.whenReady().then(async () => {
     else if (ext === ".m4a" || ext === ".aac") contentType = "audio/aac";
     else if (ext === ".opus") contentType = "audio/opus";
     else if (ext === ".wma") contentType = "audio/x-ms-wma";
+    else if (ext === ".mp4" || ext === ".m4v") contentType = "video/mp4";
+    else if (ext === ".webm") contentType = "video/webm";
+    else if (ext === ".mkv") contentType = "video/x-matroska";
+    else if (ext === ".mov") contentType = "video/quicktime";
+    else if (ext === ".avi") contentType = "video/x-msvideo";
+    else if (ext === ".ogv") contentType = "video/ogg";
+    else if (ext === ".ts") contentType = "video/mp2t";
+    else if (ext === ".vtt") contentType = "text/vtt";
+    else if (ext === ".srt") contentType = "text/plain";
 
     const range = request.headers.get("Range") || "";
     if (range) {
@@ -311,6 +321,22 @@ app.whenReady().then(async () => {
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
+});
+
+app.on("before-quit", (e) => {
+  // Give renderers a brief moment to fire any pending beforeunload / IPC saves
+  const windows = BrowserWindow.getAllWindows();
+  if (windows.length > 0) {
+    e.preventDefault();
+    for (const win of windows) {
+      if (!win.isDestroyed()) {
+        win.webContents.send("app:save-state");
+      }
+    }
+    setTimeout(() => {
+      app.quit();
+    }, 300);
+  }
 });
 
 app.on("window-all-closed", async () => {

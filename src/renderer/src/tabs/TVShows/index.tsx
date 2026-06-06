@@ -184,7 +184,7 @@ export const TVShowsTab: React.FC = () => {
       const ep = currentSeasonEpisodes[0];
       if (ep?.filePath) {
         openVideo(
-          `file://${ep.filePath}`,
+          `ember://media/${ep.filePath}`,
           ep.title ?? `Episode ${ep.episodeNumber}`,
         );
         setSelected(null);
@@ -697,7 +697,7 @@ export const TVShowsTab: React.FC = () => {
                     }}
                     onClick={() =>
                       openVideo(
-                        `file://${ep.filePath}`,
+                        `ember://media/${ep.filePath}`,
                         ep.title ?? `Episode ${ep.episodeNumber}`,
                       )
                     }

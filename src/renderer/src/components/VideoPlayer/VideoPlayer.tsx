@@ -15,7 +15,7 @@ import { shouldClearProgress } from "../../../../shared/progress";
 import { useMoviesStore } from "../../store/media.store";
 
 const INACTIVITY_MS = 3000;
-const PROGRESS_SAVE_INTERVAL_MS = 15000;
+const PROGRESS_SAVE_INTERVAL_MS = 180000; // 3 minutes
 
 function fmt(s: number): string {
   if (!isFinite(s) || isNaN(s) || s < 0) return "0:00";
@@ -28,8 +28,8 @@ function fmt(s: number): string {
 }
 
 function deriveSubtitleUrls(videoSrc: string): string[] {
-  const base = videoSrc.replace(/^file:\/\//, "").replace(/\.[^.]+$/, "");
-  return [`file://${base}.vtt`, `file://${base}.srt`];
+  const base = videoSrc.replace(/^file:\/\//, "").replace(/^ember:\/\/media\/?/, "").replace(/\.[^.]+$/, "");
+  return [`ember://media/${base}.vtt`, `ember://media/${base}.srt`];
 }
 
 export const VideoPlayer: React.FC = () => {
@@ -42,6 +42,7 @@ export const VideoPlayer: React.FC = () => {
   const inactivityTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const progressSaveTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const hasResumed = useRef(false);
+  const lastProgressRef = useRef<{ movieId: string; pct: number } | null>(null);
 
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -79,6 +80,12 @@ export const VideoPlayer: React.FC = () => {
       setCurrentTime(v.currentTime);
       if (v.buffered.length > 0)
         setBuffered(v.buffered.end(v.buffered.length - 1));
+      if (movieId && v.duration > 0 && isFinite(v.duration)) {
+        lastProgressRef.current = {
+          movieId,
+          pct: v.currentTime / v.duration,
+        };
+      }
     };
     const onDuration = (): void => {
       const dur = isFinite(v.duration) ? v.duration : 0;
@@ -121,9 +128,26 @@ export const VideoPlayer: React.FC = () => {
     hasResumed.current = false;
     const v = videoRef.current;
     if (!v) return;
+
+    const onCanPlay = (): void => {
+      v.play().catch((err: Error) => {
+        if (err.name !== "AbortError") {
+          console.error("Video play failed:", err.name, err.message);
+        }
+      });
+    };
+    const onError = (): void => {
+      const videoErr = v.error;
+      console.error(
+        "Video error:",
+        videoErr?.code ?? "unknown",
+        videoErr?.message ?? "no message",
+      );
+    };
+    v.addEventListener("canplay", onCanPlay, { once: true });
+    v.addEventListener("error", onError);
     v.src = src;
-    v.load();
-    void v.play();
+
     setCurrentTime(0);
     setDuration(0);
     setBuffered(0);
@@ -134,11 +158,34 @@ export const VideoPlayer: React.FC = () => {
     progressSaveTimer.current = setInterval(() => {
       if (movieId && v.duration > 0 && isFinite(v.duration)) {
         const pct = v.currentTime / v.duration;
+        lastProgressRef.current = { movieId, pct };
         void window.htpc.movies.setProgress(movieId, pct);
         updateMovieProgress(movieId, pct);
       }
     }, PROGRESS_SAVE_INTERVAL_MS);
+
+    // Save progress on window/app close (renderer process termination)
+    const onBeforeUnload = (): void => {
+      const last = lastProgressRef.current;
+      if (last?.movieId && window.htpc.movies.setProgressSync) {
+        window.htpc.movies.setProgressSync(last.movieId, last.pct);
+      }
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+
+    // Listen for main-process quit signal
+    const removeSaveStateListener = window.htpc.onSaveState?.(() => {
+      const last = lastProgressRef.current;
+      if (last?.movieId) {
+        void window.htpc.movies.setProgress(last.movieId, last.pct);
+      }
+    });
+
     return () => {
+      v.removeEventListener("canplay", onCanPlay);
+      v.removeEventListener("error", onError);
+      window.removeEventListener("beforeunload", onBeforeUnload);
+      removeSaveStateListener?.();
       if (progressSaveTimer.current) clearInterval(progressSaveTimer.current);
     };
   }, [src, movieId, updateMovieProgress]);

@@ -194,6 +194,8 @@ const htpc = {
       ipcRenderer.invoke("movies:tag", id, tags),
     setProgress: (id: string, progress: number | null): Promise<void> =>
       ipcRenderer.invoke("movies:progress:set", id, progress),
+    setProgressSync: (id: string, progress: number | null): void =>
+      ipcRenderer.sendSync("movies:progress:set:sync", id, progress),
     fetchMetadata: (title: string): Promise<unknown> =>
       ipcRenderer.invoke("movies:metadata", title),
     hide: (id: string, value: boolean): Promise<void> =>
@@ -414,6 +416,12 @@ const htpc = {
     const handler = (_: Electron.IpcRendererEvent, p: ScanProgress) => cb(p);
     ipcRenderer.on("scan:progress", handler);
     return () => ipcRenderer.removeListener("scan:progress", handler);
+  },
+
+  onSaveState: (cb: () => void) => {
+    const handler = (_: Electron.IpcRendererEvent) => cb();
+    ipcRenderer.on("app:save-state", handler);
+    return () => ipcRenderer.removeListener("app:save-state", handler);
   },
 
   devtools: {

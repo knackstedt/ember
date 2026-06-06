@@ -776,14 +776,29 @@ export function registerIpcHandlers(window: BrowserWindow): void {
   ipcMain.handle(
     "movies:progress:set",
     async (_e, id: string, progress: number | null) => {
+      const idStr = typeof id === "string" ? id : String(id);
       const now = Date.now();
-      await MovieRepo.setProgress(id, progress ?? null);
+      await MovieRepo.setProgress(idStr, progress ?? null);
       // Also update lastPlayed via repo if needed; currently setProgress handles it
       // We keep lastPlayed update here for backward compat
       const db = getDb();
-      await db.query(`UPDATE movie:⟨${id}⟩ SET lastPlayed = $now`, { now });
+      await db.query(`UPDATE movie:⟨${idStr}⟩ SET lastPlayed = $now`, { now });
     },
   );
+
+  // Synchronous variant used in renderer beforeunload to guarantee delivery
+  ipcMain.on("movies:progress:set:sync", (event, id: string, progress: number | null) => {
+    const idStr = typeof id === "string" ? id : String(id);
+    const db = getDb();
+    if (progress === null) {
+      db.query(`UPDATE movie:⟨${escapeId(idStr)}⟩ SET watchProgress = none`).catch(() => {});
+    } else {
+      db.query(`UPDATE movie:⟨${escapeId(idStr)}⟩ SET watchProgress = $progress`, { progress }).catch(() => {});
+    }
+    // Update lastPlayed too
+    db.query(`UPDATE movie:⟨${escapeId(idStr)}⟩ SET lastPlayed = $now`, { now: Date.now() }).catch(() => {});
+    event.returnValue = true;
+  });
 
   ipcMain.handle("movies:metadata", async (_e, title: string) => {
     const settings = await getSettings();

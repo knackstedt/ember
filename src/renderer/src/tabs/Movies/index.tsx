@@ -336,7 +336,7 @@ export const MoviesTab: React.FC = () => {
     enabled: !!selected,
     onConfirm: () => {
       if (selected?.filePath) {
-        openVideo(`file://${selected.filePath}`, selected.title, selected.id, selected.watchProgress);
+        openVideo(`ember://media/${selected.filePath}`, selected.title, selected.id, selected.watchProgress);
         setSelected(null);
       }
     },
@@ -360,7 +360,7 @@ export const MoviesTab: React.FC = () => {
                 const movie = movies.find((m) => m.id === id);
                 if (movie)
                   openVideo(
-                    `file://${movie.filePath}`,
+                    `ember://media/${movie.filePath}`,
                     movie.title,
                     movie.id,
                     movie.watchProgress,
@@ -727,7 +727,7 @@ export const MoviesTab: React.FC = () => {
                 }}
                 onClick={() => {
                   openVideo(
-                    `file://${selected!.filePath}`,
+                    `ember://media/${selected!.filePath}`,
                     selected!.title,
                     selected!.id,
                     selected!.watchProgress,

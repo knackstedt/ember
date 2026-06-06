@@ -22,6 +22,24 @@ export function escapeId(id: string): string {
   return id;
 }
 
+function extractRecordId(raw: unknown): string {
+  if (typeof raw === "string") {
+    const colonIdx = raw.indexOf(":");
+    return colonIdx >= 0 ? raw.slice(colonIdx + 1) : raw;
+  }
+  if (raw && typeof raw === "object") {
+    const obj = raw as Record<string, unknown>;
+    if (typeof obj.id === "string") return obj.id;
+    if (typeof obj.id === "object" && obj.id !== null) {
+      return extractRecordId(obj.id);
+    }
+    const str = String(raw);
+    const colonIdx = str.indexOf(":");
+    return colonIdx >= 0 ? str.slice(colonIdx + 1) : str;
+  }
+  return String(raw);
+}
+
 /* ------------------------------------------------------------------ */
 /*  Game Repository                                                    */
 /* ------------------------------------------------------------------ */
@@ -105,7 +123,11 @@ export const MovieRepo = {
   async list(): Promise<Movie[]> {
     const db = getDb();
     const result = await db.query<[Movie[]]>("SELECT * FROM movie ORDER BY title ASC");
-    return (result[0] ?? []) as Movie[];
+    const movies = (result[0] ?? []) as Movie[];
+    for (const m of movies) {
+      m.id = extractRecordId(m.id);
+    }
+    return movies;
   },
 
   async upsert(movie: Movie): Promise<void> {
@@ -134,7 +156,11 @@ export const MovieRepo = {
 
   async setProgress(id: string, progress: number | null): Promise<void> {
     const db = getDb();
-    await db.query(`UPDATE movie:⟨${escapeId(id)}⟩ SET watchProgress = $progress`, { progress });
+    if (progress === null) {
+      await db.query(`UPDATE movie:⟨${escapeId(id)}⟩ SET watchProgress = none`);
+    } else {
+      await db.query(`UPDATE movie:⟨${escapeId(id)}⟩ SET watchProgress = $progress`, { progress });
+    }
   },
 
   async setCoverUrl(id: string, url: string): Promise<void> {
@@ -197,7 +223,11 @@ export const TVRepo = {
   async list(): Promise<TVShow[]> {
     const db = getDb();
     const result = await db.query<[TVShow[]]>("SELECT * FROM tv_show ORDER BY title ASC");
-    return (result[0] ?? []) as TVShow[];
+    const shows = (result[0] ?? []) as TVShow[];
+    for (const s of shows) {
+      s.id = extractRecordId(s.id);
+    }
+    return shows;
   },
 
   async upsert(show: TVShow): Promise<void> {
