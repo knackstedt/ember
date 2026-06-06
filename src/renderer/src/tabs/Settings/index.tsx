@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import {
   Palette,
@@ -47,37 +47,134 @@ const TAB_COMPONENTS: Record<SubTabId, React.FC> = {
   "danger-zone": DangerZoneTab,
 };
 
+function getFocusableElements(container: HTMLElement | null): HTMLElement[] {
+  if (!container) return [];
+  return Array.from(
+    container.querySelectorAll<HTMLElement>(
+      'button:not([disabled]):not([data-nav-exclude]), input:not([disabled]), select:not([disabled]), textarea:not([disabled])'
+    )
+  ).filter((el) => {
+    const style = window.getComputedStyle(el);
+    return style.display !== "none" && style.visibility !== "hidden";
+  });
+}
+
 export const SettingsTab: React.FC = () => {
   const [activeTab, setActiveTab] = useState<SubTabId>("general");
   const ActiveComponent = TAB_COMPONENTS[activeTab];
   const contentRef = useRef<HTMLDivElement>(null);
 
+  const [focusedIndex, setFocusedIndex] = useState(-1);
+  const focusedIndexRef = useRef(focusedIndex);
+  focusedIndexRef.current = focusedIndex;
+
+  /* Reset content focus when sub-tab changes */
   useEffect(() => {
-    const handler = (e: Event) => {
-      const detail = (e as CustomEvent).detail as { action: string };
-      const idx = SUB_TABS.findIndex((t) => t.id === activeTab);
-      switch (detail?.action) {
-        case "left":
-          if (idx > 0) setActiveTab(SUB_TABS[idx - 1].id);
+    setFocusedIndex(-1);
+  }, [activeTab]);
+
+  /* Apply / remove controller-focus visual indicator and scroll into view */
+  useEffect(() => {
+    const container = contentRef.current;
+    if (!container) return;
+
+    container.querySelectorAll(".settings-focus").forEach((el) => {
+      el.classList.remove("settings-focus");
+    });
+
+    if (focusedIndex < 0) return;
+
+    const elements = getFocusableElements(container);
+    const el = elements[focusedIndex];
+    if (!el) return;
+
+    el.classList.add("settings-focus");
+    el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [focusedIndex]);
+
+  const handleNav = useCallback(
+    (action: string) => {
+      const container = contentRef.current;
+      const elements = getFocusableElements(container);
+      const currentIdx = focusedIndexRef.current;
+
+      switch (action) {
+        case "left": {
+          const subIdx = SUB_TABS.findIndex((t) => t.id === activeTab);
+          if (subIdx > 0) setActiveTab(SUB_TABS[subIdx - 1].id);
           break;
-        case "right":
-          if (idx < SUB_TABS.length - 1) setActiveTab(SUB_TABS[idx + 1].id);
+        }
+        case "right": {
+          const subIdx = SUB_TABS.findIndex((t) => t.id === activeTab);
+          if (subIdx < SUB_TABS.length - 1) setActiveTab(SUB_TABS[subIdx + 1].id);
           break;
+        }
         case "up": {
-          const el = contentRef.current;
-          if (el) el.scrollBy({ top: -80, behavior: "smooth" });
+          if (elements.length === 0) break;
+          if (currentIdx < 0) {
+            // In sub-tab bar, pressing up does nothing
+            break;
+          }
+          if (currentIdx === 0) {
+            // Exit content nav, return to sub-tabs
+            setFocusedIndex(-1);
+          } else {
+            setFocusedIndex(currentIdx - 1);
+          }
           break;
         }
         case "down": {
-          const el = contentRef.current;
-          if (el) el.scrollBy({ top: 80, behavior: "smooth" });
+          if (elements.length === 0) break;
+          if (currentIdx < 0) {
+            // Enter content nav at first element
+            setFocusedIndex(0);
+          } else {
+            setFocusedIndex(Math.min(elements.length - 1, currentIdx + 1));
+          }
+          break;
+        }
+        case "confirm": {
+          if (currentIdx < 0 || !elements[currentIdx]) break;
+          const el = elements[currentIdx];
+          const tag = el.tagName.toLowerCase();
+          if (tag === "input" || tag === "select" || tag === "textarea") {
+            el.focus();
+            if (tag === "input") {
+              const inputEl = el as HTMLInputElement;
+              if (
+                inputEl.type === "text" ||
+                inputEl.type === "password" ||
+                inputEl.type === "number"
+              ) {
+                inputEl.select();
+              }
+            }
+          } else {
+            el.click();
+          }
+          break;
+        }
+        case "cancel": {
+          const activeEl = document.activeElement as HTMLElement | null;
+          if (container && activeEl && container.contains(activeEl)) {
+            activeEl.blur();
+          }
+          setFocusedIndex(-1);
           break;
         }
       }
+    },
+    [activeTab]
+  );
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { action: string };
+      if (detail?.action) handleNav(detail.action);
     };
     window.addEventListener("htpc:nav", handler);
     return () => window.removeEventListener("htpc:nav", handler);
-  }, [activeTab]);
+  }, [handleNav]);
 
   return (
     <div className="h-full flex flex-col overflow-hidden">

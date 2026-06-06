@@ -119,6 +119,12 @@ html, body, #root {
   outline-offset: 2px;
 }
 
+/* Controller-navigation highlight inside Settings */
+.settings-focus {
+  outline: 2px solid var(--color-accent) !important;
+  outline-offset: 2px !important;
+}
+
 /* GPU-accelerated scrollable containers */
 .gpu-scroll {
   transform: translateZ(0);

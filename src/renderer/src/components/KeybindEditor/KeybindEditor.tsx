@@ -399,7 +399,8 @@ export const KeybindEditor: React.FC<KeybindEditorProps> = ({
                         </motion.span>
                       ) : (
                         <>
-                          <motion.kbd
+                          <motion.button
+                            type="button"
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
                             className="px-2.5 py-1.5 rounded text-xs font-mono cursor-pointer transition-colors"
@@ -423,7 +424,7 @@ export const KeybindEditor: React.FC<KeybindEditorProps> = ({
                             title={kbDuplicate ? "Duplicate mapping! Click to change" : "Click to record new shortcut"}
                           >
                             {customKb ?? cmd.defaultShortcut ?? "—"}
-                          </motion.kbd>
+                          </motion.button>
                           {(customKb || cmd.defaultShortcut) && (
                             <motion.button
                               whileHover={{ scale: 1.1 }}
