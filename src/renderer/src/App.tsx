@@ -536,6 +536,7 @@ export default function App(): React.ReactElement {
         useVideoPlayerStore.getState().close();
         window.dispatchEvent(new CustomEvent("htpc:escape"));
       } else if (!isTyping && (e.key === "Enter" || e.key === " ")) {
+        e.preventDefault();
         if (e.type === "keydown") {
           window.dispatchEvent(
             new CustomEvent("htpc:nav", { detail: { action: "confirm" } }),

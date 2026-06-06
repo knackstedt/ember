@@ -3,7 +3,12 @@ export type ThemeName =
   | "glassmorphism"
   | "neon-cyberpunk"
   | "terminal-tui"
-  | "custom";
+  | "custom"
+  | "synthwave-sunset"
+  | "deep-ocean"
+  | "monokai"
+  | "nord-aurora"
+  | "warm-paper";
 
 export type TabId =
   | "gaming"

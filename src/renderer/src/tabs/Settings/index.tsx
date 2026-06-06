@@ -78,6 +78,7 @@ function getFocusableInGroup(group: HTMLElement | null): HTMLElement[] {
 
 export const SettingsTab: React.FC = () => {
   const [activeTab, setActiveTab] = useState<SubTabId>("general");
+  const [focusedSubTab, setFocusedSubTab] = useState<SubTabId>("general");
   const ActiveComponent = TAB_COMPONENTS[activeTab];
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -93,6 +94,11 @@ export const SettingsTab: React.FC = () => {
   const itemIndexRef = useRef(itemIndex);
   groupIndexRef.current = groupIndex;
   itemIndexRef.current = itemIndex;
+
+  /* Keep focused sub-tab in sync with active when changed externally */
+  useEffect(() => {
+    setFocusedSubTab(activeTab);
+  }, [activeTab]);
 
   /* Reset focus when sub-tab changes */
   useEffect(() => {
@@ -160,9 +166,9 @@ export const SettingsTab: React.FC = () => {
             /* At group level: Left goes back to sub-tabs */
             setGroupIndex(-1);
           } else {
-            /* In sub-tabs: Left switches sub-tab */
-            const subIdx = SUB_TABS.findIndex((t) => t.id === activeTab);
-            if (subIdx > 0) setActiveTab(SUB_TABS[subIdx - 1].id);
+            /* In sub-tabs: Left moves focus to previous sub-tab */
+            const subIdx = SUB_TABS.findIndex((t) => t.id === focusedSubTab);
+            if (subIdx > 0) setFocusedSubTab(SUB_TABS[subIdx - 1].id);
           }
           break;
         }
@@ -187,9 +193,9 @@ export const SettingsTab: React.FC = () => {
               if (el) activateElement(el);
             }
           } else {
-            /* In sub-tabs: Right switches sub-tab */
-            const subIdx = SUB_TABS.findIndex((t) => t.id === activeTab);
-            if (subIdx < SUB_TABS.length - 1) setActiveTab(SUB_TABS[subIdx + 1].id);
+            /* In sub-tabs: Right moves focus to next sub-tab */
+            const subIdx = SUB_TABS.findIndex((t) => t.id === focusedSubTab);
+            if (subIdx < SUB_TABS.length - 1) setFocusedSubTab(SUB_TABS[subIdx + 1].id);
           }
           break;
         }
@@ -244,7 +250,8 @@ export const SettingsTab: React.FC = () => {
         }
         case "confirm": {
           if (gIdx < 0) {
-            /* In sub-tabs: confirm does nothing */
+            /* In sub-tabs: confirm activates the focused sub-tab */
+            setActiveTab(focusedSubTab);
             break;
           }
           if (iIdx < 0) {
@@ -273,7 +280,7 @@ export const SettingsTab: React.FC = () => {
         }
       }
     },
-    [activeTab]
+    [activeTab, focusedSubTab]
   );
 
   function activateElement(el: HTMLElement) {
@@ -317,8 +324,11 @@ export const SettingsTab: React.FC = () => {
         {SUB_TABS.map((tab) => (
           <motion.button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm whitespace-nowrap transition-colors"
+            onClick={() => {
+              setActiveTab(tab.id);
+              setFocusedSubTab(tab.id);
+            }}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm whitespace-nowrap transition-colors ${groupIndex === -1 && focusedSubTab === tab.id ? "settings-subtab-focus" : ""}`}
             style={{
               background:
                 activeTab === tab.id

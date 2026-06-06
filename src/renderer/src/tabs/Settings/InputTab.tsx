@@ -70,8 +70,9 @@ export const InputTab: React.FC = () => {
   return (
     <div className="flex flex-col gap-6">
       {/* Section Tabs */}
-      <div className="flex gap-2 p-1 rounded-[var(--radius-card)]" style={{ background: "var(--color-surface-raised)" }}>
-        <motion.button
+      <section className="flex flex-col gap-4" data-nav-orientation="horizontal">
+        <div className="flex gap-2 p-1 rounded-[var(--radius-card)]" style={{ background: "var(--color-surface-raised)" }}>
+          <motion.button
           className="flex items-center gap-2 px-4 py-2 rounded-[var(--radius-card)] text-sm font-medium transition-colors"
           style={{
             background: activeSection === "keyboard" ? "var(--color-accent)" : "transparent",
@@ -96,6 +97,7 @@ export const InputTab: React.FC = () => {
           Controller
         </motion.button>
       </div>
+      </section>
 
       {/* Overmapping Warnings */}
       <AnimatePresence>
@@ -155,14 +157,16 @@ export const InputTab: React.FC = () => {
       </div>
 
       {/* Keybind Editor */}
-      <KeybindEditor
-        keybinds={settings.commandKeybinds ?? {}}
-        controllerMap={settings.commandControllerMap ?? {}}
-        activeTab={activeSection}
-        onChangeKeybind={handleChangeKeybind}
-        onChangeController={handleChangeController}
-        onResetAll={handleResetAll}
-      />
+      <section className="flex flex-col gap-4">
+        <KeybindEditor
+          keybinds={settings.commandKeybinds ?? {}}
+          controllerMap={settings.commandControllerMap ?? {}}
+          activeTab={activeSection}
+          onChangeKeybind={handleChangeKeybind}
+          onChangeController={handleChangeController}
+          onResetAll={handleResetAll}
+        />
+      </section>
     </div>
   );
 };
