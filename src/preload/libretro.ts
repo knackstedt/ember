@@ -141,6 +141,7 @@ export function scanForCores(): CoreInfo[] {
 
   searchPaths.push(
     join(home, ".config/retroarch/cores"),
+    join(home, ".config/ember/cores"),
     "/usr/lib/libretro",
     "/usr/local/lib/libretro",
     "/usr/lib64/libretro",

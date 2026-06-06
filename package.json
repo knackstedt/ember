@@ -25,6 +25,7 @@
     "lucide-react": "^1.17.0",
     "music-metadata": "^10.6.0",
     "node-id3": "^0.2.6",
+    "node-stream-zip": "^1.15.0",
     "simple-icons": "^16.22.0",
     "source-map": "^0.7.4",
     "v86": "^0.5.359",

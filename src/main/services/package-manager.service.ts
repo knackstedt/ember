@@ -10,6 +10,13 @@ import {
   PackageOperationProgress,
   WineRunner,
 } from "../../shared/types";
+import {
+  BUILDBOT_CORES,
+  installBuildbotCore,
+  uninstallBuildbotCore,
+  isBuildbotCoreInstalled,
+  getBuildbotCoreVersion,
+} from "./buildbot.service";
 
 const log = createLogger("info");
 
@@ -34,28 +41,32 @@ interface PackageDefinition {
   winehqPackage?: string;
   // proton-ge: fetches latest release from GitHub, downloads tar.gz, extracts to compatibilitytools.d
   protonGeGithubRepo?: string;
+  // buildbot: reference to a libretro buildbot core definition
+  buildbotCore?: string;
 }
 
 const KNOWN_PACKAGES: PackageDefinition[] = [
   // Libretro cores via apt (common Debian/Ubuntu packages)
   { id: "libretro-nestopia", name: "nestopia", displayName: "Nestopia (NES)", manager: "apt", category: "core", platforms: ["nes"], aptName: "libretro-nestopia" },
-  { id: "libretro-fceumm", name: "fceumm", displayName: "FCEUmm (NES)", manager: "apt", category: "core", platforms: ["nes"], aptName: "libretro-fceumm" },
   { id: "libretro-snes9x", name: "snes9x", displayName: "Snes9x (SNES)", manager: "apt", category: "core", platforms: ["snes"], aptName: "libretro-snes9x" },
-  { id: "libretro-bsnes", name: "bsnes", displayName: "bsnes (SNES)", manager: "apt", category: "core", platforms: ["snes"], aptName: "libretro-bsnes" },
+  { id: "libretro-bsnes-mercury", name: "bsnes_mercury_performance", displayName: "bsnes-mercury (SNES)", manager: "apt", category: "core", platforms: ["snes"], aptName: "libretro-bsnes-mercury-performance" },
   { id: "libretro-gambatte", name: "gambatte", displayName: "Gambatte (GB/GBC)", manager: "apt", category: "core", platforms: ["gb"], aptName: "libretro-gambatte" },
   { id: "libretro-mgba", name: "mgba", displayName: "mGBA (GBA)", manager: "apt", category: "core", platforms: ["gba"], aptName: "libretro-mgba" },
   { id: "libretro-genesis-plus-gx", name: "genesis_plus_gx", displayName: "Genesis Plus GX (Genesis/SMS/GG)", manager: "apt", category: "core", platforms: ["genesis", "sms", "gamegear"], aptName: "libretro-genesisplusgx" },
-  { id: "libretro-picodrive", name: "picodrive", displayName: "PicoDrive (Genesis/32X)", manager: "apt", category: "core", platforms: ["genesis", "sms", "gamegear"], aptName: "libretro-picodrive" },
-  { id: "libretro-mupen64plus", name: "mupen64plus_next", displayName: "Mupen64Plus-Next (N64)", manager: "apt", category: "core", platforms: ["n64"], aptName: "libretro-mupen64plus-next" },
-  { id: "libretro-parallel-n64", name: "parallel_n64", displayName: "Parallel N64 (N64)", manager: "apt", category: "core", platforms: ["n64"], aptName: "libretro-parallel-n64" },
   { id: "libretro-desmume", name: "desmume", displayName: "DeSmuME (NDS)", manager: "apt", category: "core", platforms: ["nds"], aptName: "libretro-desmume" },
-  { id: "libretro-melonds", name: "melonds", displayName: "melonDS (NDS)", manager: "apt", category: "core", platforms: ["nds"], aptName: "libretro-melonds" },
-  { id: "libretro-pcsx-rearmed", name: "pcsx_rearmed", displayName: "PCSX-ReARMed (PSX)", manager: "apt", category: "core", platforms: ["psx"], aptName: "libretro-pcsx-rearmed" },
-  { id: "libretro-beetle-psx", name: "beetle_psx", displayName: "Beetle PSX (PSX)", manager: "apt", category: "core", platforms: ["psx"], aptName: "libretro-beetle-psx-hw" },
-  { id: "libretro-flycast", name: "flycast", displayName: "Flycast (Dreamcast)", manager: "apt", category: "core", platforms: ["dreamcast"], aptName: "libretro-flycast" },
-  { id: "libretro-fbneo", name: "fbneo", displayName: "FinalBurn Neo (Arcade)", manager: "apt", category: "core", platforms: ["arcade"], aptName: "libretro-fbneo" },
-  { id: "libretro-dosbox", name: "dosbox_pure", displayName: "DOSBox Pure (DOS)", manager: "apt", category: "core", platforms: ["dos"], aptName: "libretro-dosbox-pure" },
-  { id: "libretro-ppsspp", name: "ppsspp", displayName: "PPSSPP (PSP)", manager: "apt", category: "core", platforms: ["psp"], aptName: "libretro-ppsspp" },
+  { id: "libretro-beetle-psx", name: "beetle_psx", displayName: "Beetle PSX (PSX)", manager: "apt", category: "core", platforms: ["psx"], aptName: "libretro-beetle-psx" },
+
+  // Libretro cores via buildbot (nightly linux x86_64)
+  { id: "buildbot-fceumm", name: "fceumm", displayName: "FCEUmm (NES)", manager: "buildbot", category: "core", platforms: ["nes"], buildbotCore: "fceumm" },
+  { id: "buildbot-picodrive", name: "picodrive", displayName: "PicoDrive (Genesis/32X/SMS/GG)", manager: "buildbot", category: "core", platforms: ["genesis", "sms", "gamegear"], buildbotCore: "picodrive" },
+  { id: "buildbot-mupen64plus-next", name: "mupen64plus_next", displayName: "Mupen64Plus-Next (N64)", manager: "buildbot", category: "core", platforms: ["n64"], buildbotCore: "mupen64plus_next" },
+  { id: "buildbot-parallel-n64", name: "parallel_n64", displayName: "Parallel N64 (N64)", manager: "buildbot", category: "core", platforms: ["n64"], buildbotCore: "parallel_n64" },
+  { id: "buildbot-melonds", name: "melonds", displayName: "melonDS (NDS)", manager: "buildbot", category: "core", platforms: ["nds"], buildbotCore: "melonds" },
+  { id: "buildbot-pcsx-rearmed", name: "pcsx_rearmed", displayName: "PCSX-ReARMed (PSX)", manager: "buildbot", category: "core", platforms: ["psx"], buildbotCore: "pcsx_rearmed" },
+  { id: "buildbot-flycast", name: "flycast", displayName: "Flycast (Dreamcast)", manager: "buildbot", category: "core", platforms: ["dreamcast"], buildbotCore: "flycast" },
+  { id: "buildbot-fbneo", name: "fbneo", displayName: "FinalBurn Neo (Arcade)", manager: "buildbot", category: "core", platforms: ["arcade"], buildbotCore: "fbneo" },
+  { id: "buildbot-dosbox-pure", name: "dosbox_pure", displayName: "DOSBox Pure (DOS)", manager: "buildbot", category: "core", platforms: ["dos"], buildbotCore: "dosbox_pure" },
+  { id: "buildbot-ppsspp", name: "ppsspp", displayName: "PPSSPP (PSP)", manager: "buildbot", category: "core", platforms: ["psp"], buildbotCore: "ppsspp" },
 
   // Flatpak emulators
   { id: "flatpak-dolphin", name: "dolphin-emu", displayName: "Dolphin (GameCube/Wii)", manager: "flatpak", category: "emulator", platforms: ["dolphin-gc", "dolphin-wii"], flatpakRef: "org.DolphinEmu.dolphin-emu/x86_64/stable" },
@@ -75,11 +86,10 @@ const KNOWN_PACKAGES: PackageDefinition[] = [
   { id: "apt-bluez", name: "bluez", displayName: "BlueZ (Bluetooth stack)", description: "Official Linux Bluetooth protocol stack.", manager: "apt", category: "dependency", aptName: "bluez" },
   { id: "apt-bluetooth", name: "bluetooth", displayName: "Bluetooth metapackage", description: "Metapackage for Bluetooth support, daemons, and utilities.", manager: "apt", category: "dependency", aptName: "bluetooth" },
   { id: "apt-xboxdrv", name: "xboxdrv", displayName: "xboxdrv (Xbox controller driver)", description: "Userspace driver for Xbox and Xbox 360 gamepads.", manager: "apt", category: "dependency", aptName: "xboxdrv" },
-  { id: "apt-joycond", name: "joycond", displayName: "joycond (Nintendo Switch controllers)", description: "Daemon and driver for Nintendo Switch Pro Controller and Joy-Cons.", manager: "apt", category: "dependency", aptName: "joycond" },
   { id: "apt-steam-devices", name: "steam-devices", displayName: "Steam Devices (udev rules)", description: "udev rules for Steam Controller and other Valve hardware.", manager: "apt", category: "dependency", aptName: "steam-devices" },
 
   // Wiimote controller support
-  { id: "apt-cwiid", name: "cwiid", displayName: "cwiid (Wii Remote library)", description: "Library and tools to interface with Nintendo Wii Remotes.", manager: "apt", category: "dependency", aptName: "cwiid" },
+  { id: "apt-wminput", name: "wminput", displayName: "wminput (Wii Remote input driver)", description: "Userspace driver for Nintendo Wii Remotes.", manager: "apt", category: "dependency", aptName: "wminput" },
   { id: "apt-xwiimote", name: "xwiimote", displayName: "xwiimote (Wii Remote driver)", description: "Linux kernel driver and tools for Nintendo Wii Remotes.", manager: "apt", category: "dependency", aptName: "xwiimote" },
 
   // Media codecs
@@ -183,6 +193,8 @@ export async function detectPackageManager(): Promise<PackageManager[]> {
   // winehq and proton-ge are always listed as options on Linux x86_64
   results.push("winehq");
   results.push("proton-ge");
+  // buildbot is always available (HTTP download)
+  results.push("buildbot");
   return results;
 }
 
@@ -515,8 +527,11 @@ export async function detectInstalledCores(): Promise<DetectedCore[]> {
   const searchPaths: string[] = [];
   const home = process.env.HOME || "/home/user";
 
+  const buildbotCoresDir = join(app.getPath("userData"), "cores");
+
   searchPaths.push(
     join(home, ".config/retroarch/cores"),
+    buildbotCoresDir,
     "/usr/lib/libretro",
     "/usr/local/lib/libretro",
     "/usr/lib64/libretro",
@@ -623,7 +638,6 @@ async function execApt(
   window: BrowserWindow | null
 ): Promise<boolean> {
   const args = [operation === "remove" ? "remove" : operation, "-y", aptName];
-  if (operation === "install") args.unshift("install");
 
   return new Promise((resolve) => {
     const env = {
@@ -849,6 +863,9 @@ export async function listAvailablePackages(): Promise<ManagedPackage[]> {
     } else if (def.manager === "proton-ge") {
       isInstalled = await isProtonGeInstalled();
       if (isInstalled) installedVersion = getInstalledProtonGeVersion();
+    } else if (def.manager === "buildbot" && def.buildbotCore) {
+      isInstalled = isBuildbotCoreInstalled(def.buildbotCore);
+      if (isInstalled) installedVersion = getBuildbotCoreVersion(def.buildbotCore);
     }
 
     let platforms = def.platforms;
@@ -945,6 +962,14 @@ export async function installPackage(
     return installProtonGe(packageId, window);
   }
 
+  if (def.manager === "buildbot" && def.buildbotCore) {
+    const coreDef = BUILDBOT_CORES.find((c) => c.coreName === def.buildbotCore);
+    if (!coreDef) return false;
+    return installBuildbotCore(coreDef, window, (progress) => {
+      sendProgress(window, progress as PackageOperationProgress);
+    });
+  }
+
   return false;
 }
 
@@ -991,6 +1016,14 @@ export async function uninstallPackage(
     return ok;
   }
 
+  if (def.manager === "buildbot" && def.buildbotCore) {
+    const coreDef = BUILDBOT_CORES.find((c) => c.coreName === def.buildbotCore);
+    if (!coreDef) return false;
+    return uninstallBuildbotCore(coreDef, (progress) => {
+      sendProgress(window, progress as PackageOperationProgress);
+    });
+  }
+
   return false;
 }
 
@@ -1004,14 +1037,26 @@ export async function checkUpdates(
     if (pkg.manager === "apt") {
       const def = KNOWN_PACKAGES.find((p) => p.id === pkg.id);
       if (def?.aptName) {
-        await execApt("install", def.aptName, window);
+        await execApt("install", pkg.id, def.aptName, window);
       }
     }
 
     if (pkg.manager === "flatpak") {
       const def = KNOWN_PACKAGES.find((p) => p.id === pkg.id);
       if (def?.flatpakRef) {
-        await execFlatpak("update", def.flatpakRef, window);
+        await execFlatpak("update", pkg.id, def.flatpakRef, window);
+      }
+    }
+
+    if (pkg.manager === "buildbot") {
+      const def = KNOWN_PACKAGES.find((p) => p.id === pkg.id);
+      if (def?.buildbotCore) {
+        const coreDef = BUILDBOT_CORES.find((c) => c.coreName === def.buildbotCore);
+        if (coreDef) {
+          await installBuildbotCore(coreDef, window, (progress) => {
+            sendProgress(window, progress as PackageOperationProgress);
+          });
+        }
       }
     }
   }

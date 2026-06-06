@@ -16,6 +16,7 @@
         "lucide-react": "^1.17.0",
         "music-metadata": "^10.6.0",
         "node-id3": "^0.2.6",
+        "node-stream-zip": "^1.15.0",
         "simple-icons": "^16.22.0",
         "source-map": "^0.7.4",
         "v86": "^0.5.359",
@@ -796,6 +797,8 @@
     "node-id3": ["node-id3@0.2.9", "", { "dependencies": { "iconv-lite": "0.6.2" } }, "sha512-dSxhuxrkkGVRgUhDHFxdY0pilzOREcodO01HcZWfaRkCaPWGmo0dOgD8ygyL6ln4Iv4cmfRxAWn1WD9bIB9Bhw=="],
 
     "node-releases": ["node-releases@2.0.46", "", {}, "sha512-GYVXHE2KnrzAfsAjl4uP++evGFCrAU1jta4ubEjIG7YWt/64Gqv66a30yKwWczVjA6j3bM4nBwH7Pk1JmDHaxQ=="],
+
+    "node-stream-zip": ["node-stream-zip@1.15.0", "", {}, "sha512-LN4fydt9TqhZhThkZIVQnF9cwjU3qmUH9h78Mx/K7d3VvfRqqwthLwJEUOEL0QPZ0XQmNN7be5Ggit5+4dq3Bw=="],
 
     "normalize-path": ["normalize-path@3.0.0", "", {}, "sha512-6eZs5Ls3WtCisHWp9S2GUy8dqkpGi4BVSz3GaqiE6ezub0512ESztXUwUB6C6IKbQkY2Pnb/mD4WYojCRwcwLA=="],
 

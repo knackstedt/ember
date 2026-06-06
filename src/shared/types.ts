@@ -457,7 +457,7 @@ export interface StreamingService {
   sortOrder: number;
 }
 
-export type PackageManager = "apt" | "flatpak" | "appimage" | "winehq" | "proton-ge";
+export type PackageManager = "apt" | "flatpak" | "appimage" | "winehq" | "proton-ge" | "buildbot";
 
 export interface ManagedPackage {
   id: string;
