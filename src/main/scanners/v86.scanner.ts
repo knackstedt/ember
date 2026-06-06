@@ -117,12 +117,12 @@ export function scanV86Games(): Game[] {
       const ext = extname(fullPath).toLowerCase();
       if (!V86_EXTS.has(ext)) return;
       if (isInsideWindowsGameDir(fullPath)) {
-        log.info("v86", `skip Windows game dir: ${fullPath}`);
+        log.debug("v86", `skip Windows game dir: ${fullPath}`);
         return;
       }
       if (shouldExcludeV86(fullPath)) return;
       if (seen.has(fullPath)) {
-        log.info("v86", `skip duplicate path: ${fullPath}`);
+        log.debug("v86", `skip duplicate path: ${fullPath}`);
         return;
       }
       seen.add(fullPath);
