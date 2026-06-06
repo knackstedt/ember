@@ -256,7 +256,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
   ipcMain.handle("libretro:addon", async (_e, method: string, ...args: any[]) => {
     try {
       const result = await workerCall(method, ...args);
-      if (method !== "getFrameBuffer") {
+      if (!["getFrameBuffer", "getFrame", "setInputState", "setAnalogState"].includes(method)) {
         log.info("libretro", `worker.${method}() -> ${JSON.stringify(result).slice(0, 200)}`);
       }
       return result;

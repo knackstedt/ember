@@ -347,13 +347,11 @@ unsafe extern "C" fn log_callback(_level: c_uint, fmt: *const c_char) {
 extern "C" fn video_refresh_callback(data: *const c_void, width: c_uint, height: c_uint, pitch: usize) {
     unsafe {
         if data.is_null() {
-            eprintln!("[video] null data");
             return;
         }
         let fmt = TL_PIXEL_FORMAT.with(|p| *p.borrow());
         let size = pitch * height as usize;
         let frame_data = std::slice::from_raw_parts(data as *const u8, size).to_vec();
-        eprintln!("[video] frame {}x{} fmt={} size={}", width, height, fmt, size);
         TL_VIDEO.with(|video| {
             if let Some(ref video_state) = *video.borrow() {
                 video_state.set_frame(VideoFrame {
@@ -363,8 +361,6 @@ extern "C" fn video_refresh_callback(data: *const c_void, width: c_uint, height:
                     format: fmt,
                     data: frame_data,
                 });
-            } else {
-                eprintln!("[video] no video state!");
             }
         });
     }

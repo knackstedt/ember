@@ -3,7 +3,7 @@ import path, { join } from "path";
 import { readFileSync, createReadStream, statSync } from "fs";
 import { initDb } from "./db";
 import { registerIpcHandlers } from "./ipc";
-import { initInputSystem, destroyInputSystem } from "./input/evdev";
+import { initInputSystem, destroyInputSystem, setLibretroWindowGetter } from "./input/evdev";
 import { getSettings } from "./services/settings.service";
 import { getWindowState, saveWindowState } from "./services/window-state.service";
 import { createLogger } from "./util/logger";
@@ -89,7 +89,10 @@ export function createLibretroWindow(opts: {
     libretroWindow?.focus();
   });
 
+  setLibretroWindowGetter(() => libretroWindow);
+
   libretroWindow.on("closed", () => {
+    setLibretroWindowGetter(null);
     libretroWindow = null;
   });
 
@@ -98,6 +101,7 @@ export function createLibretroWindow(opts: {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send("libretro:crashed", { exitCode: details.exitCode, reason: details.reason });
     }
+    setLibretroWindowGetter(null);
     libretroWindow = null;
   });
 

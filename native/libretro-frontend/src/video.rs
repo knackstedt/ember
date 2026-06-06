@@ -112,10 +112,7 @@ impl FrameSlot {
             needed,
             self.data.len()
         );
-        let src_nz = frame.data[..needed.min(100)].iter().filter(|&&b| b != 0).count();
         self.data[..needed].copy_from_slice(&frame.data[..needed]);
-        let dst_nz = self.data[..needed.min(100)].iter().filter(|&&b| b != 0).count();
-        eprintln!("[video] write {}x{} needed={} src_nz={} dst_nz={}", frame.width, frame.height, needed, src_nz, dst_nz);
         self.width = frame.width;
         self.height = frame.height;
         self.pitch = frame.pitch;
@@ -178,8 +175,6 @@ impl DoubleBuffer {
         } else {
             unsafe { &*self.slot1.get() }
         };
-        let nz = slot.data[..slot.data.len().min(100)].iter().filter(|&&b| b != 0).count();
-        eprintln!("[video] get_ready idx={} wh={}x{} nz={}", idx, slot.width, slot.height, nz);
         if slot.width == 0 || slot.height == 0 {
             return None;
         }
