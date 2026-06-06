@@ -430,6 +430,7 @@ class ScreenshotQueue {
               resolveOnce(svgUrl, "procedural-blank");
             } else {
               const png = image.toPNG();
+              mkdirSync(screenshotDir, { recursive: true });
               writeFileSync(destPath, png);
               resolveOnce(
                 `ember://covers/flash/screenshots/${id}.png`,
@@ -610,6 +611,7 @@ export function generateProceduralThumbnail(
   try {
     const hash = hashFileHead(filePath);
     const svg = buildProceduralSVG(hash);
+    mkdirSync(generatedDir, { recursive: true });
     writeFileSync(dest, svg);
     return `ember://covers/flash/generated/${id}.svg`;
   } catch (err) {
@@ -671,6 +673,7 @@ export function generateBrokenThumbnail(
   }
   try {
     const svg = buildBrokenSVG(slug, subtext);
+    mkdirSync(generatedDir, { recursive: true });
     writeFileSync(dest, svg);
     return `ember://covers/flash/generated/${id}-broken.svg`;
   } catch (err) {

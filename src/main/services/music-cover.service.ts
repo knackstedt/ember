@@ -190,6 +190,7 @@ export async function generateProceduralCover(
   try {
     const hash = hashFileHead(filePath);
     const svg = buildProceduralSVG(hash);
+    mkdirSync(generatedCache, { recursive: true });
     writeFileSync(dest, svg);
     return `ember://covers/music/generated/${id}.svg`;
   } catch (err) {
@@ -661,6 +662,7 @@ export async function generateArtistThumbnail(
   try {
     const hash = hashString(artist);
     const svg = buildProceduralArtistSVG(hash, artist);
+    mkdirSync(artistCache, { recursive: true });
     writeFileSync(dest, svg);
     return `ember://covers/artists/${safeName}.svg`;
   } catch (err) {
@@ -740,6 +742,7 @@ export async function fetchArtistThumbnail(
       });
       if (!imageRes.ok) return undefined;
       const buffer = Buffer.from(await imageRes.arrayBuffer());
+      mkdirSync(artistCache, { recursive: true });
       writeFileSync(jpgDest, buffer);
       return `ember://covers/artists/${safeName}.jpg`;
     }
