@@ -97,6 +97,109 @@
   --blur-panel: 0px;
 }
 
+/* ─── Theme: Synthwave Sunset ───────────────────────────────── */
+[data-theme="synthwave-sunset"] {
+  --color-bg: #0d0418;
+  --color-surface: #1a0b2e;
+  --color-surface-raised: #2d1b4e;
+  --color-surface-overlay: rgba(26, 11, 46, 0.95);
+  --color-accent: #ff6b9d;
+  --color-accent-dim: #c445a0;
+  --color-text: #ffe4e1;
+  --color-text-dim: #9b7cb6;
+  --color-border: rgba(255, 107, 157, 0.2);
+  --font-sans: 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --radius-card: 4px;
+  --shadow-card: 0 0 0 1px rgba(255, 107, 157, 0.3), 0 4px 20px rgba(255, 107, 157, 0.1);
+  --shadow-glow: 0 0 25px rgba(255, 107, 157, 0.4), 0 0 60px rgba(196, 69, 160, 0.2);
+  --blur-panel: 0px;
+}
+
+/* ─── Theme: Deep Ocean ──────────────────────────────────────── */
+[data-theme="deep-ocean"] {
+  --color-bg: #001219;
+  --color-surface: #002838;
+  --color-surface-raised: #003d4d;
+  --color-surface-overlay: rgba(0, 18, 25, 0.95);
+  --color-accent: #00f5d4;
+  --color-accent-dim: #00bbf9;
+  --color-text: #e0f7fa;
+  --color-text-dim: #4a7c8c;
+  --color-border: rgba(0, 245, 212, 0.2);
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --radius-card: 16px;
+  --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.5);
+  --shadow-glow: 0 0 30px rgba(0, 245, 212, 0.25);
+  --blur-panel: 0px;
+}
+
+/* ─── Theme: Monokai ───────────────────────────────────────── */
+[data-theme="monokai"] {
+  --color-bg: #1e1e1e;
+  --color-surface: #272727;
+  --color-surface-raised: #323232;
+  --color-surface-overlay: rgba(39, 39, 39, 0.98);
+  --color-accent: #ffd866;
+  --color-accent-dim: #fc9867;
+  --color-text: #f8f8f2;
+  --color-text-dim: #727072;
+  --color-border: rgba(255, 216, 102, 0.2);
+  --font-sans: 'SF Pro Display', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --radius-card: 6px;
+  --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.8);
+  --shadow-glow: 0 0 20px rgba(255, 216, 102, 0.25);
+  --blur-panel: 0px;
+}
+
+/* ─── Theme: Nord Aurora ──────────────────────────────────── */
+[data-theme="nord-aurora"] {
+  --color-bg: #2e3440;
+  --color-surface: #3b4252;
+  --color-surface-raised: #434c5e;
+  --color-surface-overlay: rgba(59, 66, 82, 0.95);
+  --color-accent: #d08770;
+  --color-accent-dim: #bf616a;
+  --color-text: #eceff4;
+  --color-text-dim: #9196a1;
+  --color-border: rgba(208, 135, 112, 0.25);
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --radius-card: 8px;
+  --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.4);
+  --shadow-glow: 0 0 25px rgba(208, 135, 112, 0.35);
+  --blur-panel: 0px;
+}
+
+/* ─── Theme: Warm Paper ────────────────────────────────────── */
+[data-theme="warm-paper"] {
+  --color-bg: #f4ecd8;
+  --color-surface: #ebe4d1;
+  --color-surface-raised: #e3dcc6;
+  --color-surface-overlay: rgba(235, 228, 209, 0.98);
+  --color-accent: #8b4513;
+  --color-accent-dim: #a0522d;
+  --color-text: #2c2416;
+  --color-text-dim: #7d6f5a;
+  --color-border: rgba(139, 69, 19, 0.2);
+  --font-sans: 'Noto Serif', 'DejaVu Serif', 'Liberation Serif', 'Georgia', serif;
+  --font-mono: 'Courier New', monospace;
+  --radius-card: 4px;
+  --shadow-card: 0 2px 8px rgba(44, 36, 22, 0.1);
+  --shadow-glow: 0 0 15px rgba(139, 69, 19, 0.15);
+  --blur-panel: 0px;
+}
+
+/* Warm Paper scrollbar tweaks */
+[data-theme="warm-paper"] ::-webkit-scrollbar-thumb {
+  background: rgba(139, 69, 19, 0.25);
+}
+[data-theme="warm-paper"] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 69, 19, 0.45);
+}
+
 /* ─── Base styles ───────────────────────────────────────────── */
 *, *::before, *::after {
   box-sizing: border-box;
@@ -114,6 +217,11 @@ html, body, #root {
   -webkit-font-smoothing: antialiased;
 }
 
+section {
+  padding: 1rem;
+  transition: border 80ms ease, background-color 80ms ease;
+}
+
 :focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
@@ -128,6 +236,11 @@ html, body, #root {
 }
 
 .settings-focus {
+  outline: 2px solid var(--color-accent) !important;
+  outline-offset: 2px !important;
+}
+
+.settings-subtab-focus {
   outline: 2px solid var(--color-accent) !important;
   outline-offset: 2px !important;
 }

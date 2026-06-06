@@ -212,6 +212,185 @@ export const ThemeBackground: React.FC = () => {
         animRef.current = requestAnimationFrame(draw);
       };
       draw();
+    } else if (theme === "synthwave-sunset") {
+      const hues = [300, 320, 340, 200, 260, 280];
+      const orbs = Array.from({ length: 6 }, (_, i) => ({
+        x: Math.random() * w,
+        y: Math.random() * h,
+        vx: (Math.random() - 0.5) * 0.2,
+        vy: (Math.random() - 0.5) * 0.2,
+        r: 150 + Math.random() * 200,
+        hue: hues[i],
+      }));
+      const sunY = h * 0.75;
+      const sunR = Math.min(w, h) * 0.15;
+
+      const draw = (): void => {
+        ctx.clearRect(0, 0, w, h);
+
+        const sunGrad = ctx.createRadialGradient(
+          w * 0.5,
+          sunY,
+          0,
+          w * 0.5,
+          sunY,
+          sunR * 3,
+        );
+        sunGrad.addColorStop(0, "rgba(255, 150, 80, 0.25)");
+        sunGrad.addColorStop(0.4, "rgba(255, 80, 150, 0.1)");
+        sunGrad.addColorStop(1, "transparent");
+        ctx.fillStyle = sunGrad;
+        ctx.beginPath();
+        ctx.arc(w * 0.5, sunY, sunR * 3, 0, Math.PI * 2);
+        ctx.fill();
+
+        for (const orb of orbs) {
+          orb.x += orb.vx;
+          orb.y += orb.vy;
+          if (orb.x < -orb.r) orb.x = w + orb.r;
+          if (orb.x > w + orb.r) orb.x = -orb.r;
+          if (orb.y < -orb.r) orb.y = h + orb.r;
+          if (orb.y > h + orb.r) orb.y = -orb.r;
+
+          const grd = ctx.createRadialGradient(
+            orb.x,
+            orb.y,
+            0,
+            orb.x,
+            orb.y,
+            orb.r,
+          );
+          grd.addColorStop(0, `hsla(${orb.hue},80%,60%,0.12)`);
+          grd.addColorStop(1, "transparent");
+          ctx.fillStyle = grd;
+          ctx.beginPath();
+          ctx.arc(orb.x, orb.y, orb.r, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        animRef.current = requestAnimationFrame(draw);
+      };
+      draw();
+    } else if (theme === "deep-ocean") {
+      const bubbles = Array.from({ length: 40 }, () => ({
+        x: Math.random() * w,
+        y: Math.random() * h,
+        r: 1 + Math.random() * 3,
+        speed: 0.3 + Math.random() * 0.8,
+        wobble: Math.random() * Math.PI * 2,
+      }));
+
+      const draw = (): void => {
+        ctx.clearRect(0, 0, w, h);
+        for (const b of bubbles) {
+          b.y -= b.speed;
+          b.wobble += 0.02;
+          if (b.y < -10) {
+            b.y = h + 10;
+            b.x = Math.random() * w;
+          }
+          const x = b.x + Math.sin(b.wobble) * 10;
+          const grd = ctx.createRadialGradient(x, b.y, 0, x, b.y, b.r * 2);
+          grd.addColorStop(0, "rgba(0, 245, 212, 0.5)");
+          grd.addColorStop(1, "transparent");
+          ctx.fillStyle = grd;
+          ctx.beginPath();
+          ctx.arc(x, b.y, b.r * 2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        animRef.current = requestAnimationFrame(draw);
+      };
+      draw();
+    } else if (theme === "monokai") {
+      const particles = Array.from({ length: 60 }, () => ({
+        x: Math.random() * w,
+        y: Math.random() * h,
+        vx: (Math.random() - 0.5) * 0.3,
+        vy: (Math.random() - 0.5) * 0.3,
+        size: 1 + Math.random() * 2,
+        color:
+          Math.random() > 0.5
+            ? "rgba(255, 216, 102,"
+            : "rgba(120, 220, 232,",
+      }));
+
+      const draw = (): void => {
+        ctx.clearRect(0, 0, w, h);
+        for (const p of particles) {
+          p.x += p.vx;
+          p.y += p.vy;
+          if (p.x < 0) p.x = w;
+          if (p.x > w) p.x = 0;
+          if (p.y < 0) p.y = h;
+          if (p.y > h) p.y = 0;
+
+          ctx.fillStyle = `${p.color} ${0.3 + Math.random() * 0.3})`;
+          ctx.fillRect(p.x, p.y, p.size, p.size);
+        }
+        animRef.current = requestAnimationFrame(draw);
+      };
+      draw();
+    } else if (theme === "nord-aurora") {
+      let t = 0;
+      const bands = [
+        { color: "rgba(136, 192, 208,", yOffset: 0, speed: 0.01 },
+        { color: "rgba(163, 190, 140,", yOffset: 60, speed: 0.012 },
+        { color: "rgba(180, 142, 173,", yOffset: 120, speed: 0.008 },
+      ];
+
+      const draw = (): void => {
+        ctx.clearRect(0, 0, w, h);
+        t += 1;
+
+        for (const band of bands) {
+          ctx.beginPath();
+          for (let x = 0; x <= w; x += 4) {
+            const y =
+              h * 0.35 +
+              band.yOffset +
+              Math.sin(x * 0.003 + t * band.speed) * 40 +
+              Math.sin(x * 0.007 + t * band.speed * 1.5) * 20;
+            if (x === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          }
+          ctx.lineTo(w, h);
+          ctx.lineTo(0, h);
+          ctx.closePath();
+          const grad = ctx.createLinearGradient(0, h * 0.3, 0, h);
+          grad.addColorStop(0, `${band.color} 0.15)`);
+          grad.addColorStop(1, "transparent");
+          ctx.fillStyle = grad;
+          ctx.fill();
+        }
+
+        animRef.current = requestAnimationFrame(draw);
+      };
+      draw();
+    } else if (theme === "warm-paper") {
+      const draw = (): void => {
+        ctx.clearRect(0, 0, w, h);
+        const grad = ctx.createLinearGradient(0, 0, w, h);
+        grad.addColorStop(0, "rgba(244, 236, 216, 0.4)");
+        grad.addColorStop(0.5, "rgba(235, 228, 209, 0.2)");
+        grad.addColorStop(1, "rgba(227, 220, 198, 0.4)");
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, w, h);
+
+        for (let i = 0; i < 500; i++) {
+          const x = Math.random() * w;
+          const y = Math.random() * h;
+          ctx.fillStyle = `rgba(139, 69, 19, ${Math.random() * 0.02})`;
+          ctx.fillRect(x, y, 1, 1);
+        }
+      };
+      const onResizeWarm = (): void => {
+        w = canvas.width = window.innerWidth;
+        h = canvas.height = window.innerHeight;
+        draw();
+      };
+      draw();
+      window.addEventListener("resize", onResizeWarm);
+      return () => window.removeEventListener("resize", onResizeWarm);
     }
 
     return () => {

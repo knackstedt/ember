@@ -79,6 +79,7 @@
   background: rgba(0, 0, 0, 0.9);
   backface-visibility: hidden;
   overflow: hidden;
+  padding: 0;
 }
 
 .gc-card:hover,

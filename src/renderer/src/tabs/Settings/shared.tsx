@@ -60,6 +60,31 @@ export const THEMES: { id: ThemeName; label: string; preview: string }[] = [
     preview: "linear-gradient(135deg,#0c0c0c,#004400)",
   },
   { id: "custom", label: "Custom", preview: "var(--color-surface-raised)" },
+  {
+    id: "synthwave-sunset",
+    label: "Synthwave",
+    preview: "linear-gradient(135deg,#0d0418,#2d1b4e)",
+  },
+  {
+    id: "deep-ocean",
+    label: "Deep Ocean",
+    preview: "linear-gradient(135deg,#001219,#003d4d)",
+  },
+  {
+    id: "monokai",
+    label: "Monokai",
+    preview: "linear-gradient(135deg,#1e1e1e,#ffd866)",
+  },
+  {
+    id: "nord-aurora",
+    label: "Nord Aurora",
+    preview: "linear-gradient(135deg,#2e3440,#d08770)",
+  },
+  {
+    id: "warm-paper",
+    label: "Warm Paper",
+    preview: "linear-gradient(135deg,#f4ecd8,#e3dcc6)",
+  },
 ];
 
 export function PathList({
