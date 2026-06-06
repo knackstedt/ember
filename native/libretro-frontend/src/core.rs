@@ -216,12 +216,12 @@ extern "C" fn core_environment_callback(cmd: c_uint, data: *mut c_void) -> bool 
             RETRO_ENVIRONMENT_GET_VARIABLE => {
                 if !data.is_null() {
                     let var = &mut *(data as *mut RetroVariable);
-                    let key = CStr::from_ptr(var.key).to_string_lossy();
+                    let key = CStr::from_ptr(var.key).to_string_lossy().to_string();
                     TL_VARIABLES.with(|vars| {
                         if let Some(ref vars_arc) = *vars.borrow() {
                             let vars_locked = vars_arc.lock();
                             for (k, v) in vars_locked.iter() {
-                                if k == key.as_ref() {
+                                if k == &key {
                                     let c_val = CString::new(v.as_str()).unwrap();
                                     var.value = c_val.into_raw();
                                     return true;
@@ -238,20 +238,38 @@ extern "C" fn core_environment_callback(cmd: c_uint, data: *mut c_void) -> bool 
                 if !data.is_null() {
                     let vars = data as *const RetroVariable;
                     let mut i = 0;
+                    TL_VARIABLES.with(|tl| {
+                        if let Some(ref vars_arc) = *tl.borrow() {
+                            vars_arc.lock().clear();
+                        }
+                    });
                     loop {
                         let var = &*vars.add(i);
                         if var.key.is_null() {
                             break;
                         }
                         let key = CStr::from_ptr(var.key).to_string_lossy().to_string();
-                        let value = if var.value.is_null() {
+                        let raw_value = if var.value.is_null() {
                             String::new()
                         } else {
                             CStr::from_ptr(var.value).to_string_lossy().to_string()
                         };
-                        TL_VARIABLES.with(|vars| {
-                            if let Some(ref vars_arc) = *vars.borrow() {
-                                vars_arc.lock().push((key, value));
+                        // The value string is "default|option2|option3|...".
+                        // Extract the default (first option) for GET_VARIABLE to return.
+                        // Format is "description; default|option2|option3"
+                        // Extract the default value (first option after the semicolon).
+                        let default_value = raw_value
+                            .split(';')
+                            .nth(1)
+                            .unwrap_or("")
+                            .split('|')
+                            .next()
+                            .unwrap_or("")
+                            .trim()
+                            .to_string();
+                        TL_VARIABLES.with(|tl| {
+                            if let Some(ref vars_arc) = *tl.borrow() {
+                                vars_arc.lock().push((key, default_value));
                             }
                         });
                         i += 1;
@@ -291,6 +309,17 @@ extern "C" fn core_environment_callback(cmd: c_uint, data: *mut c_void) -> bool 
                 }
                 true
             }
+            RETRO_ENVIRONMENT_GET_LOG_INTERFACE => {
+                if !data.is_null() {
+                    let cb = data as *mut RetroLogCallback;
+                    (*cb).log = Some(log_callback);
+                }
+                true
+            }
+            RETRO_ENVIRONMENT_GET_PERF_INTERFACE => {
+                // No-op: we don't support performance counters
+                false
+            }
             RETRO_ENVIRONMENT_SHUTDOWN => {
                 TL_RUNNING.with(|r| {
                     if let Some(ref running) = *r.borrow() {
@@ -306,14 +335,25 @@ extern "C" fn core_environment_callback(cmd: c_uint, data: *mut c_void) -> bool 
     }
 }
 
+unsafe extern "C" fn log_callback(_level: c_uint, fmt: *const c_char) {
+    if !fmt.is_null() {
+        // Forward to libc printf so variadic args are actually formatted.
+        // On x86_64 SysV ABI the caller has already placed args in registers/on the stack;
+        // calling printf directly works because it reads from the same locations.
+        libc::printf(fmt);
+    }
+}
+
 extern "C" fn video_refresh_callback(data: *const c_void, width: c_uint, height: c_uint, pitch: usize) {
     unsafe {
         if data.is_null() {
+            eprintln!("[video] null data");
             return;
         }
         let fmt = TL_PIXEL_FORMAT.with(|p| *p.borrow());
         let size = pitch * height as usize;
         let frame_data = std::slice::from_raw_parts(data as *const u8, size).to_vec();
+        eprintln!("[video] frame {}x{} fmt={} size={}", width, height, fmt, size);
         TL_VIDEO.with(|video| {
             if let Some(ref video_state) = *video.borrow() {
                 video_state.set_frame(VideoFrame {
@@ -323,6 +363,8 @@ extern "C" fn video_refresh_callback(data: *const c_void, width: c_uint, height:
                     format: fmt,
                     data: frame_data,
                 });
+            } else {
+                eprintln!("[video] no video state!");
             }
         });
     }

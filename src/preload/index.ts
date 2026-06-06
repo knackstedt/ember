@@ -318,6 +318,14 @@ const htpc = {
 
   libretro: {
     ...libretroApi,
+    launch: (opts: {
+      romPath: string;
+      title: string;
+      platform: string;
+      gameId: string;
+      shader?: string;
+      corePath?: string;
+    }): Promise<boolean> => ipcRenderer.invoke("libretro:launch", opts),
     onCoreListChanged: (cb: () => void) => {
       const handler = () => {
         libretroApi.invalidateCoreCache();

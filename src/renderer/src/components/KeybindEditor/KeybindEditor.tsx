@@ -49,6 +49,7 @@ const CONTROLLER_BUTTONS = [
   { id: "right_trigger", label: "RT / R2" },
   { id: "left_thumb", label: "LS / L3" },
   { id: "right_thumb", label: "RS / R3" },
+  { id: "home", label: "Home / Xbox / PS" },
 ];
 
 function normalizeShortcut(e: KeyboardEvent): string {

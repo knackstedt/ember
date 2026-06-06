@@ -1,6 +1,8 @@
 import { join, dirname } from "path";
 import { readFileSync, rmSync, mkdirSync, readdirSync, existsSync } from "fs";
 import { BrowserWindow, ipcMain, app, dialog, shell } from "electron";
+import { spawn, ChildProcess } from "child_process";
+import { createLibretroWindow } from "..";
 import {
   getSettings,
   setSettings,
@@ -101,6 +103,76 @@ import {
 
 const log = createLogger("info");
 
+// ---------------------------------------------------------------------------
+// Libretro worker process — isolates dynarec cores from Electron V8
+// ---------------------------------------------------------------------------
+
+let libretroWorker: ChildProcess | null = null;
+let workerReqId = 0;
+const workerPending = new Map<number, { resolve: (v: any) => void; reject: (e: any) => void }>();
+
+function ensureLibretroWorker(): ChildProcess {
+  if (libretroWorker && !libretroWorker.killed && libretroWorker.exitCode === null) {
+    return libretroWorker;
+  }
+
+  const workerScript = join(__dirname, "libretro-worker.js");
+  if (!existsSync(workerScript)) {
+    throw new Error(`Libretro worker not found at ${workerScript}`);
+  }
+
+  // Spawn as plain Node.js (ELECTRON_RUN_AS_NODE=1) to avoid Electron V8
+  // signal-handler conflicts with dynarec cores. Use spawn() instead of fork()
+  // because fork() still does Electron-specific initialization even with the env var.
+  const worker = require("child_process").spawn(process.execPath, [workerScript], {
+    env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
+    stdio: ["pipe", "pipe", "pipe", "ipc"],
+  });
+
+  worker.on("message", (msg: any) => {
+    const pending = workerPending.get(msg.id);
+    if (pending) {
+      workerPending.delete(msg.id);
+      if (msg.error) {
+        pending.reject(new Error(msg.error));
+      } else {
+        pending.resolve(msg.result);
+      }
+    }
+  });
+
+  worker.stdout!.on("data", (chunk: Buffer) => {
+    log.info("libretro-worker", chunk.toString("utf8").trim());
+  });
+
+  worker.stderr!.on("data", (chunk: Buffer) => {
+    log.info("libretro-worker", chunk.toString("utf8").trim());
+  });
+
+  worker.on("exit", (code: number | null, signal: NodeJS.Signals | null) => {
+    log.warn("libretro", `Worker exited code=${code} signal=${signal}`);
+    if (libretroWorker === worker) {
+      libretroWorker = null;
+    }
+    for (const pending of workerPending.values()) {
+      pending.reject(new Error("Libretro worker crashed"));
+    }
+    workerPending.clear();
+  });
+
+  libretroWorker = worker;
+  return worker;
+}
+
+function workerCall(method: string, ...args: any[]): Promise<any> {
+  const worker = ensureLibretroWorker();
+  const id = ++workerReqId;
+  return new Promise((resolve, reject) => {
+    workerPending.set(id, { resolve, reject });
+    worker.send!({ id, method, args });
+  });
+}
+
 const scanLocks = {
   movies: false,
   music: false,
@@ -109,16 +181,22 @@ const scanLocks = {
 
 const regenerateLocks = new Set<string>();
 
+function sendToWindow(win: BrowserWindow, channel: string, ...args: any[]) {
+  if (!win.isDestroyed() && !win.webContents.isDestroyed()) {
+    win.webContents.send(channel, ...args);
+  }
+}
+
 export function registerIpcHandlers(window: BrowserWindow): void {
   ipcMain.handle("devtools:is-open", () => {
     return window.webContents.isDevToolsOpened();
   });
 
   window.webContents.on("devtools-opened", () => {
-    window.webContents.send("devtools:changed", true);
+    sendToWindow(window, "devtools:changed", true);
   });
   window.webContents.on("devtools-closed", () => {
-    window.webContents.send("devtools:changed", false);
+    sendToWindow(window, "devtools:changed", false);
   });
 
   ipcMain.handle("settings:get", async () => {
@@ -161,6 +239,31 @@ export function registerIpcHandlers(window: BrowserWindow): void {
 
   ipcMain.handle("games:launch", (_e, game: Game) => {
     return launchGame(game);
+  });
+
+  ipcMain.handle("libretro:launch", (_e, opts: {
+    romPath: string;
+    title: string;
+    platform: string;
+    gameId: string;
+    shader?: string;
+    corePath?: string;
+  }) => {
+    createLibretroWindow(opts);
+    return true;
+  });
+
+  ipcMain.handle("libretro:addon", async (_e, method: string, ...args: any[]) => {
+    try {
+      const result = await workerCall(method, ...args);
+      if (method !== "getFrameBuffer") {
+        log.info("libretro", `worker.${method}() -> ${JSON.stringify(result).slice(0, 200)}`);
+      }
+      return result;
+    } catch (err: any) {
+      log.error("libretro", `Worker method ${method} failed:`, err);
+      throw err;
+    }
   });
 
   ipcMain.handle("games:favorite", async (_e, id: string, value: boolean) => {
@@ -522,7 +625,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
 
   ipcMain.handle("games:compressAll", async (_e) => {
     const result = await compressAllRoms((current, total, title) => {
-      window.webContents.send("compression:progress", { current, total, title });
+      sendToWindow(window, "compression:progress", { current, total, title });
     });
     return result;
   });
@@ -538,14 +641,14 @@ export function registerIpcHandlers(window: BrowserWindow): void {
   ipcMain.handle("movies:scan", async (_e, extraPaths?: string[]) => {
     if (scanLocks.movies) return [];
     scanLocks.movies = true;
-    window.webContents.send("scan:progress", {
+    sendToWindow(window, "scan:progress", {
       scanner: "movies",
       current: 0,
       total: 0,
       status: "scanning",
     });
     const movies = await scanMovieFiles(extraPaths, (current, total) => {
-      window.webContents.send("scan:progress", {
+      sendToWindow(window, "scan:progress", {
         scanner: "movies",
         current,
         total,
@@ -623,7 +726,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
         movie: defined,
       });
     }
-    window.webContents.send("scan:progress", {
+    sendToWindow(window, "scan:progress", {
       scanner: "movies",
       current: movies.length,
       total: movies.length,
@@ -711,7 +814,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
   ipcMain.handle("music:scan", async (_e, extraPaths?: string[]) => {
     if (scanLocks.music) return [];
     scanLocks.music = true;
-    window.webContents.send("scan:progress", {
+    sendToWindow(window, "scan:progress", {
       scanner: "music",
       current: 0,
       total: 0,
@@ -728,7 +831,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
       await MusicRepo.upsert(track);
     }
     log.info("music:scan", "DB insert done");
-    window.webContents.send("scan:progress", {
+    sendToWindow(window, "scan:progress", {
       scanner: "music",
       current: tracks.length,
       total: tracks.length,
@@ -829,7 +932,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     const results = await enrichTracks(tracks, {
       tadbApiKey: settings.theaudiodbApiKey,
       onProgress: (current, total) => {
-        window.webContents.send("scan:progress", {
+        sendToWindow(window, "scan:progress", {
           scanner: "music-enrich",
           current,
           total,
@@ -867,7 +970,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
   ipcMain.handle("tv:scan", async (_e, extraPaths?: string[]) => {
     if (scanLocks.tv) return [];
     scanLocks.tv = true;
-    window.webContents.send("scan:progress", {
+    sendToWindow(window, "scan:progress", {
       scanner: "tv",
       current: 0,
       total: 0,
@@ -879,7 +982,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     for (const show of shows) {
       await TVRepo.upsert(show);
     }
-    window.webContents.send("scan:progress", {
+    sendToWindow(window, "scan:progress", {
       scanner: "tv",
       current: shows.length,
       total: shows.length,

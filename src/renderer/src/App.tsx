@@ -42,6 +42,7 @@ import { ErrorBoundary } from "./components/ErrorBoundary/ErrorBoundary";
 import { CommandPalette } from "./components/CommandPalette/CommandPalette";
 import { useCommands } from "./hooks/useCommands";
 import { useCommandsStore } from "./store/commands.store";
+import { useGamepadApi } from "./hooks/useGamepadApi";
 import { CommandDefinition, COMMAND_DEFINITIONS } from "../../shared/commands";
 
 function normalizeShortcut(e: KeyboardEvent): string {
@@ -110,7 +111,37 @@ function useVisibleTabs(settings: AppSettings | null) {
   return TABS.filter((t) => !disabled.has(t.id));
 }
 
+const isLibretroWindow = new URLSearchParams(window.location.search).has("libretro");
+
+function LibretroWindow(): React.ReactElement {
+  const launch = useLibretroPlayerStore((s) => s.launch);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const romPath = params.get("romPath");
+    const title = params.get("title") ?? "";
+    const platform = params.get("platform") ?? "";
+    const gameId = params.get("gameId") ?? "";
+    const shader = params.get("shader") ?? undefined;
+    const corePath = params.get("corePath") ?? undefined;
+
+    if (romPath) {
+      void launch({ romPath, title, platform: platform as any, gameId, shader, corePath });
+    }
+  }, [launch]);
+
+  return (
+    <div className="flex items-center justify-center h-screen w-screen bg-black">
+      <LibretroPlayer />
+    </div>
+  );
+}
+
 export default function App(): React.ReactElement {
+  if (isLibretroWindow) {
+    return <LibretroWindow />;
+  }
+
   const settings = useSettingsStore((s) => s.settings);
   const loading = useSettingsStore((s) => s.loading);
   const load = useSettingsStore((s) => s.load);
@@ -118,6 +149,7 @@ export default function App(): React.ReactElement {
   const visibleTabIds = visibleTabs.map((t) => t.id);
   const addDevice = useInputStore((s) => s.addDevice);
   const removeDevice = useInputStore((s) => s.removeDevice);
+  const inputDevices = useInputStore((s) => s.devices);
   const hasPlayer = useMusicPlayerStore((s) => s.queue.length > 0);
   const setBladeCollapsed = useMusicPlayerStore((s) => s.setBladeCollapsed);
   const videoOpen = useVideoPlayerStore((s) => !!s.src);
@@ -145,6 +177,50 @@ export default function App(): React.ReactElement {
   customControllerMapRef.current = settings?.commandControllerMap ?? {};
   const executeCommandRef = useRef<(cmd: CommandDefinition) => void>(() => {});
 
+  /* Axis navigation state for analog sticks / D-pad axes */
+  const axisValuesRef = useRef<Record<string, number>>({});
+  const axisTimersRef = useRef<Record<string, number>>({});
+  const axisCooldownRef = useRef<Record<string, number>>({});
+  const AXIS_THRESHOLD = 16384;
+  const AXIS_COOLDOWN_MS = 200;
+
+  function getAxisNavAction(axis: string, value: number): string | null {
+    if (axis === "dpad_x") {
+      if (value < 0) return "left";
+      if (value > 0) return "right";
+    } else if (axis === "dpad_y") {
+      if (value < 0) return "up";
+      if (value > 0) return "down";
+    } else if (axis === "left_x") {
+      if (value < -AXIS_THRESHOLD) return "left";
+      if (value > AXIS_THRESHOLD) return "right";
+    } else if (axis === "left_y") {
+      if (value < -AXIS_THRESHOLD) return "up";
+      if (value > AXIS_THRESHOLD) return "down";
+    }
+    return null;
+  }
+
+  function canDispatchAxisNav(axis: string): boolean {
+    const now = Date.now();
+    const last = axisCooldownRef.current[axis] ?? 0;
+    if (now - last < AXIS_COOLDOWN_MS) return false;
+    axisCooldownRef.current[axis] = now;
+    return true;
+  }
+
+  function dispatchNavAction(action: string) {
+    if (useContextMenuStore.getState().isOpen) {
+      window.dispatchEvent(
+        new CustomEvent("htpc:menu-nav", { detail: { action } }),
+      );
+    } else {
+      window.dispatchEvent(
+        new CustomEvent("htpc:nav", { detail: { action } }),
+      );
+    }
+  }
+
   const { executeCommand } = useCommands(
     {
       activeTab: activeTabRef.current,
@@ -157,6 +233,9 @@ export default function App(): React.ReactElement {
     setActiveTab,
   );
   executeCommandRef.current = executeCommand;
+
+  // Fallback gamepad input via browser Gamepad API (works without evdev permissions)
+  useGamepadApi(!anyEmulatorOpen && inputDevices.length === 0);
 
   useEffect(() => {
     load();
@@ -220,6 +299,24 @@ export default function App(): React.ReactElement {
     }
   }, [settings?.defaultTab]);
 
+  // Listen for fallback gamepad API tab-switch events
+  useEffect(() => {
+    const onNext = () => {
+      const idx = visibleTabIds.indexOf(activeTabRef.current);
+      setActiveTab(visibleTabIds[(idx + 1) % visibleTabIds.length]);
+    };
+    const onPrev = () => {
+      const idx = visibleTabIds.indexOf(activeTabRef.current);
+      setActiveTab(visibleTabIds[(idx - 1 + visibleTabIds.length) % visibleTabIds.length]);
+    };
+    window.addEventListener("htpc:tab-next", onNext);
+    window.addEventListener("htpc:tab-prev", onPrev);
+    return () => {
+      window.removeEventListener("htpc:tab-next", onNext);
+      window.removeEventListener("htpc:tab-prev", onPrev);
+    };
+  }, []);
+
   useEffect(() => {
     setBladeCollapsed(anyEmulatorOpen);
   }, [anyEmulatorOpen]);
@@ -279,6 +376,55 @@ export default function App(): React.ReactElement {
       window.htpc.input.onDeviceDisconnected(removeDevice);
     const unsubEvent = window.htpc.input.onEvent((ev) => {
       useInputStore.getState().setLastEvent(ev);
+
+      // When an emulator has focus, only allow mapped controller keybinds
+      const emuOpen =
+        useFlashPlayerStore.getState().open ||
+        useJsnesPlayerStore.getState().open ||
+        useEmulatorjsPlayerStore.getState().open ||
+        useV86PlayerStore.getState().open ||
+        useLibretroPlayerStore.getState().open;
+      if (emuOpen) {
+        if (ev.type === "axis") return;
+        if (ev.type === "button_press") {
+          const ctrlMap = customControllerMapRef.current;
+          const mappedCmdId = Object.entries(ctrlMap).find(([, btn]) => btn === ev.action)?.[0];
+          if (mappedCmdId) {
+            const cmd = COMMAND_DEFINITIONS.find((c) => c.id === mappedCmdId);
+            if (cmd) executeCommandRef.current(cmd);
+          }
+          return;
+        }
+        return;
+      }
+
+      if (ev.type === "axis" && ev.axis) {
+        const axis = ev.axis;
+        const prev = axisValuesRef.current[axis] ?? 0;
+        axisValuesRef.current[axis] = ev.value ?? 0;
+
+        const existingTimer = axisTimersRef.current[axis];
+        if (existingTimer) {
+          clearTimeout(existingTimer);
+          delete axisTimersRef.current[axis];
+        }
+
+        const action = getAxisNavAction(axis, ev.value ?? 0);
+        const prevAction = getAxisNavAction(axis, prev);
+
+        if (action && action !== prevAction && canDispatchAxisNav(axis)) {
+          dispatchNavAction(action);
+          const repeat = () => {
+            if (canDispatchAxisNav(axis)) {
+              dispatchNavAction(action);
+            }
+            axisTimersRef.current[axis] = window.setTimeout(repeat, 180);
+          };
+          axisTimersRef.current[axis] = window.setTimeout(repeat, 500);
+        }
+        return;
+      }
+
       if (ev.type !== "button_press") return;
 
       // Check custom controller mappings first
@@ -293,6 +439,12 @@ export default function App(): React.ReactElement {
       }
 
       if (ev.action === "start") {
+        const idx = visibleTabIds.indexOf(activeTabRef.current);
+        setActiveTab(visibleTabIds[(idx + 1) % visibleTabIds.length]);
+      } else if (ev.action === "left_bumper") {
+        const idx = visibleTabIds.indexOf(activeTabRef.current);
+        setActiveTab(visibleTabIds[(idx - 1 + visibleTabIds.length) % visibleTabIds.length]);
+      } else if (ev.action === "right_bumper") {
         const idx = visibleTabIds.indexOf(activeTabRef.current);
         setActiveTab(visibleTabIds[(idx + 1) % visibleTabIds.length]);
       } else if (ev.action === "west") {
@@ -314,15 +466,7 @@ export default function App(): React.ReactElement {
         };
         const action = actionMap[ev.action ?? ""];
         if (action) {
-          if (useContextMenuStore.getState().isOpen) {
-            window.dispatchEvent(
-              new CustomEvent("htpc:menu-nav", { detail: { action } }),
-            );
-          } else {
-            window.dispatchEvent(
-              new CustomEvent("htpc:nav", { detail: { action } }),
-            );
-          }
+          dispatchNavAction(action);
         }
       }
     });
@@ -330,6 +474,9 @@ export default function App(): React.ReactElement {
       unsubConnect();
       unsubDisconnect();
       unsubEvent();
+      Object.values(axisTimersRef.current).forEach(clearTimeout);
+      axisTimersRef.current = {};
+      axisCooldownRef.current = {};
     };
   }, []);
 

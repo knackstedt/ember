@@ -255,6 +255,7 @@ export default defineConfig({
           "workers/game-scan.worker": resolve(
             "src/main/workers/game-scan.worker.ts",
           ),
+          "libretro-worker": resolve("src/main/libretro-worker.ts"),
         },
         output: {
           entryFileNames: "[name].js",

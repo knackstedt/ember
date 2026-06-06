@@ -54,26 +54,39 @@ pub const RETRO_ENVIRONMENT_GET_LIBRETRO_PATH: c_uint = 19;
 pub const RETRO_ENVIRONMENT_SET_AUDIO_CALLBACK: c_uint = 22;
 pub const RETRO_ENVIRONMENT_SET_FRAME_TIME_CALLBACK: c_uint = 25;
 pub const RETRO_ENVIRONMENT_GET_LOG_INTERFACE: c_uint = 27;
+pub const RETRO_ENVIRONMENT_GET_PERF_INTERFACE: c_uint = 28;
 pub const RETRO_ENVIRONMENT_GET_SAVE_DIRECTORY: c_uint = 30;
 pub const RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO: c_uint = 32;
+
+pub const RETRO_LOG_DEBUG: c_uint = 0;
+pub const RETRO_LOG_INFO: c_uint = 1;
+pub const RETRO_LOG_WARN: c_uint = 2;
+pub const RETRO_LOG_ERROR: c_uint = 3;
+
+pub type RetroLogFn = unsafe extern "C" fn(level: c_uint, fmt: *const c_char);
+
+#[repr(C)]
+pub struct RetroLogCallback {
+    pub log: Option<RetroLogFn>,
+}
 
 #[repr(C)]
 #[derive(Debug, Clone)]
 pub struct RetroSystemInfo {
     pub library_name: *const c_char,
     pub library_version: *const c_char,
+    pub valid_extensions: *const c_char,
     pub need_fullpath: bool,
     pub block_extract: bool,
-    pub valid_extensions: *const c_char,
 }
 
 #[derive(Debug, Clone)]
 pub struct SystemInfo {
     pub library_name: String,
     pub library_version: String,
+    pub valid_extensions: String,
     pub need_fullpath: bool,
     pub block_extract: bool,
-    pub valid_extensions: String,
 }
 
 // SAFETY: All fields are owned String/bool types, safe to send across threads

@@ -70,6 +70,40 @@ function isSystemDolphinInstalled(): boolean {
   return result.status === 0;
 }
 
+function findSteamCommand(): { cmd: string; args: string[] } | null {
+  // Prefer native Steam binary in PATH
+  const steamInPath = spawnSync("sh", ["-c", "command -v steam"], {
+    stdio: "ignore",
+  });
+  if (steamInPath.status === 0) {
+    return { cmd: "steam", args: ["-silent"] };
+  }
+
+  // Fall back to Flatpak Steam
+  const flatpakInPath = spawnSync("sh", ["-c", "command -v flatpak"], {
+    stdio: "ignore",
+  });
+  if (flatpakInPath.status === 0) {
+    try {
+      const flatpakCheck = spawnSync(
+        "flatpak",
+        ["info", "com.valvesoftware.Steam"],
+        { stdio: "ignore" },
+      );
+      if (flatpakCheck.status === 0) {
+        return {
+          cmd: "flatpak",
+          args: ["run", "com.valvesoftware.Steam", "-silent"],
+        };
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  return null;
+}
+
 function fullscreenDolphinWindow(): void {
   try {
     const xdotoolCheck = spawnSync("xdotool", ["--version"], {
@@ -128,10 +162,44 @@ export async function launchGame(game: Game): Promise<void> {
   let args: string[];
 
   switch (game.platform) {
-    case "steam":
-      cmd = "xdg-open";
-      args = [`steam://rungameid/${game.steamAppId}`];
-      break;
+    case "steam": {
+      if (!game.steamAppId) {
+        return Promise.reject(
+          new Error(`Steam AppID missing for game: ${game.title}`),
+        );
+      }
+      const steam = findSteamCommand();
+      const steamCmd = steam?.cmd ?? "xdg-open";
+      const steamArgs = steam
+        ? [...steam.args, `steam://rungameid/${game.steamAppId}`]
+        : [`steam://rungameid/${game.steamAppId}`];
+
+      log.info(
+        "launcher",
+        `Spawning: ${steamCmd} ${steamArgs
+          .map((a) => (a.includes(" ") ? `"${a}"` : a))
+          .join(" ")}`,
+      );
+
+      const steamProc = spawn(steamCmd, steamArgs, {
+        detached: true,
+        stdio: "ignore",
+        env: { ...process.env },
+      });
+      steamProc.on("error", (err) => {
+        log.error("launcher", `Spawn error for "${game.title}": ${err}`);
+      });
+      steamProc.unref();
+
+      // Update lastPlayed for the recently-played list, but do not start
+      // interval-based playtime tracking — the dispatcher process exits
+      // immediately and we have no way to know when the actual game closes.
+      GameRepo.setLastPlayed(game.id, Date.now()).catch((err) => {
+        log.warn("launcher", `Failed to set lastPlayed for ${game.id}: ${err}`);
+      });
+
+      return Promise.resolve();
+    }
     case "dolphin-gc":
     case "dolphin-wii": {
       const romPath = resolveRomPath(game);
@@ -258,8 +326,8 @@ export async function launchGame(game: Game): Promise<void> {
         settled = true;
         const stderrTail = stderrBuf.trim().slice(-500);
         const reason = signal
-          ? `Emulator was killed by signal ${signal}. ${stderrTail}`
-          : `Emulator exited immediately with code ${code}. ${stderrTail}`;
+          ? `Process was killed by signal ${signal}. ${stderrTail}`
+          : `Process exited immediately with code ${code}. ${stderrTail}`;
         log.error("launcher", `"${game.title}" failed: ${reason}`);
         reject(new Error(reason));
       }

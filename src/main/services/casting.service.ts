@@ -18,10 +18,12 @@ export async function startCastReceiver(window: BrowserWindow): Promise<void> {
 
   log.info("casting", "Cast receiver stub — not yet implemented");
   receiverActive = false;
-  window.webContents.send("casting:status", {
-    active: false,
-    message: "Cast receiver not yet implemented",
-  });
+  if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
+    window.webContents.send("casting:status", {
+      active: false,
+      message: "Cast receiver not yet implemented",
+    });
+  }
 }
 
 export async function stopCastReceiver(): Promise<void> {

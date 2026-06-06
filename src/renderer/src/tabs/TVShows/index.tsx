@@ -11,6 +11,7 @@ import { OskInput } from "../../components/OnScreenKeyboard/OnScreenKeyboard";
 import { TVShow } from "../../../../shared/types";
 import { useVideoPlayerStore } from "../../store/videoPlayer.store";
 import { useGridFocus } from "../../hooks/useGridFocus";
+import { useDetailController } from "../../hooks/useDetailController";
 import { useContextMenu } from "../../hooks/useContextMenu";
 import { ContextMenuOption } from "../../components/ContextMenu/ContextMenu";
 import {
@@ -176,6 +177,21 @@ export const TVShowsTab: React.FC = () => {
         ?.episodes ?? []
     );
   }, [selected, selectedSeason]);
+
+  useDetailController({
+    enabled: !!selected,
+    onConfirm: () => {
+      const ep = currentSeasonEpisodes[0];
+      if (ep?.filePath) {
+        openVideo(
+          `file://${ep.filePath}`,
+          ep.title ?? `Episode ${ep.episodeNumber}`,
+        );
+        setSelected(null);
+      }
+    },
+    onCancel: () => setSelected(null),
+  });
 
   const activeCollection = useMemo(
     () => collections.find((c) => c.id === activeCollectionId),

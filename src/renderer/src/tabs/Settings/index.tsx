@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import {
   Palette,
@@ -50,6 +50,34 @@ const TAB_COMPONENTS: Record<SubTabId, React.FC> = {
 export const SettingsTab: React.FC = () => {
   const [activeTab, setActiveTab] = useState<SubTabId>("general");
   const ActiveComponent = TAB_COMPONENTS[activeTab];
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { action: string };
+      const idx = SUB_TABS.findIndex((t) => t.id === activeTab);
+      switch (detail?.action) {
+        case "left":
+          if (idx > 0) setActiveTab(SUB_TABS[idx - 1].id);
+          break;
+        case "right":
+          if (idx < SUB_TABS.length - 1) setActiveTab(SUB_TABS[idx + 1].id);
+          break;
+        case "up": {
+          const el = contentRef.current;
+          if (el) el.scrollBy({ top: -80, behavior: "smooth" });
+          break;
+        }
+        case "down": {
+          const el = contentRef.current;
+          if (el) el.scrollBy({ top: 80, behavior: "smooth" });
+          break;
+        }
+      }
+    };
+    window.addEventListener("htpc:nav", handler);
+    return () => window.removeEventListener("htpc:nav", handler);
+  }, [activeTab]);
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
@@ -86,7 +114,7 @@ export const SettingsTab: React.FC = () => {
       </div>
 
       {/* Tab content */}
-      <div className="flex-1 overflow-y-auto gpu-scroll">
+      <div ref={contentRef} className="flex-1 overflow-y-auto gpu-scroll">
         <div className="max-w-5xl mx-auto p-6">
           <ActiveComponent />
         </div>

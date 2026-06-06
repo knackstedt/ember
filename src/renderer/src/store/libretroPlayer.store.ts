@@ -124,6 +124,7 @@ export const useLibretroPlayerStore = create<LibretroPlayerState>((set, get) => 
       });
       window.htpc.games.playTime.start(opts.gameId).catch(() => {});
     } catch (err: any) {
+      console.error("[libretro] launch error:", err);
       set({ error: String(err?.message ?? err), isLoading: false });
     }
   },

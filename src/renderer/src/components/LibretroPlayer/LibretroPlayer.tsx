@@ -178,7 +178,7 @@ export const LibretroPlayer: React.FC = () => {
       if (cancelled) return;
 
       try {
-        const frame = await window.htpc.libretro.getFrameBuffer(coreId);
+        const frame = await window.htpc.libretro.getFrame(coreId);
         if (frame && frame.width > 0 && frame.height > 0) {
           const canvas = canvasRef.current;
           if (!canvas) return;
@@ -211,52 +211,18 @@ export const LibretroPlayer: React.FC = () => {
 
           const pixelData = new Uint8Array(frame.data);
 
-          switch (frame.format) {
-            case PIXEL_FORMAT_RGB565: {
-              // 16-bit RGB: upload as RGB + UNSIGNED_SHORT_5_6_5
-              gl.texImage2D(
-                gl.TEXTURE_2D,
-                0,
-                gl.RGB,
-                frame.width,
-                frame.height,
-                0,
-                gl.RGB,
-                gl.UNSIGNED_SHORT_5_6_5,
-                pixelData
-              );
-              break;
-            }
-            case PIXEL_FORMAT_0RGB1555: {
-              // 16-bit 0RGB: upload as RGBA + UNSIGNED_SHORT_5_5_5_1
-              gl.texImage2D(
-                gl.TEXTURE_2D,
-                0,
-                gl.RGBA,
-                frame.width,
-                frame.height,
-                0,
-                gl.RGBA,
-                gl.UNSIGNED_SHORT_5_5_5_1,
-                pixelData
-              );
-              break;
-            }
-            default: {
-              // XRGB8888 and RGBA8888: upload as RGBA + UNSIGNED_BYTE
-              gl.texImage2D(
-                gl.TEXTURE_2D,
-                0,
-                gl.RGBA,
-                frame.width,
-                frame.height,
-                0,
-                gl.RGBA,
-                gl.UNSIGNED_BYTE,
-                pixelData
-              );
-            }
-          }
+          // getFrame always returns RGBA data
+          gl.texImage2D(
+            gl.TEXTURE_2D,
+            0,
+            gl.RGBA,
+            frame.width,
+            frame.height,
+            0,
+            gl.RGBA,
+            gl.UNSIGNED_BYTE,
+            pixelData
+          );
 
           if (programRef.current) {
             gl.useProgram(programRef.current);
@@ -267,7 +233,7 @@ export const LibretroPlayer: React.FC = () => {
               uniformsRef.current.u_time,
               (performance.now() - startTimeRef.current) / 1000.0
             );
-            gl.uniform1i(uniformsRef.current.u_format, frame.format);
+            gl.uniform1i(uniformsRef.current.u_format, PIXEL_FORMAT_RGBA8888);
           }
 
           gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);

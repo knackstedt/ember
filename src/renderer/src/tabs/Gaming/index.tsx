@@ -17,6 +17,7 @@ import { CoreSelector } from "../../components/CoreSelector/CoreSelector";
 import { Dropdown } from "../../components/Dropdown/Dropdown";
 import { Game, GamePlatform, GameEmulatorConfig, WineRunner } from "../../../../shared/types";
 import { useGridFocus } from "../../hooks/useGridFocus";
+import { useDetailController } from "../../hooks/useDetailController";
 import { useContextMenu } from "../../hooks/useContextMenu";
 import { ContextMenuOption } from "../../components/ContextMenu/ContextMenu";
 import { useFlashPlayerStore } from "../../store/flashPlayer.store";
@@ -103,7 +104,7 @@ const PLATFORM_FILTERS: ChipFilter<
 ];
 
 const LIBRETRO_PLATFORMS: GamePlatform[] = [
-  "n64", "genesis", "sms", "gamegear", "pce", "psx", "nds", "dreamcast"
+  "nes", "n64", "genesis", "sms", "gamegear", "pce", "psx", "nds", "dreamcast"
 ];
 
 const PROTON_COLORS: Record<string, string> = {
@@ -589,10 +590,11 @@ export const GamingTab: React.FC = () => {
       useFlashPlayerStore.getState().launch(romPath, game.title, game.id);
       return;
     }
-    if (game.platform === "nes" && romPath) {
-      useJsnesPlayerStore.getState().launch(romPath, game.title, game.id);
-      return;
-    }
+    // Temporarily disabled: routing NES through libretro for testing
+    // if (game.platform === "nes" && romPath) {
+    //   useJsnesPlayerStore.getState().launch(romPath, game.title, game.id);
+    //   return;
+    // }
     if ((game.platform === "snes" || game.platform === "gb" || game.platform === "gba") && romPath) {
       const shader = await resolveShader(game);
       useEmulatorjsPlayerStore.getState().launch(romPath, game.title, game.platform, game.id, shader);
@@ -604,7 +606,7 @@ export const GamingTab: React.FC = () => {
     }
     if (LIBRETRO_PLATFORMS.includes(game.platform) && romPath) {
       const shader = await resolveShader(game);
-      await useLibretroPlayerStore.getState().launch({
+      await window.htpc.libretro.launch({
         romPath,
         title: game.title,
         gameId: game.id,
@@ -629,6 +631,17 @@ export const GamingTab: React.FC = () => {
     .filter((g) => g.lastPlayed && g.lastPlayed > 0)
     .sort((a, b) => (b.lastPlayed ?? 0) - (a.lastPlayed ?? 0))
     .slice(0, 8);
+
+  useDetailController({
+    enabled: !!selected,
+    onConfirm: () => {
+      if (selected && !getMissingCoreTooltip(selected)) {
+        void launch(selected);
+        setSelected(null);
+      }
+    },
+    onCancel: () => setSelected(null),
+  });
 
   return (
     <div className="flex flex-col h-full">

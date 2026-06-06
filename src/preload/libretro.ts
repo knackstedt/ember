@@ -1,39 +1,13 @@
 import { join } from "path";
 import { existsSync, readdirSync, statSync } from "fs";
-
-// ---------------------------------------------------------------------------
-// Load native addon directly in renderer process (zero IPC overhead)
-// ---------------------------------------------------------------------------
-
-const addonPath = join(__dirname, "..", "..", "resources", "libretro-frontend.linux-x64-gnu.node");
-
-let NativeAddon: any = null;
-let Frontend: any = null;
-let addonLoadAttempted = false;
-
-function loadAddon() {
-  if (addonLoadAttempted) return;
-  addonLoadAttempted = true;
-  try {
-    // @ts-ignore — require is available in preload with sandbox: false
-    NativeAddon = require(addonPath);
-    Frontend = new NativeAddon.LibretroFrontend();
-    console.log("[libretro] Native addon loaded directly in renderer process:", addonPath);
-  } catch (err) {
-    console.error("[libretro] Failed to load native addon:", err);
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Core scanning (was in main/services/libretro.service.ts)
-// ---------------------------------------------------------------------------
+import { ipcRenderer } from "electron";
 
 export interface CoreInfo {
   id: number;
   name: string;
   version: string;
   extensions: string;
-  needFullpath: boolean;
+  need_fullpath: boolean;
   path: string;
 }
 
@@ -125,7 +99,7 @@ function findCoresInPath(searchPath: string): CoreInfo[] {
         name: coreName,
         version: "",
         extensions,
-        needFullpath: false,
+        need_fullpath: false,
         path: fullPath,
       });
     }
@@ -143,6 +117,7 @@ export function scanForCores(): CoreInfo[] {
     join(home, ".config/retroarch/cores"),
     join(home, ".config/ember/cores"),
     "/usr/lib/libretro",
+    "/usr/lib/x86_64-linux-gnu/libretro",
     "/usr/local/lib/libretro",
     "/usr/lib64/libretro",
     "/usr/local/lib64/libretro",
@@ -171,7 +146,6 @@ export function scanForCores(): CoreInfo[] {
   return allCores;
 }
 
-// Best cores for each platform, ordered by priority (best first)
 const CORE_PRIORITY: Record<string, string[]> = {
   nes: ["nestopia", "fceumm", "mesen"],
   snes: ["bsnes", "snes9x", "mesen"],
@@ -214,7 +188,6 @@ export function detectAllCoresForRom(romPath: string, availableCores: CoreInfo[]
 
   const priorityList = CORE_PRIORITY[platform] ?? [];
 
-  // Sort by priority list first, then alphabetically for unlisted cores
   compatible.sort((a, b) => {
     const aIdx = priorityList.indexOf(a.coreName);
     const bIdx = priorityList.indexOf(b.coreName);
@@ -225,18 +198,6 @@ export function detectAllCoresForRom(romPath: string, availableCores: CoreInfo[]
   });
 
   return compatible;
-}
-
-// ---------------------------------------------------------------------------
-// Direct API exposed to renderer (zero IPC)
-// ---------------------------------------------------------------------------
-
-function ensureFrontend() {
-  loadAddon();
-  if (!Frontend) {
-    throw new Error("Libretro native addon not loaded. Check console for errors.");
-  }
-  return Frontend;
 }
 
 let cachedCores: CoreInfo[] | null = null;
@@ -263,75 +224,43 @@ export const libretroApi = {
     cachedCores = null;
   },
 
-  loadCore: (corePath: string): { id: number; name: string; version: string; extensions: string; needFullpath: boolean } => {
-    return ensureFrontend().loadCore(corePath);
-  },
+  // ---------------------------------------------------------------------------
+  // Addon methods — proxied to main process via IPC to avoid V8 signal conflicts
+  // ---------------------------------------------------------------------------
 
-  loadGame: (coreId: number, romPath: string): boolean => {
-    return ensureFrontend().loadGame(coreId, romPath);
-  },
+  loadCore: (corePath: string): Promise<{ id: number; name: string; version: string; extensions: string; need_fullpath: boolean }> =>
+    ipcRenderer.invoke("libretro:addon", "loadCore", corePath),
 
-  start: (coreId: number): boolean => {
-    return ensureFrontend().start(coreId);
-  },
+  loadGame: (coreId: number, romPath: string): Promise<boolean> =>
+    ipcRenderer.invoke("libretro:addon", "loadGame", coreId, romPath),
 
-  stop: (coreId: number): boolean => {
-    return ensureFrontend().stop(coreId);
-  },
+  start: (coreId: number): Promise<boolean> =>
+    ipcRenderer.invoke("libretro:addon", "start", coreId),
 
-  reset: (coreId: number): boolean => {
-    return ensureFrontend().reset(coreId);
-  },
+  stop: (coreId: number): Promise<boolean> =>
+    ipcRenderer.invoke("libretro:addon", "stop", coreId),
 
-  unload: (coreId: number): boolean => {
-    return ensureFrontend().unload(coreId);
-  },
+  reset: (coreId: number): Promise<boolean> =>
+    ipcRenderer.invoke("libretro:addon", "reset", coreId),
 
-  unloadAll: (): boolean => {
-    return ensureFrontend().unloadAll();
-  },
+  unload: (coreId: number): Promise<boolean> =>
+    ipcRenderer.invoke("libretro:addon", "unload", coreId),
 
-  getFrame: (coreId: number): { width: number; height: number; data: Uint8Array } | null => {
-    try {
-      const frame = ensureFrontend().getFrame(coreId);
-      if (!frame || frame.width === 0) return null;
-      return frame;
-    } catch {
-      return null;
-    }
-  },
+  unloadAll: (): Promise<boolean> =>
+    ipcRenderer.invoke("libretro:addon", "unloadAll"),
 
-  getFrameBuffer: (coreId: number): { width: number; height: number; pitch: number; format: number; data: ArrayBuffer } | null => {
-    try {
-      const frame = ensureFrontend().getFrameBuffer(coreId);
-      if (!frame || frame.width === 0) return null;
-      return frame;
-    } catch {
-      return null;
-    }
-  },
+  getFrame: (coreId: number): Promise<{ width: number; height: number; data: Uint8Array } | null> =>
+    ipcRenderer.invoke("libretro:addon", "getFrame", coreId),
 
-  getAvInfo: (coreId: number): { fps: number; sampleRate: number; baseWidth: number; baseHeight: number; maxWidth: number; maxHeight: number; aspectRatio: number } | null => {
-    try {
-      return ensureFrontend().getAvInfo(coreId);
-    } catch {
-      return null;
-    }
-  },
+  getFrameBuffer: (coreId: number): Promise<{ width: number; height: number; pitch: number; format: number; data: ArrayBuffer } | null> =>
+    ipcRenderer.invoke("libretro:addon", "getFrameBuffer", coreId),
 
-  setInput: (coreId: number, port: number, device: number, index: number, id: number, value: number): boolean => {
-    try {
-      return ensureFrontend().setInputState(coreId, port, device, index, id, value);
-    } catch {
-      return false;
-    }
-  },
+  getAvInfo: (coreId: number): Promise<{ fps: number; sampleRate: number; baseWidth: number; baseHeight: number; maxWidth: number; maxHeight: number; aspectRatio: number } | null> =>
+    ipcRenderer.invoke("libretro:addon", "getAvInfo", coreId),
 
-  setAnalog: (coreId: number, port: number, index: number, axis: number, value: number): boolean => {
-    try {
-      return ensureFrontend().setAnalogState(coreId, port, index, axis, value);
-    } catch {
-      return false;
-    }
-  },
+  setInput: (coreId: number, port: number, device: number, index: number, id: number, value: number): Promise<boolean> =>
+    ipcRenderer.invoke("libretro:addon", "setInputState", coreId, port, device, index, id, value),
+
+  setAnalog: (coreId: number, port: number, index: number, axis: number, value: number): Promise<boolean> =>
+    ipcRenderer.invoke("libretro:addon", "setAnalogState", coreId, port, index, axis, value),
 };

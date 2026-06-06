@@ -15,6 +15,7 @@ import { useVideoPlayerStore } from "../../store/videoPlayer.store";
 import { StreamingTile } from "../../components/StreamingTile/StreamingTile";
 import { StreamingService } from "../../../../shared/types";
 import { useGridFocus } from "../../hooks/useGridFocus";
+import { useDetailController } from "../../hooks/useDetailController";
 import { useContextMenu } from "../../hooks/useContextMenu";
 import { ContextMenuOption } from "../../components/ContextMenu/ContextMenu";
 import {
@@ -330,6 +331,17 @@ export const MoviesTab: React.FC = () => {
     .filter((m) => m.lastPlayed && m.lastPlayed > 0)
     .sort((a, b) => (b.lastPlayed ?? 0) - (a.lastPlayed ?? 0))
     .slice(0, 8);
+
+  useDetailController({
+    enabled: !!selected,
+    onConfirm: () => {
+      if (selected?.filePath) {
+        openVideo(`file://${selected.filePath}`, selected.title, selected.id, selected.watchProgress);
+        setSelected(null);
+      }
+    },
+    onCancel: () => setSelected(null),
+  });
 
   return (
     <div className="flex flex-col h-full">

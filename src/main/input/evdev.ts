@@ -100,6 +100,36 @@ function detectControllerType(
   return "generic";
 }
 
+const EV_ABS = 0x03;
+const EV_KEY = 0x01;
+
+const CONTROLLER_NAME_HINTS = [
+  "controller", "gamepad", "joystick", "pad", "xbox", "dualshock",
+  "dualsense", "playstation", "switch", "pro controller", "wiimote",
+  "wii remote", "gamecube", "nintendo", "8bitdo", "steam controller",
+];
+
+function nameLooksLikeController(name: string): boolean {
+  const lower = name.toLowerCase();
+  return CONTROLLER_NAME_HINTS.some((hint) => lower.includes(hint));
+}
+
+function hasControllerCapabilities(eventPath: string, name?: string): boolean {
+  try {
+    if (name && nameLooksLikeController(name)) return true;
+
+    const deviceNum = eventPath.replace("/dev/input/event", "");
+    const capPath = `/sys/class/input/event${deviceNum}/device/capabilities/ev`;
+    if (!existsSync(capPath)) return false;
+    const evCap = parseInt(readFileSync(capPath, "utf-8").trim(), 16);
+    // Controllers/joysticks expose absolute axes (EV_ABS). Keyboards, mice,
+    // power buttons, and HDMI audio devices do not.
+    return (evCap & (1 << EV_ABS)) !== 0;
+  } catch {
+    return false;
+  }
+}
+
 function getDeviceInfo(
   eventPath: string,
 ): { name: string; vendorId: number; productId: number } | null {
@@ -134,9 +164,8 @@ function getDeviceInfo(
 async function openDevice(
   eventPath: string,
   window: BrowserWindow,
+  info: { name: string; vendorId: number; productId: number },
 ): Promise<{ device: unknown; close: () => void } | null> {
-  const info = getDeviceInfo(eventPath);
-  if (!info) return null;
 
   const controllerType = detectControllerType(
     info.name,
@@ -155,7 +184,9 @@ async function openDevice(
     buttonCount: 16,
   };
 
-  window.webContents.send("input:device-connected", deviceInfo);
+  if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
+    window.webContents.send("input:device-connected", deviceInfo);
+  }
 
   // Pure Node.js binary reader — struct input_event is 24 bytes on 64-bit Linux
   const EVENT_SIZE = 24; // sec(8) + usec(8) + type(2) + code(2) + value(4)
@@ -210,16 +241,17 @@ async function openDevice(
           };
         }
 
-        if (inputEvent && !window.isDestroyed()) {
+        if (inputEvent && !window.isDestroyed() && !window.webContents.isDestroyed()) {
           window.webContents.send("input:event", inputEvent);
         }
       }
       remainder = buf;
     });
 
-    stream.on("error", () => {
+    stream.on("error", (err) => {
+      log.warn("evdev", `Error reading ${eventPath} (${info.name}): ${err}`);
       activeDevices.delete(eventPath);
-      if (!window.isDestroyed()) {
+      if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
         window.webContents.send("input:device-disconnected", deviceId);
       }
     });
@@ -232,7 +264,7 @@ async function openDevice(
       device: stream,
       close: () => {
         stream.destroy();
-        if (!window.isDestroyed()) {
+        if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
           window.webContents.send("input:device-disconnected", deviceId);
         }
       },
@@ -278,17 +310,19 @@ export async function initInputSystem(window: BrowserWindow): Promise<void> {
       .map((e) => join(INPUT_DIR, e));
 
     for (const device of eventDevices) {
-      if (!activeDevices.has(device)) {
-        try {
-          const handle = await withTimeout(
-            openDevice(device, window),
-            2000,
-            `openDevice(${device})`,
-          );
-          if (handle) activeDevices.set(device, handle);
-        } catch (err) {
-          log.warn("evdev", `Skipping ${device} due to timeout/error: ${err}`);
-        }
+      if (activeDevices.has(device)) continue;
+      const info = getDeviceInfo(device);
+      if (!info) continue;
+      if (!hasControllerCapabilities(device, info.name)) continue;
+      try {
+        const handle = await withTimeout(
+          openDevice(device, window, info),
+          2000,
+          `openDevice(${device})`,
+        );
+        if (handle) activeDevices.set(device, handle);
+      } catch (err) {
+        log.warn("evdev", `Skipping ${device} due to timeout/error: ${err}`);
       }
     }
 

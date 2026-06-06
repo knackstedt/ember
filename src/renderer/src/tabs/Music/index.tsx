@@ -14,6 +14,7 @@ import { useMusicPlayerStore } from "../../store/musicPlayer.store";
 import { StreamingTile } from "../../components/StreamingTile/StreamingTile";
 import { StreamingService } from "../../../../shared/types";
 import { useGridFocus } from "../../hooks/useGridFocus";
+import { useDetailController } from "../../hooks/useDetailController";
 import { useCoverCacheStore } from "../../store/coverCache.store";
 import { useContextMenu } from "../../hooks/useContextMenu";
 import { ContextMenuOption } from "../../components/ContextMenu/ContextMenu";
@@ -561,6 +562,20 @@ export const MusicTab: React.FC = () => {
       ...years.map((y) => ({ id: String(y), label: String(y) })),
     ],
   };
+
+  useDetailController({
+    enabled: !!selected,
+    onConfirm: () => {
+      if (selected) {
+        const idx = trackItems.findIndex((t) => t.id === selected.id);
+        if (idx >= 0) {
+          play(trackItems, idx);
+        }
+        setSelected(null);
+      }
+    },
+    onCancel: () => setSelected(null),
+  });
 
   return (
     <div className="flex flex-col h-full">
