@@ -20,6 +20,12 @@ const THEMES = {
         module: "\x1b[38;2;82;148;226m",
         gray: "\x1b[38;2;128;128;128m",
         time: "\x1b[38;2;69;197;139m",
+        jsonKey: "\x1b[38;2;156;220;254m",
+        jsonString: "\x1b[38;2;206;145;120m",
+        jsonNumber: "\x1b[38;2;181;206;168m",
+        jsonBoolean: "\x1b[38;2;86;156;214m",
+        jsonNull: "\x1b[38;2;86;156;214m",
+        jsonBrace: "\x1b[38;2;128;128;128m",
     },
     light: {
         trace: "\x1b[38;2;12;157;118m",
@@ -31,6 +37,12 @@ const THEMES = {
         module: "\x1b[38;2;2;122;232m",
         gray: "\x1b[38;2;100;100;100m",
         time: "\x1b[38;2;12;157;118m",
+        jsonKey: "\x1b[38;2;1;36;86m",
+        jsonString: "\x1b[38;2;163;21;21m",
+        jsonNumber: "\x1b[38;2;0;100;0m",
+        jsonBoolean: "\x1b[38;2;0;0;255m",
+        jsonNull: "\x1b[38;2;0;0;255m",
+        jsonBrace: "\x1b[38;2;80;80;80m",
     },
 };
 
@@ -46,7 +58,8 @@ function isPathLike(str: string): boolean {
         str.startsWith("http://") ||
         str.startsWith("https://") ||
         str.startsWith("/") ||
-        str.startsWith("file://")
+        str.startsWith("file://") ||
+        str.startsWith("ember://")
     );
 }
 
@@ -80,16 +93,148 @@ function linkifyModule(module: string): string {
     return makeTerminalLink(target, shorthand);
 }
 
+const JSON_COLORS = {
+    key: THEMES.dark.jsonKey,
+    string: THEMES.dark.jsonString,
+    number: THEMES.dark.jsonNumber,
+    boolean: THEMES.dark.jsonBoolean,
+    null: THEMES.dark.jsonNull,
+    brace: THEMES.dark.jsonBrace,
+};
+
+function highlightJson(json: string): string {
+    let out = "";
+    let i = 0;
+    while (i < json.length) {
+        const ch = json[i];
+        if (ch === '"') {
+            const end = json.indexOf('"', i + 1);
+            if (end === -1) {
+                out += ch;
+                i++;
+                continue;
+            }
+            let str = json.slice(i, end + 1);
+            // Check if this is a key (followed by colon, possibly with whitespace)
+            let j = end + 1;
+            while (j < json.length && /\s/.test(json[j])) j++;
+            if (json[j] === ':') {
+                out += JSON_COLORS.key + str + reset;
+            } else {
+                // String value - also linkify ember:// URLs inside
+                const inner = str.slice(1, -1);
+                if (inner.startsWith("ember://")) {
+                    const shorthand = extractShorthand(inner);
+                    str = '"' + makeTerminalLink(inner, shorthand) + '"';
+                }
+                out += JSON_COLORS.string + str + reset;
+            }
+            i = end + 1;
+        } else if (/[\{\}\[\]]/.test(ch)) {
+            out += JSON_COLORS.brace + ch + reset;
+            i++;
+        } else if (/\d/.test(ch) || (ch === '-' && /\d/.test(json[i + 1]))) {
+            let end = i + 1;
+            while (end < json.length && /[\d.eE+\-]/.test(json[end])) end++;
+            out += JSON_COLORS.number + json.slice(i, end) + reset;
+            i = end;
+        } else if (json.slice(i, i + 4) === 'true') {
+            out += JSON_COLORS.boolean + 'true' + reset;
+            i += 4;
+        } else if (json.slice(i, i + 5) === 'false') {
+            out += JSON_COLORS.boolean + 'false' + reset;
+            i += 5;
+        } else if (json.slice(i, i + 4) === 'null') {
+            out += JSON_COLORS.null + 'null' + reset;
+            i += 4;
+        } else {
+            out += ch;
+            i++;
+        }
+    }
+    return out;
+}
+
+function extractJsonBlobs(msg: string): { text: string; start: number; end: number }[] {
+    const blobs: { text: string; start: number; end: number }[] = [];
+    for (let i = 0; i < msg.length; i++) {
+        if (msg[i] === "{" || msg[i] === "[") {
+            const start = i;
+            const open = msg[i];
+            const close = open === "{" ? "}" : "]";
+            let depth = 1;
+            let inString = false;
+            let escaped = false;
+            for (let j = i + 1; j < msg.length; j++) {
+                const ch = msg[j];
+                if (inString) {
+                    if (escaped) {
+                        escaped = false;
+                    } else if (ch === "\\") {
+                        escaped = true;
+                    } else if (ch === '"') {
+                        inString = false;
+                    }
+                } else {
+                    if (ch === '"') {
+                        inString = true;
+                    } else if (ch === open) {
+                        depth++;
+                    } else if (ch === close) {
+                        depth--;
+                        if (depth === 0) {
+                            const text = msg.slice(start, j + 1);
+                            try {
+                                JSON.parse(text);
+                                blobs.push({ text, start, end: j + 1 });
+                            } catch {
+                                // not valid JSON
+                            }
+                            i = j;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return blobs;
+}
+
 function linkifyMessage(msg: string): string {
+    // Extract JSON blobs first so link replacements don't interfere with them
+    const jsonBlobs = extractJsonBlobs(msg);
+    let placeholderIndex = 0;
+    for (let i = jsonBlobs.length - 1; i >= 0; i--) {
+        const blob = jsonBlobs[i];
+        msg =
+            msg.slice(0, blob.start) +
+            `__JSON_${placeholderIndex++}__` +
+            msg.slice(blob.end);
+    }
+
     msg = msg.replace(/https?:\/\/[^\s\)]+/g, (url) => {
         const shorthand = extractShorthand(url);
         return makeTerminalLink(url, shorthand);
     });
 
-    msg = msg.replace(/\/(?:[^\s:)]+\/)+[^\s:)]+:\d+(?::\d+)?/g, (path) => {
+    msg = msg.replace(/ember:\/\/[^\s\)]+/g, (url) => {
+        const shorthand = extractShorthand(url);
+        return makeTerminalLink(url, shorthand);
+    });
+
+    msg = msg.replace(new RegExp("\\/(?:[^\\s:]+/)+[^\\s:)]+:\\d+(?::\\d+)?", "g"), (path) => {
         const shorthand = extractShorthand(path);
         return makeTerminalLink(`file://${path}`, shorthand);
     });
+
+    // Restore JSON blobs with syntax highlighting
+    for (let i = 0; i < placeholderIndex; i++) {
+        msg = msg.replace(
+            `__JSON_${i}__`,
+            highlightJson(jsonBlobs[placeholderIndex - 1 - i].text)
+        );
+    }
 
     return msg;
 }
