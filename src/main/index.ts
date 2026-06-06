@@ -198,15 +198,6 @@ async function createWindow(): Promise<void> {
 
   registerIpcHandlers(mainWindow);
 
-  try {
-    await initInputSystem(mainWindow);
-  } catch (err) {
-    log.warn(
-      "input",
-      `evdev init failed (user may not be in input group): ${err}`
-    );
-  }
-
   const loadUrl = isDev && process.env["ELECTRON_RENDERER_URL"]
     ? process.env["ELECTRON_RENDERER_URL"]
     : join(__dirname, "../renderer/index.html");
@@ -214,9 +205,18 @@ async function createWindow(): Promise<void> {
   log.info("window", `preload path: ${join(__dirname, "../preload/index.js")}`);
 
   if (isDev && process.env["ELECTRON_RENDERER_URL"]) {
-    mainWindow.loadURL(process.env["ELECTRON_RENDERER_URL"]);
+    await mainWindow.loadURL(process.env["ELECTRON_RENDERER_URL"]);
   } else {
-    mainWindow.loadFile(join(__dirname, "../renderer/index.html"));
+    await mainWindow.loadFile(join(__dirname, "../renderer/index.html"));
+  }
+
+  try {
+    await initInputSystem(mainWindow);
+  } catch (err) {
+    log.warn(
+      "input",
+      `evdev init failed (user may not be in input group): ${err}`
+    );
   }
 }
 

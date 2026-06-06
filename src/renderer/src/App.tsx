@@ -163,6 +163,8 @@ export default function App(): React.ReactElement {
   const activeTabRef = useRef<TabId>(activeTab);
   activeTabRef.current = activeTab;
   const isFullscreenRef = useRef(false);
+  const [evdevGamepadActive, setEvdevGamepadActive] = useState(false);
+  const evdevGamepadActiveRef = useRef(false);
 
   /* Command palette context refs */
   const selectedGameRef = useRef<string | null>(null);
@@ -235,7 +237,7 @@ export default function App(): React.ReactElement {
   executeCommandRef.current = executeCommand;
 
   // Fallback gamepad input via browser Gamepad API (works without evdev permissions)
-  useGamepadApi(!anyEmulatorOpen && inputDevices.length === 0);
+  useGamepadApi(!anyEmulatorOpen && inputDevices.length === 0 && !evdevGamepadActive);
 
   useEffect(() => {
     load();
@@ -376,6 +378,10 @@ export default function App(): React.ReactElement {
       window.htpc.input.onDeviceDisconnected(removeDevice);
     const unsubEvent = window.htpc.input.onEvent((ev) => {
       useInputStore.getState().setLastEvent(ev);
+      if (ev.source === "gamepad" && !evdevGamepadActiveRef.current) {
+        evdevGamepadActiveRef.current = true;
+        setEvdevGamepadActive(true);
+      }
 
       // When an emulator has focus, only allow mapped controller keybinds
       const emuOpen =
