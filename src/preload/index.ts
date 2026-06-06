@@ -316,7 +316,17 @@ const htpc = {
       ipcRenderer.invoke("files:read", filePath),
   },
 
-  libretro: libretroApi,
+  libretro: {
+    ...libretroApi,
+    onCoreListChanged: (cb: () => void) => {
+      const handler = () => {
+        libretroApi.invalidateCoreCache();
+        cb();
+      };
+      ipcRenderer.on("libretro:cores:changed", handler);
+      return () => ipcRenderer.removeListener("libretro:cores:changed", handler);
+    },
+  },
 
   flashFilters: {
     list: (): Promise<{ id: string; name: string; content: string }[]> =>

@@ -85,16 +85,30 @@ export const DependenciesTab: React.FC = () => {
       await window.htpc.packages.setAptPassword(aptPassword);
       setShowAptPassword(false);
       setAptPasswordInput("");
-      // Actually trigger the install now that password is set
       if (pendingPackageId) {
         const id = pendingPackageId;
+        const pkg = packages.find((p) => p.id === id);
         setPendingPackageId(null);
-        await performInstall(id);
+        if (pkg?.isInstalled) {
+          await performUninstall(id);
+        } else {
+          await performInstall(id);
+        }
       }
     }
   };
 
-  const handleUninstallPackage = async (packageId: string) => {
+  const handleUninstallPackage = async (pkg: ManagedPackage) => {
+    if (pkg.manager === "apt" && pkg.isInstalled) {
+      setPendingPackageId(pkg.id);
+      setShowAptPassword(true);
+      setAptPasswordInput("");
+    } else {
+      await performUninstall(pkg.id);
+    }
+  };
+
+  const performUninstall = async (packageId: string) => {
     try {
       await window.htpc.packages.uninstall(packageId);
       await loadPackages();
@@ -274,6 +288,7 @@ export const DependenciesTab: React.FC = () => {
                       <div className="flex items-center gap-2">
                         <button
                           className="p-1.5 rounded"
+                          disabled={isOp}
                           style={{
                             background: pkg.isPinned
                               ? "var(--color-accent)20"
@@ -282,8 +297,10 @@ export const DependenciesTab: React.FC = () => {
                               ? "var(--color-accent)"
                               : "var(--color-text-dim)",
                             border: "1px solid var(--color-border)",
+                            opacity: isOp ? 0.5 : 1,
+                            cursor: isOp ? "not-allowed" : "pointer",
                           }}
-                          onClick={() => handleTogglePin(pkg)}
+                          onClick={() => !isOp && handleTogglePin(pkg)}
                           title={pkg.isPinned ? "Unpin" : "Pin"}
                         >
                           <svg
@@ -303,6 +320,7 @@ export const DependenciesTab: React.FC = () => {
                         </button>
                         <button
                           className="p-1.5 rounded"
+                          disabled={isOp}
                           style={{
                             background: pkg.autoUpdate
                               ? "var(--color-accent)20"
@@ -311,8 +329,10 @@ export const DependenciesTab: React.FC = () => {
                               ? "var(--color-accent)"
                               : "var(--color-text-dim)",
                             border: "1px solid var(--color-border)",
+                            opacity: isOp ? 0.5 : 1,
+                            cursor: isOp ? "not-allowed" : "pointer",
                           }}
-                          onClick={() => handleToggleAutoUpdate(pkg)}
+                          onClick={() => !isOp && handleToggleAutoUpdate(pkg)}
                           title={
                             pkg.autoUpdate
                               ? "Disable auto-update"
@@ -343,7 +363,7 @@ export const DependenciesTab: React.FC = () => {
                               cursor: isOp ? "not-allowed" : "pointer",
                             }}
                             onClick={() =>
-                              !isOp && handleUninstallPackage(pkg.id)
+                              !isOp && handleUninstallPackage(pkg)
                             }
                             whileTap={{ scale: isOp ? 1 : 0.96 }}
                           >

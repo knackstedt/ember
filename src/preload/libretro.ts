@@ -259,6 +259,10 @@ export const libretroApi = {
     return detectAllCoresForRom(romPath, cores);
   },
 
+  invalidateCoreCache: (): void => {
+    cachedCores = null;
+  },
+
   loadCore: (corePath: string): { id: number; name: string; version: string; extensions: string; needFullpath: boolean } => {
     return ensureFrontend().loadCore(corePath);
   },

@@ -206,7 +206,12 @@ export default function App(): React.ReactElement {
       }
     });
 
-    return () => { unsubScan(); };
+    const unsubCores = window.htpc.libretro.onCoreListChanged(() => {
+      useGamesStore.getState().load();
+      useGamesStore.getState().refreshCores();
+    });
+
+    return () => { unsubScan(); unsubCores(); };
   }, []);
 
   useEffect(() => {

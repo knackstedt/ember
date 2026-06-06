@@ -9,8 +9,10 @@ interface GamesState {
   searchQuery: string;
   regeneratingIds: Set<string>;
   pendingThumbnailIds: Set<string>;
+  coreVersion: number;
   load: () => Promise<void>;
   scan: () => Promise<void>;
+  refreshCores: () => void;
   setFilter: (filter: GamesState["activeFilter"]) => void;
   setSearch: (q: string) => void;
   toggleFavorite: (id: string) => Promise<void>;
@@ -35,6 +37,7 @@ export const useGamesStore = create<GamesState>((set, get) => ({
   searchQuery: "",
   regeneratingIds: new Set(),
   pendingThumbnailIds: new Set(),
+  coreVersion: 0,
 
   load: async () => {
     set({ loading: true });
@@ -58,6 +61,8 @@ export const useGamesStore = create<GamesState>((set, get) => ({
       set({ scanning: false });
     }
   },
+
+  refreshCores: () => set((s) => ({ coreVersion: s.coreVersion + 1 })),
 
   setFilter: (filter) => set({ activeFilter: filter }),
   setSearch: (searchQuery) => set({ searchQuery }),

@@ -934,43 +934,38 @@ export async function installPackage(
     percent: 5,
   });
 
+  let result = false;
+
   if (def.manager === "apt" && def.aptName) {
-    return execApt("install", packageId, def.aptName, window);
-  }
-
-  if (def.manager === "flatpak" && def.flatpakRef) {
-    return execFlatpak("install", packageId, def.flatpakRef, window);
-  }
-
-  if (def.manager === "appimage") {
-    const ok = await installAppimage(def, window);
+    result = await execApt("install", packageId, def.aptName, window);
+  } else if (def.manager === "flatpak" && def.flatpakRef) {
+    result = await execFlatpak("install", packageId, def.flatpakRef, window);
+  } else if (def.manager === "appimage") {
+    result = await installAppimage(def, window);
     sendProgress(window, {
       packageId,
       operation: "install",
-      status: ok ? "success" : "error",
-      message: ok ? "Done" : "Failed",
-      percent: ok ? 100 : undefined,
+      status: result ? "success" : "error",
+      message: result ? "Done" : "Failed",
+      percent: result ? 100 : undefined,
     });
-    return ok;
-  }
-
-  if (def.manager === "winehq" && def.winehqPackage) {
-    return installWineHq(packageId, def.winehqPackage, window);
-  }
-
-  if (def.manager === "proton-ge") {
-    return installProtonGe(packageId, window);
-  }
-
-  if (def.manager === "buildbot" && def.buildbotCore) {
+  } else if (def.manager === "winehq" && def.winehqPackage) {
+    result = await installWineHq(packageId, def.winehqPackage, window);
+  } else if (def.manager === "proton-ge") {
+    result = await installProtonGe(packageId, window);
+  } else if (def.manager === "buildbot" && def.buildbotCore) {
     const coreDef = BUILDBOT_CORES.find((c) => c.coreName === def.buildbotCore);
     if (!coreDef) return false;
-    return installBuildbotCore(coreDef, window, (progress) => {
+    result = await installBuildbotCore(coreDef, window, (progress) => {
       sendProgress(window, progress as PackageOperationProgress);
     });
   }
 
-  return false;
+  if (result && def.category === "core" && window && !window.isDestroyed()) {
+    window.webContents.send("libretro:cores:changed");
+  }
+
+  return result;
 }
 
 export async function uninstallPackage(
@@ -988,43 +983,38 @@ export async function uninstallPackage(
     percent: 5,
   });
 
+  let result = false;
+
   if (def.manager === "apt" && def.aptName) {
-    return execApt("remove", packageId, def.aptName, window);
-  }
-
-  if (def.manager === "flatpak" && def.flatpakRef) {
-    return execFlatpak("uninstall", packageId, def.flatpakRef, window);
-  }
-
-  if (def.manager === "winehq" && def.aptName) {
-    return execApt("remove", packageId, def.aptName, window);
-  }
-
-  if (def.manager === "proton-ge") {
-    return uninstallProtonGe(packageId, window);
-  }
-
-  if (def.manager === "appimage") {
-    const ok = await uninstallAppimage(def);
+    result = await execApt("remove", packageId, def.aptName, window);
+  } else if (def.manager === "flatpak" && def.flatpakRef) {
+    result = await execFlatpak("uninstall", packageId, def.flatpakRef, window);
+  } else if (def.manager === "winehq" && def.aptName) {
+    result = await execApt("remove", packageId, def.aptName, window);
+  } else if (def.manager === "proton-ge") {
+    result = await uninstallProtonGe(packageId, window);
+  } else if (def.manager === "appimage") {
+    result = await uninstallAppimage(def);
     sendProgress(window, {
       packageId,
       operation: "uninstall",
-      status: ok ? "success" : "error",
-      message: ok ? "Done" : "Failed",
-      percent: ok ? 100 : undefined,
+      status: result ? "success" : "error",
+      message: result ? "Done" : "Failed",
+      percent: result ? 100 : undefined,
     });
-    return ok;
-  }
-
-  if (def.manager === "buildbot" && def.buildbotCore) {
+  } else if (def.manager === "buildbot" && def.buildbotCore) {
     const coreDef = BUILDBOT_CORES.find((c) => c.coreName === def.buildbotCore);
     if (!coreDef) return false;
-    return uninstallBuildbotCore(coreDef, (progress) => {
+    result = await uninstallBuildbotCore(coreDef, (progress) => {
       sendProgress(window, progress as PackageOperationProgress);
     });
   }
 
-  return false;
+  if (result && def.category === "core" && window && !window.isDestroyed()) {
+    window.webContents.send("libretro:cores:changed");
+  }
+
+  return result;
 }
 
 export async function checkUpdates(

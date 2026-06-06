@@ -132,6 +132,7 @@ const LazyGameCard: React.FC<{
   const loadThumbnail = useGamesStore((s) => s.loadThumbnail);
   const regeneratingIds = useGamesStore((s) => s.regeneratingIds);
   const pendingThumbnailIds = useGamesStore((s) => s.pendingThumbnailIds);
+  const coreVersion = useGamesStore((s) => s.coreVersion);
 
   useEffect(() => {
     if (game.platform === "flash" && !game.coverUrl) {
@@ -139,7 +140,7 @@ const LazyGameCard: React.FC<{
     }
   }, [game.id, game.platform, game.coverUrl, loadThumbnail]);
 
-  const missingCoreTooltip = useMemo(() => getMissingCoreTooltip(game), [game]);
+  const missingCoreTooltip = useMemo(() => getMissingCoreTooltip(game), [game, coreVersion]);
 
   const b = gameBadge(game);
   return (
@@ -192,6 +193,7 @@ export const GamingTab: React.FC = () => {
   const hide = useGamesStore((s) => s.hide);
   const regenerateThumbnail = useGamesStore((s) => s.regenerateThumbnail);
   const updateLastPlayed = useGamesStore((s) => s.updateLastPlayed);
+  useGamesStore((s) => s.coreVersion); // forces re-render when cores change
   const [selected, setSelected] = useState<Game | null>(null);
   const [columnCount, setColumnCount] = useState(6);
   const [selectedEmulatorConfig, setSelectedEmulatorConfig] = useState<GameEmulatorConfig>({});
