@@ -1,6 +1,7 @@
 import { join } from "path";
 import { existsSync, readdirSync, statSync } from "fs";
 import { ipcRenderer } from "electron";
+import { detectChdPlatform } from "@shared/chd";
 
 export interface CoreInfo {
   id: number;
@@ -68,7 +69,6 @@ const PLATFORM_EXTS: Record<string, string> = {
   ".bin": "psx",
   ".iso": "psx",
   ".pbp": "psx",
-  ".chd": "dreamcast",
   ".gdi": "dreamcast",
   ".cdi": "dreamcast",
   ".wad": "doom",
@@ -169,7 +169,10 @@ export function detectCoreForRom(romPath: string, availableCores: CoreInfo[]): D
 
 export function detectAllCoresForRom(romPath: string, availableCores: CoreInfo[]): DetectedCore[] {
   const ext = (romPath.match(/\.[^.]+$/)?.[0] ?? "").toLowerCase();
-  const platform = PLATFORM_EXTS[ext];
+  let platform = PLATFORM_EXTS[ext];
+  if (!platform && ext === ".chd") {
+    platform = detectChdPlatform(romPath) ?? undefined;
+  }
   if (!platform) return [];
 
   const compatible: DetectedCore[] = [];

@@ -3,6 +3,7 @@ import { join, extname, basename, dirname } from "path";
 import { homedir } from "os";
 import { createHash } from "crypto";
 import { Game, GamePlatform } from "../../shared/types";
+import { detectChdPlatform } from "@shared/chd";
 import { createLogger } from "../util/logger";
 
 const log = createLogger("info");
@@ -65,7 +66,6 @@ const PLATFORM_EXTS: Record<string, GamePlatform> = {
   ".cue": "psx",
   ".pbp": "psx",
   ".nds": "nds",
-  ".chd": "dreamcast",
   ".gdi": "dreamcast",
   ".cdi": "dreamcast",
 };
@@ -74,11 +74,10 @@ const PLATFORM_EXTS: Record<string, GamePlatform> = {
 const ISO_EXTS = new Set([".iso", ".img", ".bin"]);
 
 /**
- * Detect PlayStation ISO by checking for definitive PSX/PS2 signatures.
- * Only returns "psx" if we find EXACT PlayStation system identifiers.
- * Returns null for unknown/generic ISOs (including DOS/PC ISOs).
+ * Detect console ISO platform by checking for platform-specific signatures.
+ * Returns the detected platform or null for unknown/generic ISOs.
  */
-function detectPlayStationIso(filePath: string): "psx" | null {
+function detectIsoPlatform(filePath: string): GamePlatform | null {
   let fd: number;
   try {
     fd = openSync(filePath, "r");
@@ -86,43 +85,62 @@ function detectPlayStationIso(filePath: string): "psx" | null {
     return null;
   }
   try {
-    // Read from multiple offsets where PlayStation data appears
-    // PS1: License string at 0x8000 (32KB - start of user area)
-    // PS2: Various system locations
-    const offsets = [0x8000, 0x9320, 0x4000];
-    const searches = [
-      "PLAYSTATION",
-      "Sony Computer Entertainment",
-      "PS-X EXE",  // PS1 EXE header
-      "BOOT2",     // PS2 boot indicator
-    ];
+    // Read a larger buffer at 0x8000 to catch signatures that appear
+    // later in the ISO 9660 Primary Volume Descriptor
+    const buf = Buffer.alloc(256);
+    const bytesRead = readSync(fd, buf, 0, 256, 0x8000);
+    if (bytesRead < 16) {
+      closeSync(fd);
+      return null;
+    }
 
-    for (const offset of offsets) {
-      const buf = Buffer.alloc(128);
-      const bytesRead = readSync(fd, buf, 0, 128, offset);
-      if (bytesRead < 16) continue;
+    const str = buf.toString("ascii", 0, bytesRead);
+    const hexPreview = buf.toString("hex", 0, 32);
+    log.info("rom", `ISO header at 0x8000: "${str.slice(0, 96).replace(/[^\x20-\x7E]/g, '.')}" (hex: ${hexPreview})`);
 
-      const str = buf.toString("ascii", 0, bytesRead);
-      const hexPreview = buf.toString("hex", 0, 32);
+    // PSP UMD ISO: "PSP GAME" in system identifier area
+    if (str.includes("PSP GAME")) {
+      closeSync(fd);
+      return "psp";
+    }
 
-      for (const search of searches) {
-        if (str.includes(search)) {
-          log.info("rom", `PSX detection: found "${search}" at offset 0x${offset.toString(16)} in ${filePath} (hex: ${hexPreview})`);
+    // PS3 Blu-ray ISO: "PS3VOLUME" in the volume descriptor
+    if (str.includes("PS3VOLUME")) {
+      closeSync(fd);
+      return "ps3";
+    }
+
+    // PlayStation family (PS1/PS2): "PLAYSTATION" in the system identifier
+    if (str.includes("PLAYSTATION")) {
+      // Distinguish PS1 from PS2 by checking for PS1 EXE header at 0x9320
+      const psxBuf = Buffer.alloc(128);
+      const psxBytes = readSync(fd, psxBuf, 0, 128, 0x9320);
+      if (psxBytes >= 8) {
+        const psxStr = psxBuf.toString("ascii", 0, psxBytes);
+        if (psxStr.includes("PS-X EXE")) {
+          log.info("rom", `PS1 EXE header found at 0x9320, detecting as psx: ${filePath}`);
           closeSync(fd);
           return "psx";
         }
       }
-
-      // Debug: log what we found for investigation
-      if (offset === 0x8000) {
-        log.info("rom", `ISO header at 0x8000: "${str.slice(0, 64).replace(/[^\x20-\x7E]/g, '.')}" (hex: ${hexPreview})`);
-      }
+      // No PS1 EXE header → PS2
+      log.info("rom", `PLAYSTATION header without PS1 EXE, detecting as ps2: ${filePath}`);
+      closeSync(fd);
+      return "ps2";
     }
 
     closeSync(fd);
+
+    // Standard ISO 9660 with no PlayStation signature.
+    // Use directory path as a fallback for platforms with no reliable header.
+    const lowerPath = filePath.toLowerCase();
+    if (lowerPath.includes("xbox360") || lowerPath.includes("xbox 360")) {
+      return "xbox360";
+    }
+
     return null;
   } catch (err) {
-    log.info("rom", `PSX detection error for ${filePath}: ${err}`);
+    log.info("rom", `ISO detection error for ${filePath}: ${err}`);
     try { closeSync(fd); } catch {}
     return null;
   }
@@ -197,9 +215,18 @@ export function scanRomGames(): Game[] {
           }
         }
 
-        platform = detectPlayStationIso(fullPath);
+        platform = detectIsoPlatform(fullPath);
         if (!platform) {
-          log.info("rom", `skip unknown ISO/BIN (not PlayStation): ${fullPath}`);
+          log.info("rom", `skip unknown ISO/BIN: ${fullPath}`);
+          return;
+        }
+      }
+
+      // For CHD files, detect the platform from CHD header metadata
+      if (!platform && ext === ".chd") {
+        platform = detectChdPlatform(fullPath);
+        if (!platform) {
+          log.info("rom", `skip unknown CHD platform: ${fullPath}`);
           return;
         }
       }

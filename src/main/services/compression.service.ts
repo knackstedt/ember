@@ -42,11 +42,14 @@ const PLATFORM_FORMATS: Record<
   { format: CompressionFormat; tool: keyof ToolAvailability } | undefined
 > = {
   psx: { format: "chd", tool: "chdman" },
+  ps2: { format: "chd", tool: "chdman" },
+  ps3: undefined,
+  psp: { format: "cso", tool: "maxcso" },
+  xbox360: undefined,
   dreamcast: { format: "chd", tool: "chdman" },
   "dolphin-gc": { format: "rvz", tool: "dolphinTool" },
   "dolphin-wii": { format: "rvz", tool: "dolphinTool" },
-  // PSP and Switch not yet scanned, but prepared for future use
-  // "psp": { format: "cso", tool: "maxcso" },
+  // Switch not yet scanned, but prepared for future use
   // "switch": { format: "nsz", tool: "nsz" },
   // Fallback for all other ROM platforms
   nes: { format: "7z", tool: "sevenZip" },

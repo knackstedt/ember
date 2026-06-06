@@ -578,7 +578,7 @@ export async function detectInstalledCores(): Promise<DetectedCore[]> {
     ".nds": "nds", ".md": "genesis", ".smd": "genesis",
     ".gen": "genesis", ".sms": "sms", ".gg": "gamegear",
     ".pce": "pce", ".cue": "psx", ".bin": "psx",
-    ".iso": "psx", ".pbp": "psx", ".chd": "dreamcast",
+    ".iso": "psx", ".pbp": "psx",
     ".gdi": "dreamcast", ".cdi": "dreamcast", ".wad": "doom",
   };
 
@@ -879,7 +879,7 @@ export async function listAvailablePackages(): Promise<ManagedPackage[]> {
           ".nds": "nds", ".md": "genesis", ".smd": "genesis",
           ".gen": "genesis", ".sms": "sms", ".gg": "gamegear",
           ".pce": "pce", ".cue": "psx", ".bin": "psx",
-          ".iso": "psx", ".pbp": "psx", ".chd": "dreamcast",
+          ".iso": "psx", ".pbp": "psx",
           ".gdi": "dreamcast", ".cdi": "dreamcast", ".wad": "doom",
         };
         platforms = Array.from(new Set(liveCore.extensions.map((e) => platMap[e]).filter(Boolean))) as string[];
