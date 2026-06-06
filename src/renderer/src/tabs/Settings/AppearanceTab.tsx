@@ -11,7 +11,7 @@ export const AppearanceTab: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-8">
-      <section className="flex flex-col gap-4">
+      <section className="flex flex-col gap-4" data-nav-orientation="horizontal">
         <h2 className="text-lg font-semibold" style={{ color: "var(--color-text)" }}>
           Appearance
         </h2>
@@ -51,6 +51,9 @@ export const AppearanceTab: React.FC = () => {
             ))}
           </div>
         </div>
+      </section>
+
+      <section className="flex flex-col gap-4">
         <Toggle
           label="Start Fullscreen"
           value={settings.fullscreen}

@@ -229,8 +229,13 @@ export const MoviesTab: React.FC = () => {
     columnCount,
     gridRef,
     onConfirm: (movie) => setSelected(movie),
-    enabled: subTab === "local" && !selected,
+    enabled: subTab !== "streaming" && !selected,
   });
+
+  /* Reset grid focus when the view context changes so we don’t point at a stale item */
+  useEffect(() => {
+    setFocusedIndex(0);
+  }, [subTab, selectedAiGroupId]);
 
   const movieCollections = useMemo(
     () => collections.filter((c) => c.itemType === "movie" || c.itemType === "mixed"),
@@ -238,7 +243,7 @@ export const MoviesTab: React.FC = () => {
   );
 
   const { menu, bindItem } = useContextMenu({
-    items,
+    items: gridItems,
     focusedIndex,
     getOptions: (movie): ContextMenuOption[] => {
       const opts: ContextMenuOption[] = [

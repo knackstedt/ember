@@ -144,8 +144,18 @@ export const SettingsTab: React.FC = () => {
       switch (action) {
         case "left": {
           if (gIdx >= 0 && iIdx >= 0) {
-            /* Inside a group: Left exits back to group level */
-            setItemIndex(-1);
+            const isHorizontal = groups[gIdx].dataset.navOrientation === "horizontal";
+            if (isHorizontal) {
+              /* Horizontal group: Left moves to previous item */
+              if (iIdx === 0) {
+                setItemIndex(-1);
+              } else {
+                setItemIndex(iIdx - 1);
+              }
+            } else {
+              /* Vertical group: Left exits back to group level */
+              setItemIndex(-1);
+            }
           } else if (gIdx >= 0 && iIdx < 0) {
             /* At group level: Left goes back to sub-tabs */
             setGroupIndex(-1);
@@ -162,10 +172,20 @@ export const SettingsTab: React.FC = () => {
             const items = getFocusableInGroup(groups[gIdx]);
             if (items.length > 0) setItemIndex(0);
           } else if (gIdx >= 0 && iIdx >= 0) {
-            /* Inside a group: Right activates the focused item (same as confirm) */
             const items = getFocusableInGroup(groups[gIdx]);
-            const el = items[iIdx];
-            if (el) activateElement(el);
+            const isHorizontal = groups[gIdx].dataset.navOrientation === "horizontal";
+            if (isHorizontal) {
+              /* Horizontal group: Right moves to next item */
+              if (iIdx >= items.length - 1) {
+                setItemIndex(-1);
+              } else {
+                setItemIndex(iIdx + 1);
+              }
+            } else {
+              /* Vertical group: Right activates the focused item */
+              const el = items[iIdx];
+              if (el) activateElement(el);
+            }
           } else {
             /* In sub-tabs: Right switches sub-tab */
             const subIdx = SUB_TABS.findIndex((t) => t.id === activeTab);
@@ -188,7 +208,10 @@ export const SettingsTab: React.FC = () => {
           } else {
             /* Inside a group: Up moves to previous item or exits to group level */
             const items = getFocusableInGroup(groups[gIdx]);
-            if (iIdx === 0) {
+            const isHorizontal = groups[gIdx].dataset.navOrientation === "horizontal";
+            if (isHorizontal) {
+              setItemIndex(-1);
+            } else if (iIdx === 0) {
               setItemIndex(-1);
             } else {
               setItemIndex(iIdx - 1);
@@ -208,7 +231,10 @@ export const SettingsTab: React.FC = () => {
           } else {
             /* Inside a group: Down moves to next item or exits to group level */
             const items = getFocusableInGroup(groups[gIdx]);
-            if (iIdx >= items.length - 1) {
+            const isHorizontal = groups[gIdx].dataset.navOrientation === "horizontal";
+            if (isHorizontal) {
+              setItemIndex(-1);
+            } else if (iIdx >= items.length - 1) {
               setItemIndex(-1);
             } else {
               setItemIndex(iIdx + 1);
