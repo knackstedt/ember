@@ -110,11 +110,11 @@ export function useCommands(
         case "palette.open":
           useCommandsStore.getState().open();
           break;
-        case "app.fullscreen":
-          window.htpc.app.setFullscreen(
-            !(document.fullscreenElement ?? false),
-          );
+        case "app.fullscreen": {
+          const current = useSettingsStore.getState().settings?.fullscreen ?? false;
+          void useSettingsStore.getState().update({ fullscreen: !current });
           break;
+        }
         case "app.quit":
           window.htpc.app.quit();
           break;

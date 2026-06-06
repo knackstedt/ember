@@ -162,7 +162,6 @@ export default function App(): React.ReactElement {
   const [activeTab, setActiveTab] = useState<TabId>("gaming");
   const activeTabRef = useRef<TabId>(activeTab);
   activeTabRef.current = activeTab;
-  const isFullscreenRef = useRef(false);
   const [evdevGamepadActive, setEvdevGamepadActive] = useState(false);
   const evdevGamepadActiveRef = useRef(false);
 
@@ -526,11 +525,7 @@ export default function App(): React.ReactElement {
         }
       }
 
-      if (e.type === "keydown" && e.key === "F11") {
-        e.preventDefault();
-        isFullscreenRef.current = !isFullscreenRef.current;
-        window.htpc.app.setFullscreen(isFullscreenRef.current);
-      } else if (e.type === "keydown" && e.key === "Escape") {
+      if (e.type === "keydown" && e.key === "Escape") {
         useVideoPlayerStore.getState().close();
         window.dispatchEvent(new CustomEvent("htpc:escape"));
       } else if (!isTyping && (e.key === "Enter" || e.key === " ")) {
@@ -763,8 +758,8 @@ export default function App(): React.ReactElement {
                 background: "transparent",
               }}
               onClick={() => {
-                isFullscreenRef.current = !isFullscreenRef.current;
-                window.htpc.app.setFullscreen(isFullscreenRef.current);
+                const current = useSettingsStore.getState().settings?.fullscreen ?? false;
+                void useSettingsStore.getState().update({ fullscreen: !current });
               }}
               title="Fullscreen"
             >
