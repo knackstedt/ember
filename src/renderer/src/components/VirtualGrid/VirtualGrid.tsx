@@ -124,17 +124,24 @@ export const VirtualGrid = React.forwardRef(function VirtualGridInner<T>(
     forwardedRef,
     () => ({
       scrollToItem(index: number) {
+        const row = Math.floor(index / effectiveColCount);
         if (scrollRef) {
-          const row = Math.floor(index / effectiveColCount);
-          virtualizerRef.current?.scrollToIndex(row);
+          virtualizerRef.current?.scrollToIndex(row, { align: "nearest" });
         } else {
-          const row = Math.floor(index / effectiveColCount);
-          const col = index % effectiveColCount;
-          vgridRef.current?.scrollToIndex(col, row);
+          const vgrid = vgridRef.current;
+          if (!vgrid) return;
+          const rowOffset = row * rowHeight;
+          const scrollTop = vgrid.scrollTop;
+          const viewportHeight = vgrid.viewportHeight;
+          if (rowOffset < scrollTop) {
+            vgrid.scrollTo(0, rowOffset);
+          } else if (rowOffset + rowHeight > scrollTop + viewportHeight) {
+            vgrid.scrollTo(0, rowOffset + rowHeight - viewportHeight);
+          }
         }
       },
     }),
-    [effectiveColCount, scrollRef],
+    [effectiveColCount, rowHeight, scrollRef],
   );
 
   const cellWidth = minItemWidth

@@ -345,11 +345,7 @@ export const MoviesTab: React.FC = () => {
 
   return (
     <div className="flex flex-col h-full">
-      <div
-        ref={scrollContainerRef}
-        className="flex-1 min-h-0 overflow-y-auto gpu-scroll"
-        style={{ padding: 16 }}
-      >
+      <div style={{ padding: 16, paddingBottom: 0 }}>
         {/* Collapsible content — scrolls out of view */}
         {subTab === "local" && (
           <div className="flex flex-col gap-3 mb-3">
@@ -382,21 +378,10 @@ export const MoviesTab: React.FC = () => {
           </div>
         )}
 
-        {/* Sticky compact bar — search + active filter summary */}
+        {/* Compact bar — search + active filter summary */}
         <div
           className="flex items-center gap-2 pb-3 flex-wrap"
-          style={{
-            position: "sticky",
-            top: -16,
-            zIndex: 10,
-            background: "var(--color-bg)",
-            paddingTop: 16,
-            marginTop: -16,
-            marginLeft: -16,
-            marginRight: -16,
-            paddingLeft: 16,
-            paddingRight: 16,
-          }}
+          style={{ background: "var(--color-bg)" }}
         >
           {subTab === "local" && (
             <>
@@ -607,8 +592,13 @@ export const MoviesTab: React.FC = () => {
             )}
           </div>
         )}
-
-        {/* Grid content — participates in the outer scroll */}
+      </div>
+      <div
+        ref={scrollContainerRef}
+        className="flex-1 min-h-0 overflow-y-auto gpu-scroll"
+        style={{ padding: 16 }}
+      >
+        {/* Grid content */}
         {subTab === "local" && (
           <>
             {loading ? (

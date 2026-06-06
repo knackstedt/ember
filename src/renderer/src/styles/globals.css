@@ -120,6 +120,13 @@ html, body, #root {
 }
 
 /* Controller-navigation highlight inside Settings */
+.settings-group-focus {
+  outline: 2px dashed var(--color-accent-dim) !important;
+  outline-offset: 4px !important;
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--color-accent) 8%, var(--color-surface-raised)) !important;
+}
+
 .settings-focus {
   outline: 2px solid var(--color-accent) !important;
   outline-offset: 2px !important;

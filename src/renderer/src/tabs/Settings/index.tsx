@@ -59,98 +59,177 @@ function getFocusableElements(container: HTMLElement | null): HTMLElement[] {
   });
 }
 
+function getGroups(container: HTMLElement | null): HTMLElement[] {
+  if (!container) return [];
+  return Array.from(container.querySelectorAll<HTMLElement>("section"));
+}
+
+function getFocusableInGroup(group: HTMLElement | null): HTMLElement[] {
+  if (!group) return [];
+  return Array.from(
+    group.querySelectorAll<HTMLElement>(
+      'button:not([disabled]):not([data-nav-exclude]), input:not([disabled]), select:not([disabled]), textarea:not([disabled])'
+    )
+  ).filter((el) => {
+    const style = window.getComputedStyle(el);
+    return style.display !== "none" && style.visibility !== "hidden";
+  });
+}
+
 export const SettingsTab: React.FC = () => {
   const [activeTab, setActiveTab] = useState<SubTabId>("general");
   const ActiveComponent = TAB_COMPONENTS[activeTab];
   const contentRef = useRef<HTMLDivElement>(null);
 
-  const [focusedIndex, setFocusedIndex] = useState(-1);
-  const focusedIndexRef = useRef(focusedIndex);
-  focusedIndexRef.current = focusedIndex;
+  /* ── Navigation state ──
+     groupIndex = -1  => focus is in sub-tab bar
+     groupIndex >= 0, itemIndex = -1  => a group is focused (group-level nav)
+     groupIndex >= 0, itemIndex >= 0  => navigating inside a group
+   */
+  const [groupIndex, setGroupIndex] = useState(-1);
+  const [itemIndex, setItemIndex] = useState(-1);
 
-  /* Reset content focus when sub-tab changes */
+  const groupIndexRef = useRef(groupIndex);
+  const itemIndexRef = useRef(itemIndex);
+  groupIndexRef.current = groupIndex;
+  itemIndexRef.current = itemIndex;
+
+  /* Reset focus when sub-tab changes */
   useEffect(() => {
-    setFocusedIndex(-1);
+    setGroupIndex(-1);
+    setItemIndex(-1);
   }, [activeTab]);
 
-  /* Apply / remove controller-focus visual indicator and scroll into view */
+  /* Apply / remove visual focus indicators */
   useEffect(() => {
     const container = contentRef.current;
     if (!container) return;
 
+    container.querySelectorAll(".settings-group-focus").forEach((el) => {
+      el.classList.remove("settings-group-focus");
+    });
     container.querySelectorAll(".settings-focus").forEach((el) => {
       el.classList.remove("settings-focus");
     });
 
-    if (focusedIndex < 0) return;
+    const groups = getGroups(container);
 
-    const elements = getFocusableElements(container);
-    const el = elements[focusedIndex];
-    if (!el) return;
+    if (groupIndex >= 0 && itemIndex < 0) {
+      /* Group is focused but not entered */
+      const g = groups[groupIndex];
+      if (g) {
+        g.classList.add("settings-group-focus");
+        g.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+      return;
+    }
 
-    el.classList.add("settings-focus");
-    el.scrollIntoView({ behavior: "smooth", block: "nearest" });
-  }, [focusedIndex]);
+    if (groupIndex >= 0 && itemIndex >= 0) {
+      const items = getFocusableInGroup(groups[groupIndex]);
+      const el = items[itemIndex];
+      if (el) {
+        el.classList.add("settings-focus");
+        el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+    }
+  }, [groupIndex, itemIndex]);
 
   const handleNav = useCallback(
     (action: string) => {
       const container = contentRef.current;
-      const elements = getFocusableElements(container);
-      const currentIdx = focusedIndexRef.current;
+      const groups = getGroups(container);
+      const gIdx = groupIndexRef.current;
+      const iIdx = itemIndexRef.current;
 
       switch (action) {
         case "left": {
-          const subIdx = SUB_TABS.findIndex((t) => t.id === activeTab);
-          if (subIdx > 0) setActiveTab(SUB_TABS[subIdx - 1].id);
+          if (gIdx >= 0 && iIdx >= 0) {
+            /* Inside a group: Left exits back to group level */
+            setItemIndex(-1);
+          } else if (gIdx >= 0 && iIdx < 0) {
+            /* At group level: Left goes back to sub-tabs */
+            setGroupIndex(-1);
+          } else {
+            /* In sub-tabs: Left switches sub-tab */
+            const subIdx = SUB_TABS.findIndex((t) => t.id === activeTab);
+            if (subIdx > 0) setActiveTab(SUB_TABS[subIdx - 1].id);
+          }
           break;
         }
         case "right": {
-          const subIdx = SUB_TABS.findIndex((t) => t.id === activeTab);
-          if (subIdx < SUB_TABS.length - 1) setActiveTab(SUB_TABS[subIdx + 1].id);
+          if (gIdx >= 0 && iIdx < 0) {
+            /* At group level: Right enters the group */
+            const items = getFocusableInGroup(groups[gIdx]);
+            if (items.length > 0) setItemIndex(0);
+          } else if (gIdx >= 0 && iIdx >= 0) {
+            /* Inside a group: Right activates the focused item (same as confirm) */
+            const items = getFocusableInGroup(groups[gIdx]);
+            const el = items[iIdx];
+            if (el) activateElement(el);
+          } else {
+            /* In sub-tabs: Right switches sub-tab */
+            const subIdx = SUB_TABS.findIndex((t) => t.id === activeTab);
+            if (subIdx < SUB_TABS.length - 1) setActiveTab(SUB_TABS[subIdx + 1].id);
+          }
           break;
         }
         case "up": {
-          if (elements.length === 0) break;
-          if (currentIdx < 0) {
-            // In sub-tab bar, pressing up does nothing
+          if (gIdx < 0) {
+            /* In sub-tabs: Up does nothing */
             break;
           }
-          if (currentIdx === 0) {
-            // Exit content nav, return to sub-tabs
-            setFocusedIndex(-1);
+          if (iIdx < 0) {
+            /* At group level: Up moves to previous group or exits to sub-tabs */
+            if (gIdx === 0) {
+              setGroupIndex(-1);
+            } else {
+              setGroupIndex(gIdx - 1);
+            }
           } else {
-            setFocusedIndex(currentIdx - 1);
+            /* Inside a group: Up moves to previous item or exits to group level */
+            const items = getFocusableInGroup(groups[gIdx]);
+            if (iIdx === 0) {
+              setItemIndex(-1);
+            } else {
+              setItemIndex(iIdx - 1);
+            }
           }
           break;
         }
         case "down": {
-          if (elements.length === 0) break;
-          if (currentIdx < 0) {
-            // Enter content nav at first element
-            setFocusedIndex(0);
+          if (gIdx < 0) {
+            /* In sub-tabs: Down enters first group */
+            if (groups.length > 0) setGroupIndex(0);
+          } else if (iIdx < 0) {
+            /* At group level: Down moves to next group */
+            if (gIdx < groups.length - 1) {
+              setGroupIndex(gIdx + 1);
+            }
           } else {
-            setFocusedIndex(Math.min(elements.length - 1, currentIdx + 1));
+            /* Inside a group: Down moves to next item or exits to group level */
+            const items = getFocusableInGroup(groups[gIdx]);
+            if (iIdx >= items.length - 1) {
+              setItemIndex(-1);
+            } else {
+              setItemIndex(iIdx + 1);
+            }
           }
           break;
         }
         case "confirm": {
-          if (currentIdx < 0 || !elements[currentIdx]) break;
-          const el = elements[currentIdx];
-          const tag = el.tagName.toLowerCase();
-          if (tag === "input" || tag === "select" || tag === "textarea") {
-            el.focus();
-            if (tag === "input") {
-              const inputEl = el as HTMLInputElement;
-              if (
-                inputEl.type === "text" ||
-                inputEl.type === "password" ||
-                inputEl.type === "number"
-              ) {
-                inputEl.select();
-              }
-            }
+          if (gIdx < 0) {
+            /* In sub-tabs: confirm does nothing */
+            break;
+          }
+          if (iIdx < 0) {
+            /* At group level: confirm enters the group */
+            const items = getFocusableInGroup(groups[gIdx]);
+            if (items.length > 0) setItemIndex(0);
           } else {
-            el.click();
+            /* Inside a group: confirm activates the item */
+            const items = getFocusableInGroup(groups[gIdx]);
+            const el = items[iIdx];
+            if (el) activateElement(el);
           }
           break;
         }
@@ -159,13 +238,36 @@ export const SettingsTab: React.FC = () => {
           if (container && activeEl && container.contains(activeEl)) {
             activeEl.blur();
           }
-          setFocusedIndex(-1);
+          if (iIdx >= 0) {
+            setItemIndex(-1);
+          } else if (gIdx >= 0) {
+            setGroupIndex(-1);
+          }
           break;
         }
       }
     },
     [activeTab]
   );
+
+  function activateElement(el: HTMLElement) {
+    const tag = el.tagName.toLowerCase();
+    if (tag === "input" || tag === "select" || tag === "textarea") {
+      el.focus();
+      if (tag === "input") {
+        const inputEl = el as HTMLInputElement;
+        if (
+          inputEl.type === "text" ||
+          inputEl.type === "password" ||
+          inputEl.type === "number"
+        ) {
+          inputEl.select();
+        }
+      }
+    } else {
+      el.click();
+    }
+  }
 
   useEffect(() => {
     const handler = (e: Event) => {

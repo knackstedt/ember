@@ -147,6 +147,8 @@ export default function App(): React.ReactElement {
   const load = useSettingsStore((s) => s.load);
   const visibleTabs = useVisibleTabs(settings);
   const visibleTabIds = visibleTabs.map((t) => t.id);
+  const visibleTabIdsRef = useRef(visibleTabIds);
+  visibleTabIdsRef.current = visibleTabIds;
   const addDevice = useInputStore((s) => s.addDevice);
   const removeDevice = useInputStore((s) => s.removeDevice);
   const inputDevices = useInputStore((s) => s.devices);
@@ -303,12 +305,14 @@ export default function App(): React.ReactElement {
   // Listen for fallback gamepad API tab-switch events
   useEffect(() => {
     const onNext = () => {
-      const idx = visibleTabIds.indexOf(activeTabRef.current);
-      setActiveTab(visibleTabIds[(idx + 1) % visibleTabIds.length]);
+      const tabs = visibleTabIdsRef.current;
+      const idx = tabs.indexOf(activeTabRef.current);
+      setActiveTab(tabs[(idx + 1) % tabs.length]);
     };
     const onPrev = () => {
-      const idx = visibleTabIds.indexOf(activeTabRef.current);
-      setActiveTab(visibleTabIds[(idx - 1 + visibleTabIds.length) % visibleTabIds.length]);
+      const tabs = visibleTabIdsRef.current;
+      const idx = tabs.indexOf(activeTabRef.current);
+      setActiveTab(tabs[(idx - 1 + tabs.length) % tabs.length]);
     };
     window.addEventListener("htpc:tab-next", onNext);
     window.addEventListener("htpc:tab-prev", onPrev);
@@ -337,7 +341,7 @@ export default function App(): React.ReactElement {
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail as { tab?: TabId };
-      if (detail?.tab && visibleTabIds.includes(detail.tab)) {
+      if (detail?.tab && visibleTabIdsRef.current.includes(detail.tab)) {
         setActiveTab(detail.tab);
       }
     };
@@ -444,14 +448,17 @@ export default function App(): React.ReactElement {
       }
 
       if (ev.action === "start") {
-        const idx = visibleTabIds.indexOf(activeTabRef.current);
-        setActiveTab(visibleTabIds[(idx + 1) % visibleTabIds.length]);
+        const tabs = visibleTabIdsRef.current;
+        const idx = tabs.indexOf(activeTabRef.current);
+        setActiveTab(tabs[(idx + 1) % tabs.length]);
       } else if (ev.action === "left_bumper") {
-        const idx = visibleTabIds.indexOf(activeTabRef.current);
-        setActiveTab(visibleTabIds[(idx - 1 + visibleTabIds.length) % visibleTabIds.length]);
+        const tabs = visibleTabIdsRef.current;
+        const idx = tabs.indexOf(activeTabRef.current);
+        setActiveTab(tabs[(idx - 1 + tabs.length) % tabs.length]);
       } else if (ev.action === "right_bumper") {
-        const idx = visibleTabIds.indexOf(activeTabRef.current);
-        setActiveTab(visibleTabIds[(idx + 1) % visibleTabIds.length]);
+        const tabs = visibleTabIdsRef.current;
+        const idx = tabs.indexOf(activeTabRef.current);
+        setActiveTab(tabs[(idx + 1) % tabs.length]);
       } else if (ev.action === "west") {
         window.dispatchEvent(
           new CustomEvent("htpc:contextmenu", { detail: { source: "gamepad" } }),
@@ -530,6 +537,9 @@ export default function App(): React.ReactElement {
         window.dispatchEvent(new CustomEvent("htpc:escape"));
       } else if (!isTyping && (e.key === "Enter" || e.key === " ")) {
         if (e.type === "keydown") {
+          window.dispatchEvent(
+            new CustomEvent("htpc:nav", { detail: { action: "confirm" } }),
+          );
           const timer = window.setTimeout(() => {
             longPressTimers.delete(e.key);
             window.dispatchEvent(
@@ -548,12 +558,14 @@ export default function App(): React.ReactElement {
         }
       } else if (!isTyping && e.type === "keydown" && e.key === "q") {
         e.preventDefault();
-        const idx = visibleTabIds.indexOf(activeTabRef.current);
-        setActiveTab(visibleTabIds[(idx - 1 + visibleTabIds.length) % visibleTabIds.length]);
+        const tabs = visibleTabIdsRef.current;
+        const idx = tabs.indexOf(activeTabRef.current);
+        setActiveTab(tabs[(idx - 1 + tabs.length) % tabs.length]);
       } else if (!isTyping && e.type === "keydown" && e.key === "e") {
         e.preventDefault();
-        const idx = visibleTabIds.indexOf(activeTabRef.current);
-        setActiveTab(visibleTabIds[(idx + 1) % visibleTabIds.length]);
+        const tabs = visibleTabIdsRef.current;
+        const idx = tabs.indexOf(activeTabRef.current);
+        setActiveTab(tabs[(idx + 1) % tabs.length]);
       } else if (
         !isTyping &&
         e.type === "keydown" &&
@@ -567,6 +579,7 @@ export default function App(): React.ReactElement {
           "ArrowLeft",
           "ArrowRight",
           "Enter",
+          " ",
         ].includes(e.key)
       ) {
         e.preventDefault();
@@ -580,6 +593,7 @@ export default function App(): React.ReactElement {
           d: "right",
           ArrowRight: "right",
           Enter: "confirm",
+          " ": "confirm",
         };
         const action = actionMap[e.key];
         if (action) {
@@ -595,12 +609,14 @@ export default function App(): React.ReactElement {
         }
       } else if (e.type === "keydown" && e.key === "Tab" && !e.shiftKey) {
         e.preventDefault();
-        const idx = visibleTabIds.indexOf(activeTabRef.current);
-        setActiveTab(visibleTabIds[(idx + 1) % visibleTabIds.length]);
+        const tabs = visibleTabIdsRef.current;
+        const idx = tabs.indexOf(activeTabRef.current);
+        setActiveTab(tabs[(idx + 1) % tabs.length]);
       } else if (e.type === "keydown" && e.key === "Tab" && e.shiftKey) {
         e.preventDefault();
-        const idx = visibleTabIds.indexOf(activeTabRef.current);
-        setActiveTab(visibleTabIds[(idx - 1 + visibleTabIds.length) % visibleTabIds.length]);
+        const tabs = visibleTabIdsRef.current;
+        const idx = tabs.indexOf(activeTabRef.current);
+        setActiveTab(tabs[(idx - 1 + tabs.length) % tabs.length]);
       } else if (e.type === "keydown" && e.key === "F1" && e.ctrlKey) {
         // Ctrl+F1 — rescan all libraries
         e.preventDefault();
