@@ -37,6 +37,63 @@ const THEMES = {
 const reset = "\x1b[0m";
 const bold = "\x1b[1m";
 
+const OSC8_START = "\x1b]8;;";
+const OSC8_END = "\x1b]8;;";
+const BEL = "\x07";
+
+function isPathLike(str: string): boolean {
+    return (
+        str.startsWith("http://") ||
+        str.startsWith("https://") ||
+        str.startsWith("/") ||
+        str.startsWith("file://")
+    );
+}
+
+function extractShorthand(pathOrUrl: string): string {
+    const lineMatch = pathOrUrl.match(/(:\d+(?::\d+)?)$/);
+    const lineSuffix = lineMatch ? lineMatch[1] : "";
+    const withoutLine = lineSuffix
+        ? pathOrUrl.slice(0, -lineSuffix.length)
+        : pathOrUrl;
+
+    try {
+        const url = new URL(withoutLine);
+        const parts = url.pathname.split("/").filter(Boolean);
+        const filename = parts.pop() || url.pathname;
+        return filename + lineSuffix;
+    } catch {
+        const parts = withoutLine.split(/[\\/]/).filter(Boolean);
+        const filename = parts.pop() || withoutLine;
+        return filename + lineSuffix;
+    }
+}
+
+function makeTerminalLink(target: string, text: string): string {
+    return `${OSC8_START}${target}${BEL}${text}${OSC8_END}${BEL}`;
+}
+
+function linkifyModule(module: string): string {
+    if (!isPathLike(module)) return module;
+    const shorthand = extractShorthand(module);
+    const target = module.startsWith("/") ? `file://${module}` : module;
+    return makeTerminalLink(target, shorthand);
+}
+
+function linkifyMessage(msg: string): string {
+    msg = msg.replace(/https?:\/\/[^\s\)]+/g, (url) => {
+        const shorthand = extractShorthand(url);
+        return makeTerminalLink(url, shorthand);
+    });
+
+    msg = msg.replace(/\/(?:[^\s:)]+\/)+[^\s:)]+:\d+(?::\d+)?/g, (path) => {
+        const shorthand = extractShorthand(path);
+        return makeTerminalLink(`file://${path}`, shorthand);
+    });
+
+    return msg;
+}
+
 let _theme: "light" | "dark" | undefined;
 
 function getTheme(): "light" | "dark" {
@@ -135,8 +192,12 @@ export class ConsoleLogger implements Logger {
     private write(level: string, module: string, msg: string) {
         const color = (this.palette as any)[level];
         const timestamp = new Date().toTimeString().slice(0, 8);
+        const linkedModule = linkifyModule(module);
+        const moduleStr = isPathLike(module)
+            ? linkedModule
+            : `${this.palette.module}${module}`;
         process.stdout?.write(
-            `${this.palette.time}${timestamp} ${color}${bold}${level.toUpperCase().padEnd(5)}${reset} ${this.palette.gray}[${this.palette.module}${module}${this.palette.gray}] ${reset}${msg}\n`
+            `${this.palette.time}${timestamp} ${color}${bold}${level.toUpperCase().padEnd(5)}${reset} ${this.palette.gray}[${moduleStr}${this.palette.gray}] ${reset}${linkifyMessage(msg)}\n`
         );
     }
 

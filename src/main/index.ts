@@ -177,14 +177,8 @@ async function createWindow(): Promise<void> {
 
   mainWindow.webContents.on("console-message", (_event, level, message, line, sourceId) => {
     const labels = ["debug","info", "warn", "error"];
-    
-    // http://localhost:5173/@fs/home/knackstedt/Pivot/source/apophis
-    const pathname = URL.canParse(sourceId) ? new URL(sourceId).pathname : null;
-    const src = pathname?.startsWith("/@fs" + process.cwd())
-      ? path.relative(process.cwd(), pathname.replace("@fs/", ""))
-      : sourceId;
-
-    (log[labels[level] as "info"])(src + ":" + line, message);
+    const moduleStr = sourceId ? `${sourceId}:${line}` : `line:${line}`;
+    (log[labels[level] as "info"])(moduleStr, message);
   });
 
   mainWindow.webContents.on("before-input-event", (_event, input) => {
