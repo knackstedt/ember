@@ -5,10 +5,6 @@
   --pointer-from-top: 0.5;
   --pointer-from-left: 0.5;
   --card-opacity: 0;
-  --rotate-x: 0deg;
-  --rotate-y: 0deg;
-  --background-x: 50%;
-  --background-y: 50%;
   --icon: none;
   --behind-glow-color: rgba(125, 190, 255, 0.67);
   --behind-glow-size: 25%;
@@ -26,8 +22,6 @@
   --sunpillar-clr-5: var(--sunpillar-5);
   --sunpillar-clr-6: var(--sunpillar-6);
   --card-radius: 12px;
-  perspective: 500px;
-  transform: translate3d(0, 0, 0.1px);
   position: relative;
   touch-action: none;
   width: 100%;
@@ -60,7 +54,6 @@
 }
 
 .gc-card-wrapper:hover,
-.gc-card-wrapper.active,
 .gc-card-wrapper.focused {
   --card-opacity: 1;
 }
@@ -71,27 +64,14 @@
   aspect-ratio: 0.718;
   border-radius: var(--card-radius);
   position: relative;
-  background-blend-mode: color-dodge, normal, normal, normal;
-  animation: gc-glow-bg 12s linear infinite;
   box-shadow: rgba(0, 0, 0, 0.8) calc((var(--pointer-from-left) * 10px) - 3px) calc((var(--pointer-from-top) * 20px) - 6px) 20px -5px;
-  transition: transform 1s ease;
-  transform: translateZ(0) rotateX(0deg) rotateY(0deg);
   background: rgba(0, 0, 0, 0.9);
   backface-visibility: hidden;
   overflow: hidden;
   padding: 0;
 }
 
-.gc-card:hover,
-.gc-card.active,
-.gc-card-wrapper.focused .gc-card {
-  transition: none;
-  transform: translateZ(0) rotateX(var(--rotate-y)) rotateY(var(--rotate-x));
-}
 
-.gc-card-shell.entering .gc-card {
-  transition: transform 180ms ease-out;
-}
 
 .gc-card-shell {
   position: relative;
@@ -200,17 +180,14 @@
 }
 
 .gc-card:hover .gc-shine,
-.gc-card.active .gc-shine,
 .gc-card-wrapper.focused .gc-shine {
   filter: brightness(1.2) contrast(1.5) saturate(0.8) opacity(0.3);
   animation-play-state: running, running;
 }
 
 .gc-card:hover .gc-shine::before,
-.gc-card.active .gc-shine::before,
 .gc-card-wrapper.focused .gc-shine::before,
 .gc-card:hover .gc-shine::after,
-.gc-card.active .gc-shine::after,
 .gc-card-wrapper.focused .gc-shine::after {
   opacity: 0.85;
 }
@@ -475,15 +452,6 @@
 
 .gc-last-played {
   color: rgba(255, 255, 255, 0.45);
-}
-
-@keyframes gc-glow-bg {
-  0% {
-    --bgrotate: 0deg;
-  }
-  100% {
-    --bgrotate: 360deg;
-  }
 }
 
 @keyframes gc-holo-bg {

@@ -103,7 +103,7 @@ export const VirtualGrid = React.forwardRef(function VirtualGridInner<T>(
     renderItem,
     className,
     style,
-    overscan = 8,
+    overscan = 2,
     onColumnCountChange,
     scrollRef,
   }: VirtualGridProps<T>,
@@ -112,6 +112,8 @@ export const VirtualGrid = React.forwardRef(function VirtualGridInner<T>(
   const vgridRef = useRef<VGridHandle>(null);
   const virtualizerRef = useRef<VirtualizerHandle>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const renderItemRef = useRef(renderItem);
+  renderItemRef.current = renderItem;
 
   const { containerWidth, effectiveColCount } = useGridLayout(
     containerRef,
@@ -186,7 +188,7 @@ export const VirtualGrid = React.forwardRef(function VirtualGridInner<T>(
                 }
                 return (
                   <div key={colIndex} style={{ width: cellWidth, flexShrink: 0 }} className="min-w-0">
-                    {renderItem(items[index], index)}
+                    {renderItemRef.current(items[index], index)}
                   </div>
                 );
               })}
@@ -227,7 +229,7 @@ export const VirtualGrid = React.forwardRef(function VirtualGridInner<T>(
           }
           return (
             <div className="w-full h-full min-w-0">
-              {renderItem(items[index], index)}
+              {renderItemRef.current(items[index], index)}
             </div>
           );
         }}

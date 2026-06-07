@@ -131,8 +131,9 @@ const LazyGameCard: React.FC<{
   onFavorite: () => void;
 }> = React.memo(({ game, index, focusedIndex, onSelect, onFavorite }) => {
   const loadThumbnail = useGamesStore((s) => s.loadThumbnail);
-  const regeneratingIds = useGamesStore((s) => s.regeneratingIds);
-  const pendingThumbnailIds = useGamesStore((s) => s.pendingThumbnailIds);
+  const isThumbnailPending = useGamesStore(
+    (s) => s.pendingThumbnailIds.has(game.id) || s.regeneratingIds.has(game.id)
+  );
   const coreVersion = useGamesStore((s) => s.coreVersion);
 
   useEffect(() => {
@@ -156,12 +157,11 @@ const LazyGameCard: React.FC<{
       badgeColor={b?.color}
       isFavorite={game.isFavorite}
       isFocused={index === focusedIndex}
-      isThumbnailPending={pendingThumbnailIds.has(game.id) || regeneratingIds.has(game.id)}
+      isThumbnailPending={isThumbnailPending}
       corrupt={game.corrupt}
       missingCoreTooltip={missingCoreTooltip}
       playTime={game.playTime}
       lastPlayed={game.lastPlayed}
-      suppressMountAnimation
       onSelect={onSelect}
       onFavorite={onFavorite}
     />
@@ -874,7 +874,7 @@ export const GamingTab: React.FC = () => {
       </div>
       <div
         ref={scrollContainerRef}
-        className="flex-1 min-h-0 overflow-y-auto gpu-scroll"
+        className="flex-1 min-h-0 gpu-scroll"
         style={{ padding: 16 }}
       >
         {/* Grid content */}
@@ -920,7 +920,6 @@ export const GamingTab: React.FC = () => {
             onColumnCountChange={setColumnCount}
             rowHeight={260}
             renderItem={renderItem}
-            scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
           />
         )}
       </div>

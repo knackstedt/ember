@@ -12,6 +12,9 @@
     "build": "electron-vite build",
     "predist": "bun scripts/setup-libretro.ts",
     "dist": "electron-builder",
+    "dist:x64:flatpak": "electron-builder --linux flatpak --x64",
+    "dist:x64:tar.gz": "electron-builder --linux tar.gz --x64",
+    "dist:x64:appimage": "electron-builder --linux AppImage --x64",
     "preview": "electron-vite preview",
     "lint": "eslint src",
     "test": "bun test",
@@ -87,7 +90,7 @@
           "arch": ["x64", "arm64"]
         }
       ],
-      "category": "AudioVideo",
+      "category": "AudioVideo;Game;Audio;Video;Emulator;",
       "maintainer": "dotglitch",
       "vendor": "dotglitch"
     },

@@ -1,6 +1,6 @@
 import { app, BrowserWindow, shell, protocol, Menu } from "electron";
 import path, { join } from "path";
-import { readFileSync, createReadStream, statSync } from "fs";
+import { readFileSync, createReadStream, statSync, lstatSync, readlinkSync, unlinkSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { initDb } from "./db";
 import { registerIpcHandlers } from "./ipc";
 import { initInputSystem, destroyInputSystem, setLibretroWindowGetter } from "./input/evdev";
@@ -12,9 +12,101 @@ const log = createLogger("info");
 
 const isDev = !app.isPackaged || process.env.NODE_ENV === "development";
 
-if (!isDev && !app.requestSingleInstanceLock()) {
-  log.info("lock", "Another instance is already running, exiting");
-  app.exit(0);
+function isProcessRunning(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function killOldInstance(pid: number) {
+  try {
+    process.kill(pid, "SIGTERM");
+    const start = Date.now();
+    while (Date.now() - start < 3000) {
+      if (!isProcessRunning(pid)) return;
+    }
+    try {
+      process.kill(pid, "SIGKILL");
+    } catch {
+      // Already gone
+    }
+  } catch {
+    // Already gone
+  }
+}
+
+function clearStaleSingletonLock() {
+  try {
+    const userData = app.getPath("userData");
+    const singletonLock = path.join(userData, "SingletonLock");
+
+    const stats = lstatSync(singletonLock);
+    if (!stats.isSymbolicLink()) return;
+
+    const target = readlinkSync(singletonLock);
+    try {
+      statSync(target);
+    } catch {
+      unlinkSync(singletonLock);
+      log.info("lock", "Removed stale SingletonLock");
+    }
+  } catch {
+    // No SingletonLock or not a symlink — nothing to do.
+  }
+}
+
+function acquireInstanceLock(): boolean {
+  try {
+    const userData = app.getPath("userData");
+    const pidFile = path.join(userData, "ember.pid");
+
+    // Ensure userData directory exists (fresh install or wiped profile)
+    try { mkdirSync(userData, { recursive: true }); } catch {}
+
+    if (existsSync(pidFile)) {
+      const oldPid = parseInt(readFileSync(pidFile, "utf8").trim(), 10);
+      if (!isNaN(oldPid) && oldPid !== process.pid && isProcessRunning(oldPid)) {
+        log.info("lock", `Killing existing instance (PID ${oldPid})`);
+        killOldInstance(oldPid);
+      }
+    }
+
+    writeFileSync(pidFile, String(process.pid));
+    return true;
+  } catch (err) {
+    log.error("lock", `Failed to acquire instance lock: ${err}`);
+    return false;
+  }
+}
+
+function releaseInstanceLock() {
+  try {
+    const pidFile = path.join(app.getPath("userData"), "ember.pid");
+    if (existsSync(pidFile)) {
+      const pid = parseInt(readFileSync(pidFile, "utf8").trim(), 10);
+      if (pid === process.pid) {
+        unlinkSync(pidFile);
+      }
+    }
+  } catch {
+    // Ignore cleanup errors
+  }
+}
+
+if (!isDev) {
+  if (!acquireInstanceLock()) {
+    log.info("lock", "Failed to acquire instance lock, exiting");
+    app.exit(0);
+  }
+
+  // Clean up any stale Electron SingletonLock left by a crashed previous run.
+  clearStaleSingletonLock();
+
+  app.on("quit", releaseInstanceLock);
+  app.on("before-quit", releaseInstanceLock);
 }
 
 if (isDev) {
