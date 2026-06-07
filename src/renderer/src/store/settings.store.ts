@@ -55,6 +55,14 @@ const defaults: AppSettings = {
     pixelateSize: 4,
     ditherLevels: 4,
   },
+  controllerBrowser: {
+    snapToElement: true,
+    snapDistance: 50,
+    snapSelectors: ["button", "a", "input", "textarea", "select", "[role='button']"],
+    mouseSpeed: 0.5,
+    swapRightStickAxes: false,
+    buttonRemapping: {},
+  },
 };
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({

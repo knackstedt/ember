@@ -1,7 +1,8 @@
 import { join, dirname } from "path";
 import { readFileSync, rmSync, mkdirSync, readdirSync, existsSync } from "fs";
-import { BrowserWindow, ipcMain, app, dialog, shell } from "electron";
+import { BrowserWindow, ipcMain, app, dialog, shell, session } from "electron";
 import { spawn, ChildProcess } from "child_process";
+import { homedir } from "os";
 import { createLibretroWindow } from "..";
 import {
   getSettings,
@@ -39,6 +40,7 @@ import {
   MappingRepo,
   BrokenFlashRepo,
   CollectionRepo,
+  escapeId,
 } from "../db/repository";
 import { getProtonRating } from "../services/protondb.service";
 import { performGameScan } from "../services/game-scan.service";
@@ -95,17 +97,7 @@ import {
   enrichTracks,
 } from "../services/music-enrichment.service";
 import {
-  isButlerAvailable,
-  getItchAuthStatus,
-  itchLogin,
-  itchLogout,
-  listItchLibrary,
-  installItchGame,
-  uninstallItchGame,
   launchItchGame,
-  checkItchUpdate,
-  updateItchGame,
-  downloadItchBuild,
 } from "../services/itch.service";
 import {
   compressGame,
@@ -1478,58 +1470,59 @@ export function registerIpcHandlers(window: BrowserWindow): void {
   /*  Store / itch.io                                                    */
   /* ------------------------------------------------------------------ */
 
-  ipcMain.handle("store:itch:status", async () => {
-    return getItchAuthStatus();
-  });
-
-  ipcMain.handle("store:itch:login", async () => {
-    return itchLogin();
-  });
-
-  ipcMain.handle("store:itch:logout", async () => {
-    return itchLogout();
-  });
-
-  ipcMain.handle("store:itch:library", async () => {
-    return listItchLibrary();
-  });
-
-  ipcMain.handle("store:itch:install", async (_e, gameId: string, title: string) => {
-    return installItchGame(gameId, title);
-  });
-
-  ipcMain.handle("store:itch:uninstall", async (_e, gameId: string) => {
-    return uninstallItchGame(gameId);
-  });
-
   ipcMain.handle("store:itch:launch", async (_e, game: Game) => {
     return launchItchGame(game);
-  });
-
-  ipcMain.handle("store:itch:update", async (_e, gameId: string) => {
-    return updateItchGame(gameId);
-  });
-
-  ipcMain.handle("store:itch:updates", async () => {
-    const library = await listItchLibrary();
-    const updates: { gameId: string; title: string; latestVersion?: string }[] = [];
-    for (const g of library) {
-      if (!g.id) continue;
-      const result = await checkItchUpdate(g.id);
-      if (result.updateAvailable) {
-        updates.push({ gameId: g.id, title: g.title, latestVersion: result.latestVersion });
-      }
-    }
-    return updates;
-  });
-
-  ipcMain.handle("store:itch:download", async (_e, downloadUrl: string, destPath: string) => {
-    return downloadItchBuild(downloadUrl, destPath);
   });
 
   ipcMain.handle("store:providers:list", async () => {
     return [
       { id: "itch", name: "itch.io", url: "https://itch.io", icon: "itch-io" },
     ];
+  });
+
+  /* ------------------------------------------------------------------ */
+  /*  Download interception — redirect itch.io downloads to Games dir   */
+  /* ------------------------------------------------------------------ */
+
+  let cachedGamePaths: string[] = [];
+  (async () => {
+    try {
+      const s = await getSettings();
+      cachedGamePaths = s.gamePaths ?? [];
+    } catch {
+      // ignore
+    }
+  })();
+
+  ipcMain.on("store:gamePaths:cache", (_e, paths: string[]) => {
+    cachedGamePaths = paths;
+  });
+
+  session.defaultSession.on("will-download", (_event, item, _webContents) => {
+    const url = item.getURL();
+    const filename = item.getFilename();
+    const isItchDownload =
+      url.includes("itch.io") ||
+      url.includes("itch.zone") ||
+      url.includes("hwcdn.net") ||
+      url.includes("amazonaws.com") ||
+      filename.endsWith(".zip") ||
+      filename.endsWith(".tar.gz") ||
+      filename.endsWith(".tar.bz2") ||
+      filename.endsWith(".rar") ||
+      filename.endsWith(".7z");
+
+    if (isItchDownload) {
+      const basePath = cachedGamePaths[0] ?? join(homedir(), "Games");
+      const itchDir = join(basePath, "itch");
+      try {
+        if (!existsSync(itchDir)) {
+          mkdirSync(itchDir, { recursive: true });
+        }
+      } catch {
+        // ignore mkdir failure
+      }
+      item.setSavePath(join(itchDir, filename));
+    }
   });
 }

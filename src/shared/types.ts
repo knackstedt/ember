@@ -365,6 +365,15 @@ export interface BackgroundSettings {
   gradient?: string;
 }
 
+export interface ControllerBrowserSettings {
+  snapToElement: boolean;
+  snapDistance: number;
+  snapSelectors: string[];
+  mouseSpeed: number;
+  swapRightStickAxes: boolean;
+  buttonRemapping: Record<string, string>;
+}
+
 export interface AppSettings {
   theme: ThemeName;
   fullscreen: boolean;
@@ -394,6 +403,7 @@ export interface AppSettings {
   commandKeybinds?: Record<string, string>;
   /** Custom controller button mappings: command id → button action (e.g. "north", "select") */
   commandControllerMap?: Record<string, string>;
+  controllerBrowser?: ControllerBrowserSettings;
 }
 
 export interface PluginManifest {

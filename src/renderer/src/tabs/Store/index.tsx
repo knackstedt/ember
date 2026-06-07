@@ -19,6 +19,7 @@ import {
   Gamepad2,
 } from "lucide-react";
 import { useToastStore } from "../../store/toast.store";
+import { useBrowserControllerNav } from "../../hooks/useBrowserControllerNav";
 
 interface BrowserTab {
   id: string;
@@ -50,6 +51,7 @@ export const StoreTab: React.FC = () => {
   const [libraryGames, setLibraryGames] = useState<any[]>([]);
   const [showLibrary, setShowLibrary] = useState(false);
   const webviewRefs = useRef<Record<string, Electron.WebviewTag | null>>({});
+  const activeWebviewRef = useRef<Electron.WebviewTag | null>(null);
   const addToast = useToastStore((s) => s.add);
 
   const activeTab = useMemo(
@@ -200,6 +202,14 @@ export const StoreTab: React.FC = () => {
     if (wv && wv.canGoForward()) wv.goForward();
   }, [activeTabId]);
 
+  /* Controller navigation for the active webview */
+  useBrowserControllerNav({
+    webviewRef: activeWebviewRef,
+    enabled: true,
+    onBack: goBack,
+    onForward: goForward,
+  });
+
   const reload = useCallback(() => {
     const wv = webviewRefs.current[activeTabId];
     if (wv) wv.reload();
@@ -213,10 +223,19 @@ export const StoreTab: React.FC = () => {
   /*  Webview events                                                      */
   /* ------------------------------------------------------------------ */
 
+  const webviewCleanups = useRef<Record<string, (() => void)>>({});
+
   const attachWebview = useCallback(
     (id: string, el: Electron.WebviewTag | null) => {
       if (!el) return;
+
+      // Clean up previous listeners for this tab if any
+      webviewCleanups.current[id]?.();
+
       webviewRefs.current[id] = el;
+      if (id === activeTabId) {
+        activeWebviewRef.current = el;
+      }
 
       const handleLoadStart = () => {
         updateTab(id, { isLoading: true });
@@ -254,7 +273,8 @@ export const StoreTab: React.FC = () => {
       el.addEventListener("page-favicon-updated", handleFavicon);
       el.addEventListener("new-window", handleNewWindow as any);
 
-      return () => {
+      // Store cleanup so we can call it on tab close, not on React ref re-run
+      webviewCleanups.current[id] = () => {
         el.removeEventListener("did-start-loading", handleLoadStart);
         el.removeEventListener("did-stop-loading", handleLoadStop);
         el.removeEventListener("page-title-updated", handlePageTitle);
@@ -262,8 +282,13 @@ export const StoreTab: React.FC = () => {
         el.removeEventListener("new-window", handleNewWindow as any);
       };
     },
-    [addTab, updateTab]
+    [addTab, updateTab, activeTabId]
   );
+
+  // Keep activeWebviewRef in sync when switching store tabs
+  useEffect(() => {
+    activeWebviewRef.current = webviewRefs.current[activeTabId] ?? null;
+  }, [activeTabId]);
 
   /* ------------------------------------------------------------------ */
   /*  Install from itch web                                               */
