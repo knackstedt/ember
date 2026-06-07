@@ -23,6 +23,7 @@
     "framer-motion": "^11.3.0",
     "jsnes": "^2.1.0",
     "lucide-react": "^1.17.0",
+    "matrix-animation": "^2.0.0",
     "music-metadata": "^10.6.0",
     "node-id3": "^0.2.6",
     "node-stream-zip": "^1.15.0",

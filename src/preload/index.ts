@@ -305,6 +305,8 @@ const htpc = {
 
   openDirectory: (): Promise<string | null> =>
     ipcRenderer.invoke("dialog:open-directory"),
+  openFile: (opts?: { filters?: Electron.FileFilter[]; title?: string }): Promise<string | null> =>
+    ipcRenderer.invoke("dialog:open-file", opts),
 
   shell: {
     openExternal: (url: string): Promise<void> => shell.openExternal(url),

@@ -1200,6 +1200,15 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     return canceled ? null : filePaths[0];
   });
 
+  ipcMain.handle("dialog:open-file", async (_e, opts?: { filters?: Electron.FileFilter[]; title?: string }) => {
+    const { canceled, filePaths } = await dialog.showOpenDialog({
+      title: opts?.title ?? "Select File",
+      properties: ["openFile"],
+      filters: opts?.filters ?? [{ name: "All Files", extensions: ["*"] }],
+    });
+    return canceled ? null : filePaths[0];
+  });
+
   ipcMain.handle("shell:openPath", async (_e, path: string) => {
     return shell.openPath(path);
   });

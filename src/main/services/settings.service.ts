@@ -14,6 +14,7 @@ const DEFAULTS: AppSettings = {
   hardwareAcceleration: true,
   disabledTabs: [],
   dailyBackground: { enabled: false, source: "bing" },
+  background: { type: "theme" },
   defaultEmulatorShader: "",
   emulatorShaders: {},
   commandKeybinds: {},

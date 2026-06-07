@@ -332,6 +332,37 @@ export interface DailyBackgroundSettings {
   customUrl?: string;
 }
 
+export type BackgroundType =
+  | "theme"
+  | "matrix-preset"
+  | "daily"
+  | "image"
+  | "solid"
+  | "gradient";
+
+export type ImageFitMode = "cover" | "contain" | "stretch" | "center" | "tile";
+
+export type MatrixPreset =
+  | "cyberpunk"
+  | "ocean-blue"
+  | "fire-red"
+  | "monochrome"
+  | "purple-haze"
+  | "neon-pink"
+  | "matrix"
+  | "digital-rain";
+
+export interface BackgroundSettings {
+  type: BackgroundType;
+  matrixPreset?: MatrixPreset;
+  dailySource?: DailyBackgroundSource;
+  dailyCustomUrl?: string;
+  imagePath?: string;
+  imageFit?: ImageFitMode;
+  solidColor?: string;
+  gradient?: string;
+}
+
 export interface AppSettings {
   theme: ThemeName;
   fullscreen: boolean;
@@ -350,7 +381,9 @@ export interface AppSettings {
   hardwareAcceleration: boolean;
   flashSettings?: FlashSettings;
   disabledTabs: TabId[];
+  /** @deprecated Use background.type === "daily" instead */
   dailyBackground: DailyBackgroundSettings;
+  background?: BackgroundSettings;
   defaultEmulatorShader?: string;
   emulatorShaders?: Partial<Record<GamePlatform, string>>;
   /** Dolphin emulator post-processing effect */

@@ -1,79 +1,308 @@
 import React, { useEffect, useRef, useState } from "react";
+import { MatrixAnimation } from "matrix-animation";
 import { useSettingsStore } from "../../store/settings.store";
-import { DailyBackgroundSource } from "../../../../shared/types";
+import {
+  MatrixPreset,
+  BackgroundSettings,
+  DailyBackgroundSource,
+} from "../../../../shared/types";
 
-const CACHE_DATE_KEY = "htpc-daily-bg-date";
-const CACHE_URL_KEY = "htpc-daily-bg-url";
-const CACHE_SOURCE_KEY = "htpc-daily-bg-source";
+const r = (a: number, b: number): string =>
+  Array.from({ length: b - a + 1 }, (_, i) => String.fromCodePoint(a + i)).join("");
 
-async function fetchBingImageUrl(): Promise<string | null> {
-  try {
-    const res = await fetch(
-      "https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=1&mkt=en-US",
-    );
-    const data = await res.json();
-    const path = data?.images?.[0]?.url;
-    return path ? `https://www.bing.com${path}` : null;
-  } catch {
-    return null;
-  }
-}
+const MATRIX_PRESETS: Record<
+  MatrixPreset,
+  ConstructorParameters<typeof MatrixAnimation>[1]
+> = {
+  cyberpunk: {
+    fadeStrength: 0.04,
+    rainWidth: 10,
+    rainHeight: 18,
+    rainDrop: {
+      headColor: "rgba(255,45,120,0.95)",
+      trailColors: [
+        "rgba(255,45,120,0.3)",
+        "rgba(160,32,240,0.2)",
+        "rgba(255,0,255,0.1)",
+      ],
+      randomizeScale: true,
+      randomizePosition: true,
+      charArrays: [
+        r(0xFF01, 0xFF5E), // fullwidth Latin  — glitched corp display text
+        r(0xFF65, 0xFF9F), // half-width Katakana — neon sign kanji
+        r(0x2500, 0x257F), // box drawing       — hardwired circuit traces
+        r(0x2190, 0x21AF), // arrows            — data flow indicators
+        r(0x2100, 0x214F), // letterlike        — hacked glyphs ℃℉™℗ℤℝℵ
+      ],
+      fontSize: 16,
+      fontFamily: "monospace",
+      alignToColumns: true,
+      minFontSize: 12,
+      maxFontSize: 22,
+      moveSpeed: 0,
+      minMoveSpeed: 4,
+      maxMoveSpeed: 12,
+      correlateScaleSpeed: false,
+      minFrameDelay: 30,
+      maxFrameDelay: 50,
+      randomizeFrameDelay: true,
+    },
+    rainGenerator: { density: 1.5 },
+  },
+  "ocean-blue": {
+    fadeStrength: 0.05,
+    minFrameTime: 50,
+    rainWidth: 10,
+    rainHeight: 18,
+    rainDrop: {
+      headColor: "rgba(0,245,212,0.95)",
+      trailColors: [
+        "rgba(0,245,212,0.3)",
+        "rgba(0,187,249,0.2)",
+        "rgba(0,100,200,0.1)",
+      ],
+      charArrays: "🮤🮥🮦🮧🮨🮩🮪🮫🮬🮭🮮",
+      randomizeScale: true,
+      randomizePosition: true,
+      fontSize: 14,
+      fontFamily: "monospace",
+      alignToColumns: true,
+      minFontSize: 12,
+      maxFontSize: 22,
+      moveSpeed: 0,
+      minMoveSpeed: 4,
+      maxMoveSpeed: 12,
+      correlateScaleSpeed: false,
+      minFrameDelay: 30,
+      maxFrameDelay: 50,
+      randomizeFrameDelay: true,
+    },
+    rainGenerator: { density: .65 },
+  },
+  "fire-red": {
+    fadeStrength: 0.04,
+    rainWidth: 10,
+    rainHeight: 24,
+    rainDrop: {
+      headColor: "rgba(255,200,100,0.95)",
+      trailColors: [
+        "rgba(255,100,50,0.3)",
+        "rgba(200,50,0,0.2)",
+        "rgba(100,0,0,0.1)",
+      ],
+      randomizeScale: true,
+      randomizePosition: true,
+      charArrays: "🯰🯱🯲🯳🯴🯵🯶🯷🯸🯹",
+      fontSize: 16,
+      fontFamily: "monospace",
+      alignToColumns: true,
+      minFontSize: 12,
+      maxFontSize: 22,
+      moveSpeed: 0,
+      minMoveSpeed: 16,
+      maxMoveSpeed: 24,
+      correlateScaleSpeed: false,
+      minFrameDelay: 50,
+      maxFrameDelay: 100,
+      randomizeFrameDelay: true,
+    },
+    rainGenerator: { density: 1 },
+  },
+  monochrome: {
+    fadeStrength: 0.05,
+    rainWidth: 10,
+    rainHeight: 18,
+    rainDrop: {
+      headColor: "rgba(255,255,255,0.95)",
+      trailColors: [
+        "rgba(200,200,200,0.3)",
+        "rgba(150,150,150,0.2)",
+        "rgba(100,100,100,0.1)",
+      ],
+      charArrays: "⸪⸫⸬⸭⁖⁘⁙⁚⁛",
+      randomizeScale: true,
+      randomizePosition: true,
+      fontSize: 14,
+      fontFamily: "monospace",
+      alignToColumns: true,
+      minFontSize: 12,
+      maxFontSize: 22,
+      moveSpeed: 0,
+      minMoveSpeed: 4,
+      maxMoveSpeed: 12,
+      correlateScaleSpeed: false,
+      minFrameDelay: 30,
+      maxFrameDelay: 50,
+      randomizeFrameDelay: true,
+    },
+    rainGenerator: { density: .75 },
+  },
+  "purple-haze": {
+    rainWidth: 10,
+    rainHeight: 18,
+    minFrameTime: 75,
+    rainGenerator: { density: 0.5 },
+    rainDrop: {
+      direction: "TD",
+      charArrays: [
+        "ｦｧｨｩｪｫｬｭｮｯｰｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ─━│┃┄┅┆┇┈┉┊┋┌┍┎┏┐┑┒┓└┕┖┗┘┙┚┛├┝┞┟┠┡┢┣┤┥┦┧┨┩┪┫┬┭┮┯┰┱┲┳┴┵┶┷┸┹┺┻┼┽┾┿∀∁∂∃∄∅∆∇∈∉∊∋∌∍∎∏∐∑−∓∔∕∖∗∘∙√∛∜∝∞∟∠∡∢∣∤∥∦∧∨∩∪∫∬∭∮∯▀▁▂▃▄▅▆▇█▉▊▋▌▍▎▏▐░▒▓▔▕▖▗▘▙▚▛▜▝▞▟"
+      ],
+      headColor: "rgba(255,255,255,0.8)",
+      trailColor: "rgba(140,62,225,1.00)",
+      fontSize: 16,
+      fontFamily: "monospace",
+      randomizeScale: false,
+      minFontSize: 12,
+      maxFontSize: 22,
+      moveSpeed: 0,
+      minMoveSpeed: 4,
+      maxMoveSpeed: 12,
+      correlateScaleSpeed: false,
+      minFrameDelay: 30,
+      maxFrameDelay: 50,
+      randomizePosition: true,
+      randomizeFrameDelay: true,
+      jitterLeftStrength: 0,
+      jitterRightStrength: 0,
+      jitterUpStrength: 0,
+      jitterDownStrength: 0,
+    },
+    trailBloomSize: 0,
+    trailBloomColor: "#ffffff",
+    headBloomSize: 0,
+    headBloomColor: "#ffffff",
+    warmupIterations: 50,
+    fadeStrength: 0.05,
+  },
+  "neon-pink": {
+    fadeStrength: 0.04,
+    rainWidth: 10,
+    rainHeight: 18,
+    minFrameDelay: 50,
+    rainDrop: {
+      headColor: "rgba(255,100,200,0.95)",
+      trailColors: [
+        "rgba(255,150,220,0.3)",
+        "rgba(255,50,150,0.2)",
+        "rgba(200,0,100,0.1)",
+      ],
+      randomizeScale: true,
+      randomizePosition: true,
+      charArrays: [
+        "⠁⠂⠃⠄⠅⠆⠇⠈⠉⠊⠋⠌⠍⠎⠏⠐⠑⠒⠓⠔⠕⠖⠗⠘⠙⠚⠛⠜⠝⠞⠟⠠⠡⠢⠣⠤⠥⠦⠧⠨⠩⠪⠫⠬⠭⠮⠯⠰⠱⠲⠳⠴⠵⠶⠷⠸⠹⠺⠻⠼⠽⠾⠿⡀⡁⡂⡃⡄⡅⡆⡇⡈⡉⡊⡋⡌⡍⡎⡏⡐⡑⡒⡓⡔⡕⡖⡗⡘⡙⡚⡛⡜⡝⡞⡟⡠⡡⡢⡣⡤⡥⡦⡧⡨⡩⡪⡫⡬⡭⡮⡯⡰⡱⡲⡳⡴⡵⡶⡷⡸⡹⡺⡻⡼⡽⡾⡿⢀⢁⢂⢃⢄⢅⢆⢇⢈⢉⢊⢋⢌⢍⢎⢏⢐⢑⢒⢓⢔⢕⢖⢗⢘⢙⢚⢛⢜⢝⢞⢟⢠⢡⢢⢣⢤⢥⢦⢧⢨⢩⢪⢫⢬⢭⢮⢯⢰⢱⢲⢳⢴⢵⢶⢷⢸⢹⢺⢻⢼⢽⢾⢿⣀⣁⣂⣃⣄⣅⣆⣇⣈⣉⣊⣋⣌⣍⣎⣏⣐⣑⣒⣓⣔⣕⣖⣗⣘⣙⣚⣛⣜⣝⣞⣟⣠⣡⣢⣣⣤⣥⣦⣧⣨⣩⣪⣫⣬⣭⣮⣯⣰⣱⣲⣳⣴⣵⣶⣷⣸⣹⣺⣻⣼⣽⣾⣿",
+        "⠁⠂⠃⠄⠅⠆⠇"
+      ],
+      fontSize: 16,
+      fontFamily: "monospace",
+      alignToColumns: true,
+      correlateScaleSpeed: true,
+      minMoveSpeed: 4,
+      maxMoveSpeed: 12,
+      minFontSize: 12,
+      maxFontSize: 22,
+      frameDelay: 50,
+    },
+    rainGenerator: { density: 1.5 },
+  },
+  matrix: {
+    rainWidth: 10,
+    rainHeight: 18,
+    minFrameTime: 125,
+    syncFrame: false,
+    rainGenerator: { density: 0.5 },
+    rainDrop: {
+      direction: "TD",
+      charArrays: ["0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZアァカサタナハマヤャラワガザダバパイィキシチニヒミリヰギジヂビピウゥクスツヌフムユュルグズブヅプエェケセテネヘメレヱゲゼデベペオォコソトノホモヨョロヲゴゾドボポヴッン"],
+      headColor: "rgba(255,255,255,0.8)",
+      trailColor: "rgba(62, 225, 78, 1.00)",
+      fontSize: 16,
+      randomizePosition: true,
+      frameDelay: 50,
+      minFrameDelay: 50,
+      maxFrameDelay: 130,
+      randomizeFrameDelay: true,
+      randomizeScale: true,
+      minFontSize: 12,
+      maxFontSize: 22,
+      moveSpeed: 0,
+      minMoveSpeed: 8,
+      maxMoveSpeed: 42,
+      correlateScaleSpeed: true,
+      jitterLeftStrength: 0,
+      jitterRightStrength: 0,
+      jitterUpStrength: 0,
+      jitterDownStrength: 0,
+    },
+    trailBloomSize: 8,
+    trailBloomColor: "#82ffa9",
+    headBloomSize: 4,
+    headBloomColor: "#ffffff",
+    warmupIterations: 50,
+    fadeStrength: 0.05,
+  },
+  "digital-rain": {
+    rainWidth: 10,
+    rainHeight: 18,
+    minFrameTime: 75,
+    rainGenerator: { density: 0.5 },
+    rainDrop: {
+      direction: "TD",
+      charArrays: [
+        "⠁⠂⠃⠄⠅⠆⠇⠈⠉⠊⠋⠌⠍⠎⠏⠐⠑⠒⠓⠔⠕⠖⠗⠘⠙⠚⠛⠜⠝⠞⠟⠠⠡⠢⠣⠤⠥⠦⠧⠨⠩⠪⠫⠬⠭⠮⠯⠰⠱⠲⠳⠴⠵⠶⠷⠸⠹⠺⠻⠼⠽⠾⠿⡀⡁⡂⡃⡄⡅⡆⡇⡈⡉⡊⡋⡌⡍⡎⡏⡐⡑⡒⡓⡔⡕⡖⡗⡘⡙⡚⡛⡜⡝⡞⡟⡠⡡⡢⡣⡤⡥⡦⡧⡨⡩⡪⡫⡬⡭⡮⡯⡰⡱⡲⡳⡴⡵⡶⡷⡸⡹⡺⡻⡼⡽⡾⡿⢀⢁⢂⢃⢄⢅⢆⢇⢈⢉⢊⢋⢌⢍⢎⢏⢐⢑⢒⢓⢔⢕⢖⢗⢘⢙⢚⢛⢜⢝⢞⢟⢠⢡⢢⢣⢤⢥⢦⢧⢨⢩⢪⢫⢬⢭⢮⢯⢰⢱⢲⢳⢴⢵⢶⢷⢸⢹⢺⢻⢼⢽⢾⢿⣀⣁⣂⣃⣄⣅⣆⣇⣈⣉⣊⣋⣌⣍⣎⣏⣐⣑⣒⣓⣔⣕⣖⣗⣘⣙⣚⣛⣜⣝⣞⣟⣠⣡⣢⣣⣤⣥⣦⣧⣨⣩⣪⣫⣬⣭⣮⣯⣰⣱⣲⣳⣴⣵⣶⣷⣸⣹⣺⣻⣼⣽⣾⣿",
+        "⠁⠂⠃⠄⠅⠆⠇",
+        "⣾⣽⣼⣻⣺⣹⣟⢿⢾⣯⣮⣭⡿⡾⡽⢵⡷⡟⠿⡯⡷⡿"
+      ],
+      headColor: "rgba(255,255,255,0.8)",
+      trailColor: "rgba(140,62,225,1.00)",
+      fontSize: 16,
+      fontFamily: "monospace",
+      randomizeScale: false,
+      minFontSize: 12,
+      maxFontSize: 22,
+      moveSpeed: 0,
+      minMoveSpeed: 4,
+      maxMoveSpeed: 12,
+      correlateScaleSpeed: false,
+      minFrameDelay: 30,
+      maxFrameDelay: 50,
+      randomizePosition: true,
+      randomizeFrameDelay: true,
+    },
+    trailBloomSize: 0,
+    trailBloomColor: "#ffffff",
+    headBloomSize: 0,
+    headBloomColor: "#ffffff",
+    warmupIterations: 50,
+    fadeStrength: 0.05,
+  },
+};
 
-async function fetchUnsplashUrl(): Promise<string | null> {
-  try {
-    const res = await fetch(
-      "https://source.unsplash.com/random/1920x1080/?nature,landscape",
-      { redirect: "follow" },
-    );
-    return res.url ?? null;
-  } catch {
-    return null;
-  }
-}
-
-async function fetchPicsumUrl(): Promise<string | null> {
-  try {
-    const res = await fetch("https://picsum.photos/1920/1080", {
-      redirect: "follow",
-    });
-    return res.url ?? null;
-  } catch {
-    return null;
-  }
-}
-
-async function fetchDailyImageUrl(
-  source: DailyBackgroundSource,
-  customUrl?: string,
-): Promise<string | null> {
-  switch (source) {
-    case "bing":
-      return fetchBingImageUrl();
-    case "unsplash":
-      return fetchUnsplashUrl();
-    case "picsum":
-      return fetchPicsumUrl();
-    case "custom":
-      return customUrl || null;
+function getImageStyle(fit: string | undefined): React.CSSProperties {
+  switch (fit) {
+    case "contain":
+      return { objectFit: "contain" as const };
+    case "stretch":
+      return { objectFit: "fill" as const };
+    case "center":
+      return { objectFit: "none" as const };
+    case "tile":
+      return {};
+    case "cover":
     default:
-      return null;
+      return { objectFit: "cover" as const };
   }
 }
 
-function getTodayStr(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
-export const ThemeBackground: React.FC = () => {
-  const theme = useSettingsStore((s) => s.settings?.theme ?? "dark-oled");
-  const dailyBg = useSettingsStore((s) => s.settings?.dailyBackground);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+function useThemeCanvas(
+  canvasRef: React.RefObject<HTMLCanvasElement>,
+  theme: string,
+  enabled: boolean,
+) {
   const animRef = useRef<number>(0);
-  const [bgUrl, setBgUrl] = useState<string | null>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas || !enabled) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
@@ -155,7 +384,7 @@ export const ThemeBackground: React.FC = () => {
       draw();
     } else if (theme === "neon-cyberpunk") {
       let scanY = 0;
-      const CYCLE_FRAMES = 480; // ~8s at 60fps
+      const CYCLE_FRAMES = 480;
 
       const draw = (): void => {
         ctx.clearRect(0, 0, w, h);
@@ -174,40 +403,6 @@ export const ThemeBackground: React.FC = () => {
         ctx.moveTo(0, Math.round(scanY));
         ctx.lineTo(w, Math.round(scanY));
         ctx.stroke();
-
-        animRef.current = requestAnimationFrame(draw);
-      };
-      draw();
-    } else if (theme === "terminal-tui") {
-      const FONT_SIZE = 14;
-      const cols = Math.floor(w / FONT_SIZE);
-      const chars = "01アイウエオカキクケコサシスセソABCDEFGHIJKLMNOP".split(
-        "",
-      );
-      const drops = Array.from(
-        { length: cols },
-        () => Math.random() * -(h / FONT_SIZE),
-      );
-
-      ctx.fillStyle = "#000";
-      ctx.fillRect(0, 0, w, h);
-
-      const draw = (): void => {
-        ctx.fillStyle = "rgba(0,0,0,0.05)";
-        ctx.fillRect(0, 0, w, h);
-        ctx.font = `${FONT_SIZE}px monospace`;
-
-        for (let i = 0; i < drops.length; i++) {
-          const ch = chars[Math.floor(Math.random() * chars.length)];
-          const x = i * FONT_SIZE;
-          const y = drops[i] * FONT_SIZE;
-
-          ctx.fillStyle = "rgba(180,255,180,0.95)";
-          ctx.fillText(ch, x, y);
-
-          if (y > h && Math.random() > 0.975) drops[i] = 0;
-          drops[i] += 0.5;
-        }
 
         animRef.current = requestAnimationFrame(draw);
       };
@@ -391,65 +586,308 @@ export const ThemeBackground: React.FC = () => {
       draw();
       window.addEventListener("resize", onResizeWarm);
       return () => window.removeEventListener("resize", onResizeWarm);
+    } else if (theme === "terminal-tui") {
+      // terminal-tui uses the MatrixAnimation in the matrix container
+      ctx.clearRect(0, 0, w, h);
     }
 
     return () => {
       cancelAnimationFrame(animRef.current);
       window.removeEventListener("resize", onResize);
     };
-  }, [theme]);
+  }, [theme, enabled]);
+}
+
+function MatrixBackground({ preset }: { preset: MatrixPreset }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const animRef = useRef<MatrixAnimation | null>(null);
 
   useEffect(() => {
-    if (!dailyBg?.enabled) {
-      setBgUrl(null);
-      return;
+    const node = containerRef.current;
+    if (!node) return;
+
+    const rawConfig = MATRIX_PRESETS[preset];
+    if (!rawConfig) return;
+
+    // Deep-clone so the library's mutations don't pollute our preset
+    const config = JSON.parse(JSON.stringify(rawConfig));
+
+    let created = false;
+    let ro: ResizeObserver | null = null;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    const createAnim = () => {
+      if (created || !node) return;
+      created = true;
+      ro?.disconnect();
+      ro = null;
+      if (timeoutId) clearTimeout(timeoutId);
+      timeoutId = null;
+      const anim = new MatrixAnimation(node, config);
+      animRef.current = anim;
+    };
+
+    if (node.clientWidth > 0 && node.clientHeight > 0) {
+      createAnim();
+    } else {
+      ro = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          const cr = entry.contentRect;
+          if (cr.width > 0 && cr.height > 0) {
+            createAnim();
+            return;
+          }
+        }
+      });
+      ro.observe(node);
+
+      // Fallback: if ResizeObserver never fires, force creation after a delay.
+      timeoutId = setTimeout(() => {
+        if (!created) {
+          node.style.width = window.innerWidth + "px";
+          node.style.height = window.innerHeight + "px";
+          createAnim();
+        }
+      }, 250);
     }
 
-    const today = getTodayStr();
-    const cachedDate = localStorage.getItem(CACHE_DATE_KEY);
-    const cachedUrl = localStorage.getItem(CACHE_URL_KEY);
-    const cachedSource = localStorage.getItem(CACHE_SOURCE_KEY);
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      ro?.disconnect();
+      animRef.current?.dispose();
+      animRef.current = null;
+    };
+  }, [preset]);
 
-    if (
-      cachedDate === today &&
-      cachedUrl &&
-      cachedSource === dailyBg.source &&
-      (dailyBg.source !== "custom" || cachedUrl === dailyBg.customUrl)
-    ) {
-      setBgUrl(cachedUrl);
-      return;
-    }
+  return (
+    <div
+      ref={containerRef}
+      className="matrix-animation-bg"
+      style={{
+        position: "absolute",
+        inset: 0,
+        width: "100%",
+        height: "100%",
+        pointerEvents: "none",
+        zIndex: 0,
+        background: "#000",
+      }}
+    />
+  );
+}
 
+function DailyBackground({
+  source,
+  customUrl,
+}: {
+  source: DailyBackgroundSource;
+  customUrl?: string;
+}) {
+  const [imageUrl, setImageUrl] = useState<string>("");
+
+  useEffect(() => {
     let cancelled = false;
-    fetchDailyImageUrl(dailyBg.source, dailyBg.customUrl).then((url) => {
-      if (cancelled || !url) return;
-      localStorage.setItem(CACHE_DATE_KEY, today);
-      localStorage.setItem(CACHE_URL_KEY, url);
-      localStorage.setItem(CACHE_SOURCE_KEY, dailyBg.source);
-      setBgUrl(url);
-    });
 
+    async function resolve() {
+      if (source === "custom") {
+        if (customUrl && !cancelled) setImageUrl(customUrl);
+        return;
+      }
+      if (source === "picsum") {
+        if (!cancelled) setImageUrl("https://picsum.photos/1920/1080");
+        return;
+      }
+      if (source === "unsplash") {
+        if (!cancelled) setImageUrl("https://source.unsplash.com/random/1920x1080");
+        return;
+      }
+      if (source === "bing") {
+        try {
+          const res = await fetch(
+            "https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=1&mkt=en-US",
+          );
+          const data = await res.json();
+          const url = data?.images?.[0]?.url;
+          if (url && !cancelled) {
+            setImageUrl(`https://www.bing.com${url}`);
+            return;
+          }
+        } catch {
+          /* CORS or network failure — fall through to fallback */
+        }
+        if (!cancelled) setImageUrl("https://picsum.photos/1920/1080");
+        return;
+      }
+    }
+
+    resolve();
     return () => {
       cancelled = true;
     };
-  }, [dailyBg?.enabled, dailyBg?.source, dailyBg?.customUrl]);
+  }, [source, customUrl]);
+
+  if (!imageUrl) return null;
+  return <ImageBackground imagePath={imageUrl} imageFit="cover" />;
+}
+
+function ImageBackground({
+  imagePath,
+  imageFit,
+}: {
+  imagePath: string;
+  imageFit?: string;
+}) {
+  const [src, setSrc] = useState<string>("");
+
+  useEffect(() => {
+    let cancelled = false;
+    let objectUrl = "";
+
+    async function load() {
+      if (!imagePath) return;
+      // HTTP/HTTPS URLs can be used directly
+      if (
+        imagePath.startsWith("http://") ||
+        imagePath.startsWith("https://") ||
+        imagePath.startsWith("data:")
+      ) {
+        if (!cancelled) setSrc(imagePath);
+        return;
+      }
+
+      // Local file path: read via IPC and create a blob URL
+      try {
+        const data = await window.htpc.files.read(imagePath);
+        if (!data || cancelled) return;
+        const blob = new Blob([new Uint8Array(data)]);
+        objectUrl = URL.createObjectURL(blob);
+        if (!cancelled) setSrc(objectUrl);
+      } catch {
+        if (!cancelled) setSrc("");
+      }
+    }
+
+    load();
+
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [imagePath]);
+
+  if (!src) return null;
+
+  const isTile = imageFit === "tile";
+  if (isTile) {
+    return (
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          zIndex: 0,
+          pointerEvents: "none",
+          backgroundImage: `url("${src}")`,
+          backgroundRepeat: "repeat",
+          backgroundSize: "auto",
+          backgroundPosition: "center",
+        }}
+      />
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt=""
+      style={{
+        position: "absolute",
+        inset: 0,
+        width: "100%",
+        height: "100%",
+        pointerEvents: "none",
+        zIndex: 0,
+        ...getImageStyle(imageFit),
+      }}
+    />
+  );
+}
+
+function BaseBackground({ background }: { background: BackgroundSettings }) {
+  if (background.type === "image") {
+    if (!background.imagePath) return null;
+    return (
+      <ImageBackground
+        imagePath={background.imagePath}
+        imageFit={background.imageFit}
+      />
+    );
+  }
+
+  if (background.type === "solid") {
+    return (
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          zIndex: 0,
+          pointerEvents: "none",
+          backgroundColor: background.solidColor || "#000000",
+        }}
+      />
+    );
+  }
+
+  if (background.type === "gradient") {
+    return (
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          zIndex: 0,
+          pointerEvents: "none",
+          background: background.gradient || "linear-gradient(#000, #000)",
+        }}
+      />
+    );
+  }
+
+  return null;
+}
+
+export const ThemeBackground: React.FC = () => {
+  const theme = useSettingsStore((s) => s.settings?.theme ?? "dark-oled");
+  const background = useSettingsStore(
+    (s) => s.settings?.background ?? { type: "theme" as const },
+  );
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  const useTheme = background.type === "theme";
+  const useMatrix = background.type === "matrix-preset";
+  const useDaily = background.type === "daily";
+  const useCustomBg =
+    background.type === "image" ||
+    background.type === "solid" ||
+    background.type === "gradient";
+  const isTerminalTuiTheme = theme === "terminal-tui";
+
+  useThemeCanvas(canvasRef, theme, useTheme);
+
+  let matrixPreset: MatrixPreset | undefined;
+  if (useMatrix) {
+    matrixPreset = background.matrixPreset ?? "digital-rain";
+  } else if (useTheme && isTerminalTuiTheme) {
+    matrixPreset = "matrix";
+  }
+
+  const showCanvas = useTheme && !isTerminalTuiTheme;
 
   return (
     <>
-      {bgUrl && (
-        <img
-          src={bgUrl}
-          alt=""
-          style={{
-            position: "absolute",
-            inset: 0,
-            width: "100%",
-            height: "100%",
-            objectFit: "cover",
-            pointerEvents: "none",
-            zIndex: 0,
-            opacity: 0.35,
-          }}
+      {useCustomBg && <BaseBackground background={background} />}
+      {useDaily && (
+        <DailyBackground
+          source={background.dailySource ?? "bing"}
+          customUrl={background.dailyCustomUrl}
         />
       )}
       <canvas
@@ -459,9 +897,11 @@ export const ThemeBackground: React.FC = () => {
           inset: 0,
           pointerEvents: "none",
           zIndex: 0,
-          mixBlendMode: bgUrl ? "overlay" : "normal",
+          mixBlendMode: useCustomBg ? "overlay" : "normal",
+          opacity: showCanvas ? 1 : 0,
         }}
       />
+      {matrixPreset && <MatrixBackground preset={matrixPreset} />}
     </>
   );
 };

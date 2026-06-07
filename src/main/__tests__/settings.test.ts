@@ -15,8 +15,11 @@ describe("settings defaults", () => {
       hardwareAcceleration: true,
       disabledTabs: [],
       dailyBackground: { enabled: false, source: "bing" },
+      background: { type: "theme" },
       defaultEmulatorShader: "",
       emulatorShaders: {},
+      commandKeybinds: {},
+      commandControllerMap: {},
     };
 
     expect(defaults.theme).toBe("dark-oled");
@@ -24,5 +27,6 @@ describe("settings defaults", () => {
     expect(Array.isArray(defaults.disabledTabs)).toBe(true);
     expect(typeof defaults.dailyBackground).toBe("object");
     expect(defaults.dailyBackground.enabled).toBe(false);
+    expect(defaults.background).toEqual({ type: "theme" });
   });
 });

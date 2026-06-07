@@ -84,6 +84,7 @@ export const IPC_CHANNELS = {
   },
   dialog: {
     openDirectory: "dialog:open-directory",
+    openFile: "dialog:open-file",
   },
   shell: {
     openPath: "shell:openPath",

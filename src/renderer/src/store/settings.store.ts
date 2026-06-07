@@ -22,8 +22,11 @@ const defaults: AppSettings = {
   hardwareAcceleration: true,
   disabledTabs: [],
   dailyBackground: { enabled: false, source: "bing" },
+  background: { type: "theme" },
   defaultEmulatorShader: "",
   emulatorShaders: {},
+  commandKeybinds: {},
+  commandControllerMap: {},
   flashSettings: {
     aspectRatio: "free",
     canvasSize: "window",
