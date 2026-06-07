@@ -1,13 +1,17 @@
 {
   "name": "ember",
+  "desktopName": "Ember",
   "version": "0.1.0",
   "description": "Home Theater PC Application",
   "license": "PolyForm-Noncommercial-1.0.0",
+  "homepage": "https://github.com/dotglitch/ember",
   "main": "out/main/index.js",
   "scripts": {
-    "postinstall": "node node_modules/electron/install.js && bun scripts/setup-v86.ts && bun scripts/setup-libretro.ts",
+    "postinstall": "node node_modules/electron/install.js && bun scripts/setup-v86.ts && bun scripts/setup-libretro.ts && cd native/libretro-frontend && cargo fetch",
     "dev": "bun scripts/dev.ts",
     "build": "electron-vite build",
+    "predist": "bun scripts/setup-libretro.ts",
+    "dist": "electron-builder",
     "preview": "electron-vite preview",
     "lint": "eslint src",
     "test": "bun test",
@@ -41,6 +45,7 @@
     "@vitejs/plugin-react": "^4.3.1",
     "autoprefixer": "^10.4.19",
     "electron": "^31.0.2",
+    "electron-builder": "^26.15.0",
     "electron-vite": "^5.0.0",
     "playwright": "^1.60.0",
     "postcss": "^8.4.38",
@@ -50,5 +55,59 @@
     "typescript": "^5.5.2",
     "vite": "^5.3.1",
     "ws": "^8.21.0"
+  },
+  "build": {
+    "appId": "dev.dotglitch.ember",
+    "productName": "Ember",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "out/**/*",
+      "resources/**/*",
+      "package.json"
+    ],
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": ["x64", "arm64"]
+        },
+        {
+          "target": "deb",
+          "arch": ["x64", "arm64"]
+        },
+        {
+          "target": "rpm",
+          "arch": ["x64", "arm64"]
+        },
+        {
+          "target": "tar.gz",
+          "arch": ["x64", "arm64"]
+        },
+        {
+          "target": "flatpak",
+          "arch": ["x64", "arm64"]
+        }
+      ],
+      "category": "AudioVideo",
+      "maintainer": "dotglitch",
+      "vendor": "dotglitch"
+    },
+    "flatpak": {
+      "runtime": "org.freedesktop.Platform",
+      "runtimeVersion": "23.08",
+      "sdk": "org.freedesktop.Sdk",
+      "base": "org.electronjs.Electron2.BaseApp",
+      "baseVersion": "23.08",
+      "finishArgs": [
+        "--socket=wayland",
+        "--socket=x11",
+        "--share=ipc",
+        "--device=dri",
+        "--socket=pulseaudio",
+        "--filesystem=home"
+      ]
+    }
   }
 }

@@ -12,3 +12,5 @@ resources/v86-bios/
 native/libretro-frontend/target/
 native/libretro-frontend/Cargo.lock
 resources/*.node
+
+release

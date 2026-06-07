@@ -164,7 +164,7 @@ function emulatorjsStaticPlugin(): Plugin {
 }
 
 function libretroStaticPlugin(): Plugin {
-  const addonPath = resolve("resources/libretro-frontend.linux-x64-gnu.node");
+  const arches = ["x64", "arm64"];
 
   return {
     name: "libretro-static",
@@ -177,6 +177,8 @@ function libretroStaticPlugin(): Plugin {
           res.end("Bad Request");
           return;
         }
+        const hostArch = process.arch === "arm64" ? "arm64" : "x64";
+        const addonPath = resolve(`resources/libretro-frontend.linux-${hostArch}-gnu.node`);
         if (!existsSync(addonPath)) {
           res.statusCode = 404;
           res.end("Native addon not found. Run cargo build in native/libretro-frontend/");
@@ -189,8 +191,11 @@ function libretroStaticPlugin(): Plugin {
     writeBundle(options) {
       const outDir = options.dir;
       if (!outDir) return;
-      if (existsSync(addonPath)) {
-        copyFileSync(addonPath, resolve(outDir, "libretro-frontend.linux-x64-gnu.node"));
+      for (const arch of arches) {
+        const addonPath = resolve(`resources/libretro-frontend.linux-${arch}-gnu.node`);
+        if (existsSync(addonPath)) {
+          copyFileSync(addonPath, resolve(outDir, `libretro-frontend.linux-${arch}-gnu.node`));
+        }
       }
     },
   };
