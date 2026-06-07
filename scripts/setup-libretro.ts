@@ -2,8 +2,8 @@ import { existsSync, copyFileSync } from "fs";
 import { resolve } from "path";
 
 const ARCHS = [
-  { target: "x86_64-unknown-linux-gnu", arch: "x64", dir: "target/release" },
-  { target: "aarch64-unknown-linux-gnu", arch: "arm64", dir: "target/aarch64-unknown-linux-gnu/release" },
+  { target: "x86_64-unknown-linux-gnu", arch: "x64", dirs: ["target/x86_64-unknown-linux-gnu/release", "target/release"] },
+  { target: "aarch64-unknown-linux-gnu", arch: "arm64", dirs: ["target/aarch64-unknown-linux-gnu/release"] },
 ] as const;
 
 async function buildArch(target: string, cwd: string): Promise<number> {
@@ -24,24 +24,35 @@ async function buildArch(target: string, cwd: string): Promise<number> {
   return proc.exitCode ?? 1;
 }
 
+function findAddon(rustDir: string, dirs: readonly string[]): string | undefined {
+  for (const dir of dirs) {
+    const candidate = resolve(rustDir, dir, "liblibretro_frontend.so");
+    if (existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  return undefined;
+}
+
 async function main() {
   const rustDir = resolve("native/libretro-frontend");
   console.log("Setting up libretro native addon...\n");
 
-  for (const { target, arch, dir } of ARCHS) {
-    const src = resolve(rustDir, dir, "liblibretro_frontend.so");
+  for (const { target, arch, dirs } of ARCHS) {
     const dest = resolve(`resources/libretro-frontend.linux-${arch}-gnu.node`);
+    let src = findAddon(rustDir, dirs);
 
-    if (!existsSync(src)) {
+    if (!src) {
       const exitCode = await buildArch(target, rustDir);
       if (exitCode !== 0) {
         console.warn(`Warning: failed to build ${target} (exit ${exitCode}). Skipping ${arch}.`);
         continue;
       }
+      src = findAddon(rustDir, dirs);
     }
 
-    if (!existsSync(src)) {
-      console.error(`Addon not found after build: ${src}`);
+    if (!src) {
+      console.error(`Addon not found after build for ${arch}`);
       process.exit(1);
     }
 
