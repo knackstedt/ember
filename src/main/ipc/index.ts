@@ -88,8 +88,8 @@ import {
   checkUpdates,
   setAptPassword,
   detectInstalledCores,
-  detectWineRunner,
 } from "../services/package-manager.service";
+import { detectWineRunner } from "../services/wine-detection.service";
 import {
   enrichTrack,
   enrichTracks,

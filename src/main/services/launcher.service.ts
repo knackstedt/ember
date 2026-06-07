@@ -3,7 +3,7 @@ import { existsSync } from "fs";
 import { Game, Movie, MusicTrack } from "../../shared/types";
 import { createLogger } from "../util/logger";
 import { GameRepo } from "../db/repository";
-import { buildWineCommand } from "./package-manager.service";
+import { buildWineCommand } from "./wine-detection.service";
 
 const log = createLogger("info");
 

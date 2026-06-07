@@ -1,14 +1,12 @@
-import { spawn, SpawnOptions, ChildProcess } from "child_process";
+import { spawn, ChildProcess } from "child_process";
 import { join } from "path";
 import { existsSync, mkdirSync, readdirSync, statSync, unlinkSync } from "fs";
-import { homedir } from "os";
 import { app, BrowserWindow } from "electron";
 import { createLogger } from "../util/logger";
 import {
   ManagedPackage,
   PackageManager,
   PackageOperationProgress,
-  WineRunner,
 } from "../../shared/types";
 import {
   BUILDBOT_CORES,
@@ -17,6 +15,18 @@ import {
   isBuildbotCoreInstalled,
   getBuildbotCoreVersion,
 } from "./buildbot.service";
+import {
+  runCommand,
+  isAptInstalled,
+  getAptVersion,
+  isWineInstalled,
+  getWineVersion,
+  getProtonGeDir,
+  getInstalledProtonGeVersion,
+  fetchLatestProtonGeRelease,
+  isProtonGeInstalled,
+  buildWineCommand,
+} from "./wine-detection.service";
 
 const log = createLogger("info");
 
@@ -133,39 +143,6 @@ function getAppimageDir(): string {
   return dir;
 }
 
-function runCommand(
-  cmd: string,
-  args: string[],
-  options?: SpawnOptions & { input?: string }
-): Promise<{ stdout: string; stderr: string; code: number | null }> {
-  return new Promise((resolve) => {
-    const proc = spawn(cmd, args, {
-      env: { ...process.env, DEBIAN_FRONTEND: "noninteractive" },
-      ...options,
-    });
-
-    let stdout = "";
-    let stderr = "";
-
-    proc.stdout?.setEncoding("utf8");
-    proc.stderr?.setEncoding("utf8");
-    proc.stdout?.on("data", (d: string) => { stdout += d; });
-    proc.stderr?.on("data", (d: string) => { stderr += d; });
-
-    if (options?.input) {
-      proc.stdin?.write(options.input);
-      proc.stdin?.end();
-    }
-
-    proc.on("close", (code) => {
-      resolve({ stdout, stderr, code });
-    });
-    proc.on("error", (err) => {
-      resolve({ stdout, stderr: stderr || String(err), code: 1 });
-    });
-  });
-}
-
 function sendProgress(
   window: BrowserWindow | null,
   progress: PackageOperationProgress
@@ -196,17 +173,6 @@ export async function detectPackageManager(): Promise<PackageManager[]> {
   // buildbot is always available (HTTP download)
   results.push("buildbot");
   return results;
-}
-
-async function isAptInstalled(aptName: string): Promise<boolean> {
-  const { code } = await runCommand("dpkg-query", ["-W", "-f='${Status}'", aptName]);
-  return code === 0;
-}
-
-async function getAptVersion(aptName: string): Promise<string | undefined> {
-  const { stdout, code } = await runCommand("dpkg-query", ["-W", "-f='${Version}'", aptName]);
-  if (code === 0) return stdout.trim().replace(/^'|'$/g, "");
-  return undefined;
 }
 
 async function isFlatpakInstalled(flatpakRef: string): Promise<boolean> {
@@ -244,70 +210,6 @@ function getAppimageVersion(name: string): string | undefined {
   } catch {
     return undefined;
   }
-}
-
-// ---------------------------------------------------------------------------
-//  Wine / Proton-GE detection helpers
-// ---------------------------------------------------------------------------
-
-async function isWineInstalled(): Promise<boolean> {
-  // Check system wine first
-  const { code: sysCode } = await runCommand("sh", ["-c", "command -v wine"]);
-  if (sysCode === 0) return true;
-  // Also check WineHQ package directly
-  return isAptInstalled("winehq-stable");
-}
-
-async function getWineVersion(): Promise<string | undefined> {
-  const { stdout, code } = await runCommand("wine", ["--version"]);
-  if (code === 0) return stdout.trim().replace(/^wine-/, "");
-  return getAptVersion("winehq-stable");
-}
-
-function getProtonGeDir(): string {
-  // Steam compatibilitytools.d is the conventional install location
-  const steamDir = join(homedir(), ".steam", "root", "compatibilitytools.d");
-  const steamFlatpak = join(homedir(), ".var", "app", "com.valvesoftware.Steam", "data", "Steam", "compatibilitytools.d");
-  if (existsSync(steamDir)) return steamDir;
-  if (existsSync(steamFlatpak)) return steamFlatpak;
-  // Fallback: create under steam root
-  mkdirSync(steamDir, { recursive: true });
-  return steamDir;
-}
-
-function getInstalledProtonGeVersion(): string | undefined {
-  try {
-    const dir = getProtonGeDir();
-    const entries = readdirSync(dir);
-    // Entries look like "GE-Proton9-27"
-    const ge = entries.filter((e) => /^GE-Proton/i.test(e));
-    if (ge.length === 0) return undefined;
-    // Sort descending to return the newest installed version
-    ge.sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
-    return ge[0];
-  } catch {
-    return undefined;
-  }
-}
-
-async function fetchLatestProtonGeRelease(): Promise<{ tag: string; tarUrl: string } | null> {
-  try {
-    const res = await fetch(
-      "https://api.github.com/repos/GloriousEggroll/proton-ge-custom/releases/latest",
-      { headers: { Accept: "application/vnd.github+json", "User-Agent": "htpc-app" } }
-    );
-    if (!res.ok) return null;
-    const data = await res.json() as { tag_name: string; assets: { name: string; browser_download_url: string }[] };
-    const tarAsset = data.assets.find((a) => a.name.endsWith(".tar.gz") && !a.name.includes("sha512sum"));
-    if (!tarAsset) return null;
-    return { tag: data.tag_name, tarUrl: tarAsset.browser_download_url };
-  } catch {
-    return null;
-  }
-}
-
-async function isProtonGeInstalled(): Promise<boolean> {
-  return getInstalledProtonGeVersion() !== undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -455,62 +357,6 @@ async function uninstallProtonGe(packageId: string, window: BrowserWindow | null
 
 // ---------------------------------------------------------------------------
 //  Wine runner detection (exported for IPC + scanner use)
-// ---------------------------------------------------------------------------
-
-/**
- * Detect the best available Windows .exe runner on this system.
- * Priority: umu-run > Proton-GE > system Proton (Steam) > Wine.
- * Returns null if nothing is installed.
- */
-export async function detectWineRunner(): Promise<WineRunner | null> {
-  if (await isUmuRunInstalled()) return "umu-run";
-  if (await isProtonGeInstalled()) return "proton-ge";
-
-  // Check for system Proton bundled with Steam
-  const systemProtonPaths = [
-    join(homedir(), ".steam", "root", "ubuntu12_32", "steam-runtime"),
-    join(homedir(), ".local", "share", "Steam", "ubuntu12_32", "steam-runtime"),
-    "/usr/bin/steam-runtime-launch-client",
-  ];
-  if (systemProtonPaths.some(existsSync)) return "system-proton";
-
-  if (await isWineInstalled()) return "wine";
-  return null;
-}
-
-async function isUmuRunInstalled(): Promise<boolean> {
-  const { code } = await runCommand("sh", ["-c", "command -v umu-run"]);
-  return code === 0;
-}
-
-/**
- * Build the command + args to launch a Windows .exe with the best available runner.
- */
-export async function buildWineCommand(exePath: string, preferredRunner?: WineRunner): Promise<{ cmd: string; args: string[] } | null> {
-  const runner = preferredRunner ?? (await detectWineRunner());
-  if (!runner) return null;
-
-  if (runner === "umu-run") {
-    return { cmd: "umu-run", args: [exePath] };
-  }
-
-  if (runner === "proton-ge" || runner === "system-proton") {
-    const geVersion = getInstalledProtonGeVersion();
-    if (geVersion) {
-      const protonExe = join(getProtonGeDir(), geVersion, "proton");
-      if (existsSync(protonExe)) {
-        return {
-          cmd: protonExe,
-          args: ["run", exePath],
-        };
-      }
-    }
-    // Fall through to wine if proton binary not found
-  }
-
-  return { cmd: "wine", args: [exePath] };
-}
-
 // ---------------------------------------------------------------------------
 //  Live core detection
 // ---------------------------------------------------------------------------

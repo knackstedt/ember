@@ -4,7 +4,7 @@ import { homedir } from "os";
 import { createHash } from "crypto";
 import { Game, WineRunner } from "../../shared/types";
 import { createLogger } from "../util/logger";
-import { detectWineRunner } from "../services/package-manager.service";
+import { detectWineRunner } from "../services/wine-detection.service";
 
 const log = createLogger("info");
 
