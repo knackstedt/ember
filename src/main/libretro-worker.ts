@@ -10,11 +10,14 @@
 import { join } from "path";
 import { existsSync } from "fs";
 
+const arch = process.arch === "arm64" ? "arm64" : "x64";
+const addonName = `libretro-frontend.linux-${arch}-gnu.node`;
+
 function findAddon(): string | null {
   const candidates = [
-    join(__dirname, "..", "..", "resources", "libretro-frontend.linux-x64-gnu.node"),
-    join(__dirname, "..", "renderer", "libretro-frontend.linux-x64-gnu.node"),
-    join(__dirname, "libretro-frontend.linux-x64-gnu.node"),
+    join(__dirname, "..", "..", "resources", addonName),
+    join(__dirname, "..", "renderer", addonName),
+    join(__dirname, addonName),
   ];
   for (const p of candidates) {
     if (existsSync(p)) return p;
@@ -24,7 +27,7 @@ function findAddon(): string | null {
 
 const addonPath = findAddon();
 if (!addonPath) {
-  console.error(JSON.stringify({ error: "Libretro native addon not found" }));
+  console.error(JSON.stringify({ error: `Libretro native addon not found (${addonName})` }));
   process.exit(1);
 }
 

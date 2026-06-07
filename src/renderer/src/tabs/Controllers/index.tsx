@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Gamepad2 } from "lucide-react";
+import { Gamepad2, Lock, Unlock } from "lucide-react";
 import { useInputStore } from "../../store/input.store";
+import type { LiveControllerState } from "../../store/input.store";
 import {
   ControllerDevice,
   ControllerType,
@@ -252,20 +253,44 @@ function DiagramForDevice({
   type,
   highlight,
   learn,
+  pressed,
+  axes,
 }: {
   type: ControllerType;
   highlight: string | null;
   learn: string | null;
+  pressed?: string[];
+  axes?: Record<string, number>;
 }) {
   if (type === "xbox")
-    return <XboxController highlightCode={highlight} learnCode={learn} />;
+    return (
+      <XboxController
+        highlightCode={highlight}
+        learnCode={learn}
+        pressedCodes={pressed}
+        axes={axes}
+      />
+    );
   if (type === "ps4" || type === "ps5" || type === "ps3")
-    return <PS4Controller highlightCode={highlight} learnCode={learn} />;
+    return (
+      <PS4Controller
+        highlightCode={highlight}
+        learnCode={learn}
+        pressedCodes={pressed}
+        axes={axes}
+      />
+    );
   return null;
 }
 
 export const ControllersTab: React.FC = () => {
-  const { devices, lastEvent } = useInputStore();
+  const {
+    devices,
+    lastEvent,
+    liveStates,
+    controllersTabLocked,
+    controllersTabUnlockProgress,
+  } = useInputStore();
   const [selectedDevice, setSelectedDevice] = useState<ControllerDevice | null>(
     null,
   );
@@ -276,6 +301,10 @@ export const ControllersTab: React.FC = () => {
   const [confirmReset, setConfirmReset] = useState(false);
   const learningRef = useRef<string | null>(null);
   learningRef.current = learningCode;
+
+  const liveState: LiveControllerState | null = selectedDevice
+    ? (liveStates[selectedDevice.id] ?? null)
+    : null;
 
   useEffect(() => {
     if (devices.length > 0 && !selectedDevice) setSelectedDevice(devices[0]);
@@ -525,6 +554,62 @@ export const ControllersTab: React.FC = () => {
               </AnimatePresence>
             </div>
 
+            {/* Controller lock / unlock prompt */}
+            <AnimatePresence>
+              {controllersTabLocked && (
+                <motion.div
+                  className="flex flex-col gap-2 px-4 py-3 rounded text-sm"
+                  style={{
+                    background:
+                      "color-mix(in srgb, var(--color-accent) 12%, var(--color-surface))",
+                    border: "1px solid var(--color-accent)",
+                  }}
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                >
+                  <div className="flex items-center gap-2">
+                    <Lock size={16} style={{ color: "var(--color-accent)" }} />
+                    <span style={{ color: "var(--color-text)" }}>
+                      Controller navigation is <strong>locked</strong> while
+                      viewing this tab.
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs" style={{ color: "var(--color-text-dim)" }}>
+                      Hold <strong>X / □</strong> for 5 seconds to unlock
+                    </span>
+                    <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: "var(--color-surface-raised)" }}>
+                      <motion.div
+                        className="h-full rounded-full"
+                        style={{ background: "var(--color-accent)" }}
+                        animate={{ width: `${controllersTabUnlockProgress * 100}%` }}
+                        transition={{ duration: 0.05 }}
+                      />
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+              {!controllersTabLocked && (
+                <motion.div
+                  className="flex items-center gap-2 px-4 py-2 rounded text-sm"
+                  style={{
+                    background:
+                      "color-mix(in srgb, #5bba47 12%, var(--color-surface))",
+                    border: "1px solid #5bba47",
+                  }}
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                >
+                  <Unlock size={16} style={{ color: "#5bba47" }} />
+                  <span style={{ color: "var(--color-text)" }}>
+                    Controller navigation <strong>unlocked</strong>
+                  </span>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             {/* SVG diagram */}
             {hasDiagram && (
               <div
@@ -538,7 +623,120 @@ export const ControllersTab: React.FC = () => {
                   type={selectedDevice.type}
                   highlight={hoveredCode}
                   learn={learningCode}
+                  pressed={
+                    liveState
+                      ? Object.entries(liveState.buttons)
+                          .filter(([, v]) => v)
+                          .map(([k]) => k)
+                      : undefined
+                  }
+                  axes={liveState?.axes}
                 />
+              </div>
+            )}
+
+            {/* Live input readout */}
+            {liveState && (
+              <div
+                className="rounded-[var(--radius-card)] p-4 flex flex-col gap-3"
+                style={{
+                  background: "var(--color-surface)",
+                  border: "1px solid var(--color-border)",
+                }}
+              >
+                <h3
+                  className="text-xs font-semibold uppercase tracking-wider"
+                  style={{ color: "var(--color-text-dim)" }}
+                >
+                  Live Input
+                </h3>
+                {/* Buttons */}
+                <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                  {BUTTON_CODES.map((code) => {
+                    const pressed = liveState.buttons[code] ?? false;
+                    return (
+                      <div
+                        key={code}
+                        className="flex flex-col items-center gap-1 p-2 rounded"
+                        style={{
+                          background: pressed
+                            ? "color-mix(in srgb, var(--color-accent) 25%, var(--color-surface-raised))"
+                            : "var(--color-surface-raised)",
+                          border: `1px solid ${pressed ? "var(--color-accent)" : "var(--color-border)"}`,
+                        }}
+                      >
+                        <span
+                          className="text-[10px] font-medium uppercase"
+                          style={{ color: "var(--color-text-dim)" }}
+                        >
+                          {BUTTON_LABELS[code] ?? code}
+                        </span>
+                        <div
+                          className="w-3 h-3 rounded-full"
+                          style={{
+                            background: pressed
+                              ? "var(--color-accent)"
+                              : "var(--color-border)",
+                          }}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+                {/* Axes */}
+                {Object.keys(liveState.axes).length > 0 && (
+                  <div className="flex flex-col gap-2">
+                    {Object.entries(liveState.axes).map(([axis, value]) => {
+                      const normalized =
+                        typeof value === "number"
+                          ? Math.max(-1, Math.min(1, value / 32767))
+                          : value;
+                      const isCenter = Math.abs(normalized) < 0.05;
+                      const pct = ((normalized + 1) / 2) * 100;
+                      return (
+                        <div key={axis} className="flex items-center gap-3">
+                          <span
+                            className="text-[10px] font-mono uppercase w-20 shrink-0"
+                            style={{ color: "var(--color-text-dim)" }}
+                          >
+                            {axis}
+                          </span>
+                          <div className="flex-1 h-3 rounded-full relative overflow-hidden" style={{ background: "var(--color-surface-raised)" }}>
+                            <div
+                              className="absolute top-0 bottom-0 rounded-full transition-all"
+                              style={{
+                                left: "50%",
+                                width: isCenter ? "2px" : `${Math.abs(pct - 50) * 2}%`,
+                                background: isCenter
+                                  ? "var(--color-border)"
+                                  : "var(--color-accent)",
+                                transform: isCenter
+                                  ? "translateX(-1px)"
+                                  : normalized >= 0
+                                    ? "none"
+                                    : `translateX(-${Math.abs(pct - 50) * 2}%) translateX(-100%)`,
+                              }}
+                            />
+                            <div
+                              className="absolute top-0 bottom-0 w-0.5 rounded-full"
+                              style={{
+                                left: "50%",
+                                background: "var(--color-text-dim)",
+                                transform: "translateX(-50%)",
+                              }}
+                            />
+                          </div>
+                          <span
+                            className="text-[10px] font-mono w-10 text-right shrink-0"
+                            style={{ color: "var(--color-text-dim)" }}
+                          >
+                            {typeof value === "number" ? value.toFixed(0) : value}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
 

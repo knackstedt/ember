@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { useInputStore } from "../store/input.store";
 
 /**
  * Fallback gamepad input using the browser Gamepad API.
@@ -42,6 +43,14 @@ export function useGamepadApi(enabled: boolean) {
   const timersRef = useRef<Record<string, number>>({});
   const cooldownRef = useRef<Record<string, number>>({});
   const longPressTimersRef = useRef<Record<number, number>>({});
+  const lockedRef = useRef(true);
+
+  useEffect(() => {
+    const unsub = useInputStore.subscribe((state) => {
+      lockedRef.current = state.controllersTabLocked;
+    });
+    return () => unsub();
+  }, []);
 
   useEffect(() => {
     if (!enabled) return;
@@ -73,9 +82,64 @@ export function useGamepadApi(enabled: boolean) {
         const nextButtons: (boolean | undefined)[] = [];
         const nextAxes: number[] = [...gp.axes];
 
+        // Build live state for the Controllers tab readout
+        const liveButtons: Record<string, boolean> = {};
+        const liveAxes: Record<string, number> = {};
+        const gamepadBtnToAction: Record<number, string> = {
+          0: "south",
+          1: "east",
+          2: "west",
+          3: "north",
+          4: "left_bumper",
+          5: "right_bumper",
+          6: "left_trigger",
+          7: "right_trigger",
+          8: "select",
+          9: "start",
+          10: "left_thumb",
+          11: "right_thumb",
+          12: "dpad_up",
+          13: "dpad_down",
+          14: "dpad_left",
+          15: "dpad_right",
+          16: "home",
+        };
+        let liveChanged = false;
+        for (let i = 0; i < gp.buttons.length; i++) {
+          const pressed = gp.buttons[i]?.pressed ?? false;
+          nextButtons[i] = pressed;
+          const action = gamepadBtnToAction[i];
+          if (action) {
+            liveButtons[action] = pressed;
+            if (pressed !== (prev.buttons[i] ?? false)) liveChanged = true;
+          }
+        }
+        for (let i = 0; i < gp.axes.length; i++) {
+          const val = gp.axes[i] ?? 0;
+          nextAxes[i] = val;
+          const axisName = i === 0 ? "left_x" : i === 1 ? "left_y" : i === 2 ? "right_x" : i === 3 ? "right_y" : `axis_${i}`;
+          liveAxes[axisName] = val;
+          if (val !== (prev.axes[i] ?? 0)) liveChanged = true;
+        }
+        if (liveChanged) {
+          const existing = useInputStore.getState().liveStates[id];
+          useInputStore.setState({
+            liveStates: {
+              ...useInputStore.getState().liveStates,
+              [id]: {
+                buttons: { ...(existing?.buttons ?? {}), ...liveButtons },
+                axes: { ...(existing?.axes ?? {}), ...liveAxes },
+                lastUpdated: Date.now(),
+              },
+            },
+          });
+        }
+
+        // Skip navigation dispatch when the Controllers tab is locked
+        if (lockedRef.current) continue;
+
         for (let i = 0; i < gp.buttons.length; i++) {
           const pressed = gp.buttons[i]?.pressed;
-          nextButtons[i] = pressed;
 
           if (pressed && !prev.buttons[i]) {
             // Button pressed

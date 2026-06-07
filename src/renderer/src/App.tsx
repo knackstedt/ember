@@ -193,6 +193,11 @@ export default function App(): React.ReactElement {
   /* Button long-press timers for evdev controller input */
   const buttonTimersRef = useRef<Record<string, number>>({});
 
+  /* Controllers tab lock state */
+  const controllersTabLockedRef = useRef(true);
+  const unlockTimerRef = useRef<number | null>(null);
+  const unlockIntervalRef = useRef<number | null>(null);
+
   function getAxisNavAction(axis: string, value: number): string | null {
     if (axis === "dpad_x") {
       if (value < 0) return "left";
@@ -354,6 +359,27 @@ export default function App(): React.ReactElement {
     useFocusZoneStore.getState().clearZone();
   }, [activeTab]);
 
+  /* Reset controller lock when entering / leaving the Controllers tab */
+  useEffect(() => {
+    if (activeTab === "controllers") {
+      controllersTabLockedRef.current = true;
+      useInputStore.getState().setControllersTabLocked(true);
+      useInputStore.getState().setControllersTabUnlockProgress(0);
+    } else {
+      if (unlockTimerRef.current) {
+        clearTimeout(unlockTimerRef.current);
+        unlockTimerRef.current = null;
+      }
+      if (unlockIntervalRef.current) {
+        clearInterval(unlockIntervalRef.current);
+        unlockIntervalRef.current = null;
+      }
+      controllersTabLockedRef.current = true;
+      useInputStore.getState().setControllersTabLocked(true);
+      useInputStore.getState().setControllersTabUnlockProgress(0);
+    }
+  }, [activeTab]);
+
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail as { tab?: TabId };
@@ -400,6 +426,7 @@ export default function App(): React.ReactElement {
       window.htpc.input.onDeviceDisconnected(removeDevice);
     const unsubEvent = window.htpc.input.onEvent((ev) => {
       useInputStore.getState().setLastEvent(ev);
+      useInputStore.getState().updateLiveState(ev.deviceId, ev);
       if (ev.source === "gamepad" && !evdevGamepadActiveRef.current) {
         evdevGamepadActiveRef.current = true;
         setEvdevGamepadActive(true);
@@ -423,6 +450,51 @@ export default function App(): React.ReactElement {
           }
           return;
         }
+        return;
+      }
+
+      // Controllers tab lock / unlock logic
+      if (
+        activeTabRef.current === "controllers" &&
+        ev.source === "gamepad" &&
+        controllersTabLockedRef.current
+      ) {
+        if (ev.type === "button_press" && ev.action === "west") {
+          if (!unlockTimerRef.current) {
+            const startTime = Date.now();
+            unlockIntervalRef.current = window.setInterval(() => {
+              const elapsed = Date.now() - startTime;
+              const progress = Math.min(elapsed / 5000, 1);
+              useInputStore.getState().setControllersTabUnlockProgress(progress);
+              if (progress >= 1) {
+                controllersTabLockedRef.current = false;
+                useInputStore.getState().setControllersTabLocked(false);
+                if (unlockTimerRef.current) {
+                  clearTimeout(unlockTimerRef.current);
+                  unlockTimerRef.current = null;
+                }
+                if (unlockIntervalRef.current) {
+                  clearInterval(unlockIntervalRef.current);
+                  unlockIntervalRef.current = null;
+                }
+              }
+            }, 50);
+            unlockTimerRef.current = window.setTimeout(() => {
+              // Unlock is handled by the interval above for smooth progress
+            }, 5000);
+          }
+        } else if (ev.type === "button_release" && ev.action === "west") {
+          if (unlockTimerRef.current) {
+            clearTimeout(unlockTimerRef.current);
+            unlockTimerRef.current = null;
+          }
+          if (unlockIntervalRef.current) {
+            clearInterval(unlockIntervalRef.current);
+            unlockIntervalRef.current = null;
+          }
+          useInputStore.getState().setControllersTabUnlockProgress(0);
+        }
+        // Suppress all controller navigation while locked
         return;
       }
 
@@ -527,6 +599,14 @@ export default function App(): React.ReactElement {
       axisTimersRef.current = {};
       axisCooldownRef.current = {};
       buttonTimersRef.current = {};
+      if (unlockTimerRef.current) {
+        clearTimeout(unlockTimerRef.current);
+        unlockTimerRef.current = null;
+      }
+      if (unlockIntervalRef.current) {
+        clearInterval(unlockIntervalRef.current);
+        unlockIntervalRef.current = null;
+      }
     };
   }, []);
 
