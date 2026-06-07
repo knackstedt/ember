@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Play,
@@ -14,6 +14,7 @@ import {
   Repeat,
 } from "lucide-react";
 import { useMusicPlayerStore } from "../../store/musicPlayer.store";
+import { useFocusZoneStore } from "../../store/focusZone.store";
 
 const PLAYER_HEIGHT = 72;
 
@@ -29,6 +30,11 @@ const REPEAT_NEXT: Record<"none" | "all" | "one", "all" | "one" | "none"> = {
   all: "one",
   one: "none",
 };
+
+type PlayerButton = "prev" | "play" | "next" | "shuffle" | "repeat" | "collapse";
+
+const FULL_BUTTONS: PlayerButton[] = ["prev", "play", "next", "shuffle", "repeat", "collapse"];
+const COLLAPSED_BUTTONS: PlayerButton[] = ["play", "collapse"];
 
 export const MusicPlayer: React.FC = () => {
   const {
@@ -50,7 +56,15 @@ export const MusicPlayer: React.FC = () => {
     toggleRepeat,
   } = useMusicPlayerStore();
 
+  const activeZone = useFocusZoneStore((s) => s.activeZone);
+  const setZone = useFocusZoneStore((s) => s.setZone);
+
   const [collapsed, setCollapsed] = useState(false);
+  const [focusedButton, setFocusedButton] = useState<PlayerButton>("play");
+  const focusedButtonRef = useRef(focusedButton);
+  focusedButtonRef.current = focusedButton;
+
+  const buttons = collapsed ? COLLAPSED_BUTTONS : FULL_BUTTONS;
 
   useEffect(() => {
     const check = (): void => setCollapsed(window.innerHeight < 480);
@@ -59,8 +73,82 @@ export const MusicPlayer: React.FC = () => {
     return () => window.removeEventListener("resize", check);
   }, []);
 
+  useEffect(() => {
+    if (activeZone === "player" && collapsed) {
+      setCollapsed(false);
+    }
+  }, [activeZone]);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      if (activeZone !== "player") return;
+      const detail = (e as CustomEvent).detail as { action: string };
+      const action = detail?.action;
+      if (!action) return;
+
+      const currentButtons = collapsed ? COLLAPSED_BUTTONS : FULL_BUTTONS;
+      const idx = currentButtons.indexOf(focusedButtonRef.current);
+
+      switch (action) {
+        case "left": {
+          if (idx > 0) {
+            setFocusedButton(currentButtons[idx - 1]);
+          }
+          break;
+        }
+        case "right": {
+          if (idx < currentButtons.length - 1) {
+            setFocusedButton(currentButtons[idx + 1]);
+          }
+          break;
+        }
+        case "up": {
+          setZone("tab");
+          break;
+        }
+        case "confirm": {
+          const btn = focusedButtonRef.current;
+          switch (btn) {
+            case "prev":
+              prev();
+              break;
+            case "play":
+              playing ? pause() : resume();
+              break;
+            case "next":
+              next();
+              break;
+            case "shuffle":
+              toggleShuffle();
+              break;
+            case "repeat":
+              toggleRepeat();
+              break;
+            case "collapse":
+              setCollapsed(true);
+              break;
+          }
+          break;
+        }
+        case "cancel": {
+          setZone("tab");
+          break;
+        }
+      }
+    };
+
+    window.addEventListener("htpc:nav", handler);
+    return () => window.removeEventListener("htpc:nav", handler);
+  }, [activeZone, playing, collapsed, setZone, prev, pause, resume, next, toggleShuffle, toggleRepeat]);
+
   const track = queue[currentIndex];
   if (!track) return null;
+
+  const isFocused = (btn: PlayerButton) => activeZone === "player" && focusedButton === btn;
+  const focusStyle = (btn: PlayerButton): React.CSSProperties =>
+    isFocused(btn)
+      ? { outline: "2px solid var(--color-accent)", outlineOffset: "2px", borderRadius: "var(--radius-card)" }
+      : {};
 
   const albumArt = track.albumArtUrl ? (
     <img
@@ -105,6 +193,7 @@ export const MusicPlayer: React.FC = () => {
           style={{
             background: "var(--color-accent)",
             color: "var(--color-bg)",
+            ...focusStyle("play"),
           }}
           aria-label={playing ? "Pause" : "Play"}
         >
@@ -113,7 +202,7 @@ export const MusicPlayer: React.FC = () => {
         <button
           onClick={() => setCollapsed(false)}
           className="w-6 h-6 flex items-center justify-center rounded text-xs"
-          style={{ color: "var(--color-text-dim)" }}
+          style={{ color: "var(--color-text-dim)", ...focusStyle("collapse") }}
           aria-label="Expand player"
           title="Expand"
         >
@@ -169,7 +258,7 @@ export const MusicPlayer: React.FC = () => {
         <button
           onClick={prev}
           className="w-8 h-8 flex items-center justify-center rounded hover:bg-white/10 transition-colors"
-          style={{ color: "var(--color-text)", fontSize: 18 }}
+          style={{ color: "var(--color-text)", fontSize: 18, ...focusStyle("prev") }}
           aria-label="Previous"
           title="Previous"
         >
@@ -181,6 +270,7 @@ export const MusicPlayer: React.FC = () => {
           style={{
             background: "var(--color-accent)",
             color: "var(--color-bg)",
+            ...focusStyle("play"),
           }}
           aria-label={playing ? "Pause" : "Play"}
         >
@@ -189,7 +279,7 @@ export const MusicPlayer: React.FC = () => {
         <button
           onClick={next}
           className="w-8 h-8 flex items-center justify-center rounded hover:bg-white/10 transition-colors"
-          style={{ color: "var(--color-text)", fontSize: 18 }}
+          style={{ color: "var(--color-text)", fontSize: 18, ...focusStyle("next") }}
           aria-label="Next"
           title="Next"
         >
@@ -253,6 +343,7 @@ export const MusicPlayer: React.FC = () => {
           color: shuffle ? "var(--color-accent)" : "var(--color-text-dim)",
           background: shuffle ? "var(--color-accent-dim)" : "transparent",
           opacity: shuffle ? 1 : 0.6,
+          ...focusStyle("shuffle"),
         }}
         aria-label={shuffle ? "Shuffle on" : "Shuffle off"}
         title={shuffle ? "Shuffle on" : "Shuffle off"}
@@ -270,6 +361,7 @@ export const MusicPlayer: React.FC = () => {
           background:
             repeat !== "none" ? "var(--color-accent-dim)" : "transparent",
           opacity: repeat !== "none" ? 1 : 0.6,
+          ...focusStyle("repeat"),
         }}
         aria-label={`Repeat: ${repeat} → ${REPEAT_NEXT[repeat]}`}
         title={`Repeat: ${repeat}`}
@@ -289,7 +381,7 @@ export const MusicPlayer: React.FC = () => {
       <button
         onClick={() => setCollapsed(true)}
         className="w-7 h-7 flex items-center justify-center rounded text-sm ml-1 hover:bg-white/10 transition-colors"
-        style={{ color: "var(--color-text-dim)" }}
+        style={{ color: "var(--color-text-dim)", ...focusStyle("collapse") }}
         aria-label="Collapse player"
         title="Collapse"
       >

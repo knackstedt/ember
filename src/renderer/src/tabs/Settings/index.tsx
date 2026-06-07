@@ -150,10 +150,19 @@ export const SettingsTab: React.FC = () => {
       switch (action) {
         case "left": {
           if (gIdx >= 0 && iIdx >= 0) {
-            const isHorizontal = groups[gIdx].dataset.navOrientation === "horizontal";
-            if (isHorizontal) {
+            const orientation = groups[gIdx].dataset.navOrientation;
+            if (orientation === "horizontal") {
               /* Horizontal group: Left moves to previous item */
               if (iIdx === 0) {
+                setItemIndex(-1);
+              } else {
+                setItemIndex(iIdx - 1);
+              }
+            } else if (orientation === "grid") {
+              /* Grid group: Left moves to previous column or exits */
+              const cols = parseInt(groups[gIdx].dataset.navColumns ?? "1", 10);
+              const col = iIdx % cols;
+              if (col === 0) {
                 setItemIndex(-1);
               } else {
                 setItemIndex(iIdx - 1);
@@ -179,10 +188,19 @@ export const SettingsTab: React.FC = () => {
             if (items.length > 0) setItemIndex(0);
           } else if (gIdx >= 0 && iIdx >= 0) {
             const items = getFocusableInGroup(groups[gIdx]);
-            const isHorizontal = groups[gIdx].dataset.navOrientation === "horizontal";
-            if (isHorizontal) {
+            const orientation = groups[gIdx].dataset.navOrientation;
+            if (orientation === "horizontal") {
               /* Horizontal group: Right moves to next item */
               if (iIdx >= items.length - 1) {
+                setItemIndex(-1);
+              } else {
+                setItemIndex(iIdx + 1);
+              }
+            } else if (orientation === "grid") {
+              /* Grid group: Right moves to next column or exits */
+              const cols = parseInt(groups[gIdx].dataset.navColumns ?? "1", 10);
+              const col = iIdx % cols;
+              if (col >= cols - 1 || iIdx >= items.length - 1) {
                 setItemIndex(-1);
               } else {
                 setItemIndex(iIdx + 1);
@@ -214,9 +232,18 @@ export const SettingsTab: React.FC = () => {
           } else {
             /* Inside a group: Up moves to previous item or exits to group level */
             const items = getFocusableInGroup(groups[gIdx]);
-            const isHorizontal = groups[gIdx].dataset.navOrientation === "horizontal";
-            if (isHorizontal) {
+            const orientation = groups[gIdx].dataset.navOrientation;
+            if (orientation === "horizontal") {
               setItemIndex(-1);
+            } else if (orientation === "grid") {
+              /* Grid group: Up moves to previous row or exits */
+              const cols = parseInt(groups[gIdx].dataset.navColumns ?? "1", 10);
+              const row = Math.floor(iIdx / cols);
+              if (row === 0) {
+                setItemIndex(-1);
+              } else {
+                setItemIndex(iIdx - cols);
+              }
             } else if (iIdx === 0) {
               setItemIndex(-1);
             } else {
@@ -237,9 +264,18 @@ export const SettingsTab: React.FC = () => {
           } else {
             /* Inside a group: Down moves to next item or exits to group level */
             const items = getFocusableInGroup(groups[gIdx]);
-            const isHorizontal = groups[gIdx].dataset.navOrientation === "horizontal";
-            if (isHorizontal) {
+            const orientation = groups[gIdx].dataset.navOrientation;
+            if (orientation === "horizontal") {
               setItemIndex(-1);
+            } else if (orientation === "grid") {
+              /* Grid group: Down moves to next row or exits */
+              const cols = parseInt(groups[gIdx].dataset.navColumns ?? "1", 10);
+              const nextIndex = iIdx + cols;
+              if (nextIndex >= items.length) {
+                setItemIndex(-1);
+              } else {
+                setItemIndex(nextIndex);
+              }
             } else if (iIdx >= items.length - 1) {
               setItemIndex(-1);
             } else {

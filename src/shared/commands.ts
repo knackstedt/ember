@@ -30,7 +30,9 @@ export interface CommandDefinition {
     | "gaming-tab"
     | "movies-tab"
     | "music-tab"
-    | "tv-tab";
+    | "tv-tab"
+    | "music-album-available"
+    | "music-artist-available";
 }
 
 export const COMMAND_DEFINITIONS: CommandDefinition[] = [
@@ -88,6 +90,12 @@ export const COMMAND_DEFINITIONS: CommandDefinition[] = [
   { id: "music.hide", label: "Hide Selected Track", category: "music", requiresContext: "music-selected" },
   { id: "music.view.tracks", label: "View: Tracks", category: "music", requiresContext: "music-tab" },
   { id: "music.view.ai-groups", label: "View: AI Groups", category: "music", requiresContext: "music-tab" },
+  { id: "music.queue-track", label: "Queue Track", description: "Add selected track to end of queue", category: "music", requiresContext: "music-selected" },
+  { id: "music.queue-track-next", label: "Queue Track Next", description: "Play selected track next", category: "music", requiresContext: "music-selected" },
+  { id: "music.queue-album", label: "Queue Album", description: "Add selected album to end of queue", category: "music", requiresContext: "music-album-available" },
+  { id: "music.queue-album-next", label: "Queue Album Next", description: "Play selected album next", category: "music", requiresContext: "music-album-available" },
+  { id: "music.queue-artist", label: "Queue Artist", description: "Add selected artist to end of queue", category: "music", requiresContext: "music-artist-available" },
+  { id: "music.queue-artist-next", label: "Queue Artist Next", description: "Play selected artist next", category: "music", requiresContext: "music-artist-available" },
 
   /* ─── TV Shows ─── */
   { id: "tv.toggle-favorite", label: "Toggle Favorite (Selected Show)", category: "tv", requiresContext: "tv-selected" },
@@ -105,6 +113,9 @@ export const COMMAND_DEFINITIONS: CommandDefinition[] = [
   { id: "player.toggle-shuffle", label: "Toggle Shuffle", category: "player", requiresContext: "music-playing" },
   { id: "player.toggle-repeat", label: "Toggle Repeat", category: "player", requiresContext: "music-playing" },
   { id: "player.close", label: "Close Player", category: "player", requiresContext: "player-open" },
+  { id: "player.toggle-queue", label: "Toggle Queue Blade", description: "Show or hide the music queue", category: "player", requiresContext: "player-open" },
+  { id: "player.focus-queue", label: "Focus Queue", description: "Move controller focus to the queue blade", category: "player", requiresContext: "player-open" },
+  { id: "player.focus-player", label: "Focus Music Player", description: "Move controller focus to the music player controls", category: "player", requiresContext: "player-open" },
 
   /* ─── Visual Effects ─── */
   { id: "visual.shader.disable", label: "Disable Shader / Filter", description: "Turn off any active shader or visual effect", category: "visual", requiresContext: "emulator-open" },

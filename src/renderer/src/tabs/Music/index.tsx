@@ -11,6 +11,7 @@ import { DetailPanel } from "../../components/DetailPanel/DetailPanel";
 import { OskInput } from "../../components/OnScreenKeyboard/OnScreenKeyboard";
 import { MusicTrack } from "../../../../shared/types";
 import { useMusicPlayerStore } from "../../store/musicPlayer.store";
+import { useFocusZoneStore } from "../../store/focusZone.store";
 import { StreamingTile } from "../../components/StreamingTile/StreamingTile";
 import { StreamingService } from "../../../../shared/types";
 import { useGridFocus } from "../../hooks/useGridFocus";
@@ -105,6 +106,9 @@ export const MusicTab: React.FC = () => {
   const artistThumbnailsLoading = useMusicStore((s) => s.artistThumbnailsLoading);
   const loadArtistThumbnail = useMusicStore((s) => s.loadArtistThumbnail);
   const play = useMusicPlayerStore((s) => s.play);
+  const hasPlayer = useMusicPlayerStore((s) => s.queue.length > 0);
+  const bladeCollapsed = useMusicPlayerStore((s) => s.bladeCollapsed);
+  const setZone = useFocusZoneStore((s) => s.setZone);
   const [selected, setSelected] = useState<MusicTrack | null>(null);
   const [subTab, setSubTab] = useState<SubTab>("local");
   const [browseMode, setBrowseMode] = useState<BrowseMode>("artists");
@@ -150,9 +154,15 @@ export const MusicTab: React.FC = () => {
   /* Dispatch selection changes for command palette context */
   useEffect(() => {
     window.dispatchEvent(
-      new CustomEvent("htpc:select-music", { detail: { id: selected?.id ?? null } }),
+      new CustomEvent("htpc:select-music", {
+        detail: {
+          id: selected?.id ?? null,
+          artist: selected?.artist ?? (browseMode === "artists" ? selectedGroup ?? null : null),
+          album: selected?.album ?? null,
+        },
+      }),
     );
-  }, [selected?.id]);
+  }, [selected?.id, selected?.artist, selected?.album, selectedGroup, browseMode]);
 
   /* Listen for view-mode commands from command palette */
   useEffect(() => {
@@ -391,12 +401,24 @@ export const MusicTab: React.FC = () => {
     { key: "tags", label: "Tag", accessor: (t) => (t as Record<string, unknown>).tags as string[] | undefined, sort: "count", maxValues: 5 },
   ], []);
 
+  const handleEdge = useCallback(
+    (direction: "up" | "down" | "left" | "right") => {
+      if (direction === "right" && hasPlayer) {
+        setZone("queue");
+      } else if (direction === "down" && hasPlayer) {
+        setZone("player");
+      }
+    },
+    [hasPlayer, setZone],
+  );
+
   const { focusedIndex: groupFocusedIndex, setFocusedIndex: setGroupFocusedIndex } = useGridFocus<MusicGroup>({
     items: groupItems,
     columnCount: groupColumnCount,
     gridRef: groupGridRef,
     onConfirm: (group) => setSelectedGroup(group.name),
     enabled: subTab === "local" && !selected && !selectedGroup && browseMode !== "tracks",
+    onEdge: handleEdge,
   });
 
   const { focusedIndex: trackFocusedIndex, setFocusedIndex: setTrackFocusedIndex } = useGridFocus<MusicTrack>({
@@ -408,6 +430,7 @@ export const MusicTab: React.FC = () => {
       setSelected(track);
     },
     enabled: subTab === "local" && !selected && (browseMode === "tracks" || !!selectedGroup),
+    onEdge: handleEdge,
   });
 
   const musicCollections = useMemo(

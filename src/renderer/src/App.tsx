@@ -43,6 +43,7 @@ import { CommandPalette } from "./components/CommandPalette/CommandPalette";
 import { useCommands } from "./hooks/useCommands";
 import { useCommandsStore } from "./store/commands.store";
 import { useGamepadApi } from "./hooks/useGamepadApi";
+import { useFocusZoneStore } from "./store/focusZone.store";
 import { CommandDefinition, COMMAND_DEFINITIONS } from "../../shared/commands";
 
 function normalizeShortcut(e: KeyboardEvent): string {
@@ -171,6 +172,8 @@ export default function App(): React.ReactElement {
   const selectedGameRef = useRef<string | null>(null);
   const selectedMovieRef = useRef<string | null>(null);
   const selectedMusicRef = useRef<string | null>(null);
+  const selectedMusicArtistRef = useRef<string | null>(null);
+  const selectedMusicAlbumRef = useRef<string | null>(null);
   const selectedTvRef = useRef<string | null>(null);
 
   /* Re-assignable keybind refs (keyboard handler captures at mount) */
@@ -186,6 +189,9 @@ export default function App(): React.ReactElement {
   const axisCooldownRef = useRef<Record<string, number>>({});
   const AXIS_THRESHOLD = 16384;
   const AXIS_COOLDOWN_MS = 200;
+
+  /* Button long-press timers for evdev controller input */
+  const buttonTimersRef = useRef<Record<string, number>>({});
 
   function getAxisNavAction(axis: string, value: number): string | null {
     if (axis === "dpad_x") {
@@ -231,6 +237,8 @@ export default function App(): React.ReactElement {
       selectedGameId: selectedGameRef.current,
       selectedMovieId: selectedMovieRef.current,
       selectedMusicId: selectedMusicRef.current,
+      selectedMusicArtist: selectedMusicArtistRef.current,
+      selectedMusicAlbum: selectedMusicAlbumRef.current,
       selectedTvId: selectedTvRef.current,
     },
     setActiveTab,
@@ -324,11 +332,15 @@ export default function App(): React.ReactElement {
 
   useEffect(() => {
     setBladeCollapsed(anyEmulatorOpen);
+    if (anyEmulatorOpen) {
+      useFocusZoneStore.getState().clearZone();
+    }
   }, [anyEmulatorOpen]);
 
   useEffect(() => {
     if (videoOpen) {
       useMusicPlayerStore.getState().pause();
+      useFocusZoneStore.getState().clearZone();
     }
   }, [videoOpen]);
 
@@ -337,6 +349,10 @@ export default function App(): React.ReactElement {
       setActiveTab(visibleTabIds[0] ?? "gaming");
     }
   }, [visibleTabIds.join(","), activeTab]);
+
+  useEffect(() => {
+    useFocusZoneStore.getState().clearZone();
+  }, [activeTab]);
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -358,7 +374,10 @@ export default function App(): React.ReactElement {
       selectedMovieRef.current = (e as CustomEvent).detail?.id ?? null;
     };
     const onSelectMusic = (e: Event) => {
-      selectedMusicRef.current = (e as CustomEvent).detail?.id ?? null;
+      const detail = (e as CustomEvent).detail;
+      selectedMusicRef.current = detail?.id ?? null;
+      selectedMusicArtistRef.current = detail?.artist ?? null;
+      selectedMusicAlbumRef.current = detail?.album ?? null;
     };
     const onSelectTv = (e: Event) => {
       selectedTvRef.current = (e as CustomEvent).detail?.id ?? null;
@@ -408,7 +427,7 @@ export default function App(): React.ReactElement {
       }
 
       if (ev.type === "axis" && ev.axis) {
-        const axis = ev.axis;
+        const axis = ev.axis ?? "";
         const prev = axisValuesRef.current[axis] ?? 0;
         axisValuesRef.current[axis] = ev.value ?? 0;
 
@@ -430,6 +449,17 @@ export default function App(): React.ReactElement {
             axisTimersRef.current[axis] = window.setTimeout(repeat, 180);
           };
           axisTimersRef.current[axis] = window.setTimeout(repeat, 500);
+        }
+        return;
+      }
+
+      if (ev.type === "button_release") {
+        if (ev.action) {
+          const timer = buttonTimersRef.current[ev.action];
+          if (timer) {
+            clearTimeout(timer);
+            delete buttonTimersRef.current[ev.action];
+          }
         }
         return;
       }
@@ -463,17 +493,23 @@ export default function App(): React.ReactElement {
         window.dispatchEvent(
           new CustomEvent("htpc:contextmenu", { detail: { source: "gamepad" } }),
         );
-      } else if (ev.action === "north") {
-        useCommandsStore.getState().open();
       } else if (ev.action === "select") {
         useCommandsStore.getState().toggle();
+      } else if (ev.action === "south") {
+        dispatchNavAction("confirm");
+        const timer = window.setTimeout(() => {
+          delete buttonTimersRef.current["south"];
+          window.dispatchEvent(
+            new CustomEvent("htpc:contextmenu", { detail: { source: "gamepad" } }),
+          );
+        }, 800);
+        buttonTimersRef.current["south"] = timer;
       } else {
         const actionMap: Record<string, string> = {
           dpad_up: "up",
           dpad_down: "down",
           dpad_left: "left",
           dpad_right: "right",
-          south: "confirm",
           east: "cancel",
         };
         const action = actionMap[ev.action ?? ""];
@@ -487,8 +523,10 @@ export default function App(): React.ReactElement {
       unsubDisconnect();
       unsubEvent();
       Object.values(axisTimersRef.current).forEach(clearTimeout);
+      Object.values(buttonTimersRef.current).forEach(clearTimeout);
       axisTimersRef.current = {};
       axisCooldownRef.current = {};
+      buttonTimersRef.current = {};
     };
   }, []);
 

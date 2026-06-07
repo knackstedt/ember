@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ChevronLeft,
@@ -9,6 +9,7 @@ import {
   SkipBack,
 } from "lucide-react";
 import { useMusicPlayerStore } from "../../store/musicPlayer.store";
+import { useFocusZoneStore } from "../../store/focusZone.store";
 
 const BLADE_WIDTH = 280;
 const COLLAPSED_WIDTH = 40;
@@ -34,7 +35,76 @@ export const QueueBlade: React.FC = () => {
     resume,
   } = useMusicPlayerStore();
 
+  const activeZone = useFocusZoneStore((s) => s.activeZone);
+  const setZone = useFocusZoneStore((s) => s.setZone);
+
+  const [focusedIndex, setFocusedIndex] = useState(0);
+  const focusedIndexRef = useRef(focusedIndex);
+  focusedIndexRef.current = focusedIndex;
+
+  const trackListRef = useRef<HTMLDivElement>(null);
+
   const currentTrack = queue[currentIndex];
+
+  // Auto-expand when entering focus and reset focus to current track
+  useEffect(() => {
+    if (activeZone === "queue") {
+      if (bladeCollapsed) {
+        toggleBlade();
+      }
+      setFocusedIndex(currentIndex);
+    }
+  }, [activeZone]);
+
+  // Scroll focused item into view
+  useEffect(() => {
+    if (activeZone !== "queue") return;
+    const container = trackListRef.current;
+    if (!container) return;
+    const buttons = container.querySelectorAll<HTMLElement>("button");
+    const el = buttons[focusedIndex];
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }, [focusedIndex, activeZone]);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      if (activeZone !== "queue") return;
+      const detail = (e as CustomEvent).detail as { action: string };
+      const action = detail?.action;
+      if (!action) return;
+
+      switch (action) {
+        case "up": {
+          setFocusedIndex((prev) => Math.max(0, prev - 1));
+          break;
+        }
+        case "down": {
+          setFocusedIndex((prev) => Math.min(queue.length - 1, prev + 1));
+          break;
+        }
+        case "left": {
+          setZone("tab");
+          break;
+        }
+        case "confirm": {
+          const idx = focusedIndexRef.current;
+          if (idx >= 0 && idx < queue.length) {
+            play(queue, idx);
+          }
+          break;
+        }
+        case "cancel": {
+          setZone("tab");
+          break;
+        }
+      }
+    };
+
+    window.addEventListener("htpc:nav", handler);
+    return () => window.removeEventListener("htpc:nav", handler);
+  }, [activeZone, queue.length, play, setZone]);
 
   return (
     <motion.div
@@ -198,20 +268,25 @@ export const QueueBlade: React.FC = () => {
             )}
 
             {/* Track list */}
-            <div className="flex-1 min-h-0 overflow-y-auto gpu-scroll">
+            <div ref={trackListRef} className="flex-1 min-h-0 overflow-y-auto gpu-scroll">
               {queue.map((track, index) => {
                 const isCurrent = index === currentIndex;
+                const isFocused = activeZone === "queue" && index === focusedIndex;
                 return (
                   <button
                     key={`${track.id}-${index}`}
                     onClick={() => play(queue, index)}
                     className="w-full flex items-center gap-2 px-3 py-2 text-left transition-colors"
                     style={{
-                      background: isCurrent
-                        ? "var(--color-accent-dim)"
-                        : "transparent",
+                      background: isFocused
+                        ? "color-mix(in srgb, var(--color-accent) 20%, transparent)"
+                        : isCurrent
+                          ? "var(--color-accent-dim)"
+                          : "transparent",
                       opacity: isCurrent ? 1 : 0.85,
                       borderBottom: "1px solid var(--color-border)",
+                      outline: isFocused ? "2px solid var(--color-accent)" : "none",
+                      outlineOffset: isFocused ? "-2px" : undefined,
                     }}
                   >
                     <span

@@ -19,6 +19,7 @@ import { useJsnesPlayerStore } from "../store/jsnesPlayer.store";
 import { useEmulatorjsPlayerStore } from "../store/emulatorjsPlayer.store";
 import { useV86PlayerStore } from "../store/v86Player.store";
 import { useLibretroPlayerStore } from "../store/libretroPlayer.store";
+import { useFocusZoneStore } from "../store/focusZone.store";
 
 const THEME_CYCLE: ThemeName[] = [
   "dark-oled",
@@ -34,6 +35,8 @@ export interface CommandContext {
   selectedGameId: string | null;
   selectedMovieId: string | null;
   selectedMusicId: string | null;
+  selectedMusicArtist: string | null;
+  selectedMusicAlbum: string | null;
   selectedTvId: string | null;
 }
 
@@ -76,6 +79,10 @@ export function useCommands(
   const playerResume = useMusicPlayerStore((s) => s.resume);
   const playerShuffle = useMusicPlayerStore((s) => s.toggleShuffle);
   const playerRepeat = useMusicPlayerStore((s) => s.toggleRepeat);
+  const addToQueue = useMusicPlayerStore((s) => s.addToQueue);
+  const queueNext = useMusicPlayerStore((s) => s.queueNext);
+  const toggleBlade = useMusicPlayerStore((s) => s.toggleBlade);
+  const setFocusZone = useFocusZoneStore((s) => s.setZone);
   const closeVideoPlayer = useVideoPlayerStore((s) => s.close);
 
   const closeFlash = useFlashPlayerStore((s) => s.close);
@@ -295,6 +302,56 @@ export function useCommands(
         case "music.view.ai-groups":
           window.dispatchEvent(new CustomEvent("htpc:music-view", { detail: "ai-groups" }));
           break;
+        case "music.queue-track": {
+          const track = music.find((t) => t.id === context.selectedMusicId);
+          if (track) addToQueue([track]);
+          break;
+        }
+        case "music.queue-track-next": {
+          const track = music.find((t) => t.id === context.selectedMusicId);
+          if (track) queueNext([track]);
+          break;
+        }
+        case "music.queue-album": {
+          if (!context.selectedMusicAlbum) break;
+          const albumTracks = music
+            .filter((t) => t.album === context.selectedMusicAlbum && !t.hidden)
+            .sort((a, b) => (a.trackNumber ?? 0) - (b.trackNumber ?? 0));
+          if (albumTracks.length > 0) addToQueue(albumTracks);
+          break;
+        }
+        case "music.queue-album-next": {
+          if (!context.selectedMusicAlbum) break;
+          const albumTracks = music
+            .filter((t) => t.album === context.selectedMusicAlbum && !t.hidden)
+            .sort((a, b) => (a.trackNumber ?? 0) - (b.trackNumber ?? 0));
+          if (albumTracks.length > 0) queueNext(albumTracks);
+          break;
+        }
+        case "music.queue-artist": {
+          if (!context.selectedMusicArtist) break;
+          const artistTracks = music
+            .filter((t) => t.artist?.toLowerCase() === context.selectedMusicArtist!.toLowerCase() && !t.hidden)
+            .sort((a, b) => {
+              const albumCmp = (a.album ?? "").localeCompare(b.album ?? "");
+              if (albumCmp !== 0) return albumCmp;
+              return (a.trackNumber ?? 0) - (b.trackNumber ?? 0);
+            });
+          if (artistTracks.length > 0) addToQueue(artistTracks);
+          break;
+        }
+        case "music.queue-artist-next": {
+          if (!context.selectedMusicArtist) break;
+          const artistTracks = music
+            .filter((t) => t.artist?.toLowerCase() === context.selectedMusicArtist!.toLowerCase() && !t.hidden)
+            .sort((a, b) => {
+              const albumCmp = (a.album ?? "").localeCompare(b.album ?? "");
+              if (albumCmp !== 0) return albumCmp;
+              return (a.trackNumber ?? 0) - (b.trackNumber ?? 0);
+            });
+          if (artistTracks.length > 0) queueNext(artistTracks);
+          break;
+        }
 
         /* TV */
         case "tv.toggle-favorite": {
@@ -356,6 +413,15 @@ export function useCommands(
           closeEmulatorjs();
           closeV86();
           closeLibretro();
+          break;
+        case "player.toggle-queue":
+          toggleBlade();
+          break;
+        case "player.focus-queue":
+          setFocusZone("queue");
+          break;
+        case "player.focus-player":
+          setFocusZone("player");
           break;
 
         /* Visual */
@@ -443,6 +509,8 @@ export function useCommands(
       playerResume,
       playerShuffle,
       playerRepeat,
+      addToQueue,
+      queueNext,
       closeVideoPlayer,
       closeFlash,
       closeJsnes,
@@ -466,6 +534,10 @@ export function useCommands(
           return context.activeTab === "movies" && !!context.selectedMovieId;
         case "music-selected":
           return context.activeTab === "music" && !!context.selectedMusicId;
+        case "music-album-available":
+          return context.activeTab === "music" && !!context.selectedMusicAlbum;
+        case "music-artist-available":
+          return context.activeTab === "music" && !!context.selectedMusicArtist;
         case "tv-selected":
           return context.activeTab === "tv-shows" && !!context.selectedTvId;
         case "gaming-tab":

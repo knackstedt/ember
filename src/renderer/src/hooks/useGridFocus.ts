@@ -9,6 +9,7 @@ export interface UseGridFocusOptions<T> {
   gridRef: React.RefObject<VirtualGridHandle | null>;
   onConfirm: (item: T, index: number) => void;
   enabled: boolean;
+  onEdge?: (direction: "up" | "down" | "left" | "right") => void;
 }
 
 export function useGridFocus<T>({
@@ -17,6 +18,7 @@ export function useGridFocus<T>({
   gridRef,
   onConfirm,
   enabled,
+  onEdge,
 }: UseGridFocusOptions<T>): {
   focusedIndex: number;
   setFocusedIndex: (i: number) => void;
@@ -41,6 +43,9 @@ export function useGridFocus<T>({
     }
   }, [items.length, enabled]);
 
+  const onEdgeRef = useRef(onEdge);
+  onEdgeRef.current = onEdge;
+
   const handleNav = useCallback(
     (action: NavAction) => {
       if (!enabledRef.current || itemsRef.current.length === 0) return;
@@ -58,25 +63,35 @@ export function useGridFocus<T>({
         const maxRow = Math.ceil(itemCount / columnCount) - 1;
         let nextRow = row;
         let nextCol = col;
+        let hitEdge = false;
 
         switch (action) {
           case "up":
+            if (row === 0) hitEdge = true;
             nextRow = Math.max(0, row - 1);
             break;
           case "down":
+            if (row === maxRow) hitEdge = true;
             nextRow = Math.min(maxRow, row + 1);
             break;
           case "left":
+            if (col === 0) hitEdge = true;
             nextCol = Math.max(0, col - 1);
             break;
           case "right":
+            if (col === columnCount - 1) hitEdge = true;
             nextCol = Math.min(columnCount - 1, col + 1);
             break;
         }
 
         let nextIndex = nextRow * columnCount + nextCol;
         if (nextIndex >= itemCount) nextIndex = itemCount - 1;
-        if (nextIndex === prev) return prev;
+        if (nextIndex === prev) {
+          if (hitEdge && onEdgeRef.current && (action === "up" || action === "down" || action === "left" || action === "right")) {
+            onEdgeRef.current(action);
+          }
+          return prev;
+        }
 
         if (action === "up" || action === "down") {
           gridRef.current?.scrollToItem(nextIndex);

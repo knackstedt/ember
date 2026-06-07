@@ -40,12 +40,19 @@ export function useContextMenu<T>({
   onActionRef.current = onAction;
 
   const openMenu = useCallback(
-    (item: T, position?: { x: number; y: number }) => {
+    (item: T, position?: { x: number; y: number }, centered?: boolean) => {
       const opts = getOptionsRef.current(item);
       if (opts.length === 0) return;
+      let pos = position ?? { x: window.innerWidth / 2, y: window.innerHeight / 3 };
+      if (centered) {
+        pos = {
+          x: window.innerWidth / 2,
+          y: Math.max(8, window.innerHeight / 2 - opts.length * 22),
+        };
+      }
       setState({
         open: true,
-        position: position ?? { x: window.innerWidth / 2, y: window.innerHeight / 3 },
+        position: pos,
         item,
         activeOption: 0,
       });
@@ -75,7 +82,7 @@ export function useContextMenu<T>({
       if (!detail) return;
       const item = itemsRef.current[focusedIndexRef.current];
       if (!item) return;
-      openMenu(item, { x: window.innerWidth / 2, y: window.innerHeight / 3 });
+      openMenu(item, undefined, true);
     };
     window.addEventListener("htpc:contextmenu", handler);
     return () => window.removeEventListener("htpc:contextmenu", handler);

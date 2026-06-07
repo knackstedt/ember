@@ -53,7 +53,7 @@ export const AppearanceTab: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-8">
-      <section className="flex flex-col gap-4" data-nav-orientation="horizontal">
+      <section className="flex flex-col gap-4" data-nav-orientation="grid" data-nav-columns="5">
         <h2 className="text-lg font-semibold" style={{ color: "var(--color-text)" }}>
           Appearance
         </h2>

@@ -72,13 +72,14 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   }, [isOpen, onClose]);
 
   // Clamp position to viewport
+  const estimatedHeight = Math.min(options.length * 44 + 12, window.innerHeight - 32);
   const clampedX = Math.min(
     Math.max(position.x, 8),
-    window.innerWidth - 240,
+    Math.max(8, window.innerWidth - 240),
   );
   const clampedY = Math.min(
     Math.max(position.y, 8),
-    window.innerHeight - options.length * 40 - 16,
+    Math.max(8, window.innerHeight - estimatedHeight),
   );
 
   return (
@@ -86,12 +87,14 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
       {isOpen && (
         <motion.div
           ref={menuRef}
-          className="context-menu fixed z-[100] flex flex-col rounded-[var(--radius-card)] overflow-hidden py-1.5"
+          className="context-menu fixed z-[100] flex flex-col rounded-[var(--radius-card)] py-1.5"
           style={{
             left: clampedX,
             top: clampedY,
             minWidth: 200,
             maxWidth: 320,
+            maxHeight: estimatedHeight,
+            overflow: "hidden auto",
             background: "var(--color-surface-raised)",
             border: "1px solid var(--color-border)",
             boxShadow: "0 8px 32px rgba(0,0,0,0.4)",

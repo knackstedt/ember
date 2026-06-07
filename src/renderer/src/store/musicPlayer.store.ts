@@ -12,6 +12,8 @@ export interface MusicPlayerStore {
   repeat: "none" | "one" | "all";
   bladeCollapsed: boolean;
   play(tracks: MusicTrack[], startIndex?: number): void;
+  addToQueue(tracks: MusicTrack[]): void;
+  queueNext(tracks: MusicTrack[]): void;
   pause(): void;
   resume(): void;
   seek(seconds: number): void;
@@ -69,6 +71,30 @@ export const useMusicPlayerStore = create<MusicPlayerStore>((set, get) => {
         duration: 0,
       });
       if (tracks.length > 0) loadAndPlay(tracks[startIndex], true);
+    },
+
+    addToQueue(tracks) {
+      const { queue } = get();
+      if (queue.length === 0) {
+        get().play(tracks, 0);
+        return;
+      }
+      set({ queue: [...queue, ...tracks] });
+    },
+
+    queueNext(tracks) {
+      const { queue, currentIndex } = get();
+      if (queue.length === 0) {
+        get().play(tracks, 0);
+        return;
+      }
+      const insertAt = currentIndex + 1;
+      const newQueue = [
+        ...queue.slice(0, insertAt),
+        ...tracks,
+        ...queue.slice(insertAt),
+      ];
+      set({ queue: newQueue });
     },
 
     pause() {
