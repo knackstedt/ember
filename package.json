@@ -25,6 +25,7 @@
     "@emulatorjs/emulatorjs": "^4.2.3",
     "@ruffle-rs/ruffle": "^0.2.0",
     "@surrealdb/node": "^3.0.0",
+    "surrealdb": "^2.0.1",
     "@xenova/transformers": "^2.17.2",
     "castv2": "^0.1.10",
     "esbuild": "^0.21.5",
