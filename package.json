@@ -15,7 +15,8 @@
     "preview": "electron-vite preview",
     "lint": "eslint src",
     "test": "bun test",
-    "test:watch": "bun test --watch"
+    "test:watch": "bun test --watch",
+    "retag": "VERSION=$(jq -r '.version' package.json) && git push origin :refs/tags/v${VERSION} 2>/dev/null || true && git tag -d v${VERSION} 2>/dev/null || true && git tag v${VERSION} && git push origin v${VERSION} --force"
   },
   "dependencies": {
     "@emulatorjs/emulatorjs": "^4.2.3",
@@ -83,10 +84,6 @@
         },
         {
           "target": "tar.gz",
-          "arch": ["x64", "arm64"]
-        },
-        {
-          "target": "flatpak",
           "arch": ["x64", "arm64"]
         }
       ],
