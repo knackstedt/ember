@@ -57,6 +57,7 @@ export const COMMAND_DEFINITIONS: CommandDefinition[] = [
   { id: "nav.tab.movies", label: "Switch to Movies", category: "navigation" },
   { id: "nav.tab.music", label: "Switch to Music", category: "navigation" },
   { id: "nav.tab.tv", label: "Switch to TV Shows", category: "navigation" },
+  { id: "nav.tab.store", label: "Switch to Store", category: "navigation" },
   { id: "nav.tab.settings", label: "Switch to Settings", category: "navigation" },
   { id: "nav.tab.controllers", label: "Switch to Controllers", category: "navigation" },
   { id: "nav.tab.next", label: "Next Tab", category: "navigation", defaultShortcut: "Tab" },

@@ -4,6 +4,7 @@ import { Game, Movie, MusicTrack } from "../../shared/types";
 import { createLogger } from "../util/logger";
 import { GameRepo } from "../db/repository";
 import { buildWineCommand } from "./wine-detection.service";
+import { launchItchGame } from "./itch.service";
 
 const log = createLogger("info");
 
@@ -262,6 +263,17 @@ export async function launchGame(game: Game): Promise<void> {
     case "dreamcast":
       // Handled via in-renderer emulator components
       return Promise.resolve();
+    case "itch": {
+      const result = await launchItchGame(game);
+      if (result.success) {
+        startPlayTimeTracking(game.id);
+        GameRepo.setLastPlayed(game.id, Date.now()).catch((err) => {
+          log.warn("launcher", `Failed to set lastPlayed for ${game.id}: ${err}`);
+        });
+        return Promise.resolve();
+      }
+      return Promise.reject(new Error(result.error ?? "Failed to launch itch game"));
+    }
     default:
       if (game.execPath) {
         // Use a minimal shell-quote parser to respect quoted arguments

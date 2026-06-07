@@ -414,6 +414,33 @@ const htpc = {
     },
   },
 
+  store: {
+    itch: {
+      status: (): Promise<{ authenticated: boolean; username?: string; error?: string }> =>
+        ipcRenderer.invoke("store:itch:status"),
+      login: (): Promise<{ success: boolean; error?: string }> =>
+        ipcRenderer.invoke("store:itch:login"),
+      logout: (): Promise<{ success: boolean; error?: string }> =>
+        ipcRenderer.invoke("store:itch:logout"),
+      library: (): Promise<{ id: string; title: string; coverUrl?: string; developer?: string; installed?: boolean; installPath?: string; execPath?: string; version?: string }[]> =>
+        ipcRenderer.invoke("store:itch:library"),
+      install: (gameId: string, title: string): Promise<{ success: boolean; error?: string; installPath?: string }> =>
+        ipcRenderer.invoke("store:itch:install", gameId, title),
+      uninstall: (gameId: string): Promise<{ success: boolean; error?: string }> =>
+        ipcRenderer.invoke("store:itch:uninstall", gameId),
+      launch: (game: Game): Promise<{ success: boolean; error?: string }> =>
+        ipcRenderer.invoke("store:itch:launch", game),
+      update: (gameId: string): Promise<{ success: boolean; error?: string }> =>
+        ipcRenderer.invoke("store:itch:update", gameId),
+      updates: (): Promise<{ gameId: string; title: string; latestVersion?: string }[]> =>
+        ipcRenderer.invoke("store:itch:updates"),
+      download: (downloadUrl: string, destPath: string): Promise<{ success: boolean; error?: string }> =>
+        ipcRenderer.invoke("store:itch:download", downloadUrl, destPath),
+    },
+    providers: (): Promise<{ id: string; name: string; url: string; icon?: string }[]> =>
+      ipcRenderer.invoke("store:providers:list"),
+  },
+
   onScanProgress: (cb: (progress: ScanProgress) => void) => {
     const handler = (_: Electron.IpcRendererEvent, p: ScanProgress) => cb(p);
     ipcRenderer.on("scan:progress", handler);

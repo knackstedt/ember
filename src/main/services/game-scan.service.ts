@@ -11,6 +11,7 @@ import { scanFlashGames } from "../scanners/flash.scanner";
 import { scanRomGames } from "../scanners/rom.scanner";
 import { scanV86Games } from "../scanners/v86.scanner";
 import { scanWindowsGames } from "../scanners/windows.scanner";
+import { scanItchGames } from "../scanners/itch.scanner";
 import { Game } from "../../shared/types";
 import { createLogger } from "../util/logger";
 import { calculateCRC32, calculateMD5, calculateSHA1, getRomHashes } from "./metadata/datfiles.service";
@@ -33,7 +34,7 @@ function normalizeGame(game: Game): Record<string, unknown> {
  * Platforms whose games are discovered by scanners and may become stale
  */
 const MANAGED_PLATFORMS = new Set([
-  "steam", "gog", "heroic", "lutris", "desktop",
+  "steam", "gog", "heroic", "lutris", "desktop", "itch",
   "dolphin-gc", "dolphin-wii", "nes", "snes", "gb", "gba", "n64",
   "genesis", "sms", "gamegear", "pce", "psx", "nds", "dreamcast",
   "flash", "dos", "windows",
@@ -247,8 +248,9 @@ async function scanInMainThread(
   const roms = scanRomGames();
   const v86 = scanV86Games();
   const windows = scanWindowsGames();
+  const itch = scanItchGames();
 
-  const all = [...steam, ...dolphin, ...heroic, ...lutris, ...desktop, ...flash, ...roms, ...v86, ...windows];
+  const all = [...steam, ...dolphin, ...heroic, ...lutris, ...desktop, ...flash, ...roms, ...v86, ...windows, ...itch];
 
   // Metadata enrichment disabled - games are stored as scanned
   const enrichedGames = all;

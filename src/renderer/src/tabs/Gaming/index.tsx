@@ -83,6 +83,7 @@ const PLATFORM_FILTERS: ChipFilter<
   { id: "gog", label: "GOG" },
   { id: "heroic", label: "Heroic/Epic" },
   { id: "lutris", label: "Lutris" },
+  { id: "itch", label: "itch.io" },
   { id: "dolphin-gc", label: "GameCube" },
   { id: "dolphin-wii", label: "Wii" },
   { id: "nes", label: "NES" },
@@ -384,6 +385,8 @@ export const GamingTab: React.FC = () => {
     enabled: !selected,
   });
 
+  const focusedRow = Math.floor(focusedIndex / Math.max(1, columnCount));
+
   const gameCollections = useMemo(
     () => collections.filter((c) => c.itemType === "game" || c.itemType === "mixed"),
     [collections],
@@ -659,6 +662,7 @@ export const GamingTab: React.FC = () => {
               const game = games.find((g) => g.id === id);
               if (game && !getMissingCoreTooltip(game)) launch(game);
             }}
+            collapsed={focusedRow >= 1}
           />
 
           <CollectionsBar

@@ -5,6 +5,7 @@ import {
   Film,
   Music,
   Tv,
+  Store,
   Settings,
   Maximize,
 } from "lucide-react";
@@ -15,6 +16,7 @@ import { GamingTab } from "./tabs/Gaming";
 import { MoviesTab } from "./tabs/Movies";
 import { MusicTab } from "./tabs/Music";
 import { TVShowsTab } from "./tabs/TVShows";
+import { StoreTab } from "./tabs/Store";
 import { SettingsTab } from "./tabs/Settings";
 import { ControllersTab } from "./tabs/Controllers";
 import { TabId, ScanProgress, AppSettings } from "../../shared/types";
@@ -98,6 +100,7 @@ const TABS: TabDef[] = [
   { id: "movies", label: "Movies", Icon: Film, component: MoviesTab },
   { id: "music", label: "Music", Icon: Music, component: MusicTab },
   { id: "tv-shows", label: "TV Shows", Icon: Tv, component: TVShowsTab },
+  { id: "store", label: "Store", Icon: Store, component: StoreTab },
   {
     id: "controllers",
     label: "Controllers",

@@ -15,6 +15,7 @@ export type TabId =
   | "movies"
   | "music"
   | "tv-shows"
+  | "store"
   | "settings"
   | "controllers";
 
@@ -45,6 +46,7 @@ export type GamePlatform =
   | "dos"
   | "windows"
   | "desktop"
+  | "itch"
   | "unknown";
 
 export type WineRunner = "wine" | "proton-ge" | "system-proton" | "umu-run";
@@ -610,4 +612,51 @@ export type IpcChannel =
   | "packages:setAutoUpdate"
   | "packages:checkUpdates"
   | "packages:progress"
-  | "packages:apt:password";
+  | "packages:apt:password"
+  | "store:itch:status"
+  | "store:itch:login"
+  | "store:itch:logout"
+  | "store:itch:library"
+  | "store:itch:install"
+  | "store:itch:uninstall"
+  | "store:itch:launch"
+  | "store:itch:update"
+  | "store:itch:updates"
+  | "store:itch:download"
+  | "store:providers:list";
+
+export type StoreProviderId = "itch";
+
+export interface StoreProvider {
+  id: StoreProviderId;
+  name: string;
+  url: string;
+  icon?: string;
+}
+
+export interface StoreGame {
+  id: string;
+  title: string;
+  platform: GamePlatform;
+  storeId: StoreProviderId;
+  storeGameId: string;
+  execPath?: string;
+  installPath?: string;
+  coverUrl?: string;
+  description?: string;
+  developer?: string;
+  genres?: string[];
+  isInstalled?: boolean;
+  isUpdateAvailable?: boolean;
+  version?: string;
+  lastPlayed?: number;
+  playTime?: number;
+}
+
+export interface StoreDownloadProgress {
+  gameId: string;
+  title: string;
+  progress: number;
+  status: "queued" | "downloading" | "installing" | "complete" | "error";
+  error?: string;
+}

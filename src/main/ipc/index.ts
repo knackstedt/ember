@@ -95,6 +95,19 @@ import {
   enrichTracks,
 } from "../services/music-enrichment.service";
 import {
+  isButlerAvailable,
+  getItchAuthStatus,
+  itchLogin,
+  itchLogout,
+  listItchLibrary,
+  installItchGame,
+  uninstallItchGame,
+  launchItchGame,
+  checkItchUpdate,
+  updateItchGame,
+  downloadItchBuild,
+} from "../services/itch.service";
+import {
   compressGame,
   compressAllRoms,
   getToolAvailability,
@@ -1459,5 +1472,64 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     const db = getDb();
     await db.query("DELETE FROM controller_mapping");
     return true;
+  });
+
+  /* ------------------------------------------------------------------ */
+  /*  Store / itch.io                                                    */
+  /* ------------------------------------------------------------------ */
+
+  ipcMain.handle("store:itch:status", async () => {
+    return getItchAuthStatus();
+  });
+
+  ipcMain.handle("store:itch:login", async () => {
+    return itchLogin();
+  });
+
+  ipcMain.handle("store:itch:logout", async () => {
+    return itchLogout();
+  });
+
+  ipcMain.handle("store:itch:library", async () => {
+    return listItchLibrary();
+  });
+
+  ipcMain.handle("store:itch:install", async (_e, gameId: string, title: string) => {
+    return installItchGame(gameId, title);
+  });
+
+  ipcMain.handle("store:itch:uninstall", async (_e, gameId: string) => {
+    return uninstallItchGame(gameId);
+  });
+
+  ipcMain.handle("store:itch:launch", async (_e, game: Game) => {
+    return launchItchGame(game);
+  });
+
+  ipcMain.handle("store:itch:update", async (_e, gameId: string) => {
+    return updateItchGame(gameId);
+  });
+
+  ipcMain.handle("store:itch:updates", async () => {
+    const library = await listItchLibrary();
+    const updates: { gameId: string; title: string; latestVersion?: string }[] = [];
+    for (const g of library) {
+      if (!g.id) continue;
+      const result = await checkItchUpdate(g.id);
+      if (result.updateAvailable) {
+        updates.push({ gameId: g.id, title: g.title, latestVersion: result.latestVersion });
+      }
+    }
+    return updates;
+  });
+
+  ipcMain.handle("store:itch:download", async (_e, downloadUrl: string, destPath: string) => {
+    return downloadItchBuild(downloadUrl, destPath);
+  });
+
+  ipcMain.handle("store:providers:list", async () => {
+    return [
+      { id: "itch", name: "itch.io", url: "https://itch.io", icon: "itch-io" },
+    ];
   });
 }
