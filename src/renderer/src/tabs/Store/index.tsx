@@ -203,7 +203,7 @@ export const StoreTab: React.FC = () => {
   }, [activeTabId]);
 
   /* Controller navigation for the active webview */
-  useBrowserControllerNav({
+  const virtualCursor = useBrowserControllerNav({
     webviewRef: activeWebviewRef,
     enabled: true,
     onBack: goBack,
@@ -329,7 +329,9 @@ export const StoreTab: React.FC = () => {
   /* ------------------------------------------------------------------ */
 
   return (
-    <div className="flex flex-col h-full w-full bg-black/40 backdrop-blur-sm">
+    <>
+      {virtualCursor}
+      <div className="flex flex-col h-full w-full bg-black/40 backdrop-blur-sm">
       {/* Top bar: itch auth + providers */}
       <div className="flex items-center gap-2 px-3 py-2 border-b border-white/10 bg-black/20">
         <div className="flex items-center gap-2 mr-4">
@@ -582,5 +584,6 @@ export const StoreTab: React.FC = () => {
         </AnimatePresence>
       </div>
     </div>
+    </>
   );
 };
