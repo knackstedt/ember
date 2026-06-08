@@ -11,6 +11,7 @@ import {
   CollectionItem,
   SmartFilterGroup,
   StreamingService,
+  SessionHook,
 } from "../../shared/types";
 
 export function escapeId(id: string): string {
@@ -112,6 +113,38 @@ export const GameRepo = {
   async setEmulatorConfig(id: string, config: GameEmulatorConfig): Promise<void> {
     const db = getDb();
     await db.query(`UPSERT game_config:⟨${escapeId(id)}⟩ CONTENT $config`, { config });
+  },
+
+  async setSessionConfig(
+    id: string,
+    config: {
+      launchCommand?: string | null;
+      launchArgs?: string[] | null;
+      launchWorkingDir?: string | null;
+      launchEnv?: Record<string, string> | null;
+      sessionHooks?: SessionHook[] | null;
+    },
+  ): Promise<void> {
+    const db = getDb();
+    const updates: string[] = [];
+    if (config.launchCommand !== undefined) {
+      updates.push(`launchCommand = ${config.launchCommand === null ? "NONE" : JSON.stringify(config.launchCommand)}`);
+    }
+    if (config.launchArgs !== undefined) {
+      updates.push(`launchArgs = ${config.launchArgs === null ? "NONE" : JSON.stringify(config.launchArgs)}`);
+    }
+    if (config.launchWorkingDir !== undefined) {
+      updates.push(`launchWorkingDir = ${config.launchWorkingDir === null ? "NONE" : JSON.stringify(config.launchWorkingDir)}`);
+    }
+    if (config.launchEnv !== undefined) {
+      updates.push(`launchEnv = ${config.launchEnv === null ? "NONE" : JSON.stringify(config.launchEnv)}`);
+    }
+    if (config.sessionHooks !== undefined) {
+      updates.push(`sessionHooks = ${config.sessionHooks === null ? "NONE" : JSON.stringify(config.sessionHooks)}`);
+    }
+    if (updates.length > 0) {
+      await db.query(`UPDATE game:⟨${escapeId(id)}⟩ SET ${updates.join(", ")}`);
+    }
   },
 };
 

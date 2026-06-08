@@ -59,6 +59,23 @@ export type ProtonRating =
   | "borked"
   | "unknown";
 
+export type SessionHookTiming =
+  | "before-start-blocking"
+  | "before-start"
+  | "after-start"
+  | "after-crash"
+  | "after-close";
+
+export interface SessionHook {
+  id: string;
+  timing: SessionHookTiming;
+  command: string;
+  args?: string[];
+  timeout?: number;
+  env?: Record<string, string>;
+  workingDir?: string;
+}
+
 export interface Game {
   id: string;
   title: string;
@@ -111,6 +128,16 @@ export interface Game {
   compressedRomPath?: string;
   /** Compression format used for compressedRomPath */
   compressionFormat?: string;
+  /** Override launch command (replaces execPath/romPath logic) */
+  launchCommand?: string;
+  /** Override launch arguments */
+  launchArgs?: string[];
+  /** Override working directory */
+  launchWorkingDir?: string;
+  /** Extra environment variables merged into the game process env */
+  launchEnv?: Record<string, string>;
+  /** Session lifecycle hooks */
+  sessionHooks?: SessionHook[];
 }
 
 export interface GameEmulatorConfig {
@@ -549,6 +576,7 @@ export type IpcChannel =
   | "games:tag"
   | "games:emulatorConfig:get"
   | "games:emulatorConfig:set"
+  | "games:sessionConfig:set"
   | "movies:scan"
   | "movies:list"
   | "movies:launch"

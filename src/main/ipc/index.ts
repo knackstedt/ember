@@ -266,7 +266,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
       }
       return result;
     } catch (err: any) {
-      log.error("libretro", `Worker method ${method} failed:`, err);
+      log.error("libretro", `Worker method ${method} failed: ${err}`);
       throw err;
     }
   });
@@ -289,6 +289,10 @@ export function registerIpcHandlers(window: BrowserWindow): void {
 
   ipcMain.handle("games:emulatorConfig:set", async (_e, id: string, config: GameEmulatorConfig) => {
     await GameRepo.setEmulatorConfig(id, config);
+  });
+
+  ipcMain.handle("games:sessionConfig:set", async (_e, id: string, config: Parameters<typeof GameRepo.setSessionConfig>[1]) => {
+    await GameRepo.setSessionConfig(id, config);
   });
 
   ipcMain.handle("games:wineConfig:set", async (_e, id: string, config: { wineRunner?: WineRunner; wineCustomCommand?: string | null; umuCustomCommand?: string | null }) => {

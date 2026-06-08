@@ -48,6 +48,8 @@ import {
   Play,
   X,
   Archive,
+  Settings,
+  Plus,
 } from "lucide-react";
 import { AiGroup } from "../../../../shared/types";
 import { DynamicFacetFilters, FacetField } from "../../components/DynamicFacetFilters/DynamicFacetFilters";
@@ -201,6 +203,7 @@ export const GamingTab: React.FC = () => {
   const [selectedEmulatorConfig, setSelectedEmulatorConfig] = useState<GameEmulatorConfig>({});
   const [activeCollectionId, setActiveCollectionId] = useState<string | null>(null);
   const [showCollectionManager, setShowCollectionManager] = useState(false);
+  const [showLaunchSettings, setShowLaunchSettings] = useState(false);
   const [collectionItemIds, setCollectionItemIds] = useState<Set<string>>(new Set());
   const gridRef = useRef<VirtualGridHandle>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -662,7 +665,6 @@ export const GamingTab: React.FC = () => {
               const game = games.find((g) => g.id === id);
               if (game && !getMissingCoreTooltip(game)) launch(game);
             }}
-            collapsed={focusedRow >= 1}
           />
 
           <CollectionsBar
@@ -973,12 +975,13 @@ export const GamingTab: React.FC = () => {
         onTagsChange={
           selected ? (newTags) => setTags(selected.id, newTags) : undefined
         }
+        hideTags={showLaunchSettings}
         actions={
           selected && (
             <>
               <Tooltip content={getMissingCoreTooltip(selected) ?? ""}>
                 <motion.button
-                  className="px-6 py-2.5 rounded-[var(--radius-card)] font-semibold text-sm"
+                  className="px-5 py-2.5 rounded-[var(--radius-card)] font-semibold text-sm flex items-center gap-2 whitespace-nowrap"
                   style={{
                     background: getMissingCoreTooltip(selected) ? "var(--color-surface-raised)" : "var(--color-accent)",
                     color: getMissingCoreTooltip(selected) ? "var(--color-text-dim)" : "var(--color-bg)",
@@ -1050,7 +1053,7 @@ export const GamingTab: React.FC = () => {
               )}
               {selected.compressedRomPath && (
                 <span
-                  className="px-4 py-2.5 rounded-[var(--radius-card)] text-sm font-medium flex items-center gap-2"
+                  className="px-4 py-2.5 rounded-[var(--radius-card)] text-sm font-medium flex items-center gap-2 whitespace-nowrap"
                   style={{
                     background: "color-mix(in srgb, var(--color-accent) 12%, transparent)",
                     color: "var(--color-accent)",
@@ -1060,227 +1063,247 @@ export const GamingTab: React.FC = () => {
                   <Archive size={14} /> Compressed ({selected.compressionFormat})
                 </span>
               )}
+              <Tooltip content="Launch Settings">
+                <motion.button
+                  className="px-3 py-2.5 rounded-[var(--radius-card)] font-semibold text-sm flex items-center gap-2"
+                  style={{
+                    background: showLaunchSettings ? "var(--color-accent)" : "var(--color-surface-raised)",
+                    color: showLaunchSettings ? "var(--color-bg)" : "var(--color-text)",
+                    border: "1px solid var(--color-border)",
+                  }}
+                  onClick={() => setShowLaunchSettings((v) => !v)}
+                  whileTap={{ scale: 0.96 }}
+                >
+                  <Settings size={14} />
+                </motion.button>
+              </Tooltip>
             </>
           )
         }
       >
         {selected && (
           <div className="flex flex-col gap-4">
-            {/* Screenshots from game data */}
-            {(detailGameData?.screenshots?.length || detailGameData?.bannerUrl || detailGameData?.coverUrl) && (
-              <div>
-                <div
-                  className="text-xs font-semibold uppercase tracking-wide mb-2"
-                  style={{ color: "var(--color-text-dim)" }}
-                >
-                  Screenshots
-                </div>
-                <div
-                  className="flex gap-2 overflow-x-auto pb-1"
-                  style={{ scrollbarWidth: "thin" }}
-                >
-                  {(detailGameData?.screenshots?.length
-                    ? detailGameData.screenshots.slice(0, 6)
-                    : [detailGameData?.bannerUrl, detailGameData?.coverUrl].filter(Boolean)
-                  )
-                    .filter((u): u is string => !!u)
-                    .map((url, i) => (
-                      <img
-                        key={i}
-                        src={url}
-                        alt=""
-                        className="h-28 flex-shrink-0 rounded-[var(--radius-card)] object-cover"
-                        style={{ maxWidth: 220 }}
-                      />
-                    ))}
-                </div>
-              </div>
-            )}
-
-            {/* Videos from lazy metadata */}
-            {detailGameData?.videos && detailGameData.videos.length > 0 && (
-              <div>
-                <div
-                  className="text-xs font-semibold uppercase tracking-wide mb-2"
-                  style={{ color: "var(--color-text-dim)" }}
-                >
-                  Videos
-                </div>
-                <div className="flex flex-col gap-2">
-                  {detailGameData.videos.slice(0, 3).map((video, i) => (
-                    <a
-                      key={i}
-                      href={video.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-2 p-2 rounded hover:bg-white/5 transition-colors"
-                      style={{ background: "var(--color-surface-raised)" }}
+            {showLaunchSettings ? (
+              <GameSessionSettings game={selected} />
+            ) : (
+              <>
+                {/* Screenshots from game data */}
+                {(detailGameData?.screenshots?.length || detailGameData?.bannerUrl || detailGameData?.coverUrl) && (
+                  <div>
+                    <div
+                      className="text-xs font-semibold uppercase tracking-wide mb-2"
+                      style={{ color: "var(--color-text-dim)" }}
                     >
-                      <Play size={18} />
-                      <span className="text-sm truncate flex-1">{video.name ?? "Video"}</span>
-                      <span className="text-xs" style={{ color: "var(--color-text-dim)" }}>{video.type}</span>
-                    </a>
-                  ))}
-                </div>
-              </div>
-            )}
-            {selected.playTime !== undefined && (
-              <div className="flex items-center gap-2 text-sm">
-                <span style={{ color: "var(--color-text-dim)" }}>
-                  Play Time
-                </span>
-                <span style={{ color: "var(--color-text)", fontWeight: 600 }}>
-                  {selected.playTime >= 60
-                    ? `${Math.floor(selected.playTime / 60)}h ${selected.playTime % 60}m`
-                    : `${selected.playTime}m`}
-                </span>
-              </div>
-            )}
-            {(selected.platform === "nes" || selected.platform === "snes" || selected.platform === "gb" || selected.platform === "gba") && (
-              <div>
-                <div
-                  className="text-xs font-semibold uppercase tracking-wide mb-2"
-                  style={{ color: "var(--color-text-dim)" }}
-                >
-                  Emulator Shader
-                </div>
-                <Dropdown
-                  value={selectedEmulatorConfig.shader ?? ""}
-                  options={[
-                    { value: "", label: "Inherit (use emulator/global default)" },
-                    { value: "2xSal.glsl", label: "2xSal" },
-                    { value: "4xBR.glsl", label: "4xBR" },
-                    { value: "6xBRZ.glsl", label: "6xBRZ" },
-                    { value: "crt-easymode.glsl", label: "CRT Easymode" },
-                    { value: "crt-geom.glsl", label: "CRT Geom" },
-                    { value: "dot.glsl", label: "Dot" },
-                    { value: "lcd.glsl", label: "LCD" },
-                    { value: "ntsc.glsl", label: "NTSC" },
-                    { value: "sharp-bilinear.glsl", label: "Sharp Bilinear" },
-                    { value: "supereagle.glsl", label: "Super Eagle" },
-                    { value: "xbrz.glsl", label: "xBRZ" },
-                  ]}
-                  onChange={(shader) => {
-                    const next = { ...selectedEmulatorConfig, shader: shader || undefined };
-                    setSelectedEmulatorConfig(next);
-                    void setEmulatorConfig(selected.id, next);
-                  }}
-                  className="w-full"
-                />
-              </div>
-            )}
-            {LIBRETRO_PLATFORMS.includes(selected.platform) && (
-              <div>
-                <div
-                  className="text-xs font-semibold uppercase tracking-wide mb-2"
-                  style={{ color: "var(--color-text-dim)" }}
-                >
-                  Libretro Core
-                </div>
-                <CoreSelector
-                  game={selected}
-                  onSelectCore={(corePath) => {
-                    useLibretroPlayerStore.getState().setSelectedCore(corePath);
-                  }}
-                />
-                <div
-                  className="text-xs font-semibold uppercase tracking-wide mb-2 mt-4"
-                  style={{ color: "var(--color-text-dim)" }}
-                >
-                  Shader
-                </div>
-                <Dropdown
-                  value={selectedEmulatorConfig.shader ?? ""}
-                  options={[
-                    { value: "", label: "None" },
-                    ...SHADER_PRESETS.filter((s) => s.id !== "none").map((preset) => ({
-                      value: preset.id,
-                      label: preset.name,
-                    })),
-                  ]}
-                  onChange={(shader) => {
-                    const next = { ...selectedEmulatorConfig, shader: shader || undefined };
-                    setSelectedEmulatorConfig(next);
-                    void setEmulatorConfig(selected.id, next);
-                  }}
-                  className="w-full"
-                />
-              </div>
-            )}
-            {selected.platform === "windows" && (
-              <div className="flex flex-col gap-4">
-                <div>
-                  <div
-                    className="text-xs font-semibold uppercase tracking-wide mb-2"
-                    style={{ color: "var(--color-text-dim)" }}
-                  >
-                    Compatibility Runner
+                      Screenshots
+                    </div>
+                    <div
+                      className="flex gap-2 overflow-x-auto pb-1"
+                      style={{ scrollbarWidth: "thin" }}
+                    >
+                      {(detailGameData?.screenshots?.length
+                        ? detailGameData.screenshots.slice(0, 6)
+                        : [detailGameData?.bannerUrl, detailGameData?.coverUrl].filter(Boolean)
+                      )
+                        .filter((u): u is string => !!u)
+                        .map((url, i) => (
+                          <img
+                            key={i}
+                            src={url}
+                            alt=""
+                            className="h-28 flex-shrink-0 rounded-[var(--radius-card)] object-cover"
+                            style={{ maxWidth: 220 }}
+                          />
+                        ))}
+                    </div>
                   </div>
-                  <Dropdown
-                    value={selected.wineRunner ?? ""}
-                    options={[
-                      { value: "", label: "Auto-detect" },
-                      { value: "umu-run", label: "umu-run" },
-                      { value: "wine", label: "Wine" },
-                      { value: "proton-ge", label: "Proton-GE" },
-                      { value: "system-proton", label: "System Proton" },
-                    ]}
-                    onChange={(runner) => {
-                      const value = runner as WineRunner || undefined;
-                      void setWineRunner(selected.id, value ?? "wine");
-                    }}
-                    className="w-full"
-                  />
-                </div>
-                <div>
-                  <div
-                    className="text-xs font-semibold uppercase tracking-wide mb-2"
-                    style={{ color: "var(--color-text-dim)" }}
-                  >
-                    Wine Custom Command
+                )}
+
+                {/* Videos from lazy metadata */}
+                {detailGameData?.videos && detailGameData.videos.length > 0 && (
+                  <div>
+                    <div
+                      className="text-xs font-semibold uppercase tracking-wide mb-2"
+                      style={{ color: "var(--color-text-dim)" }}
+                    >
+                      Videos
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      {detailGameData.videos.slice(0, 3).map((video, i) => (
+                        <a
+                          key={i}
+                          href={video.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 p-2 rounded hover:bg-white/5 transition-colors"
+                          style={{ background: "var(--color-surface-raised)" }}
+                        >
+                          <Play size={18} />
+                          <span className="text-sm truncate flex-1">{video.name ?? "Video"}</span>
+                          <span className="text-xs" style={{ color: "var(--color-text-dim)" }}>{video.type}</span>
+                        </a>
+                      ))}
+                    </div>
                   </div>
-                  <input
-                    type="text"
-                    value={selected.wineCustomCommand ?? ""}
-                    onChange={(e) => void setWineCustomCommand(selected.id, e.target.value || null)}
-                    placeholder="wine {exe} --some-flag"
-                    className="w-full text-sm px-2 py-1.5 rounded"
-                    style={{
-                      background: "var(--color-surface-raised)",
-                      border: "1px solid var(--color-border)",
-                      color: "var(--color-text)",
-                      outline: "none",
-                    }}
-                  />
-                  <p className="text-[10px] mt-1" style={{ color: "var(--color-text-dim)" }}>
-                    Use {"{exe}"} as placeholder for the executable path. Leave empty for default.
-                  </p>
-                </div>
-                <div>
-                  <div
-                    className="text-xs font-semibold uppercase tracking-wide mb-2"
-                    style={{ color: "var(--color-text-dim)" }}
-                  >
-                    umu-run Custom Command
+                )}
+                {selected.playTime !== undefined && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <span style={{ color: "var(--color-text-dim)" }}>
+                      Play Time
+                    </span>
+                    <span style={{ color: "var(--color-text)", fontWeight: 600 }}>
+                      {selected.playTime >= 60
+                        ? `${Math.floor(selected.playTime / 60)}h ${selected.playTime % 60}m`
+                        : `${selected.playTime}m`}
+                    </span>
                   </div>
-                  <input
-                    type="text"
-                    value={selected.umuCustomCommand ?? ""}
-                    onChange={(e) => void setUmuCustomCommand(selected.id, e.target.value || null)}
-                    placeholder="umu-run {exe}"
-                    className="w-full text-sm px-2 py-1.5 rounded"
-                    style={{
-                      background: "var(--color-surface-raised)",
-                      border: "1px solid var(--color-border)",
-                      color: "var(--color-text)",
-                      outline: "none",
-                    }}
-                  />
-                  <p className="text-[10px] mt-1" style={{ color: "var(--color-text-dim)" }}>
-                    Use {"{exe}"} as placeholder for the executable path. Leave empty for default.
-                  </p>
-                </div>
-              </div>
+                )}
+                {(selected.platform === "nes" || selected.platform === "snes" || selected.platform === "gb" || selected.platform === "gba") && (
+                  <div>
+                    <div
+                      className="text-xs font-semibold uppercase tracking-wide mb-2"
+                      style={{ color: "var(--color-text-dim)" }}
+                    >
+                      Emulator Shader
+                    </div>
+                    <Dropdown
+                      value={selectedEmulatorConfig.shader ?? ""}
+                      options={[
+                        { value: "", label: "Inherit (use emulator/global default)" },
+                        { value: "2xSal.glsl", label: "2xSal" },
+                        { value: "4xBR.glsl", label: "4xBR" },
+                        { value: "6xBRZ.glsl", label: "6xBRZ" },
+                        { value: "crt-easymode.glsl", label: "CRT Easymode" },
+                        { value: "crt-geom.glsl", label: "CRT Geom" },
+                        { value: "dot.glsl", label: "Dot" },
+                        { value: "lcd.glsl", label: "LCD" },
+                        { value: "ntsc.glsl", label: "NTSC" },
+                        { value: "sharp-bilinear.glsl", label: "Sharp Bilinear" },
+                        { value: "supereagle.glsl", label: "Super Eagle" },
+                        { value: "xbrz.glsl", label: "xBRZ" },
+                      ]}
+                      onChange={(shader) => {
+                        const next = { ...selectedEmulatorConfig, shader: shader || undefined };
+                        setSelectedEmulatorConfig(next);
+                        void setEmulatorConfig(selected.id, next);
+                      }}
+                      className="w-full"
+                    />
+                  </div>
+                )}
+                {LIBRETRO_PLATFORMS.includes(selected.platform) && (
+                  <div>
+                    <div
+                      className="text-xs font-semibold uppercase tracking-wide mb-2"
+                      style={{ color: "var(--color-text-dim)" }}
+                    >
+                      Libretro Core
+                    </div>
+                    <CoreSelector
+                      game={selected}
+                      onSelectCore={(corePath) => {
+                        useLibretroPlayerStore.getState().setSelectedCore(corePath);
+                      }}
+                    />
+                    <div
+                      className="text-xs font-semibold uppercase tracking-wide mb-2 mt-4"
+                      style={{ color: "var(--color-text-dim)" }}
+                    >
+                      Shader
+                    </div>
+                    <Dropdown
+                      value={selectedEmulatorConfig.shader ?? ""}
+                      options={[
+                        { value: "", label: "None" },
+                        ...SHADER_PRESETS.filter((s) => s.id !== "none").map((preset) => ({
+                          value: preset.id,
+                          label: preset.name,
+                        })),
+                      ]}
+                      onChange={(shader) => {
+                        const next = { ...selectedEmulatorConfig, shader: shader || undefined };
+                        setSelectedEmulatorConfig(next);
+                        void setEmulatorConfig(selected.id, next);
+                      }}
+                      className="w-full"
+                    />
+                  </div>
+                )}
+                {selected.platform === "windows" && (
+                  <div className="flex flex-col gap-4">
+                    <div>
+                      <div
+                        className="text-xs font-semibold uppercase tracking-wide mb-2"
+                        style={{ color: "var(--color-text-dim)" }}
+                      >
+                        Compatibility Runner
+                      </div>
+                      <Dropdown
+                        value={selected.wineRunner ?? ""}
+                        options={[
+                          { value: "", label: "Auto-detect" },
+                          { value: "umu-run", label: "umu-run" },
+                          { value: "wine", label: "Wine" },
+                          { value: "proton-ge", label: "Proton-GE" },
+                          { value: "system-proton", label: "System Proton" },
+                        ]}
+                        onChange={(runner) => {
+                          const value = runner as WineRunner || undefined;
+                          void setWineRunner(selected.id, value ?? "wine");
+                        }}
+                        className="w-full"
+                      />
+                    </div>
+                    <div>
+                      <div
+                        className="text-xs font-semibold uppercase tracking-wide mb-2"
+                        style={{ color: "var(--color-text-dim)" }}
+                      >
+                        Wine Custom Command
+                      </div>
+                      <input
+                        type="text"
+                        value={selected.wineCustomCommand ?? ""}
+                        onChange={(e) => void setWineCustomCommand(selected.id, e.target.value || null)}
+                        placeholder="wine {exe} --some-flag"
+                        className="w-full text-sm px-2 py-1.5 rounded"
+                        style={{
+                          background: "var(--color-surface-raised)",
+                          border: "1px solid var(--color-border)",
+                          color: "var(--color-text)",
+                          outline: "none",
+                        }}
+                      />
+                      <p className="text-[10px] mt-1" style={{ color: "var(--color-text-dim)" }}>
+                        Use {"{exe}"} as placeholder for the executable path. Leave empty for default.
+                      </p>
+                    </div>
+                    <div>
+                      <div
+                        className="text-xs font-semibold uppercase tracking-wide mb-2"
+                        style={{ color: "var(--color-text-dim)" }}
+                      >
+                        umu-run Custom Command
+                      </div>
+                      <input
+                        type="text"
+                        value={selected.umuCustomCommand ?? ""}
+                        onChange={(e) => void setUmuCustomCommand(selected.id, e.target.value || null)}
+                        placeholder="umu-run {exe}"
+                        className="w-full text-sm px-2 py-1.5 rounded"
+                        style={{
+                          background: "var(--color-surface-raised)",
+                          border: "1px solid var(--color-border)",
+                          color: "var(--color-text)",
+                          outline: "none",
+                        }}
+                      />
+                      <p className="text-[10px] mt-1" style={{ color: "var(--color-text-dim)" }}>
+                        Use {"{exe}"} as placeholder for the executable path. Leave empty for default.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
@@ -1294,3 +1317,375 @@ export const GamingTab: React.FC = () => {
     </div>
   );
 };
+
+/* ------------------------------------------------------------------ */
+/*  Game Session Settings                                              */
+/* ------------------------------------------------------------------ */
+
+const HOOK_TIMING_LABELS: Record<string, string> = {
+  "before-start-blocking": "Before Start (blocking)",
+  "before-start": "Before Start",
+  "after-start": "After Start",
+  "after-crash": "After Crash",
+  "after-close": "After Close",
+};
+
+function GameSessionSettings({ game }: { game: Game }) {
+  const { setSessionConfig } = useGamesStore();
+  const [editingHook, setEditingHook] = useState<string | null>(null);
+  const [hookDraft, setHookDraft] = useState<{
+    timing: string;
+    command: string;
+    args: string;
+    timeout: string;
+    workingDir: string;
+    env: string;
+  }>({
+    timing: "before-start",
+    command: "",
+    args: "",
+    timeout: "30",
+    workingDir: "",
+    env: "",
+  });
+
+  const saveField = <K extends keyof Game>(
+    field: K,
+    value: Game[K] | null,
+  ) => {
+    void setSessionConfig(game.id, {
+      [field]: value,
+    } as any);
+  };
+
+  const addHook = () => {
+    const id = crypto.randomUUID();
+    const args = hookDraft.args
+      .split(",")
+      .map((a) => a.trim())
+      .filter(Boolean);
+    const env: Record<string, string> = {};
+    for (const line of hookDraft.env.split("\n")) {
+      const [k, ...rest] = line.split("=");
+      if (k && rest.length > 0) {
+        env[k.trim()] = rest.join("=").trim();
+      }
+    }
+    const newHook = {
+      id,
+      timing: hookDraft.timing as import("../../../../shared/types").SessionHookTiming,
+      command: hookDraft.command.trim(),
+      args: args.length > 0 ? args : undefined,
+      timeout: parseInt(hookDraft.timeout, 10) * 1000 || undefined,
+      workingDir: hookDraft.workingDir.trim() || undefined,
+      env: Object.keys(env).length > 0 ? env : undefined,
+    };
+    const next = [...(game.sessionHooks ?? []), newHook];
+    void setSessionConfig(game.id, { sessionHooks: next });
+    setEditingHook(null);
+    setHookDraft({
+      timing: "before-start",
+      command: "",
+      args: "",
+      timeout: "30",
+      workingDir: "",
+      env: "",
+    });
+  };
+
+  const removeHook = (id: string) => {
+    const next = (game.sessionHooks ?? []).filter((h) => h.id !== id);
+    void setSessionConfig(game.id, { sessionHooks: next });
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, height: 0 }}
+      animate={{ opacity: 1, height: "auto" }}
+      className="flex flex-col gap-4"
+    >
+          {/* Launch Command Override */}
+          <div>
+            <div
+              className="text-xs font-semibold uppercase tracking-wide mb-1.5"
+              style={{ color: "var(--color-text-dim)" }}
+            >
+              Launch Command
+            </div>
+            <input
+              type="text"
+              value={game.launchCommand ?? ""}
+              onChange={(e) => saveField("launchCommand", e.target.value || null)}
+              placeholder="Override command (replaces default)"
+              className="w-full text-sm px-2 py-1.5 rounded"
+              style={{
+                background: "var(--color-surface-raised)",
+                border: "1px solid var(--color-border)",
+                color: "var(--color-text)",
+                outline: "none",
+              }}
+            />
+            <p className="text-[10px] mt-1" style={{ color: "var(--color-text-dim)" }}>
+              Overrides the default launch command for this game.
+            </p>
+          </div>
+
+          {/* Launch Args */}
+          <div>
+            <div
+              className="text-xs font-semibold uppercase tracking-wide mb-1.5"
+              style={{ color: "var(--color-text-dim)" }}
+            >
+              Launch Arguments
+            </div>
+            <input
+              type="text"
+              value={game.launchArgs?.join(", ") ?? ""}
+              onChange={(e) => {
+                const v = e.target.value.trim();
+                saveField("launchArgs", v ? v.split(",").map((s) => s.trim()) : null);
+              }}
+              placeholder="arg1, arg2, arg3"
+              className="w-full text-sm px-2 py-1.5 rounded"
+              style={{
+                background: "var(--color-surface-raised)",
+                border: "1px solid var(--color-border)",
+                color: "var(--color-text)",
+                outline: "none",
+              }}
+            />
+          </div>
+
+          {/* Working Directory */}
+          <div>
+            <div
+              className="text-xs font-semibold uppercase tracking-wide mb-1.5"
+              style={{ color: "var(--color-text-dim)" }}
+            >
+              Working Directory
+            </div>
+            <input
+              type="text"
+              value={game.launchWorkingDir ?? ""}
+              onChange={(e) => saveField("launchWorkingDir", e.target.value || null)}
+              placeholder="/path/to/working/dir"
+              className="w-full text-sm px-2 py-1.5 rounded"
+              style={{
+                background: "var(--color-surface-raised)",
+                border: "1px solid var(--color-border)",
+                color: "var(--color-text)",
+                outline: "none",
+              }}
+            />
+          </div>
+
+          {/* Environment Variables */}
+          <div>
+            <div
+              className="text-xs font-semibold uppercase tracking-wide mb-1.5"
+              style={{ color: "var(--color-text-dim)" }}
+            >
+              Environment Variables
+            </div>
+            <textarea
+              value={
+                game.launchEnv
+                  ? Object.entries(game.launchEnv)
+                      .map(([k, v]) => `${k}=${v}`)
+                      .join("\n")
+                  : ""
+              }
+              onChange={(e) => {
+                const env: Record<string, string> = {};
+                for (const line of e.target.value.split("\n")) {
+                  const [k, ...rest] = line.split("=");
+                  if (k && rest.length > 0) {
+                    env[k.trim()] = rest.join("=").trim();
+                  }
+                }
+                saveField("launchEnv", Object.keys(env).length > 0 ? env : null);
+              }}
+              placeholder="KEY=value\nOTHER_KEY=value"
+              rows={3}
+              className="w-full text-sm px-2 py-1.5 rounded resize-none"
+              style={{
+                background: "var(--color-surface-raised)",
+                border: "1px solid var(--color-border)",
+                color: "var(--color-text)",
+                outline: "none",
+              }}
+            />
+          </div>
+
+          {/* Session Hooks */}
+          <div>
+            <div
+              className="text-xs font-semibold uppercase tracking-wide mb-2"
+              style={{ color: "var(--color-text-dim)" }}
+            >
+              Session Hooks
+            </div>
+            <div className="flex flex-col gap-2">
+              {(game.sessionHooks ?? []).map((hook) => (
+                <div
+                  key={hook.id}
+                  className="flex items-center gap-2 p-2 rounded text-sm"
+                  style={{
+                    background: "var(--color-surface-raised)",
+                    border: "1px solid var(--color-border)",
+                  }}
+                >
+                  <span
+                    className="px-1.5 py-0.5 rounded text-[10px] font-medium uppercase"
+                    style={{
+                      background: "color-mix(in srgb, var(--color-accent) 15%, transparent)",
+                      color: "var(--color-accent)",
+                    }}
+                  >
+                    {HOOK_TIMING_LABELS[hook.timing] ?? hook.timing}
+                  </span>
+                  <span className="truncate flex-1" style={{ color: "var(--color-text)" }}>
+                    {hook.command} {hook.args?.join(" ") ?? ""}
+                  </span>
+                  <button
+                    onClick={() => removeHook(hook.id)}
+                    className="p-1 rounded hover:bg-white/10 transition-colors"
+                    aria-label="Remove hook"
+                  >
+                    <X size={14} style={{ color: "var(--color-text-dim)" }} />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {editingHook === null ? (
+              <button
+                onClick={() => setEditingHook("new")}
+                className="flex items-center gap-1.5 mt-2 px-3 py-1.5 rounded text-xs font-medium"
+                style={{
+                  background: "var(--color-surface-raised)",
+                  border: "1px solid var(--color-border)",
+                  color: "var(--color-text)",
+                }}
+              >
+                <Plus size={14} /> Add Hook
+              </button>
+            ) : (
+              <div className="flex flex-col gap-2 mt-2 p-3 rounded"
+                style={{
+                  background: "var(--color-surface-raised)",
+                  border: "1px solid var(--color-border)",
+                }}
+              >
+                <Dropdown
+                  value={hookDraft.timing}
+                  options={[
+                    { value: "before-start-blocking", label: "Before Start (blocking)" },
+                    { value: "before-start", label: "Before Start" },
+                    { value: "after-start", label: "After Start" },
+                    { value: "after-crash", label: "After Crash" },
+                    { value: "after-close", label: "After Close" },
+                  ]}
+                  onChange={(v) => setHookDraft((d) => ({ ...d, timing: v }))}
+                  className="w-full"
+                />
+                <input
+                  type="text"
+                  value={hookDraft.command}
+                  onChange={(e) => setHookDraft((d) => ({ ...d, command: e.target.value }))}
+                  placeholder="Command (e.g. /usr/bin/obs)"
+                  className="w-full text-sm px-2 py-1.5 rounded"
+                  style={{
+                    background: "var(--color-bg)",
+                    border: "1px solid var(--color-border)",
+                    color: "var(--color-text)",
+                    outline: "none",
+                  }}
+                />
+                <input
+                  type="text"
+                  value={hookDraft.args}
+                  onChange={(e) => setHookDraft((d) => ({ ...d, args: e.target.value }))}
+                  placeholder="Arguments (comma-separated)"
+                  className="w-full text-sm px-2 py-1.5 rounded"
+                  style={{
+                    background: "var(--color-bg)",
+                    border: "1px solid var(--color-border)",
+                    color: "var(--color-text)",
+                    outline: "none",
+                  }}
+                />
+                <input
+                  type="text"
+                  value={hookDraft.workingDir}
+                  onChange={(e) => setHookDraft((d) => ({ ...d, workingDir: e.target.value }))}
+                  placeholder="Working directory"
+                  className="w-full text-sm px-2 py-1.5 rounded"
+                  style={{
+                    background: "var(--color-bg)",
+                    border: "1px solid var(--color-border)",
+                    color: "var(--color-text)",
+                    outline: "none",
+                  }}
+                />
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    value={hookDraft.timeout}
+                    onChange={(e) => setHookDraft((d) => ({ ...d, timeout: e.target.value }))}
+                    placeholder="Timeout (seconds)"
+                    className="w-24 text-sm px-2 py-1.5 rounded"
+                    style={{
+                      background: "var(--color-bg)",
+                      border: "1px solid var(--color-border)",
+                      color: "var(--color-text)",
+                      outline: "none",
+                    }}
+                  />
+                  <span className="text-xs self-center" style={{ color: "var(--color-text-dim)" }}>
+                    seconds timeout
+                  </span>
+                </div>
+                <textarea
+                  value={hookDraft.env}
+                  onChange={(e) => setHookDraft((d) => ({ ...d, env: e.target.value }))}
+                  placeholder="Extra env vars (KEY=value per line)"
+                  rows={2}
+                  className="w-full text-sm px-2 py-1.5 rounded resize-none"
+                  style={{
+                    background: "var(--color-bg)",
+                    border: "1px solid var(--color-border)",
+                    color: "var(--color-text)",
+                    outline: "none",
+                  }}
+                />
+                <div className="flex gap-2 justify-end">
+                  <button
+                    onClick={() => setEditingHook(null)}
+                    className="px-3 py-1 rounded text-xs"
+                    style={{
+                      background: "var(--color-surface-raised)",
+                      color: "var(--color-text-dim)",
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={addHook}
+                    disabled={!hookDraft.command.trim()}
+                    className="px-3 py-1 rounded text-xs font-medium"
+                    style={{
+                      background: "var(--color-accent)",
+                      color: "var(--color-bg)",
+                      opacity: hookDraft.command.trim() ? 1 : 0.5,
+                    }}
+                  >
+                    Add
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </motion.div>
+      );
+    }

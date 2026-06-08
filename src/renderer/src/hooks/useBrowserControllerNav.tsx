@@ -17,7 +17,6 @@ export function useBrowserControllerNav({
   onForward,
 }: UseBrowserControllerNavOptions) {
   const getLiveStates = useRef(() => useInputStore.getState().liveStates).current;
-  const prevButtonsRef = useRef<Record<string, Record<string, boolean>>>({});
   const manager = useRef(getCursorManager()).current;
 
   useEffect(() => {
@@ -70,23 +69,52 @@ export function useBrowserControllerNav({
     let knownDeviceIds: string[] = [];
     let animationFrameId: number;
     const instancePrefix = `bcn-${Date.now()}-${Math.random().toString(36).slice(2)}-`;
+    const pendingTimeouts = new Set<ReturnType<typeof setTimeout>>();
 
-    const ensureDevice = (deviceId: string): DeviceState => {
+    const getDefaultPos = () => ({
+      x: window.innerWidth / 2,
+      y: window.innerHeight / 2,
+    });
+
+    const seedButtons = (liveStates: Record<string, any>, deviceId: string): Record<string, boolean> => {
+      const btns = liveStates[deviceId]?.buttons;
+      return btns ? { ...btns } : {};
+    };
+
+    const seedTriggers = (liveStates: Record<string, any>, deviceId: string): Record<string, boolean> => {
+      const axes = liveStates[deviceId]?.axes;
+      const buttons = liveStates[deviceId]?.buttons;
+      if (!axes || !buttons) return {};
+      const ltAxis = (axes.left_trigger ?? 0) / 32767;
+      const rtAxis = (axes.right_trigger ?? 0) / 32767;
+      const ltBtn = buttons["left_trigger_btn"] ?? false;
+      const rtBtn = buttons["right_trigger_btn"] ?? false;
+      const ltBtnFallback = buttons["left_trigger"] ?? false;
+      const rtBtnFallback = buttons["right_trigger"] ?? false;
+      return {
+        left: ltAxis > TRIGGER_THRESHOLD || ltBtn || ltBtnFallback,
+        right: rtAxis > TRIGGER_THRESHOLD || rtBtn || rtBtnFallback,
+      };
+    };
+
+    const ensureDevice = (deviceId: string, liveStates: Record<string, any>): DeviceState => {
       let state = deviceMap.get(deviceId);
       if (!state) {
-        const posRef = { current: { x: 0, y: 0 } };
+        const saved = manager.lastPositions.get(deviceId);
+        const posRef = { current: saved ? { x: saved.x, y: saved.y } : getDefaultPos() };
+        const lastInputTime = saved?.lastInputTime ?? Date.now();
         state = {
           posRef,
-          prevButtons: {},
-          prevTriggers: {},
+          prevButtons: seedButtons(liveStates, deviceId),
+          prevTriggers: seedTriggers(liveStates, deviceId),
           wiggleSamples: [],
           wiggleEndTime: 0,
-          lastInputTime: Date.now(),
+          lastInputTime,
           lastCursorCheck: 0,
           currentCursorKey: "default",
           pendingCursorKey: "default",
           pendingCursorCount: 0,
-          visible: false,
+          visible: Date.now() - lastInputTime <= CURSOR_FADE_DELAY_MS,
           hoverStyle: "default",
           expanded: false,
         };
@@ -96,7 +124,7 @@ export function useBrowserControllerNav({
     };
 
     const sendMouseEvent = (type: string, x: number, y: number, button?: string) => {
-      if (webview) {
+      if (webview && cursorOverWebview(x, y)) {
         try {
           const bounds = webview.getBoundingClientRect();
           const relX = x - bounds.left;
@@ -126,17 +154,18 @@ export function useBrowserControllerNav({
         });
         target.dispatchEvent(ev);
 
-        // For left click, also dispatch click
+        // For left click, invoke native .click() on the nearest clickable
+        // ancestor so React onClick handlers fire reliably when the virtual
+        // cursor is hovering over a child element (e.g. an icon inside a button).
         if (type === "mouseUp" && button === "left") {
-          const clickEv = new MouseEvent("click", {
-            bubbles: true,
-            cancelable: true,
-            clientX: x,
-            clientY: y,
-            button: 0,
-            buttons: 1,
-          });
-          target.dispatchEvent(clickEv);
+          let el: Element | null = target;
+          while (el) {
+            if (el.tagName === "BUTTON" || el.tagName === "A" || (el as HTMLElement).onclick != null) {
+              (el as HTMLElement).click();
+              break;
+            }
+            el = el.parentElement;
+          }
         }
         // For right click, also dispatch contextmenu
         if (type === "mouseUp" && button === "right") {
@@ -195,16 +224,13 @@ export function useBrowserControllerNav({
       y: Math.max(0, Math.min(window.innerHeight, y)),
     });
 
-    const clampToWebview = (x: number, y: number) => {
-      if (!webview) return clampToWindow(x, y);
+    const cursorOverWebview = (x: number, y: number): boolean => {
+      if (!webview) return false;
       try {
         const bounds = webview.getBoundingClientRect();
-        return {
-          x: Math.max(bounds.left, Math.min(bounds.right, x)),
-          y: Math.max(bounds.top, Math.min(bounds.bottom, y)),
-        };
+        return x >= bounds.left && x <= bounds.right && y >= bounds.top && y <= bounds.bottom;
       } catch {
-        return clampToWindow(x, y);
+        return false;
       }
     };
 
@@ -232,6 +258,10 @@ export function useBrowserControllerNav({
 
       for (const id of knownDeviceIds) {
         if (!activeIds.includes(id)) {
+          const dev = deviceMap.get(id);
+          if (dev) {
+            manager.lastPositions.set(id, { ...dev.posRef.current, lastInputTime: dev.lastInputTime });
+          }
           deviceMap.delete(id);
         }
       }
@@ -244,7 +274,7 @@ export function useBrowserControllerNav({
         const state = liveStates[deviceId];
         if (!state) continue;
 
-        const dev = ensureDevice(deviceId);
+        const dev = ensureDevice(deviceId, liveStates);
         const axes = state.axes;
         let anyInput = false;
 
@@ -276,7 +306,7 @@ export function useBrowserControllerNav({
 
           dev.posRef.current.x += rightX * MOUSE_SPEED;
           dev.posRef.current.y += rightY * MOUSE_SPEED;
-          const clamped = clampToWebview(dev.posRef.current.x, dev.posRef.current.y);
+          const clamped = clampToWindow(dev.posRef.current.x, dev.posRef.current.y);
           dev.posRef.current.x = clamped.x;
           dev.posRef.current.y = clamped.y;
 
@@ -310,10 +340,18 @@ export function useBrowserControllerNav({
           return pressed && !wasPressed;
         };
 
+        const scheduleMouseUp = (x: number, y: number, button: string) => {
+          const t = setTimeout(() => {
+            pendingTimeouts.delete(t);
+            sendMouseEvent("mouseUp", x, y, button);
+          }, 80);
+          pendingTimeouts.add(t);
+        };
+
         if (check("south")) {
           anyInput = true;
           sendMouseEvent("mouseDown", dev.posRef.current.x, dev.posRef.current.y, "left");
-          setTimeout(() => sendMouseEvent("mouseUp", dev.posRef.current.x, dev.posRef.current.y, "left"), 80);
+          scheduleMouseUp(dev.posRef.current.x, dev.posRef.current.y, "left");
         }
         if (check("east")) {
           anyInput = true;
@@ -322,19 +360,24 @@ export function useBrowserControllerNav({
         if (check("west")) {
           anyInput = true;
           sendMouseEvent("mouseDown", dev.posRef.current.x, dev.posRef.current.y, "right");
-          setTimeout(() => sendMouseEvent("mouseUp", dev.posRef.current.x, dev.posRef.current.y, "right"), 80);
+          scheduleMouseUp(dev.posRef.current.x, dev.posRef.current.y, "right");
         }
         if (check("north")) {
           anyInput = true;
           onForward?.();
         }
-        if (check("left_bumper")) {
-          anyInput = true;
-          sendKey("Tab", ["shift"]);
-        }
-        if (check("right_bumper")) {
-          anyInput = true;
-          sendKey("Tab");
+        // Only send Tab keys for bumpers in webview/browser mode.
+        // In main mode the app already handles bumper tab switching
+        // directly via evdev / useGamepadApi to avoid double-firing.
+        if (webview) {
+          if (check("left_bumper")) {
+            anyInput = true;
+            sendKey("Tab", ["shift"]);
+          }
+          if (check("right_bumper")) {
+            anyInput = true;
+            sendKey("Tab");
+          }
         }
 
         const ltAxis = (axes.left_trigger ?? 0) / 32767;
@@ -355,12 +398,12 @@ export function useBrowserControllerNav({
         if (ltPressed && !wasLtPressed) {
           anyInput = true;
           sendMouseEvent("mouseDown", dev.posRef.current.x, dev.posRef.current.y, "right");
-          setTimeout(() => sendMouseEvent("mouseUp", dev.posRef.current.x, dev.posRef.current.y, "right"), 80);
+          scheduleMouseUp(dev.posRef.current.x, dev.posRef.current.y, "right");
         }
         if (rtPressed && !wasRtPressed) {
           anyInput = true;
           sendMouseEvent("mouseDown", dev.posRef.current.x, dev.posRef.current.y, "left");
-          setTimeout(() => sendMouseEvent("mouseUp", dev.posRef.current.x, dev.posRef.current.y, "left"), 80);
+          scheduleMouseUp(dev.posRef.current.x, dev.posRef.current.y, "left");
         }
 
         if (check("dpad_up")) sendKey("ArrowUp");
@@ -419,6 +462,13 @@ export function useBrowserControllerNav({
     animationFrameId = requestAnimationFrame(poll);
     return () => {
       cancelAnimationFrame(animationFrameId);
+      for (const t of pendingTimeouts) {
+        clearTimeout(t);
+      }
+      pendingTimeouts.clear();
+      for (const [id, dev] of deviceMap) {
+        manager.lastPositions.set(id, { ...dev.posRef.current, lastInputTime: dev.lastInputTime });
+      }
       deviceMap.clear();
       const remaining = manager.cursors.filter((c) => !c.deviceId.startsWith(instancePrefix));
       manager.setCursors(remaining);

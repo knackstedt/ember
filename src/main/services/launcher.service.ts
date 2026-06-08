@@ -5,6 +5,7 @@ import { createLogger } from "../util/logger";
 import { GameRepo } from "../db/repository";
 import { buildWineCommand } from "./wine-detection.service";
 import { launchItchGame } from "./itch.service";
+import { runSessionHooks } from "./session-hooks.service";
 
 const log = createLogger("info");
 
@@ -153,16 +154,27 @@ function fullscreenDolphinWindow(): void {
 }
 
 export async function launchGame(game: Game): Promise<void> {
-  if (!game.execPath && !game.romPath) {
+  if (!game.execPath && !game.romPath && !game.launchCommand) {
     return Promise.reject(
       new Error(`No executable or ROM path for game: ${game.title}`),
     );
   }
 
+  // Run blocking pre-start hooks before anything else
+  await runSessionHooks(game, "before-start-blocking");
+  // Fire non-blocking pre-start hooks (fire-and-forget)
+  void runSessionHooks(game, "before-start");
+
   let cmd: string;
   let args: string[];
 
-  switch (game.platform) {
+  // Allow launchCommand override for all platforms
+  if (game.launchCommand) {
+    const parsed = parseCommand(game.launchCommand);
+    cmd = parsed[0];
+    args = game.launchArgs ?? parsed.slice(1);
+  } else {
+    switch (game.platform) {
     case "steam": {
       if (!game.steamAppId) {
         return Promise.reject(
@@ -285,6 +297,7 @@ export async function launchGame(game: Game): Promise<void> {
           new Error(`Cannot launch game: ${game.title}`),
         );
       }
+    }
   }
 
   log.info("launcher", `Spawning: ${cmd} ${args.map((a) => (a.includes(" ") ? `"${a}"` : a)).join(" ")}`);
@@ -292,11 +305,15 @@ export async function launchGame(game: Game): Promise<void> {
   const isDolphin =
     game.platform === "dolphin-gc" || game.platform === "dolphin-wii";
 
+  const launchEnv = { ...process.env, ...game.launchEnv };
+  const launchCwd = game.launchWorkingDir || undefined;
+
   return new Promise<void>((resolve, reject) => {
     const proc = spawn(cmd, args, {
       detached: true,
       stdio: isDolphin ? ["ignore", "pipe", "pipe"] : "ignore",
-      env: { ...process.env },
+      env: launchEnv,
+      cwd: launchCwd,
     });
 
     let settled = false;
@@ -327,6 +344,7 @@ export async function launchGame(game: Game): Promise<void> {
         activeProcesses.set(game.id, proc);
         log.info("launcher", `"${game.title}" started successfully`);
         if (isDolphin) fullscreenDolphinWindow();
+        void runSessionHooks(game, "after-start", launchEnv);
         resolve();
       }, 1500);
     });
@@ -334,6 +352,13 @@ export async function launchGame(game: Game): Promise<void> {
     proc.on("exit", (code, signal) => {
       activeProcesses.delete(game.id);
       stopPlayTimeTracking(game.id);
+      const crashed = !signal && code !== 0;
+      const closed = !signal && code === 0;
+      if (crashed) {
+        void runSessionHooks(game, "after-crash", launchEnv);
+      } else if (closed) {
+        void runSessionHooks(game, "after-close", launchEnv);
+      }
       if (!settled && spawnOk) {
         settled = true;
         const stderrTail = stderrBuf.trim().slice(-500);

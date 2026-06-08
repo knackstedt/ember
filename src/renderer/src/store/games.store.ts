@@ -25,6 +25,13 @@ interface GamesState {
   setWineRunner: (id: string, runner: WineRunner) => Promise<void>;
   setWineCustomCommand: (id: string, command: string | null) => Promise<void>;
   setUmuCustomCommand: (id: string, command: string | null) => Promise<void>;
+  setSessionConfig: (id: string, config: {
+    launchCommand?: string | null;
+    launchArgs?: string[] | null;
+    launchWorkingDir?: string | null;
+    launchEnv?: Record<string, string> | null;
+    sessionHooks?: import("../../../shared/types").SessionHook[] | null;
+  }) => Promise<void>;
   updateLastPlayed: (id: string, timestamp?: number) => void;
   filtered: () => Game[];
 }
@@ -173,6 +180,24 @@ export const useGamesStore = create<GamesState>((set, get) => ({
     await window.htpc.games.wineConfig.set(id, { umuCustomCommand: command });
     set((s) => ({
       games: s.games.map((g) => (g.id === id ? { ...g, umuCustomCommand: command ?? undefined } : g)),
+    }));
+  },
+
+  setSessionConfig: async (id, config) => {
+    await window.htpc.games.sessionConfig.set(id, config);
+    set((s) => ({
+      games: s.games.map((g) =>
+        g.id === id
+          ? {
+              ...g,
+              ...(config.launchCommand !== undefined && { launchCommand: config.launchCommand ?? undefined }),
+              ...(config.launchArgs !== undefined && { launchArgs: config.launchArgs ?? undefined }),
+              ...(config.launchWorkingDir !== undefined && { launchWorkingDir: config.launchWorkingDir ?? undefined }),
+              ...(config.launchEnv !== undefined && { launchEnv: config.launchEnv ?? undefined }),
+              ...(config.sessionHooks !== undefined && { sessionHooks: config.sessionHooks ?? undefined }),
+            }
+          : g,
+      ),
     }));
   },
 

@@ -15,6 +15,7 @@ export interface CursorManager {
   subscribe(fn: () => void): () => void;
   notify(): void;
   setCursors(next: DeviceCursor[]): void;
+  lastPositions: Map<string, { x: number; y: number; lastInputTime: number }>;
 }
 
 const manager: CursorManager = {
@@ -31,6 +32,7 @@ const manager: CursorManager = {
     this.cursors = next;
     this.notify();
   },
+  lastPositions: new Map(),
 };
 
 export function getCursorManager(): CursorManager {

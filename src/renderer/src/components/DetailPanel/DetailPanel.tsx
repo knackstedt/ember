@@ -12,6 +12,7 @@ interface DetailPanelProps {
   metadata?: { label: string; value: string }[];
   tags?: string[];
   onTagsChange?: (tags: string[]) => void;
+  hideTags?: boolean;
   actions?: React.ReactNode;
   children?: React.ReactNode;
 }
@@ -26,6 +27,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
   metadata,
   tags,
   onTagsChange,
+  hideTags,
   actions,
   children,
 }) => {
@@ -134,7 +136,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                   ))}
                 </div>
               )}
-              {onTagsChange !== undefined && (
+              {!hideTags && onTagsChange !== undefined && (
                 <div className="mb-4">
                   <div
                     className="text-xs font-semibold uppercase tracking-wide mb-2"

@@ -144,6 +144,16 @@ const htpc = {
       set: (id: string, config: GameEmulatorConfig): Promise<void> =>
         ipcRenderer.invoke("games:emulatorConfig:set", id, config),
     },
+    sessionConfig: {
+      set: (id: string, config: {
+        launchCommand?: string | null;
+        launchArgs?: string[] | null;
+        launchWorkingDir?: string | null;
+        launchEnv?: Record<string, string> | null;
+        sessionHooks?: import("../shared/types").SessionHook[] | null;
+      }): Promise<void> =>
+        ipcRenderer.invoke("games:sessionConfig:set", id, config),
+    },
     wineConfig: {
       set: (id: string, config: { wineRunner?: WineRunner; wineCustomCommand?: string | null; umuCustomCommand?: string | null }): Promise<void> =>
         ipcRenderer.invoke("games:wineConfig:set", id, config),
