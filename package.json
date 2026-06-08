@@ -1,7 +1,7 @@
 {
   "name": "ember",
   "desktopName": "Ember",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Home Theater PC Application",
   "license": "PolyForm-Noncommercial-1.0.0",
   "homepage": "https://github.com/dotglitch/ember",
@@ -76,19 +76,31 @@
       "target": [
         {
           "target": "AppImage",
-          "arch": ["x64", "arm64"]
+          "arch": [
+            "x64",
+            "arm64"
+          ]
         },
         {
           "target": "deb",
-          "arch": ["x64", "arm64"]
+          "arch": [
+            "x64",
+            "arm64"
+          ]
         },
         {
           "target": "rpm",
-          "arch": ["x64", "arm64"]
+          "arch": [
+            "x64",
+            "arm64"
+          ]
         },
         {
           "target": "tar.gz",
-          "arch": ["x64", "arm64"]
+          "arch": [
+            "x64",
+            "arm64"
+          ]
         }
       ],
       "category": "AudioVideo;Game;Audio;Video;Emulator;",
