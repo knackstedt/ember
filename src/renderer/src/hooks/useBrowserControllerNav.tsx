@@ -4,32 +4,23 @@ import { getCursorManager, DeviceCursor } from "./browserControllerManager";
 import { CursorStyle } from "../components/VirtualCursor/VirtualCursor";
 
 interface UseBrowserControllerNavOptions {
-  webviewRef?: React.RefObject<Electron.WebviewTag | null>;
   enabled?: boolean;
-  onBack?: () => void;
-  onForward?: () => void;
 }
 
 export function useBrowserControllerNav({
-  webviewRef,
   enabled = true,
-  onBack,
-  onForward,
 }: UseBrowserControllerNavOptions) {
   const getLiveStates = useRef(() => useInputStore.getState().liveStates).current;
   const manager = useRef(getCursorManager()).current;
 
   useEffect(() => {
     if (!enabled) {
-      // Clean up any cursors we created when disabled
       const remaining = manager.cursors.filter((c) => !c.deviceId.startsWith("bcn-"));
       if (remaining.length !== manager.cursors.length) {
         manager.setCursors(remaining);
       }
       return;
     }
-
-    const webview = webviewRef?.current;
 
     const AXIS_THRESHOLD = 0.15;
     const SCROLL_THRESHOLD = 0.15;
@@ -97,6 +88,17 @@ export function useBrowserControllerNav({
       };
     };
 
+    const findWebviewAt = (x: number, y: number): Electron.WebviewTag | null => {
+      const webviews = document.querySelectorAll("webview");
+      for (const wv of webviews) {
+        const rect = wv.getBoundingClientRect();
+        if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
+          return wv as Electron.WebviewTag;
+        }
+      }
+      return null;
+    };
+
     const ensureDevice = (deviceId: string, liveStates: Record<string, any>): DeviceState => {
       let state = deviceMap.get(deviceId);
       if (!state) {
@@ -124,7 +126,8 @@ export function useBrowserControllerNav({
     };
 
     const sendMouseEvent = (type: string, x: number, y: number, button?: string) => {
-      if (webview && cursorOverWebview(x, y)) {
+      const webview = findWebviewAt(x, y);
+      if (webview) {
         try {
           const bounds = webview.getBoundingClientRect();
           const relX = x - bounds.left;
@@ -183,6 +186,8 @@ export function useBrowserControllerNav({
     };
 
     const sendKey = (keyCode: string, modifiers?: string[]) => {
+      // Only send keys to webview if cursor is inside one
+      const webview = findWebviewAt(0, 0);
       if (webview) {
         try {
           webview.sendInputEvent({ type: "keyDown", keyCode, modifiers: modifiers as any });
@@ -223,16 +228,6 @@ export function useBrowserControllerNav({
       x: Math.max(0, Math.min(window.innerWidth, x)),
       y: Math.max(0, Math.min(window.innerHeight, y)),
     });
-
-    const cursorOverWebview = (x: number, y: number): boolean => {
-      if (!webview) return false;
-      try {
-        const bounds = webview.getBoundingClientRect();
-        return x >= bounds.left && x <= bounds.right && y >= bounds.top && y <= bounds.bottom;
-      } catch {
-        return false;
-      }
-    };
 
     const updateManager = () => {
       const activeIds = Array.from(deviceMap.keys());
@@ -323,6 +318,7 @@ export function useBrowserControllerNav({
 
         if (leftX !== 0 || leftY !== 0) {
           anyInput = true;
+          const webview = findWebviewAt(dev.posRef.current.x, dev.posRef.current.y);
           if (webview) {
             try {
               webview.executeJavaScript(`window.scrollBy(${leftX * SCROLL_SPEED}, ${leftY * SCROLL_SPEED})`);
@@ -355,7 +351,10 @@ export function useBrowserControllerNav({
         }
         if (check("east")) {
           anyInput = true;
-          onBack?.();
+          const webview = findWebviewAt(dev.posRef.current.x, dev.posRef.current.y);
+          if (webview && webview.canGoBack && webview.canGoBack()) {
+            webview.goBack();
+          }
         }
         if (check("west")) {
           anyInput = true;
@@ -364,11 +363,15 @@ export function useBrowserControllerNav({
         }
         if (check("north")) {
           anyInput = true;
-          onForward?.();
+          const webview = findWebviewAt(dev.posRef.current.x, dev.posRef.current.y);
+          if (webview && webview.canGoForward && webview.canGoForward()) {
+            webview.goForward();
+          }
         }
-        // Only send Tab keys for bumpers in webview/browser mode.
+        // Only send Tab keys for bumpers when cursor is inside a webview.
         // In main mode the app already handles bumper tab switching
         // directly via evdev / useGamepadApi to avoid double-firing.
+        const webview = findWebviewAt(dev.posRef.current.x, dev.posRef.current.y);
         if (webview) {
           if (check("left_bumper")) {
             anyInput = true;
@@ -419,15 +422,16 @@ export function useBrowserControllerNav({
           dev.visible = false;
         }
 
-        if (webview) {
+        const activeWebview = findWebviewAt(dev.posRef.current.x, dev.posRef.current.y);
+        if (activeWebview) {
           const now = Date.now();
           if (now - dev.lastCursorCheck > CURSOR_CHECK_INTERVAL_MS) {
             dev.lastCursorCheck = now;
             try {
-              const bounds = webview.getBoundingClientRect();
+              const bounds = activeWebview.getBoundingClientRect();
               const relX = Math.round(dev.posRef.current.x - bounds.left);
               const relY = Math.round(dev.posRef.current.y - bounds.top);
-              webview.executeJavaScript(
+              activeWebview.executeJavaScript(
                 `(() => {
                   const el = document.elementFromPoint(${relX}, ${relY});
                   if (!el) return "default";
@@ -473,7 +477,7 @@ export function useBrowserControllerNav({
       const remaining = manager.cursors.filter((c) => !c.deviceId.startsWith(instancePrefix));
       manager.setCursors(remaining);
     };
-  }, [enabled, webviewRef, onBack, onForward]);
+  }, [enabled]);
 }
 
 const CURSOR_MAP: Record<string, boolean> = {

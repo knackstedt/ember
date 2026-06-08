@@ -19,7 +19,6 @@ import {
   Gamepad2,
 } from "lucide-react";
 import { useToastStore } from "../../store/toast.store";
-import { useBrowserControllerNav } from "../../hooks/useBrowserControllerNav";
 
 interface BrowserTab {
   id: string;
@@ -51,7 +50,6 @@ export const StoreTab: React.FC = () => {
   const [libraryGames, setLibraryGames] = useState<any[]>([]);
   const [showLibrary, setShowLibrary] = useState(false);
   const webviewRefs = useRef<Record<string, Electron.WebviewTag | null>>({});
-  const activeWebviewRef = useRef<Electron.WebviewTag | null>(null);
   const addToast = useToastStore((s) => s.add);
 
   const activeTab = useMemo(
@@ -202,14 +200,6 @@ export const StoreTab: React.FC = () => {
     if (wv && wv.canGoForward()) wv.goForward();
   }, [activeTabId]);
 
-  /* Controller navigation for the active webview */
-  useBrowserControllerNav({
-    webviewRef: activeWebviewRef,
-    enabled: true,
-    onBack: goBack,
-    onForward: goForward,
-  });
-
   const reload = useCallback(() => {
     const wv = webviewRefs.current[activeTabId];
     if (wv) wv.reload();
@@ -233,9 +223,6 @@ export const StoreTab: React.FC = () => {
       webviewCleanups.current[id]?.();
 
       webviewRefs.current[id] = el;
-      if (id === activeTabId) {
-        activeWebviewRef.current = el;
-      }
 
       const handleLoadStart = () => {
         updateTab(id, { isLoading: true });
@@ -284,11 +271,6 @@ export const StoreTab: React.FC = () => {
     },
     [addTab, updateTab, activeTabId]
   );
-
-  // Keep activeWebviewRef in sync when switching store tabs
-  useEffect(() => {
-    activeWebviewRef.current = webviewRefs.current[activeTabId] ?? null;
-  }, [activeTabId]);
 
   /* ------------------------------------------------------------------ */
   /*  Install from itch web                                               */

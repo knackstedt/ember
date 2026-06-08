@@ -158,9 +158,7 @@ export default function App(): React.ReactElement {
 
   /* Controller cursors — always call hook, control via `enabled` */
   const [activeTab, setActiveTab] = useState<TabId>("gaming");
-  useBrowserControllerNav({
-    enabled: !loading && activeTab !== "store",
-  });
+  useBrowserControllerNav({ enabled: !loading });
 
   const addDevice = useInputStore((s) => s.addDevice);
   const removeDevice = useInputStore((s) => s.removeDevice);
