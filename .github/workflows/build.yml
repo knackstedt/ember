@@ -83,7 +83,7 @@ jobs:
         run: bun run build
 
       - name: Build distribution
-        run: bun run dist
+        run: bun run dist -- --publish never
 
       - name: List release artifacts
         run: ls -lah release/
