@@ -24,58 +24,71 @@ function triggerNorm(v: number | undefined): number {
 
 /* ── geometry ── */
 const BODY = {
-  d: `M 100 58 Q 92 42 122 36 L 160 30 Q 185 26 200 28 Q 215 26 240 30 L 278 36 Q 308 42 300 58
-      L 318 118 Q 338 152 312 168 Q 282 183 258 168 L 240 158 Q 220 153 200 153 Q 180 153 160 158
-      L 142 168 Q 118 183 88 168 Q 62 152 82 118 Z`,
+  d: `M 125 36
+      C 112 36, 100 42, 92 52
+      C 84 62, 78 78, 76 96
+      C 74 114, 78 134, 88 152
+      C 98 170, 114 180, 132 182
+      C 150 184, 170 178, 186 170
+      C 194 166, 198 162, 200 160
+      C 202 162, 206 166, 214 170
+      C 230 178, 250 184, 268 182
+      C 286 180, 302 170, 312 152
+      C 322 134, 326 114, 324 96
+      C 322 78, 316 62, 308 52
+      C 300 42, 288 36, 275 36
+      C 255 32, 228 28, 200 26
+      C 172 28, 145 32, 125 36
+      Z`,
 };
 
 /* Upper-right diamond */
 const FACE = {
-  north: { cx: 295, cy: 88,  r: 11, label: "Δ", color: "#5bbfaa" },
-  south: { cx: 295, cy: 122, r: 11, label: "X", color: "#6fa8e0" },
-  west:  { cx: 278, cy: 105, r: 11, label: "[]", color: "#d499e8" },
-  east:  { cx: 312, cy: 105, r: 11, label: "O", color: "#e05252" },
+  north: { cx: 294, cy: 82,  r: 11, label: "Δ", color: "#5bbfaa" },
+  south: { cx: 294, cy: 114, r: 11, label: "X", color: "#6fa8e0" },
+  west:  { cx: 278, cy: 98, r: 11, label: "[]", color: "#d499e8" },
+  east:  { cx: 310, cy: 98, r: 11, label: "O", color: "#e05252" },
 };
 
 /* Top shoulder buttons */
 const BUMPERS = {
-  left_bumper:  { cx: 122, cy: 58, r: 9, label: "L1" },
-  right_bumper: { cx: 278, cy: 58, r: 9, label: "R1" },
+  left_bumper:  { cx: 118, cy: 52, r: 9, label: "L1" },
+  right_bumper: { cx: 282, cy: 52, r: 9, label: "R1" },
 };
 
 /* Center */
 const CENTER = {
-  select: { cx: 170, cy: 105, r: 8, label: "SH" },
-  home:   { cx: 200, cy: 105, r: 11, label: "PS", color: "#3a8cd4" },
-  start:  { cx: 230, cy: 105, r: 8, label: "OP" },
+  select: { cx: 170, cy: 100, r: 8, label: "SH" },
+  home:   { cx: 200, cy: 98, r: 11, label: "PS", color: "#3a8cd4" },
+  start:  { cx: 230, cy: 100, r: 8, label: "OP" },
 };
 
 /* Touchpad above center */
-const TOUCHPAD = { cx: 200, cy: 72, w: 48, h: 16, label: "Touch" };
+const TOUCHPAD = { cx: 200, cy: 68, w: 48, h: 16, label: "Touch" };
 
-/* D-pad — plus shape, larger */
+/* D-pad — plus shape, upper-left */
 const DPAD = {
-  cx: 128,
-  cy: 88,
+  cx: 126,
+  cy: 82,
   armLen: 16,
   armThick: 12,
 };
 
 /* Lower-left / lower-right sticks */
 const THUMB_BASE = {
-  left:  { cx: 138, cy: 145, r: 18 },
-  right: { cx: 262, cy: 145, r: 18 },
+  left:  { cx: 134, cy: 142, r: 18 },
+  right: { cx: 266, cy: 142, r: 18 },
 };
 
 const THUMB = {
-  left_thumb:  { cx: 138, cy: 145, r: 10, label: "L3" },
-  right_thumb: { cx: 262, cy: 145, r: 10, label: "R3" },
+  left_thumb:  { cx: 134, cy: 142, r: 10, label: "L3" },
+  right_thumb: { cx: 266, cy: 142, r: 10, label: "R3" },
 };
 
 /* Triggers */
 const TRIGGER = {
-  left_trigger:  { x: 92,  y: 24, w: 54, h: 24, label: "L2", barX: 115, barY: 4, barW: 8, barH: 18 },
-  right_trigger: { x: 254, y: 24, w: 54, h: 24, label: "R2", barX: 277, barY: 4, barW: 8, barH: 18 },
+  left_trigger:  { x: 92,  y: 18, w: 52, h: 24, label: "L2", barX: 114, barY: 2, barW: 8, barH: 18 },
+  right_trigger: { x: 256, y: 18, w: 52, h: 24, label: "R2", barX: 278, barY: 2, barW: 8, barH: 18 },
 };
 
 export const PS4Controller: React.FC<PS4ControllerProps> = ({

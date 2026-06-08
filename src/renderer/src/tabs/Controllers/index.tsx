@@ -613,7 +613,7 @@ export const ControllersTab: React.FC = () => {
             {/* SVG diagram */}
             {hasDiagram && (
               <div
-                className="rounded-[var(--radius-card)] p-3"
+                className="rounded-[var(--radius-card)] p-4 md:p-5"
                 style={{
                   background: "var(--color-surface)",
                   border: "1px solid var(--color-border)",
