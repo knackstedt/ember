@@ -13,7 +13,7 @@ export type CursorStyle =
   | "progress";
 
 interface VirtualCursorProps {
-  /** Mutable ref containing live screen position. Updated by the hook, read by rAF. */
+  /** Mutable ref containing live screen position */
   posRef: React.RefObject<{ x: number; y: number }>;
   /** Whether the cursor should be visible */
   visible: boolean;
@@ -21,6 +21,8 @@ interface VirtualCursorProps {
   hoverStyle?: CursorStyle;
   /** True while wiggle expansion is active */
   expanded?: boolean;
+  /** Base hue (0-360) for this controller's color */
+  hue?: number;
 }
 
 function arrowPath(ctx: CanvasRenderingContext2D, x: number, y: number, s = 1) {
@@ -35,193 +37,125 @@ function arrowPath(ctx: CanvasRenderingContext2D, x: number, y: number, s = 1) {
   ctx.closePath();
 }
 
-const CURSORS: Record<
-  CursorStyle,
-  (ctx: CanvasRenderingContext2D, x: number, y: number, flash: number) => void
-> = {
-  default: (ctx, x, y, flash) => {
-    ctx.save();
-    const ag = ctx.createRadialGradient(x + 5, y + 8, 0, x + 5, y + 8, 32);
-    ag.addColorStop(0, `rgba(255,100,30,${0.14 + flash * 0.18})`);
-    ag.addColorStop(1, "rgba(255,60,0,0)");
-    ctx.fillStyle = ag;
-    ctx.beginPath();
-    ctx.arc(x + 5, y + 8, 32, 0, Math.PI * 2);
-    ctx.fill();
+function drawCursor(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  flash: number,
+  hue: number,
+  style: CursorStyle
+) {
+  const glow = `hsl(${hue}, 100%, 60%)`;
+  const fillDark = `rgba(10,10,10,${0.90 + flash * 0.08})`;
+  const strokeMain = `hsl(${hue}, 100%, ${50 + flash * 28}%)`;
+  const highlight = `hsla(${hue}, 100%, 75%, ${0.38 + flash * 0.32})`;
+  const dotColor = `hsl(${hue}, 80%, 82%)`;
 
-    ctx.shadowBlur = 12 + flash * 26;
-    ctx.shadowColor = "#FF4400";
+  ctx.save();
 
-    arrowPath(ctx, x, y);
-    ctx.fillStyle = `rgba(22,8,4,${0.90 + flash * 0.08})`;
-    ctx.fill();
-
-    arrowPath(ctx, x, y);
-    ctx.strokeStyle = `hsl(22,100%,${50 + flash * 28}%)`;
-    ctx.lineWidth = 1.5;
-    ctx.lineJoin = "round";
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.moveTo(x + 1, y + 1);
-    ctx.lineTo(x + 1, y + 15);
-    ctx.strokeStyle = `rgba(255,160,80,${0.38 + flash * 0.32})`;
-    ctx.lineWidth = 1;
-    ctx.stroke();
-
-    ctx.shadowBlur = 20;
-    ctx.shadowColor = "#FFCC88";
-    ctx.beginPath();
-    ctx.arc(x, y, 1.8, 0, Math.PI * 2);
-    ctx.fillStyle = "#FFCC88";
-    ctx.fill();
-    ctx.restore();
-  },
-
-  pointer: (ctx, x, y, flash) => {
-    ctx.save();
-    const ag = ctx.createRadialGradient(x + 5, y + 8, 0, x + 5, y + 8, 32);
-    ag.addColorStop(0, `rgba(80,180,255,${0.14 + flash * 0.18})`);
-    ag.addColorStop(1, "rgba(0,100,255,0)");
-    ctx.fillStyle = ag;
-    ctx.beginPath();
-    ctx.arc(x + 5, y + 8, 32, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.shadowBlur = 12 + flash * 26;
-    ctx.shadowColor = "#4488FF";
-
-    arrowPath(ctx, x, y);
-    ctx.fillStyle = `rgba(4,8,22,${0.90 + flash * 0.08})`;
-    ctx.fill();
-
-    arrowPath(ctx, x, y);
-    ctx.strokeStyle = `hsl(210,100%,${55 + flash * 28}%)`;
-    ctx.lineWidth = 1.5;
-    ctx.lineJoin = "round";
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.moveTo(x + 1, y + 1);
-    ctx.lineTo(x + 1, y + 15);
-    ctx.strokeStyle = `rgba(120,200,255,${0.38 + flash * 0.32})`;
-    ctx.lineWidth = 1;
-    ctx.stroke();
-
-    ctx.shadowBlur = 20;
-    ctx.shadowColor = "#88CCFF";
-    ctx.beginPath();
-    ctx.arc(x, y, 1.8, 0, Math.PI * 2);
-    ctx.fillStyle = "#88CCFF";
-    ctx.fill();
-    ctx.restore();
-  },
-
-  text: (ctx, x, y, flash) => {
-    ctx.save();
+  if (style === "text" || style === "vertical-text") {
     ctx.shadowBlur = 10 + flash * 20;
     ctx.shadowColor = "#CCCCCC";
     ctx.fillStyle = "#FFFFFF";
-    ctx.fillRect(x - 1, y - 10, 2, 20);
-    ctx.strokeStyle = "#000000";
-    ctx.lineWidth = 1.5;
-    ctx.strokeRect(x - 1.5, y - 10.5, 3, 21);
+    if (style === "text") {
+      ctx.fillRect(x - 1, y - 10, 2, 20);
+      ctx.strokeStyle = "#000000";
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(x - 1.5, y - 10.5, 3, 21);
+    } else {
+      ctx.fillRect(x - 10, y - 1, 20, 2);
+      ctx.strokeStyle = "#000000";
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(x - 10.5, y - 1.5, 21, 3);
+    }
     ctx.restore();
-  },
+    return;
+  }
 
-  "vertical-text": (ctx, x, y, flash) => {
-    ctx.save();
-    ctx.shadowBlur = 10 + flash * 20;
-    ctx.shadowColor = "#CCCCCC";
-    ctx.fillStyle = "#FFFFFF";
-    ctx.fillRect(x - 10, y - 1, 20, 2);
-    ctx.strokeStyle = "#000000";
-    ctx.lineWidth = 1.5;
-    ctx.strokeRect(x - 10.5, y - 1.5, 21, 3);
-    ctx.restore();
-  },
+  // Ambient halo
+  const ag = ctx.createRadialGradient(x + 5, y + 8, 0, x + 5, y + 8, 32);
+  ag.addColorStop(0, `hsla(${hue}, 100%, 55%, ${0.14 + flash * 0.18})`);
+  ag.addColorStop(1, `hsla(${hue}, 100%, 50%, 0)`);
+  ctx.fillStyle = ag;
+  ctx.beginPath();
+  ctx.arc(x + 5, y + 8, 32, 0, Math.PI * 2);
+  ctx.fill();
 
-  grab: (ctx, x, y, flash) => {
-    ctx.save();
-    ctx.shadowBlur = 12 + flash * 26;
-    ctx.shadowColor = "#44FF88";
+  ctx.shadowBlur = 12 + flash * 26;
+  ctx.shadowColor = glow;
 
-    arrowPath(ctx, x, y);
-    ctx.fillStyle = `rgba(4,22,8,${0.90 + flash * 0.08})`;
-    ctx.fill();
+  arrowPath(ctx, x, y);
+  ctx.fillStyle = fillDark;
+  ctx.fill();
 
-    arrowPath(ctx, x, y);
-    ctx.strokeStyle = `hsl(140,100%,${50 + flash * 28}%)`;
-    ctx.lineWidth = 1.5;
-    ctx.lineJoin = "round";
-    ctx.stroke();
+  arrowPath(ctx, x, y);
+  ctx.strokeStyle = strokeMain;
+  ctx.lineWidth = 1.5;
+  ctx.lineJoin = "round";
+  ctx.stroke();
 
+  ctx.beginPath();
+  ctx.moveTo(x + 1, y + 1);
+  ctx.lineTo(x + 1, y + 15);
+  ctx.strokeStyle = highlight;
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  ctx.shadowBlur = 20;
+  ctx.shadowColor = dotColor;
+  ctx.beginPath();
+  ctx.arc(x, y, 1.8, 0, Math.PI * 2);
+  ctx.fillStyle = dotColor;
+  ctx.fill();
+
+  // Style-specific badge
+  if (style === "pointer") {
     ctx.beginPath();
-    ctx.moveTo(x + 1, y + 1);
-    ctx.lineTo(x + 1, y + 15);
-    ctx.strokeStyle = `rgba(120,255,160,${0.38 + flash * 0.32})`;
+    ctx.moveTo(x + 14, y + 13);
+    ctx.quadraticCurveTo(x + 20, y + 9, x + 22, y + 12);
+    ctx.quadraticCurveTo(x + 23, y + 16, x + 19, y + 18);
+    ctx.quadraticCurveTo(x + 15, y + 20, x + 14, y + 13);
+    ctx.closePath();
+    ctx.fillStyle = `hsla(${hue}, 100%, 70%, 0.9)`;
+    ctx.fill();
+    ctx.strokeStyle = `hsl(${hue}, 100%, 40%)`;
     ctx.lineWidth = 1;
     ctx.stroke();
-
-    ctx.shadowBlur = 20;
-    ctx.shadowColor = "#88FFAA";
-    ctx.beginPath();
-    ctx.arc(x, y, 1.8, 0, Math.PI * 2);
-    ctx.fillStyle = "#88FFAA";
-    ctx.fill();
-    ctx.restore();
-  },
-
-  grabbing: (ctx, x, y, flash) => {
-    CURSORS.grab(ctx, x, y, flash);
-  },
-
-  "col-resize": (ctx, x, y, flash) => {
-    CURSORS.grab(ctx, x, y, flash);
-  },
-
-  "row-resize": (ctx, x, y, flash) => {
-    CURSORS.grab(ctx, x, y, flash);
-  },
-
-  wait: (ctx, x, y, flash) => {
-    ctx.save();
-    ctx.shadowBlur = 12 + flash * 26;
-    ctx.shadowColor = "#FFAA00";
-
-    arrowPath(ctx, x, y);
-    ctx.fillStyle = `rgba(22,16,4,${0.90 + flash * 0.08})`;
-    ctx.fill();
-
-    arrowPath(ctx, x, y);
-    ctx.strokeStyle = `hsl(45,100%,${50 + flash * 28}%)`;
-    ctx.lineWidth = 1.5;
-    ctx.lineJoin = "round";
-    ctx.stroke();
-
+  } else if (style === "wait" || style === "progress") {
     ctx.beginPath();
     ctx.arc(x + 16, y + 16, 4, 0, Math.PI * 2);
-    ctx.strokeStyle = "#FFAA00";
+    ctx.strokeStyle = `hsl(${hue}, 100%, 50%)`;
     ctx.lineWidth = 1.5;
     ctx.stroke();
-
     ctx.beginPath();
     ctx.arc(x + 16, y + 16, 1.5, 0, Math.PI * 2);
-    ctx.fillStyle = "#FFAA00";
+    ctx.fillStyle = `hsl(${hue}, 100%, 50%)`;
     ctx.fill();
-    ctx.restore();
-  },
+  } else if (style === "grab" || style === "grabbing" || style === "col-resize" || style === "row-resize") {
+    ctx.beginPath();
+    ctx.arc(x + 16, y + 6, 4, 0, Math.PI * 2);
+    ctx.fillStyle = `hsla(${hue}, 100%, 70%, 0.9)`;
+    ctx.fill();
+    ctx.strokeStyle = `hsl(${hue}, 100%, 40%)`;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
 
-  progress: (ctx, x, y, flash) => {
-    CURSORS.wait(ctx, x, y, flash);
-  },
-};
+  ctx.restore();
+}
+
+const DEVICE_HUES = [22, 210, 140, 280, 45, 330, 180, 0];
+
+export function getDeviceHue(index: number): number {
+  return DEVICE_HUES[index % DEVICE_HUES.length];
+}
 
 export const VirtualCursor: React.FC<VirtualCursorProps> = ({
   posRef,
   visible,
   hoverStyle = "default",
   expanded = false,
+  hue = 22,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animRef = useRef<number>(0);
@@ -245,10 +179,8 @@ export const VirtualCursor: React.FC<VirtualCursorProps> = ({
       lastRef.current = ts;
       flashRef.current = Math.max(0, flashRef.current - dt * 5.8);
 
-      // Read live position directly from the ref (no React re-render needed)
       const pos = posRef.current ?? { x: 0, y: 0 };
 
-      // Detect rapid movement for flash effect
       const dx = pos.x - lastPosRef.current.x;
       const dy = pos.y - lastPosRef.current.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
@@ -261,19 +193,17 @@ export const VirtualCursor: React.FC<VirtualCursorProps> = ({
       const W = canvas.width;
       const H = canvas.height;
 
-      // Clear entire canvas (transparent)
       ctx.clearRect(0, 0, W, H);
 
       if (visible) {
         const fl = flashRef.current;
-        // Apply expansion scale
         if (expanded) {
           ctx.save();
           ctx.translate(pos.x, pos.y);
           ctx.scale(2, 2);
           ctx.translate(-pos.x, -pos.y);
         }
-        CURSORS[hoverStyle](ctx, pos.x, pos.y, fl);
+        drawCursor(ctx, pos.x, pos.y, fl, hue, hoverStyle);
         if (expanded) {
           ctx.restore();
         }
@@ -287,7 +217,11 @@ export const VirtualCursor: React.FC<VirtualCursorProps> = ({
       window.removeEventListener("resize", resize);
       cancelAnimationFrame(animRef.current);
     };
-  }, [visible, hoverStyle, expanded, posRef]);
+  }, [visible, hoverStyle, expanded, hue, posRef]);
+
+  useEffect(() => {
+    lastPosRef.current = { x: posRef.current.x, y: posRef.current.y };
+  }, [posRef]);
 
   return (
     <canvas

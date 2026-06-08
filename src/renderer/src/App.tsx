@@ -45,6 +45,8 @@ import { CommandPalette } from "./components/CommandPalette/CommandPalette";
 import { useCommands } from "./hooks/useCommands";
 import { useCommandsStore } from "./store/commands.store";
 import { useGamepadApi } from "./hooks/useGamepadApi";
+import { useBrowserControllerNav } from "./hooks/useBrowserControllerNav";
+import { CursorOverlay } from "./components/CursorOverlay/CursorOverlay";
 import { useFocusZoneStore } from "./store/focusZone.store";
 import { CommandDefinition, COMMAND_DEFINITIONS } from "../../shared/commands";
 
@@ -153,6 +155,13 @@ export default function App(): React.ReactElement {
   const visibleTabIds = visibleTabs.map((t) => t.id);
   const visibleTabIdsRef = useRef(visibleTabIds);
   visibleTabIdsRef.current = visibleTabIds;
+
+  /* Controller cursors — always call hook, control via `enabled` */
+  const [activeTab, setActiveTab] = useState<TabId>("gaming");
+  useBrowserControllerNav({
+    enabled: !loading && activeTab !== "store",
+  });
+
   const addDevice = useInputStore((s) => s.addDevice);
   const removeDevice = useInputStore((s) => s.removeDevice);
   const inputDevices = useInputStore((s) => s.devices);
@@ -165,7 +174,6 @@ export default function App(): React.ReactElement {
   const v86Open = useV86PlayerStore((s) => s.open);
   const libretroOpen = useLibretroPlayerStore((s) => s.open);
   const anyEmulatorOpen = flashOpen || jsnesOpen || emulatorjsOpen || v86Open || libretroOpen;
-  const [activeTab, setActiveTab] = useState<TabId>("gaming");
   const activeTabRef = useRef<TabId>(activeTab);
   activeTabRef.current = activeTab;
   const [evdevGamepadActive, setEvdevGamepadActive] = useState(false);
@@ -828,6 +836,7 @@ export default function App(): React.ReactElement {
     >
       <ToastContainer />
       <ThemeBackground />
+      <CursorOverlay />
 
       <AnimatePresence>
         {videoOpen && (

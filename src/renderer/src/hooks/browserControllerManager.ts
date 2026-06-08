@@ -1,0 +1,38 @@
+import { CursorStyle } from "../components/VirtualCursor/VirtualCursor";
+
+export interface DeviceCursor {
+  deviceId: string;
+  posRef: { current: { x: number; y: number } };
+  hue: number;
+  visible: boolean;
+  hoverStyle: CursorStyle;
+  expanded: boolean;
+}
+
+export interface CursorManager {
+  cursors: DeviceCursor[];
+  listeners: Set<() => void>;
+  subscribe(fn: () => void): () => void;
+  notify(): void;
+  setCursors(next: DeviceCursor[]): void;
+}
+
+const manager: CursorManager = {
+  cursors: [],
+  listeners: new Set(),
+  subscribe(fn) {
+    this.listeners.add(fn);
+    return () => this.listeners.delete(fn);
+  },
+  notify() {
+    this.listeners.forEach((fn) => fn());
+  },
+  setCursors(next) {
+    this.cursors = next;
+    this.notify();
+  },
+};
+
+export function getCursorManager(): CursorManager {
+  return manager;
+}
