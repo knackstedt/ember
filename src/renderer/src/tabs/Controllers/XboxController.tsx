@@ -1,4 +1,5 @@
 import React from "react";
+import xboxSvgUrl from "./xbox.svg";
 
 interface XboxControllerProps {
   highlightCode?: string | null;
@@ -6,6 +7,117 @@ interface XboxControllerProps {
   pressedCodes?: string[];
   axes?: Record<string, number>;
 }
+
+/* ── tunable constants ── */
+const STICK_TRAVEL = 28; // max pixel distance sticks move from center
+const TRIGGER_FULL_SCALE = 1027; // raw value that represents 100% pressed
+
+
+
+/* ── global styles ── */
+const STYLES = {
+  circle: {
+    strokeWidth: 2,
+    activeOpacity: 1,
+    inactiveOpacity: 0.85,
+  },
+  rect: {
+    rx: 6,
+    strokeWidth: 2,
+    activeOpacity: 1,
+    inactiveOpacity: 0.85,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: 800,
+    activeFill: "#fff",
+    inactiveFill: "var(--color-text-dim)",
+  },
+  triggerLabel: {
+    fontSize: 12,
+    fontWeight: 700,
+    activeFill: "var(--color-bg)",
+    inactiveFill: "var(--color-text-dim)",
+  },
+  triggerBar: {
+    rx: 3,
+    strokeWidth: 1.5,
+    fillOpacity: 0.9,
+  },
+  thumbBase: {
+    strokeWidth: 2,
+    opacity: 0.55,
+  },
+  dpad: {
+    rx: 3,
+    strokeWidth: 2,
+  },
+  colors: {
+    active: "var(--color-accent)",
+    surface: "var(--color-surface)",
+    surfaceRaised: "var(--color-surface-raised)",
+    border: "var(--color-border)",
+    bg: "var(--color-bg)",
+    textDim: "var(--color-text-dim)",
+    pressedMix: "color-mix(in srgb, var(--color-accent) 35%, var(--color-surface))",
+  },
+};
+
+/* ── overlay positions (tuned to xbox.svg viewBox 0 0 580 580) ── */
+
+/* Upper-right diamond */
+const FACE = {
+  north: { cx: 438, cy: 174, r: 19, label: "Y", color: "#f0c040", labelCx: 438, labelCy: 179 },
+  south: { cx: 438, cy: 252, r: 19, label: "A", color: "#5bba47", labelCx: 438, labelCy: 257 },
+  west:  { cx: 400, cy: 212, r: 19, label: "X", color: "#5b9bd5", labelCx: 400, labelCy: 217 },
+  east:  { cx: 479, cy: 212, r: 19, label: "B", color: "#e05252", labelCx: 479, labelCy: 217 },
+};
+
+/* Top shoulder buttons */
+const BUMPERS = {
+  left_bumper:  { cx: 140, cy: 105, r: 24, label: "LB", labelCx: 140, labelCy: 110 },
+  right_bumper: { cx: 440, cy: 105, r: 24, label: "RB", labelCx: 440, labelCy: 110 },
+};
+
+/* Center button shapes */
+const CENTER = {
+  select: { cx: 249, cy: 211, r: 11, label: "View" },
+  home:   { cx: 290, cy: 148, r: 20, label: "Xbox", color: "#3a8cd4" },
+  start:  { cx: 332, cy: 211, r: 11, label: "Menu" },
+};
+
+/* Floating label positions for View / Menu (and Home if you want) */
+const CENTER_LABELS = {
+  select: { cx: 249, cy: 215.5 },
+  home:   { cx: 290, cy: 152.5 },
+  start:  { cx: 332, cy: 215.5 },
+};
+
+/* D-pad — plus shape with configurable dead space in the center */
+const DPAD = {
+  cx: 216,
+  cy: 305,
+  armLen: 38,
+  armThick: 26,
+  deadR: 14, // dead-space radius from center; arms stop here, leaving a hole
+};
+
+/* Upper-left / lower-right sticks (asymmetric Xbox layout) */
+const THUMB_BASE = {
+  left:  { cx: 142, cy: 210, r: 50, labelCx: 142, labelCy: 215 },
+  right: { cx: 365, cy: 300, r: 50, labelCx: 365, labelCy: 305 },
+};
+
+const THUMB = {
+  left_thumb:  { cx: 142, cy: 210, r: 28, label: "LS", labelCx: 142, labelCy: 215 },
+  right_thumb: { cx: 365, cy: 300, r: 28, label: "RS", labelCx: 365, labelCy: 305 },
+};
+
+/* Triggers */
+const TRIGGER = {
+  left_trigger:  { x: 106,  y: 30, w: 64, h: 42, label: "LT", labelCx: 138, labelCy: 55, barX: 176, barY: 30, barW: 10, barH: 42 },
+  right_trigger: { x: 418, y: 30, w: 64, h: 42, label: "RT", labelCx: 450, labelCy: 55, barX: 402, barY: 30, barW: 10, barH: 42 },
+};
 
 /* ── helpers ── */
 function normAxis(v: number | undefined): number {
@@ -17,63 +129,9 @@ function normAxis(v: number | undefined): number {
 function triggerNorm(v: number | undefined): number {
   if (v === undefined) return 0;
   if (v >= 0 && v <= 1) return v;
-  if (v >= 0 && v <= 255) return v / 255;
-  if (v >= 0 && v <= 1023) return v / 1023;
-  return Math.max(0, v / 32767);
+  if (v >= 0 && v <= TRIGGER_FULL_SCALE) return v / TRIGGER_FULL_SCALE;
+  return Math.max(0, Math.min(1, v / 32767));
 }
-
-/* ── geometry ── */
-const BODY = {
-  d: `M 100 60 Q 95 45 120 38 L 160 32 Q 185 28 200 30 Q 215 28 240 32 L 280 38 Q 305 45 300 60
-      L 320 120 Q 340 155 315 170 Q 285 185 260 170 L 240 160 Q 220 155 200 155 Q 180 155 160 160
-      L 140 170 Q 115 185 85 170 Q 60 155 80 120 Z`,
-};
-
-/* Upper-right diamond */
-const FACE = {
-  north: { cx: 295, cy: 88,  r: 11, label: "Y", color: "#f0c040" },
-  south: { cx: 295, cy: 122, r: 11, label: "A", color: "#5bba47" },
-  west:  { cx: 278, cy: 105, r: 11, label: "X", color: "#5b9bd5" },
-  east:  { cx: 312, cy: 105, r: 11, label: "B", color: "#e05252" },
-};
-
-/* Top shoulder buttons */
-const BUMPERS = {
-  left_bumper:  { cx: 122, cy: 58, r: 9, label: "LB" },
-  right_bumper: { cx: 278, cy: 58, r: 9, label: "RB" },
-};
-
-/* Center */
-const CENTER = {
-  select: { cx: 170, cy: 105, r: 8, label: "View" },
-  home:   { cx: 200, cy: 105, r: 11, label: "Xbox", color: "#3a8cd4" },
-  start:  { cx: 230, cy: 105, r: 8, label: "Menu" },
-};
-
-/* D-pad — plus shape, larger */
-const DPAD = {
-  cx: 128,
-  cy: 88,
-  armLen: 16,
-  armThick: 12,
-};
-
-/* Lower-left / lower-right sticks */
-const THUMB_BASE = {
-  left:  { cx: 132, cy: 145, r: 18 },
-  right: { cx: 268, cy: 145, r: 18 },
-};
-
-const THUMB = {
-  left_thumb:  { cx: 132, cy: 145, r: 10, label: "LS" },
-  right_thumb: { cx: 268, cy: 145, r: 10, label: "RS" },
-};
-
-/* Triggers */
-const TRIGGER = {
-  left_trigger:  { x: 92,  y: 26, w: 54, h: 24, label: "LT", barX: 115, barY: 4, barW: 8, barH: 18 },
-  right_trigger: { x: 254, y: 26, w: 54, h: 24, label: "RT", barX: 277, barY: 4, barW: 8, barH: 18 },
-};
 
 export const XboxController: React.FC<XboxControllerProps> = ({
   highlightCode,
@@ -85,10 +143,10 @@ export const XboxController: React.FC<XboxControllerProps> = ({
   const pressedSet = new Set(pressedCodes ?? []);
 
   /* Stick offsets */
-  const lsX = normAxis(axes?.left_x)  * 10;
-  const lsY = normAxis(axes?.left_y)  * 10;
-  const rsX = normAxis(axes?.right_x) * 10;
-  const rsY = normAxis(axes?.right_y) * 10;
+  const lsX = normAxis(axes?.left_x)  * STICK_TRAVEL;
+  const lsY = normAxis(axes?.left_y)  * STICK_TRAVEL;
+  const rsX = normAxis(axes?.right_x) * STICK_TRAVEL;
+  const rsY = normAxis(axes?.right_y) * STICK_TRAVEL;
 
   /* Trigger depths */
   const ltDepth = triggerNorm(axes?.left_trigger);
@@ -100,26 +158,38 @@ export const XboxController: React.FC<XboxControllerProps> = ({
   const dpadLeft  = pressedSet.has("dpad_left")  || (axes?.dpad_x ?? 0) < 0;
   const dpadRight = pressedSet.has("dpad_right") || (axes?.dpad_x ?? 0) > 0;
 
-  const armFill   = (on: boolean) => on ? "var(--color-accent)" : "var(--color-surface)";
-  const armStroke = (on: boolean) => on ? "var(--color-accent)" : "var(--color-border)";
-
-  const { cx, cy, armLen, armThick } = DPAD;
+  const { cx, cy, armLen, armThick, deadR } = DPAD;
   const halfT = armThick / 2;
+
+  const baseFill = (active: boolean, pressed: boolean) =>
+    active
+      ? STYLES.colors.active
+      : pressed
+        ? STYLES.colors.pressedMix
+        : STYLES.colors.surface;
+
+  const baseStroke = (active: boolean, pressed: boolean) =>
+    active || pressed ? STYLES.colors.active : STYLES.colors.border;
+
+  const armFill   = (on: boolean) => on ? STYLES.colors.active : STYLES.colors.surface;
+  const armStroke = (on: boolean) => on ? STYLES.colors.active : STYLES.colors.border;
 
   return (
     <svg
-      viewBox="60 0 280 190"
+      viewBox="0 0 580.032 580.032"
       width="100%"
       height="auto"
-      style={{ maxWidth: 420, display: "block", margin: "0 auto" }}
+      style={{ maxWidth: 520, display: "block", margin: "0 auto" }}
       aria-label="Xbox controller diagram"
     >
-      {/* Body */}
-      <path
-        d={BODY.d}
-        fill="var(--color-surface-raised)"
-        stroke="var(--color-border)"
-        strokeWidth="2"
+      {/* ── Background controller image ── */}
+      <image
+        href={xboxSvgUrl}
+        x="0"
+        y="0"
+        width="580.032"
+        height="580.032"
+        preserveAspectRatio="xMidYMid meet"
       />
 
       {/* ── Triggers ── */}
@@ -130,17 +200,38 @@ export const XboxController: React.FC<XboxControllerProps> = ({
         return (
           <g key={code}>
             <rect
-              x={t.x} y={t.y} width={t.w} height={t.h} rx="4"
-              fill={ active ? "var(--color-accent)" : isPressed ? "color-mix(in srgb, var(--color-accent) 35%, var(--color-surface))" : "var(--color-surface)" }
-              stroke={ active ? "var(--color-accent)" : isPressed ? "var(--color-accent)" : "var(--color-border)" }
-              strokeWidth="1.5"
-              opacity={active || isPressed ? 1 : 0.85}
+              x={t.x} y={t.y} width={t.w} height={t.h}
+              rx={STYLES.rect.rx}
+              fill={baseFill(active, isPressed)}
+              stroke={baseStroke(active, isPressed)}
+              strokeWidth={STYLES.rect.strokeWidth}
+              opacity={active || isPressed ? STYLES.rect.activeOpacity : STYLES.rect.inactiveOpacity}
             />
-            <text x={t.x + t.w / 2} y={t.y + t.h / 2 + 4} textAnchor="middle" fontSize="9" fontWeight="600" fill={active ? "var(--color-bg)" : "var(--color-text-dim)"}>
+            <text
+              x={t.labelCx} y={t.labelCy}
+              textAnchor="middle"
+              fontSize={STYLES.triggerLabel.fontSize}
+              fontWeight={STYLES.triggerLabel.fontWeight}
+              fill={active ? STYLES.triggerLabel.activeFill : STYLES.triggerLabel.inactiveFill}
+            >
               {t.label}
             </text>
-            <rect x={t.barX} y={t.barY} width={t.barW} height={t.barH} rx="2" fill="var(--color-surface)" stroke="var(--color-border)" strokeWidth="1" />
-            <rect x={t.barX} y={t.barY + t.barH * (1 - depth)} width={t.barW} height={t.barH * depth} rx="2" fill="var(--color-accent)" opacity={0.85} />
+            {/* trigger depth bar */}
+            <rect
+              x={t.barX} y={t.barY}
+              width={t.barW} height={t.barH}
+              rx={STYLES.triggerBar.rx}
+              fill={STYLES.colors.surface}
+              stroke={STYLES.colors.border}
+              strokeWidth={STYLES.triggerBar.strokeWidth}
+            />
+            <rect
+              x={t.barX} y={t.barY + t.barH * (1 - depth)}
+              width={t.barW} height={t.barH * depth}
+              rx={STYLES.triggerBar.rx}
+              fill={STYLES.colors.active}
+              opacity={STYLES.triggerBar.fillOpacity}
+            />
           </g>
         );
       })}
@@ -151,74 +242,71 @@ export const XboxController: React.FC<XboxControllerProps> = ({
         const isPressed = pressedSet.has(code);
         return (
           <g key={code}>
-            <circle cx={b.cx} cy={b.cy} r={b.r}
-              fill={ active ? "var(--color-accent)" : isPressed ? "color-mix(in srgb, var(--color-accent) 35%, var(--color-surface))" : "var(--color-surface)" }
-              stroke={ active ? "var(--color-accent)" : isPressed ? "var(--color-accent)" : "var(--color-border)" }
-              strokeWidth="1.5"
-              opacity={active || isPressed ? 1 : 0.85}
+            <circle
+              cx={b.cx} cy={b.cy} r={b.r}
+              fill={baseFill(active, isPressed)}
+              stroke={baseStroke(active, isPressed)}
+              strokeWidth={STYLES.circle.strokeWidth}
+              opacity={active || isPressed ? STYLES.circle.activeOpacity : STYLES.circle.inactiveOpacity}
             />
-            <text x={b.cx} y={b.cy + 4} textAnchor="middle" fontSize="8" fontWeight="700" fill={active ? "#fff" : "var(--color-text-dim)"}>
+            <text
+              x={b.labelCx} y={b.labelCy}
+              textAnchor="middle"
+              fontSize={STYLES.label.fontSize}
+              fontWeight={STYLES.label.fontWeight}
+              fill={active ? STYLES.label.activeFill : STYLES.label.inactiveFill}
+            >
               {b.label}
             </text>
           </g>
         );
       })}
 
-      {/* ── D-Pad: proper plus shape with per-direction highlight ── */}
+      {/* ── D-Pad: four arms with configurable dead space in the center ── */}
       <g>
-        {/* Base vertical bar — always default */}
+        {/* Up arm */}
         <rect
-          x={cx - halfT} y={cy - armLen}
-          width={armThick} height={armLen * 2}
-          rx="2"
-          fill={armFill(false)}
-          stroke={armStroke(false)}
-          strokeWidth="1.5"
-        />
-        {/* Base horizontal bar — always default */}
-        <rect
-          x={cx - armLen} y={cy - halfT}
-          width={armLen * 2} height={armThick}
-          rx="2"
-          fill={armFill(false)}
-          stroke={armStroke(false)}
-          strokeWidth="1.5"
-        />
-        {/* Up arm — accent when pressed, default when not */}
-        <rect
-          x={cx - halfT} y={cy - armLen}
-          width={armThick} height={armLen}
-          rx="2"
+          x={cx - halfT}
+          y={cy - armLen}
+          width={armThick}
+          height={armLen - deadR}
+          rx={STYLES.dpad.rx}
           fill={armFill(dpadUp)}
           stroke={armStroke(dpadUp)}
-          strokeWidth="1.5"
+          strokeWidth={STYLES.dpad.strokeWidth}
         />
         {/* Down arm */}
         <rect
-          x={cx - halfT} y={cy}
-          width={armThick} height={armLen}
-          rx="2"
+          x={cx - halfT}
+          y={cy + deadR}
+          width={armThick}
+          height={armLen - deadR}
+          rx={STYLES.dpad.rx}
           fill={armFill(dpadDown)}
           stroke={armStroke(dpadDown)}
-          strokeWidth="1.5"
+          strokeWidth={STYLES.dpad.strokeWidth}
         />
         {/* Left arm */}
         <rect
-          x={cx - armLen} y={cy - halfT}
-          width={armLen} height={armThick}
-          rx="2"
+          x={cx - armLen}
+          y={cy - halfT}
+          width={armLen - deadR}
+          height={armThick}
+          rx={STYLES.dpad.rx}
           fill={armFill(dpadLeft)}
           stroke={armStroke(dpadLeft)}
-          strokeWidth="1.5"
+          strokeWidth={STYLES.dpad.strokeWidth}
         />
         {/* Right arm */}
         <rect
-          x={cx} y={cy - halfT}
-          width={armLen} height={armThick}
-          rx="2"
+          x={cx + deadR}
+          y={cy - halfT}
+          width={armLen - deadR}
+          height={armThick}
+          rx={STYLES.dpad.rx}
           fill={armFill(dpadRight)}
           stroke={armStroke(dpadRight)}
-          strokeWidth="1.5"
+          strokeWidth={STYLES.dpad.strokeWidth}
         />
       </g>
 
@@ -227,12 +315,33 @@ export const XboxController: React.FC<XboxControllerProps> = ({
         const active = accentCode === code;
         const isPressed = pressedSet.has(code);
         const color = (b as { color?: string }).color;
-        const baseColor = active ? (color ?? "var(--color-accent)") : isPressed ? (color ?? "var(--color-accent)") : "var(--color-surface)";
-        const borderColor = active ? (color ?? "var(--color-accent)") : isPressed ? (color ?? "var(--color-accent)") : "var(--color-border)";
+        const fillColor = active
+          ? (color ?? STYLES.colors.active)
+          : isPressed
+            ? (color ?? STYLES.colors.active)
+            : STYLES.colors.surface;
+        const strokeColor = active
+          ? (color ?? STYLES.colors.active)
+          : isPressed
+            ? (color ?? STYLES.colors.active)
+            : STYLES.colors.border;
+        const lbl = CENTER_LABELS[code as keyof typeof CENTER_LABELS];
         return (
           <g key={code}>
-            <circle cx={b.cx} cy={b.cy} r={b.r} fill={baseColor} stroke={borderColor} strokeWidth="1.5" opacity={active ? 1 : isPressed ? 0.9 : 0.8} />
-            <text x={b.cx} y={b.cy + 3.5} textAnchor="middle" fontSize={b.r < 9 ? 7 : 8} fontWeight="700" fill={active || isPressed ? "#fff" : "var(--color-text-dim)"}>
+            <circle
+              cx={b.cx} cy={b.cy} r={b.r}
+              fill={fillColor}
+              stroke={strokeColor}
+              strokeWidth={STYLES.circle.strokeWidth}
+              opacity={active ? STYLES.circle.activeOpacity : isPressed ? 0.9 : STYLES.circle.inactiveOpacity}
+            />
+            <text
+              x={lbl.cx} y={lbl.cy}
+              textAnchor="middle"
+              fontSize={b.r < 12 ? 9 : 10}
+              fontWeight={STYLES.label.fontWeight}
+              fill={active || isPressed ? STYLES.label.activeFill : STYLES.label.inactiveFill}
+            >
               {b.label}
             </text>
           </g>
@@ -240,24 +349,54 @@ export const XboxController: React.FC<XboxControllerProps> = ({
       })}
 
       {/* ── Thumbstick bases ── */}
-      <circle cx={THUMB_BASE.left.cx} cy={THUMB_BASE.left.cy} r={THUMB_BASE.left.r} fill="var(--color-surface)" stroke="var(--color-border)" strokeWidth="1.5" opacity={0.6} />
-      <circle cx={THUMB_BASE.right.cx} cy={THUMB_BASE.right.cy} r={THUMB_BASE.right.r} fill="var(--color-surface)" stroke="var(--color-border)" strokeWidth="1.5" opacity={0.6} />
+      <circle
+        cx={THUMB_BASE.left.cx} cy={THUMB_BASE.left.cy} r={THUMB_BASE.left.r}
+        fill={STYLES.colors.surface}
+        stroke={STYLES.colors.border}
+        strokeWidth={STYLES.thumbBase.strokeWidth}
+        opacity={STYLES.thumbBase.opacity}
+      />
+      <circle
+        cx={THUMB_BASE.right.cx} cy={THUMB_BASE.right.cy} r={THUMB_BASE.right.r}
+        fill={STYLES.colors.surface}
+        stroke={STYLES.colors.border}
+        strokeWidth={STYLES.thumbBase.strokeWidth}
+        opacity={STYLES.thumbBase.opacity}
+      />
 
       {/* ── Moving thumbsticks ── */}
       <g transform={`translate(${lsX}, ${lsY})`}>
-        <circle cx={THUMB.left_thumb.cx} cy={THUMB.left_thumb.cy} r={THUMB.left_thumb.r}
-          fill={pressedSet.has("left_thumb") ? "var(--color-accent)" : "var(--color-surface)"}
-          stroke={pressedSet.has("left_thumb") ? "var(--color-accent)" : "var(--color-border)"} strokeWidth="1.5" />
-        <text x={THUMB.left_thumb.cx} y={THUMB.left_thumb.cy + 4} textAnchor="middle" fontSize="8" fontWeight="700" fill={pressedSet.has("left_thumb") ? "#fff" : "var(--color-text-dim)"}>
+        <circle
+          cx={THUMB.left_thumb.cx} cy={THUMB.left_thumb.cy} r={THUMB.left_thumb.r}
+          fill={pressedSet.has("left_thumb") ? STYLES.colors.active : STYLES.colors.surface}
+          stroke={pressedSet.has("left_thumb") ? STYLES.colors.active : STYLES.colors.border}
+          strokeWidth={STYLES.circle.strokeWidth}
+        />
+        <text
+          x={THUMB.left_thumb.labelCx} y={THUMB.left_thumb.labelCy}
+          textAnchor="middle"
+          fontSize={10}
+          fontWeight={STYLES.label.fontWeight}
+          fill={pressedSet.has("left_thumb") ? STYLES.label.activeFill : STYLES.label.inactiveFill}
+        >
           {THUMB.left_thumb.label}
         </text>
       </g>
 
       <g transform={`translate(${rsX}, ${rsY})`}>
-        <circle cx={THUMB.right_thumb.cx} cy={THUMB.right_thumb.cy} r={THUMB.right_thumb.r}
-          fill={pressedSet.has("right_thumb") ? "var(--color-accent)" : "var(--color-surface)"}
-          stroke={pressedSet.has("right_thumb") ? "var(--color-accent)" : "var(--color-border)"} strokeWidth="1.5" />
-        <text x={THUMB.right_thumb.cx} y={THUMB.right_thumb.cy + 4} textAnchor="middle" fontSize="8" fontWeight="700" fill={pressedSet.has("right_thumb") ? "#fff" : "var(--color-text-dim)"}>
+        <circle
+          cx={THUMB.right_thumb.cx} cy={THUMB.right_thumb.cy} r={THUMB.right_thumb.r}
+          fill={pressedSet.has("right_thumb") ? STYLES.colors.active : STYLES.colors.surface}
+          stroke={pressedSet.has("right_thumb") ? STYLES.colors.active : STYLES.colors.border}
+          strokeWidth={STYLES.circle.strokeWidth}
+        />
+        <text
+          x={THUMB.right_thumb.labelCx} y={THUMB.right_thumb.labelCy}
+          textAnchor="middle"
+          fontSize={10}
+          fontWeight={STYLES.label.fontWeight}
+          fill={pressedSet.has("right_thumb") ? STYLES.label.activeFill : STYLES.label.inactiveFill}
+        >
           {THUMB.right_thumb.label}
         </text>
       </g>
@@ -266,12 +405,32 @@ export const XboxController: React.FC<XboxControllerProps> = ({
       {Object.entries(FACE).map(([code, b]) => {
         const active = accentCode === code;
         const isPressed = pressedSet.has(code);
-        const baseColor = active ? (b.color ?? "var(--color-accent)") : isPressed ? (b.color ?? "var(--color-accent)") : "var(--color-surface)";
-        const borderColor = active ? (b.color ?? "var(--color-accent)") : isPressed ? (b.color ?? "var(--color-accent)") : "var(--color-border)";
+        const baseColor = active
+          ? (b.color ?? STYLES.colors.active)
+          : isPressed
+            ? (b.color ?? STYLES.colors.active)
+            : STYLES.colors.surface;
+        const borderColor = active
+          ? (b.color ?? STYLES.colors.active)
+          : isPressed
+            ? (b.color ?? STYLES.colors.active)
+            : STYLES.colors.border;
         return (
           <g key={code}>
-            <circle cx={b.cx} cy={b.cy} r={b.r} fill={baseColor} stroke={borderColor} strokeWidth="1.5" opacity={active ? 1 : isPressed ? 0.9 : 0.8} />
-            <text x={b.cx} y={b.cy + 4} textAnchor="middle" fontSize={b.r < 9 ? 7 : 8} fontWeight="700" fill={active || isPressed ? "#fff" : "var(--color-text-dim)"}>
+            <circle
+              cx={b.cx} cy={b.cy} r={b.r}
+              fill={baseColor}
+              stroke={borderColor}
+              strokeWidth={STYLES.circle.strokeWidth}
+              opacity={active ? STYLES.circle.activeOpacity : isPressed ? 0.9 : STYLES.circle.inactiveOpacity}
+            />
+            <text
+              x={b.labelCx} y={b.labelCy}
+              textAnchor="middle"
+              fontSize={STYLES.label.fontSize}
+              fontWeight={STYLES.label.fontWeight}
+              fill={active || isPressed ? STYLES.label.activeFill : STYLES.label.inactiveFill}
+            >
               {b.label}
             </text>
           </g>
