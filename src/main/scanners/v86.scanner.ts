@@ -3,6 +3,7 @@ import { join, extname, basename, dirname } from "path";
 import { homedir } from "os";
 import { createHash } from "crypto";
 import { Game } from "../../shared/types";
+import { resolveSourceLocation } from "../../shared/path-utils";
 import { createLogger } from "../util/logger";
 
 const log = createLogger("info");
@@ -130,7 +131,7 @@ export function scanV86Games(): Game[] {
       const title = titleFromFilename(basename(fullPath));
       const id = hashId("v86", fullPath);
 
-      log.info("v86", `found ${title} → ${id} path: ${fullPath}`);
+      log.debug("v86", `found ${title} → ${id} path: ${fullPath}`);
 
       games.push({
         id,
@@ -138,6 +139,7 @@ export function scanV86Games(): Game[] {
         platform: "dos",
         romPath: fullPath,
         tags: [],
+        sourceLocation: resolveSourceLocation(fullPath),
       });
     });
   }

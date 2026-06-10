@@ -28,6 +28,11 @@ function fmt(s: number): string {
 }
 
 function deriveSubtitleUrls(videoSrc: string): string[] {
+  if (videoSrc.startsWith("ember://remote/")) {
+    // Remote videos: subtitles are served from the same rclone HTTP endpoint
+    const base = videoSrc.replace(/\.[^.]+$/, "");
+    return [`${base}.vtt`, `${base}.srt`];
+  }
   const base = videoSrc.replace(/^file:\/\//, "").replace(/^ember:\/\/media\/?/, "").replace(/\.[^.]+$/, "");
   return [`ember://media/${base}.vtt`, `ember://media/${base}.srt`];
 }

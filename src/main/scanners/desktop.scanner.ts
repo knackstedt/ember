@@ -2,6 +2,7 @@ import { existsSync, readdirSync, readFileSync } from "fs";
 import { join } from "path";
 import { getXdgDesktopDirs } from "./xdg";
 import { Game } from "../../shared/types";
+import { resolveSourceLocation } from "../../shared/path-utils";
 
 interface DesktopEntry {
   Name?: string;
@@ -110,6 +111,7 @@ export function scanDesktopGames(): Game[] {
           coverUrl,
           description: data.Comment,
           tags: [],
+          sourceLocation: resolveSourceLocation(data.Exec),
         });
       } catch {
         continue;

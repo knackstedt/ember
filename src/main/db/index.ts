@@ -131,6 +131,7 @@ async function runMigrations(db: Surreal): Promise<void> {
     DEFINE FIELD IF NOT EXISTS videos ON game TYPE option<array<object>>;
     DEFINE FIELD IF NOT EXISTS compressedRomPath ON game TYPE option<string>;
     DEFINE FIELD IF NOT EXISTS compressionFormat ON game TYPE option<string>;
+    DEFINE FIELD IF NOT EXISTS sourceLocation ON game TYPE option<string>;
 
     DEFINE TABLE IF NOT EXISTS movie SCHEMAFULL;
     DEFINE FIELD IF NOT EXISTS id ON movie TYPE string;
@@ -152,6 +153,7 @@ async function runMigrations(db: Surreal): Promise<void> {
     DEFINE FIELD IF NOT EXISTS watchProgress ON movie TYPE option<float>;
     DEFINE FIELD IF NOT EXISTS lastPlayed ON movie TYPE option<int>;
     DEFINE FIELD IF NOT EXISTS hidden ON movie TYPE bool DEFAULT false;
+    DEFINE FIELD IF NOT EXISTS sourceLocation ON movie TYPE option<string>;
 
     DEFINE TABLE IF NOT EXISTS music_track SCHEMAFULL;
     DEFINE FIELD IF NOT EXISTS id ON music_track TYPE string;
@@ -181,6 +183,7 @@ async function runMigrations(db: Surreal): Promise<void> {
     DEFINE FIELD IF NOT EXISTS isFavorite ON music_track TYPE bool DEFAULT false;
     DEFINE FIELD IF NOT EXISTS tags ON music_track TYPE array<string> DEFAULT [];
     DEFINE FIELD IF NOT EXISTS hidden ON music_track TYPE bool DEFAULT false;
+    DEFINE FIELD IF NOT EXISTS sourceLocation ON music_track TYPE option<string>;
 
     DEFINE TABLE IF NOT EXISTS tv_show SCHEMAFULL;
     DEFINE FIELD IF NOT EXISTS id ON tv_show TYPE string;
@@ -192,12 +195,16 @@ async function runMigrations(db: Surreal): Promise<void> {
     DEFINE FIELD IF NOT EXISTS genres ON tv_show TYPE option<array<string>>;
     DEFINE FIELD IF NOT EXISTS firstAirYear ON tv_show TYPE option<int>;
     DEFINE FIELD IF NOT EXISTS creator ON tv_show TYPE option<string>;
-    DEFINE FIELD IF NOT EXISTS seasons ON tv_show TYPE option<array<object>>;
+    DEFINE FIELD IF NOT EXISTS seasons ON tv_show TYPE option<array<object>> FLEXIBLE;
+    DEFINE FIELD IF NOT EXISTS seasons[*] ON tv_show TYPE object FLEXIBLE;
+    DEFINE FIELD IF NOT EXISTS seasons[*].episodes ON tv_show TYPE option<array<object>> FLEXIBLE;
+    DEFINE FIELD IF NOT EXISTS seasons[*].episodes[*] ON tv_show TYPE object FLEXIBLE;
     DEFINE FIELD IF NOT EXISTS tmdbId ON tv_show TYPE option<int>;
     DEFINE FIELD IF NOT EXISTS isFavorite ON tv_show TYPE bool DEFAULT false;
     DEFINE FIELD IF NOT EXISTS tags ON tv_show TYPE array<string> DEFAULT [];
     DEFINE FIELD IF NOT EXISTS rating ON tv_show TYPE option<float>;
     DEFINE FIELD IF NOT EXISTS hidden ON tv_show TYPE bool DEFAULT false;
+    DEFINE FIELD IF NOT EXISTS sourceLocation ON tv_show TYPE option<string>;
 
     DEFINE TABLE IF NOT EXISTS controller_mapping SCHEMAFULL;
     DEFINE FIELD IF NOT EXISTS deviceId ON controller_mapping TYPE string;
@@ -254,6 +261,19 @@ async function runMigrations(db: Surreal): Promise<void> {
     DEFINE FIELD IF NOT EXISTS enabled ON streaming_service TYPE bool DEFAULT true;
     DEFINE FIELD IF NOT EXISTS isBuiltin ON streaming_service TYPE bool DEFAULT false;
     DEFINE FIELD IF NOT EXISTS sortOrder ON streaming_service TYPE int DEFAULT 0;
+
+    DEFINE TABLE IF NOT EXISTS remote_source SCHEMAFULL;
+    DEFINE FIELD IF NOT EXISTS id ON remote_source TYPE string;
+    DEFINE FIELD IF NOT EXISTS name ON remote_source TYPE string;
+    DEFINE FIELD IF NOT EXISTS protocol ON remote_source TYPE string;
+    DEFINE FIELD IF NOT EXISTS host ON remote_source TYPE option<string>;
+    DEFINE FIELD IF NOT EXISTS port ON remote_source TYPE option<int>;
+    DEFINE FIELD IF NOT EXISTS remotePath ON remote_source TYPE string;
+    DEFINE FIELD IF NOT EXISTS mediaTypes ON remote_source TYPE array<string>;
+    DEFINE FIELD IF NOT EXISTS enabled ON remote_source TYPE bool DEFAULT true;
+    DEFINE FIELD IF NOT EXISTS credentialMode ON remote_source TYPE string;
+    DEFINE FIELD IF NOT EXISTS encryptedCreds ON remote_source TYPE option<string>;
+    DEFINE FIELD IF NOT EXISTS servePort ON remote_source TYPE option<int>;
   `);
 
   // Migrate old raw local coverUrl paths → ember://media protocol

@@ -2,6 +2,7 @@ import { existsSync, readdirSync, readFileSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 import { Game } from "../../shared/types";
+import { resolveSourceLocation } from "../../shared/path-utils";
 import { createLogger } from "../util/logger";
 
 const log = createLogger("info");
@@ -128,6 +129,7 @@ export function scanSteamGames(): Game[] {
           coverUrl: cover,
           execPath: `steam://rungameid/${appId}`,
           tags: [],
+          sourceLocation: "local",
         });
       } catch {
         log.error("scanSteamGames", `Failed to parse Steam game: ${entry}`);

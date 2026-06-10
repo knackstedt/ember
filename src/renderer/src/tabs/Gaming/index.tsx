@@ -50,6 +50,7 @@ import {
   Archive,
   Settings,
   Plus,
+  Globe,
 } from "lucide-react";
 import { AiGroup } from "../../../../shared/types";
 import { DynamicFacetFilters, FacetField } from "../../components/DynamicFacetFilters/DynamicFacetFilters";
@@ -185,6 +186,7 @@ export const GamingTab: React.FC = () => {
   const games = useGamesStore((s) => s.games);
   const loading = useGamesStore((s) => s.loading);
   const scanning = useGamesStore((s) => s.scanning);
+  const remoteScanning = useGamesStore((s) => s.remoteScanning);
   const activeFilter = useGamesStore((s) => s.activeFilter);
   const searchQuery = useGamesStore((s) => s.searchQuery);
   const load = useGamesStore((s) => s.load);
@@ -702,6 +704,20 @@ export const GamingTab: React.FC = () => {
           >
             {scanning ? <><Loader size={14} className="animate-spin" /> Scanning…</> : <><RotateCw size={14} /> Scan</>}
           </motion.button>
+          <motion.button
+            className="px-3 py-1.5 rounded-[var(--radius-card)] text-xs font-medium flex items-center gap-1"
+            style={{
+              background: "var(--color-surface-raised)",
+              color: "var(--color-text)",
+              border: "1px solid var(--color-border)",
+            }}
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent("htpc:switch-tab", { detail: { tab: "settings" } }));
+            }}
+            whileTap={{ scale: 0.96 }}
+          >
+            <Globe size={14} /> Remote
+          </motion.button>
           <span className="text-xs" style={{ color: "var(--color-text-dim)" }}>
             {items.length} games
           </span>
@@ -884,7 +900,7 @@ export const GamingTab: React.FC = () => {
         style={{ padding: 16 }}
       >
         {/* Grid content */}
-        {loading || scanning ? (
+        {loading || scanning || remoteScanning ? (
           <div
             className="flex flex-col items-center justify-center gap-3"
             style={{ color: "var(--color-text-dim)", minHeight: 200 }}
@@ -897,7 +913,7 @@ export const GamingTab: React.FC = () => {
               }}
             />
             <span className="text-sm">
-              {loading ? "Loading games…" : "Scanning for games…"}
+              {loading ? "Loading games…" : scanning || remoteScanning ? "Scanning for games…" : ""}
             </span>
           </div>
         ) : items.length === 0 ? (
@@ -1330,6 +1346,32 @@ const HOOK_TIMING_LABELS: Record<string, string> = {
   "after-close": "After Close",
 };
 
+function parseShellArgs(input: string): string[] {
+  const args: string[] = [];
+  let current = "";
+  let inQuotes = false;
+  let quoteChar = "";
+  for (let i = 0; i < input.length; i++) {
+    const ch = input[i];
+    if (!inQuotes && (ch === '"' || ch === "'")) {
+      inQuotes = true;
+      quoteChar = ch;
+    } else if (inQuotes && ch === quoteChar) {
+      inQuotes = false;
+      quoteChar = "";
+    } else if (!inQuotes && /\s/.test(ch)) {
+      if (current.length > 0) {
+        args.push(current);
+        current = "";
+      }
+    } else {
+      current += ch;
+    }
+  }
+  if (current.length > 0) args.push(current);
+  return args;
+}
+
 function GameSessionSettings({ game }: { game: Game }) {
   const { setSessionConfig } = useGamesStore();
   const [editingHook, setEditingHook] = useState<string | null>(null);
@@ -1349,13 +1391,9 @@ function GameSessionSettings({ game }: { game: Game }) {
     env: "",
   });
 
-  const saveField = <K extends keyof Game>(
-    field: K,
-    value: Game[K] | null,
-  ) => {
-    void setSessionConfig(game.id, {
-      [field]: value,
-    } as any);
+  type SessionConfigPayload = Parameters<typeof setSessionConfig>[1];
+  const saveSessionField = (payload: SessionConfigPayload) => {
+    void setSessionConfig(game.id, payload);
   };
 
   const addHook = () => {
@@ -1376,7 +1414,7 @@ function GameSessionSettings({ game }: { game: Game }) {
       timing: hookDraft.timing as import("../../../../shared/types").SessionHookTiming,
       command: hookDraft.command.trim(),
       args: args.length > 0 ? args : undefined,
-      timeout: parseInt(hookDraft.timeout, 10) * 1000 || undefined,
+      timeout: Number.isNaN(parseInt(hookDraft.timeout, 10)) ? undefined : parseInt(hookDraft.timeout, 10) * 1000,
       workingDir: hookDraft.workingDir.trim() || undefined,
       env: Object.keys(env).length > 0 ? env : undefined,
     };
@@ -1415,7 +1453,7 @@ function GameSessionSettings({ game }: { game: Game }) {
             <input
               type="text"
               value={game.launchCommand ?? ""}
-              onChange={(e) => saveField("launchCommand", e.target.value || null)}
+              onChange={(e) => saveSessionField({ launchCommand: e.target.value || null })}
               placeholder="Override command (replaces default)"
               className="w-full text-sm px-2 py-1.5 rounded"
               style={{
@@ -1443,9 +1481,9 @@ function GameSessionSettings({ game }: { game: Game }) {
               value={game.launchArgs?.join(", ") ?? ""}
               onChange={(e) => {
                 const v = e.target.value.trim();
-                saveField("launchArgs", v ? v.split(",").map((s) => s.trim()) : null);
+                saveSessionField({ launchArgs: v ? parseShellArgs(v) : null });
               }}
-              placeholder="arg1, arg2, arg3"
+              placeholder='arg1 arg2 "arg with spaces"'
               className="w-full text-sm px-2 py-1.5 rounded"
               style={{
                 background: "var(--color-surface-raised)",
@@ -1467,7 +1505,7 @@ function GameSessionSettings({ game }: { game: Game }) {
             <input
               type="text"
               value={game.launchWorkingDir ?? ""}
-              onChange={(e) => saveField("launchWorkingDir", e.target.value || null)}
+              onChange={(e) => saveSessionField({ launchWorkingDir: e.target.value || null })}
               placeholder="/path/to/working/dir"
               className="w-full text-sm px-2 py-1.5 rounded"
               style={{
@@ -1503,7 +1541,7 @@ function GameSessionSettings({ game }: { game: Game }) {
                     env[k.trim()] = rest.join("=").trim();
                   }
                 }
-                saveField("launchEnv", Object.keys(env).length > 0 ? env : null);
+                saveSessionField({ launchEnv: Object.keys(env).length > 0 ? env : null });
               }}
               placeholder="KEY=value\nOTHER_KEY=value"
               rows={3}

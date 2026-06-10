@@ -42,6 +42,7 @@ import { useContextMenuStore } from "./store/contextMenu.store";
 import { QueueBlade } from "./components/QueueBlade/QueueBlade";
 import { ErrorBoundary } from "./components/ErrorBoundary/ErrorBoundary";
 import { CommandPalette } from "./components/CommandPalette/CommandPalette";
+import { CredentialPrompt } from "./components/CredentialPrompt/CredentialPrompt";
 import { useCommands } from "./hooks/useCommands";
 import { useCommandsStore } from "./store/commands.store";
 import { useGamepadApi } from "./hooks/useGamepadApi";
@@ -308,6 +309,24 @@ export default function App(): React.ReactElement {
           update(id, { message: `${p.scanner}: ${label}`, progress: pct });
         }
       }
+
+      // Track remote scanning state in stores
+      if (p.scanner === "remote-movie") {
+        useMoviesStore.setState({ remoteScanning: p.status === "scanning" });
+        if (p.status === "done") {
+          useMoviesStore.getState().load();
+        }
+      } else if (p.scanner === "remote-music") {
+        useMusicStore.setState({ remoteScanning: p.status === "scanning" });
+        if (p.status === "done") {
+          useMusicStore.getState().load();
+        }
+      } else if (p.scanner === "remote-rom") {
+        useGamesStore.setState({ remoteScanning: p.status === "scanning" });
+        if (p.status === "done") {
+          useGamesStore.getState().load();
+        }
+      }
     });
 
     const unsubCores = window.htpc.libretro.onCoreListChanged(() => {
@@ -315,7 +334,14 @@ export default function App(): React.ReactElement {
       useGamesStore.getState().refreshCores();
     });
 
-    return () => { unsubScan(); unsubCores(); };
+    const unsubHook = window.htpc.onSessionHookError((detail) => {
+      useToastStore.getState().push({
+        type: "error",
+        message: `Session hook "${detail.timing}" failed for ${detail.gameTitle}: ${detail.reason}`,
+      });
+    });
+
+    return () => { unsubScan(); unsubCores(); unsubHook(); };
   }, []);
 
   useEffect(() => {
@@ -387,6 +413,16 @@ export default function App(): React.ReactElement {
       useInputStore.getState().setControllersTabLocked(true);
       useInputStore.getState().setControllersTabUnlockProgress(0);
     }
+    return () => {
+      if (unlockTimerRef.current) {
+        clearTimeout(unlockTimerRef.current);
+        unlockTimerRef.current = null;
+      }
+      if (unlockIntervalRef.current) {
+        clearInterval(unlockIntervalRef.current);
+        unlockIntervalRef.current = null;
+      }
+    };
   }, [activeTab]);
 
   useEffect(() => {
@@ -961,6 +997,11 @@ export default function App(): React.ReactElement {
       {/* Command Palette */}
       <ErrorBoundary variant="section">
         <CommandPalette onExecute={(cmd: CommandDefinition) => executeCommand(cmd)} />
+      </ErrorBoundary>
+
+      {/* Credential Prompt for remote sources */}
+      <ErrorBoundary variant="section">
+        <CredentialPrompt />
       </ErrorBoundary>
     </div>
   );

@@ -76,6 +76,12 @@ export interface SessionHook {
   workingDir?: string;
 }
 
+export type SourceLocation =
+  | "local"
+  | "remote"
+  | `rclone:${RemoteSourceProtocol}`
+  | "online";
+
 export interface Game {
   id: string;
   title: string;
@@ -138,6 +144,8 @@ export interface Game {
   launchEnv?: Record<string, string>;
   /** Session lifecycle hooks */
   sessionHooks?: SessionHook[];
+  /** Whether the game source is local or remote */
+  sourceLocation?: SourceLocation;
 }
 
 export interface GameEmulatorConfig {
@@ -164,6 +172,8 @@ export interface Movie {
   rating?: number;
   watchProgress?: number;
   hidden?: boolean;
+  /** Whether the movie source is local or remote */
+  sourceLocation?: SourceLocation;
 }
 
 export interface MusicTrack {
@@ -194,6 +204,8 @@ export interface MusicTrack {
   isFavorite?: boolean;
   tags?: string[];
   hidden?: boolean;
+  /** Whether the music source is local or remote */
+  sourceLocation?: SourceLocation;
 }
 
 export interface TVShow {
@@ -212,6 +224,8 @@ export interface TVShow {
   tags?: string[];
   rating?: number;
   hidden?: boolean;
+  /** Whether the TV show source is local or remote */
+  sourceLocation?: SourceLocation;
 }
 
 export interface TVSeason {
@@ -287,8 +301,7 @@ export type FlashCanvasSize =
   | "550x400"
   | "640x480"
   | "800x600"
-  | "1024x768"
-  | "custom";
+  | "1024x768";
 
 export interface FlashControllerMap {
   south: string;
@@ -369,115 +382,130 @@ export type BackgroundType =
   | "solid"
   | "gradient";
 
-export type ImageFitMode = "cover" | "contain" | "stretch" | "center" | "tile";
-
-export type MatrixPreset =
-  | "cyberpunk"
-  | "ocean-blue"
-  | "fire-red"
-  | "monochrome"
-  | "purple-haze"
-  | "neon-pink"
-  | "matrix"
-  | "digital-rain";
-
-export interface BackgroundSettings {
-  type: BackgroundType;
-  matrixPreset?: MatrixPreset;
-  dailySource?: DailyBackgroundSource;
-  dailyCustomUrl?: string;
-  imagePath?: string;
-  imageFit?: ImageFitMode;
-  solidColor?: string;
-  gradient?: string;
-}
-
-export interface ControllerBrowserSettings {
-  snapToElement: boolean;
-  snapDistance: number;
-  snapSelectors: string[];
-  mouseSpeed: number;
-  swapRightStickAxes: boolean;
-  buttonRemapping: Record<string, string>;
-}
+export type ImageFitMode = "cover" | "contain" | "stretch" | "center" | "repeat";
 
 export interface AppSettings {
   theme: ThemeName;
-  fullscreen: boolean;
-  defaultTab: TabId;
-  moviePaths: string[];
-  musicPaths: string[];
-  romPaths: string[];
-  gamePaths: string[];
-  tmdbApiKey?: string;
-  rawgApiKey?: string;
+  background: BackgroundType;
+  backgroundImage?: string;
+  backgroundFit?: ImageFitMode;
+  backgroundOpacity?: number;
+  customCss?: string;
+  dailyBackground?: DailyBackgroundSettings;
+  language?: string;
+  region?: string;
+  showClock?: boolean;
+  clockFormat?: "12h" | "24h";
+  /** Global volume level (0-1) */
+  volume?: number;
+  /** Path to custom CSS file */
+  customCssPath?: string;
+  /** Controller input settings */
+  controllerInputEnabled?: boolean;
+  /** Gamepad polling rate in Hz */
+  gamepadPollingRate?: number;
+  /** Enable haptic feedback */
+  hapticEnabled?: boolean;
+  /** Keybind mappings: action → key string */
+  keybinds?: Record<string, string>;
+  /** Path overrides for emulator binaries */
+  emulatorPaths?: Record<string, string>;
+  /** Extra directories to scan for ROMs */
+  romPaths?: string[];
+  /** Extra directories to scan for movies */
+  moviePaths?: string[];
+  /** Extra directories to scan for music */
+  musicPaths?: string[];
+  /** Extra directories to scan for TV shows */
+  tvPaths?: string[];
+  /** Enable automatic game metadata fetching */
+  autoFetchMetadata?: boolean;
+  /** Enable Discord Rich Presence */
+  discordRpcEnabled?: boolean;
+  /** IGDB API credentials */
+  igdbClientId?: string;
+  igdbClientSecret?: string;
+  /** Steam Web API key */
   steamApiKey?: string;
-  acoustidApiKey?: string;
+  /** RAWG API key */
+  rawgApiKey?: string;
+  /** MobyGames API key */
+  mobygamesApiKey?: string;
+  /** TheGamesDB API key */
+  thegamesdbApiKey?: string;
+  /** LaunchBox database file path */
+  launchboxDbPath?: string;
+  /** OpenCritic API key */
+  opencriticApiKey?: string;
+  /** ScreenScraper credentials */
+  screenscraperUser?: string;
+  screenscraperPassword?: string;
+  /** RetroAchievements credentials */
+  retroachievementsUser?: string;
+  retroachievementsApiKey?: string;
+  /** MusicBrainz / TheAudioDB settings */
+  musicbrainzEnabled?: boolean;
   theaudiodbApiKey?: string;
-  enableAnalytics: boolean;
-  startOnBoot: boolean;
-  hardwareAcceleration: boolean;
-  flashSettings?: FlashSettings;
-  disabledTabs: TabId[];
-  /** @deprecated Use background.type === "daily" instead */
-  dailyBackground: DailyBackgroundSettings;
-  background?: BackgroundSettings;
-  defaultEmulatorShader?: string;
-  emulatorShaders?: Partial<Record<GamePlatform, string>>;
-  /** Dolphin emulator post-processing effect */
-  dolphinPostProcessing?: string;
+  /** TMDB API key */
+  tmdbApiKey?: string;
+  /** Fanart.tv API key */
+  fanarttvApiKey?: string;
+  /** Enable automatic thumbnail generation for movies */
+  autoGenerateThumbnails?: boolean;
+  /** Enable network discovery for remote media sources */
+  networkDiscoveryEnabled?: boolean;
+  /** Enable music visualizations */
+  musicVisualization?: boolean;
+  /** Default music visualization style */
+  visualizationStyle?: string;
+  /** Enable game cover caching */
+  coverCacheEnabled?: boolean;
   /** Custom keyboard shortcuts: command id → shortcut string (e.g. "Ctrl+P") */
   commandKeybinds?: Record<string, string>;
   /** Custom controller button mappings: command id → button action (e.g. "north", "select") */
   commandControllerMap?: Record<string, string>;
   controllerBrowser?: ControllerBrowserSettings;
+  remoteSources?: RemoteSource[];
 }
 
-export interface PluginManifest {
+export type RemoteSourceProtocol =
+  | "sftp"
+  | "ftp"
+  | "smb"
+  | "webdav"
+  | "http"
+  | "googledrive"
+  | "dropbox"
+  | "onedrive";
+
+export type CredentialMode = "auto-key" | "user-password" | "session-only";
+
+export interface RemoteSource {
   id: string;
   name: string;
-  version: string;
-  description?: string;
-  author?: string;
-  entryPoint: string;
-  permissions?: string[];
+  protocol: RemoteSourceProtocol;
+  host?: string;
+  port?: number;
+  remotePath: string;
+  mediaTypes: ("movie" | "music" | "rom")[];
+  enabled: boolean;
+  credentialMode: CredentialMode;
+  encryptedCreds?: string;
+  servePort?: number;
 }
 
-export interface ScanProgress {
-  scanner: string;
-  current: number;
-  total: number;
-  status: "scanning" | "done" | "error";
-  message?: string;
+export interface ControllerBrowserSettings {
+  enabled?: boolean;
+  /** URL patterns to automatically show controller overlay in */
+  urlPatterns?: string[];
 }
 
-export type CollectionItemType = "game" | "movie" | "music" | "tv" | "mixed";
-export type CollectionType = "manual" | "smart";
-export type SortOrder = "title" | "releaseYear" | "lastPlayed" | "rating" | "playTime" | "added";
-export type SortDirection = "asc" | "desc";
-
-export type FilterOperator =
-  | "eq"
-  | "ne"
-  | "gt"
-  | "gte"
-  | "lt"
-  | "lte"
-  | "contains"
-  | "in"
-  | "startsWith"
-  | "endsWith"
-  | "exists";
-
-export interface SmartFilterRule {
-  field: string;
-  operator: FilterOperator;
-  value?: unknown;
-}
-
-export interface SmartFilterGroup {
-  logic: "and" | "or";
-  rules: (SmartFilterRule | SmartFilterGroup)[];
+export interface StreamingService {
+  id: string;
+  name: string;
+  url: string;
+  icon?: string;
+  category: "game" | "media" | "utility";
 }
 
 export interface Collection {
@@ -486,215 +514,45 @@ export interface Collection {
   icon?: string;
   color?: string;
   description?: string;
-  itemType: CollectionItemType;
-  type: CollectionType;
+  itemType: "game" | "movie" | "music" | "tv";
+  type: "manual" | "smart";
   filter?: SmartFilterGroup;
-  sortOrder?: SortOrder;
-  sortDirection?: SortDirection;
-  createdAt: number;
-  updatedAt: number;
+  sortOrder?: string;
+  sortDirection?: "asc" | "desc";
 }
 
 export interface CollectionItem {
   id: string;
   collectionId: string;
   itemId: string;
-  itemType: CollectionItemType;
+  itemType: "game" | "movie" | "music" | "tv";
   addedAt: number;
+  order?: number;
 }
 
-export interface CollectionWithItems extends Collection {
-  items: CollectionItem[];
+export type SmartFilterOperator =
+  | "eq"
+  | "ne"
+  | "gt"
+  | "gte"
+  | "lt"
+  | "lte"
+  | "contains"
+  | "startsWith"
+  | "endsWith"
+  | "in"
+  | "notIn";
+
+export interface SmartFilterCondition {
+  field: string;
+  operator: SmartFilterOperator;
+  value: string | number | boolean | string[];
 }
 
-export interface LocalAiConfig {
-  enabled: boolean;
-  provider: "ollama" | "lmstudio" | "custom";
-  baseUrl: string;
-  model: string;
-}
+export type SmartFilterGroupLogic = "AND" | "OR";
 
-export interface AiGroup {
-  id: string;
-  label: string;
-  itemIds: string[];
-  centerItemId: string;
-}
-
-export type StreamingServiceCategory = "music" | "video";
-
-export interface StreamingService {
-  id: string;
-  name: string;
-  category: StreamingServiceCategory;
-  url: string;
-  color: string;
-  textColor: string;
-  icon: string;
-  desktopApp?: string;
-  desktopAppArgs?: string[];
-  enabled: boolean;
-  isBuiltin: boolean;
-  sortOrder: number;
-}
-
-export type PackageManager = "apt" | "flatpak" | "appimage" | "winehq" | "proton-ge" | "buildbot";
-
-export interface ManagedPackage {
-  id: string;
-  name: string;
-  displayName: string;
-  description?: string;
-  manager: PackageManager;
-  version?: string;
-  installedVersion?: string;
-  isInstalled: boolean;
-  isPinned: boolean;
-  autoUpdate: boolean;
-  category: "core" | "emulator" | "dependency" | "media-codec" | "other" | "game";
-  platforms?: string[];
-  sourceUrl?: string;
-  installArgs?: string[];
-  installPath?: string;
-}
-
-export interface PackageOperationProgress {
-  packageId: string;
-  operation: "install" | "uninstall" | "update" | "search";
-  status: "pending" | "running" | "success" | "error";
-  message?: string;
-  percent?: number;
-}
-
-export type IpcChannel =
-  | "settings:get"
-  | "settings:set"
-  | "games:scan"
-  | "games:list"
-  | "games:launch"
-  | "games:favorite"
-  | "games:tag"
-  | "games:emulatorConfig:get"
-  | "games:emulatorConfig:set"
-  | "games:sessionConfig:set"
-  | "movies:scan"
-  | "movies:list"
-  | "movies:launch"
-  | "movies:favorite"
-  | "movies:tag"
-  | "movies:progress:set"
-  | "music:scan"
-  | "music:list"
-  | "music:launch"
-  | "music:favorite"
-  | "music:tag"
-  | "tv:scan"
-  | "tv:list"
-  | "tv:launch"
-  | "tv:favorite"
-  | "tv:tag"
-  | "input:devices"
-  | "input:mappings:get"
-  | "input:mappings:set"
-  | "input:mappings:reset"
-  | "plugins:list"
-  | "plugins:reload"
-  | "scan:progress"
-  | "input:event"
-  | "app:fullscreen"
-  | "app:quit"
-  | "app:xdg-defaults"
-  | "games:hide"
-  | "movies:hide"
-  | "music:hide"
-  | "tv:hide"
-  | "movies:regenerateThumbnail"
-  | "tv:regenerateThumbnail"
-  | "games:regenerateThumbnail"
-  | "shell:openPath"
-  | "shell:showItemInFolder"
-  | "libretro:cores:list"
-  | "libretro:cores:detect"
-  | "libretro:core:load"
-  | "libretro:game:load"
-  | "libretro:start"
-  | "libretro:stop"
-  | "libretro:reset"
-  | "libretro:unload"
-  | "libretro:unloadAll"
-  | "libretro:frame:get"
-  | "libretro:avinfo:get"
-  | "libretro:input:set"
-  | "libretro:analog:set"
-  | "collections:list"
-  | "collections:get"
-  | "collections:create"
-  | "collections:update"
-  | "collections:delete"
-  | "collections:items:add"
-  | "collections:items:remove"
-  | "collections:items:list"
-  | "collections:smart:evaluate"
-  | "streaming:list"
-  | "streaming:add"
-  | "streaming:update"
-  | "streaming:delete"
-  | "streaming:setEnabled"
-  | "streaming:detectDesktopApp"
-  | "streaming:launch"
-  | "packages:list"
-  | "packages:search"
-  | "packages:install"
-  | "packages:uninstall"
-  | "packages:pin"
-  | "packages:setAutoUpdate"
-  | "packages:checkUpdates"
-  | "packages:progress"
-  | "packages:apt:password"
-  | "store:itch:status"
-  | "store:itch:login"
-  | "store:itch:logout"
-  | "store:itch:library"
-  | "store:itch:install"
-  | "store:itch:uninstall"
-  | "store:itch:launch"
-  | "store:itch:update"
-  | "store:itch:updates"
-  | "store:itch:download"
-  | "store:providers:list";
-
-export type StoreProviderId = "itch";
-
-export interface StoreProvider {
-  id: StoreProviderId;
-  name: string;
-  url: string;
-  icon?: string;
-}
-
-export interface StoreGame {
-  id: string;
-  title: string;
-  platform: GamePlatform;
-  storeId: StoreProviderId;
-  storeGameId: string;
-  execPath?: string;
-  installPath?: string;
-  coverUrl?: string;
-  description?: string;
-  developer?: string;
-  genres?: string[];
-  isInstalled?: boolean;
-  isUpdateAvailable?: boolean;
-  version?: string;
-  lastPlayed?: number;
-  playTime?: number;
-}
-
-export interface StoreDownloadProgress {
-  gameId: string;
-  title: string;
-  progress: number;
-  status: "queued" | "downloading" | "installing" | "complete" | "error";
-  error?: string;
+export interface SmartFilterGroup {
+  logic: SmartFilterGroupLogic;
+  conditions: SmartFilterCondition[];
+  groups?: SmartFilterGroup[];
 }

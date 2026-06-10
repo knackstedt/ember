@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from "fs";
 import { join, dirname } from "path";
 import { homedir } from "os";
 import { Game } from "../../shared/types";
+import { resolveSourceLocation } from "../../shared/path-utils";
 import { createLogger } from "../util/logger";
 
 const log = createLogger("info");
@@ -42,6 +43,7 @@ export function listInstalledItchGames(): Game[] {
         coverUrl: game.coverUrl,
         developer: game.user?.displayName ?? game.user?.username,
         tags: [],
+        sourceLocation: resolveSourceLocation(exe),
       });
     }
   } catch (err: any) {

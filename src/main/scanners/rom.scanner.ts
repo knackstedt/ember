@@ -3,6 +3,7 @@ import { join, extname, basename, dirname } from "path";
 import { homedir } from "os";
 import { createHash } from "crypto";
 import { Game, GamePlatform } from "../../shared/types";
+import { resolveSourceLocation } from "../../shared/path-utils";
 import { detectChdPlatform } from "@shared/chd";
 import { createLogger } from "../util/logger";
 
@@ -233,7 +234,7 @@ export function scanRomGames(): Game[] {
 
       if (!platform) return;
       if (seen.has(fullPath)) {
-        log.info("rom", `skip duplicate path: ${fullPath}`);
+        log.debug("rom", `skip duplicate path: ${fullPath}`);
         return;
       }
       seen.add(fullPath);
@@ -241,7 +242,7 @@ export function scanRomGames(): Game[] {
       const title = titleFromFilename(basename(fullPath));
       const id = hashId(platform, fullPath);
 
-      log.info("rom", `found ${title} → ${id} platform: ${platform} path: ${fullPath}`);
+      log.debug("rom", `found ${title} → ${id} platform: ${platform} path: ${fullPath}`);
 
       games.push({
         id,
@@ -249,6 +250,7 @@ export function scanRomGames(): Game[] {
         platform,
         romPath: fullPath,
         tags: [],
+        sourceLocation: resolveSourceLocation(fullPath),
       });
     });
   }

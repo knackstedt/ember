@@ -185,9 +185,9 @@ export function useBrowserControllerNav({
       } catch {}
     };
 
-    const sendKey = (keyCode: string, modifiers?: string[]) => {
+    const sendKey = (keyCode: string, x: number, y: number, modifiers?: string[]) => {
       // Only send keys to webview if cursor is inside one
-      const webview = findWebviewAt(0, 0);
+      const webview = findWebviewAt(x, y);
       if (webview) {
         try {
           webview.sendInputEvent({ type: "keyDown", keyCode, modifiers: modifiers as any });
@@ -264,6 +264,8 @@ export function useBrowserControllerNav({
 
       let anyDeviceHadInput = false;
 
+      let managerNeedsUpdate = false;
+
       for (let i = 0; i < activeIds.length; i++) {
         const deviceId = activeIds[i];
         const state = liveStates[deviceId];
@@ -272,6 +274,10 @@ export function useBrowserControllerNav({
         const dev = ensureDevice(deviceId, liveStates);
         const axes = state.axes;
         let anyInput = false;
+        const prevVisible = dev.visible;
+
+        // Cache webview under this device's cursor for the entire frame
+        const webviewUnderCursor = findWebviewAt(dev.posRef.current.x, dev.posRef.current.y);
 
         const rawRightX = (axes.right_x ?? 0) / 32767;
         const rawRightY = (axes.right_y ?? 0) / 32767;
@@ -318,10 +324,9 @@ export function useBrowserControllerNav({
 
         if (leftX !== 0 || leftY !== 0) {
           anyInput = true;
-          const webview = findWebviewAt(dev.posRef.current.x, dev.posRef.current.y);
-          if (webview) {
+          if (webviewUnderCursor) {
             try {
-              webview.executeJavaScript(`window.scrollBy(${leftX * SCROLL_SPEED}, ${leftY * SCROLL_SPEED})`);
+              webviewUnderCursor.executeJavaScript(`window.scrollBy(${leftX * SCROLL_SPEED}, ${leftY * SCROLL_SPEED})`);
             } catch {}
           }
         }
@@ -351,9 +356,8 @@ export function useBrowserControllerNav({
         }
         if (check("east")) {
           anyInput = true;
-          const webview = findWebviewAt(dev.posRef.current.x, dev.posRef.current.y);
-          if (webview && webview.canGoBack && webview.canGoBack()) {
-            webview.goBack();
+          if (webviewUnderCursor && webviewUnderCursor.canGoBack && webviewUnderCursor.canGoBack()) {
+            webviewUnderCursor.goBack();
           }
         }
         if (check("west")) {
@@ -363,23 +367,21 @@ export function useBrowserControllerNav({
         }
         if (check("north")) {
           anyInput = true;
-          const webview = findWebviewAt(dev.posRef.current.x, dev.posRef.current.y);
-          if (webview && webview.canGoForward && webview.canGoForward()) {
-            webview.goForward();
+          if (webviewUnderCursor && webviewUnderCursor.canGoForward && webviewUnderCursor.canGoForward()) {
+            webviewUnderCursor.goForward();
           }
         }
         // Only send Tab keys for bumpers when cursor is inside a webview.
         // In main mode the app already handles bumper tab switching
         // directly via evdev / useGamepadApi to avoid double-firing.
-        const webview = findWebviewAt(dev.posRef.current.x, dev.posRef.current.y);
-        if (webview) {
+        if (webviewUnderCursor) {
           if (check("left_bumper")) {
             anyInput = true;
-            sendKey("Tab", ["shift"]);
+            sendKey("Tab", dev.posRef.current.x, dev.posRef.current.y, ["shift"]);
           }
           if (check("right_bumper")) {
             anyInput = true;
-            sendKey("Tab");
+            sendKey("Tab", dev.posRef.current.x, dev.posRef.current.y);
           }
         }
 
@@ -409,10 +411,10 @@ export function useBrowserControllerNav({
           scheduleMouseUp(dev.posRef.current.x, dev.posRef.current.y, "left");
         }
 
-        if (check("dpad_up")) sendKey("ArrowUp");
-        if (check("dpad_down")) sendKey("ArrowDown");
-        if (check("dpad_left")) sendKey("ArrowLeft");
-        if (check("dpad_right")) sendKey("ArrowRight");
+        if (check("dpad_up")) sendKey("ArrowUp", dev.posRef.current.x, dev.posRef.current.y);
+        if (check("dpad_down")) sendKey("ArrowDown", dev.posRef.current.x, dev.posRef.current.y);
+        if (check("dpad_left")) sendKey("ArrowLeft", dev.posRef.current.x, dev.posRef.current.y);
+        if (check("dpad_right")) sendKey("ArrowRight", dev.posRef.current.x, dev.posRef.current.y);
 
         if (anyInput) {
           dev.lastInputTime = Date.now();
@@ -422,16 +424,20 @@ export function useBrowserControllerNav({
           dev.visible = false;
         }
 
-        const activeWebview = findWebviewAt(dev.posRef.current.x, dev.posRef.current.y);
-        if (activeWebview) {
+        // Notify React only when visibility changes or device list changes
+        if (dev.visible !== prevVisible) {
+          managerNeedsUpdate = true;
+        }
+
+        if (webviewUnderCursor) {
           const now = Date.now();
           if (now - dev.lastCursorCheck > CURSOR_CHECK_INTERVAL_MS) {
             dev.lastCursorCheck = now;
             try {
-              const bounds = activeWebview.getBoundingClientRect();
+              const bounds = webviewUnderCursor.getBoundingClientRect();
               const relX = Math.round(dev.posRef.current.x - bounds.left);
               const relY = Math.round(dev.posRef.current.y - bounds.top);
-              activeWebview.executeJavaScript(
+              webviewUnderCursor.executeJavaScript(
                 `(() => {
                   const el = document.elementFromPoint(${relX}, ${relY});
                   if (!el) return "default";
@@ -456,7 +462,10 @@ export function useBrowserControllerNav({
         }
       }
 
-      if (anyDeviceHadInput || knownDeviceIds.length > 0) {
+      // Only rebuild the cursor manager/React state when devices are added/removed
+      // or visibility changes. Positions/hover/expanded are read via refs in the
+      // canvas rAF loop and do not need React re-renders.
+      if (managerNeedsUpdate || knownDeviceIds.length !== manager.cursors.filter(c => c.deviceId.startsWith(instancePrefix)).length) {
         updateManager();
       }
 

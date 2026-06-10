@@ -72,6 +72,35 @@ import {
   detectDesktopApp,
 } from "../services/streaming.service";
 import {
+  initRcloneManager,
+  listRemotes,
+  addRemote,
+  updateRemote,
+  removeRemote,
+  getRemoteFileList,
+  startServe,
+  stopServe,
+  getServePort,
+  getAllServePorts,
+  checkRemoteNeedsAuth,
+  testRemoteConnection,
+  testRemoteCredentials,
+  testRemotePath,
+} from "../services/rclone-manager";
+import {
+  queueRemoteSourceScan,
+  scanAllRemoteSources,
+} from "../services/remote-scan.service";
+import { discoverNetworkDevices } from "../services/network-discovery";
+import { startOAuthFlow } from "../services/oauth-webview";
+import {
+  setMasterPassword,
+  clearMasterPassword,
+  hasMasterPassword,
+  needsMasterPassword,
+  needsSessionReauth,
+} from "../services/credential-store.service";
+import {
   Game,
   Movie,
   MusicTrack,
@@ -193,6 +222,16 @@ function sendToWindow(win: BrowserWindow, channel: string, ...args: any[]) {
 }
 
 export function registerIpcHandlers(window: BrowserWindow): void {
+  const sendRemoteProgress = (progress: {
+    scanner: string;
+    current: number;
+    total: number;
+    status: "scanning" | "done" | "error";
+    message?: string;
+  }) => {
+    sendToWindow(window, "scan:progress", progress);
+  };
+
   ipcMain.handle("devtools:is-open", () => {
     return window.webContents.isDevToolsOpened();
   });
@@ -235,7 +274,10 @@ export function registerIpcHandlers(window: BrowserWindow): void {
   });
 
   ipcMain.handle("games:scan", async (_e, extraPaths?: string[]) => {
-    return performGameScan(window, extraPaths);
+    const result = await performGameScan(window, extraPaths);
+    // Also scan remote sources configured for ROMs
+    void scanAllRemoteSources("rom", sendRemoteProgress);
+    return result;
   });
 
   ipcMain.handle("games:list", async () => {
@@ -687,6 +729,8 @@ export function registerIpcHandlers(window: BrowserWindow): void {
         tags,
         rating,
         hidden,
+        sourceLocation,
+        remoteSourceId,
       } = movie as any;
       const clean = {
         id,
@@ -706,6 +750,8 @@ export function registerIpcHandlers(window: BrowserWindow): void {
         tags,
         rating,
         hidden,
+        sourceLocation,
+        remoteSourceId,
       };
       const defined: any = {};
       for (const [k, v] of Object.entries(clean)) {
@@ -714,6 +760,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
       if (defined.isFavorite === undefined) defined.isFavorite = false;
       if (defined.tags === undefined) defined.tags = [];
       if (defined.hidden === undefined) defined.hidden = false;
+      if (defined.sourceLocation === undefined) defined.sourceLocation = "local";
       // Preserve existing playback progress and lastPlayed
       const existing = await db.query<[{ watchProgress?: number; lastPlayed?: number }[]]>(
         `SELECT watchProgress, lastPlayed FROM movie:⟨${defined.id}⟩`,
@@ -741,6 +788,8 @@ export function registerIpcHandlers(window: BrowserWindow): void {
       total: movies.length,
       status: "done",
     });
+    // Also scan remote sources configured for movies
+    void scanAllRemoteSources("movie", sendRemoteProgress);
     return movies;
   });
 
@@ -847,20 +896,22 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     const tracks = await scanMusicFiles(extraPaths).finally(() => {
       scanLocks.music = false;
     });
-    log.info("music:scan", `inserting ${tracks.length} tracks into DB...`);
+    log.debug("music:scan", `inserting ${tracks.length} tracks into DB...`);
     for (let i = 0; i < tracks.length; i++) {
       const track = tracks[i];
       if (i % 100 === 0)
-        log.info("music:scan", `db insert ${i + 1}/${tracks.length}`);
+        log.debug("music:scan", `db insert ${i + 1}/${tracks.length}`);
       await MusicRepo.upsert(track);
     }
-    log.info("music:scan", "DB insert done");
+    log.debug("music:scan", "DB insert done");
     sendToWindow(window, "scan:progress", {
       scanner: "music",
       current: tracks.length,
       total: tracks.length,
       status: "done",
     });
+    // Also scan remote sources configured for music
+    void scanAllRemoteSources("music", sendRemoteProgress);
     return tracks;
   });
 
@@ -1528,5 +1579,105 @@ export function registerIpcHandlers(window: BrowserWindow): void {
       }
       item.setSavePath(join(itchDir, filename));
     }
+  });
+
+  /* ------------------------------------------------------------------ */
+  /*  Remote Sources (rclone)                                            */
+  /* ------------------------------------------------------------------ */
+
+  ipcMain.handle("rclone:list", async () => {
+    return listRemotes();
+  });
+
+  ipcMain.handle("rclone:add", async (_e, source: Omit<import("../../shared/types").RemoteSource, "id">, creds: Record<string, string | undefined>) => {
+    const added = await addRemote(source, creds);
+    // Queue media scan for the newly added source
+    queueRemoteSourceScan(added, sendRemoteProgress);
+    return added;
+  });
+
+  ipcMain.handle("rclone:update", async (_e, source: import("../../shared/types").RemoteSource, creds?: Record<string, string | undefined>) => {
+    return updateRemote(source, creds);
+  });
+
+  ipcMain.handle("rclone:remove", async (_e, id: string) => {
+    return removeRemote(id);
+  });
+
+  ipcMain.handle("rclone:listFiles", async (_e, source: import("../../shared/types").RemoteSource, path: string) => {
+    return getRemoteFileList(source, path);
+  });
+
+  ipcMain.handle("rclone:startServe", async (_e, source: import("../../shared/types").RemoteSource) => {
+    return startServe(source);
+  });
+
+  ipcMain.handle("rclone:stopServe", async (_e, id: string) => {
+    return stopServe(id);
+  });
+
+  ipcMain.handle("rclone:getServePort", async (_e, id: string) => {
+    return await getServePort(id);
+  });
+
+  ipcMain.handle("rclone:getAllServePorts", async () => {
+    const ports = await getAllServePorts();
+    return Object.fromEntries(ports);
+  });
+
+  ipcMain.handle("rclone:checkAuth", async (_e, source: import("../../shared/types").RemoteSource) => {
+    return checkRemoteNeedsAuth(source);
+  });
+
+  ipcMain.handle("rclone:testConnection", async (_e, source: import("../../shared/types").RemoteSource) => {
+    return testRemoteConnection(source);
+  });
+
+  ipcMain.handle("rclone:testCredentials", async (_e, source: import("../../shared/types").RemoteSource) => {
+    return testRemoteCredentials(source);
+  });
+
+  ipcMain.handle("rclone:testPath", async (_e, source: import("../../shared/types").RemoteSource) => {
+    return testRemotePath(source);
+  });
+
+  /* ------------------------------------------------------------------ */
+  /*  Network Discovery                                                  */
+  /* ------------------------------------------------------------------ */
+
+  ipcMain.handle("network:discover", async () => {
+    return discoverNetworkDevices();
+  });
+
+  /* ------------------------------------------------------------------ */
+  /*  OAuth (internal webview)                                          */
+  /* ------------------------------------------------------------------ */
+
+  ipcMain.handle("oauth:start", async (_e, authUrl: string, redirectPatterns: string[]) => {
+    return startOAuthFlow(authUrl, redirectPatterns);
+  });
+
+  /* ------------------------------------------------------------------ */
+  /*  Credential Store                                                   */
+  /* ------------------------------------------------------------------ */
+
+  ipcMain.handle("credentials:setMasterPassword", async (_e, password: string) => {
+    return setMasterPassword(password);
+  });
+
+  ipcMain.handle("credentials:clearMasterPassword", async () => {
+    return clearMasterPassword();
+  });
+
+  ipcMain.handle("credentials:hasMasterPassword", async () => {
+    return hasMasterPassword();
+  });
+
+  ipcMain.handle("credentials:needsMasterPassword", async (_e, sources: import("../../shared/types").RemoteSource[]) => {
+    return needsMasterPassword(sources);
+  });
+
+  ipcMain.handle("credentials:needsSessionReauth", async (_e, sources: import("../../shared/types").RemoteSource[]) => {
+    return needsSessionReauth(sources);
   });
 }

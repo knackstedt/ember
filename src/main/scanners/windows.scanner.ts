@@ -3,6 +3,7 @@ import { join, extname, basename, dirname } from "path";
 import { homedir } from "os";
 import { createHash } from "crypto";
 import { Game, WineRunner } from "../../shared/types";
+import { resolveSourceLocation } from "../../shared/path-utils";
 import { createLogger } from "../util/logger";
 import { detectWineRunner } from "../services/wine-detection.service";
 
@@ -98,7 +99,7 @@ export function scanWindowsGames(): Game[] {
       const title = titleFromFilename(basename(fullPath));
       const isUnity = isUnityGame(fullPath);
       const id = hashId("win", fullPath);
-      log.info("windows", `found ${title} → ${id} unity: ${isUnity} path: ${fullPath}`);
+      log.debug("windows", `found ${title} → ${id} unity: ${isUnity} path: ${fullPath}`);
 
       games.push({
         id,
@@ -107,6 +108,7 @@ export function scanWindowsGames(): Game[] {
         romPath: fullPath,
         // execPath is set at launch time once the preferred runner is resolved
         tags: isUnity ? ["unity"] : [],
+        sourceLocation: resolveSourceLocation(fullPath),
       });
     });
   }

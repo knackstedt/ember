@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { MusicTrack } from "../../../shared/types";
+import { resolveMediaUrl } from "../../../shared/path-utils";
 
 export interface MusicPlayerStore {
   queue: MusicTrack[];
@@ -30,7 +31,8 @@ export interface MusicPlayerStore {
 const audio = new Audio();
 
 function loadAndPlay(track: MusicTrack, autoplay: boolean): void {
-  audio.src = `ember://media/${encodeURIComponent(track.filePath)}`;
+  const url = resolveMediaUrl(track.filePath);
+  audio.src = url ? encodeURIComponent(url) : "";
   audio.load();
   if (autoplay) void audio.play();
 }

@@ -26,6 +26,7 @@ function normalizeGame(game: Game): Record<string, unknown> {
   if (n.rating === undefined) n.rating = 0;
   if (n.lastPlayed === undefined) n.lastPlayed = 0;
   if (n.hidden === undefined) n.hidden = false;
+  if (n.sourceLocation === undefined) n.sourceLocation = "local";
   delete n.metadataFetched;
   return n;
 }

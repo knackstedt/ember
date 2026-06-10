@@ -3,6 +3,7 @@ import { join, extname, basename } from "path";
 import { homedir } from "os";
 import { createHash } from "crypto";
 import { Game, GamePlatform } from "../../shared/types";
+import { resolveSourceLocation } from "../../shared/path-utils";
 import { createLogger } from "../util/logger";
 
 const log = createLogger("info");
@@ -144,6 +145,7 @@ export function scanDolphinGames(extraPaths: string[] = []): Game[] {
         romPath: fullPath,
         execPath: `dolphin-emu --exec="${fullPath}"`,
         tags: [],
+        sourceLocation: resolveSourceLocation(fullPath),
       });
     });
   }

@@ -3,6 +3,7 @@ import { join, extname, basename } from "path";
 import { homedir } from "os";
 import { createHash } from "crypto";
 import { Game } from "../../shared/types";
+import { resolveSourceLocation } from "../../shared/path-utils";
 import { createLogger } from "../util/logger";
 
 const log = createLogger("info");
@@ -158,6 +159,7 @@ export function scanFlashGames(): Game[] {
         execPath: `ruffle "${fullPath}"`,
         description: swfMeta.description,
         tags: [],
+        sourceLocation: resolveSourceLocation(fullPath),
       });
     });
   }

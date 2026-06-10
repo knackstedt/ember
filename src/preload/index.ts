@@ -463,6 +463,12 @@ const htpc = {
     return () => ipcRenderer.removeListener("app:save-state", handler);
   },
 
+  onSessionHookError: (cb: (detail: { gameTitle: string; timing: string; reason: string }) => void) => {
+    const handler = (_: Electron.IpcRendererEvent, detail: { gameTitle: string; timing: string; reason: string }) => cb(detail);
+    ipcRenderer.on("session-hook:error", handler);
+    return () => ipcRenderer.removeListener("session-hook:error", handler);
+  },
+
   devtools: {
     isOpen: (): Promise<boolean> => ipcRenderer.invoke("devtools:is-open"),
     onChange: (cb: (open: boolean) => void) => {
@@ -470,6 +476,58 @@ const htpc = {
       ipcRenderer.on("devtools:changed", handler);
       return () => ipcRenderer.removeListener("devtools:changed", handler);
     },
+  },
+
+  rclone: {
+    list: (): Promise<import("../shared/types").RemoteSource[]> =>
+      ipcRenderer.invoke("rclone:list"),
+    add: (source: Omit<import("../shared/types").RemoteSource, "id">, creds: Record<string, string | undefined>): Promise<import("../shared/types").RemoteSource> =>
+      ipcRenderer.invoke("rclone:add", source, creds),
+    update: (source: import("../shared/types").RemoteSource, creds?: Record<string, string | undefined>): Promise<void> =>
+      ipcRenderer.invoke("rclone:update", source, creds),
+    remove: (id: string): Promise<void> =>
+      ipcRenderer.invoke("rclone:remove", id),
+    listFiles: (source: import("../shared/types").RemoteSource, path: string): Promise<{ name: string; isDir: boolean; size?: number; modTime?: string }[]> =>
+      ipcRenderer.invoke("rclone:listFiles", source, path),
+    startServe: (source: import("../shared/types").RemoteSource): Promise<number | null> =>
+      ipcRenderer.invoke("rclone:startServe", source),
+    stopServe: (id: string): Promise<void> =>
+      ipcRenderer.invoke("rclone:stopServe", id),
+    getServePort: (id: string): Promise<number | undefined> =>
+      ipcRenderer.invoke("rclone:getServePort", id),
+    getAllServePorts: (): Promise<Record<string, number>> =>
+      ipcRenderer.invoke("rclone:getAllServePorts"),
+    checkAuth: (source: import("../shared/types").RemoteSource): Promise<boolean> =>
+      ipcRenderer.invoke("rclone:checkAuth", source),
+    testConnection: (source: import("../shared/types").RemoteSource): Promise<import("../main/services/rclone-manager").RemoteTestResult> =>
+      ipcRenderer.invoke("rclone:testConnection", source),
+    testCredentials: (source: import("../shared/types").RemoteSource): Promise<import("../main/services/rclone-manager").RemoteTestResult> =>
+      ipcRenderer.invoke("rclone:testCredentials", source),
+    testPath: (source: import("../shared/types").RemoteSource): Promise<import("../main/services/rclone-manager").RemoteTestResult> =>
+      ipcRenderer.invoke("rclone:testPath", source),
+  },
+
+  network: {
+    discover: (): Promise<import("../main/services/network-discovery").DiscoveredDevice[]> =>
+      ipcRenderer.invoke("network:discover"),
+  },
+
+  oauth: {
+    start: (authUrl: string, redirectPatterns: string[]): Promise<import("../main/services/oauth-webview").OAuthResult> =>
+      ipcRenderer.invoke("oauth:start", authUrl, redirectPatterns),
+  },
+
+  credentials: {
+    setMasterPassword: (password: string): Promise<void> =>
+      ipcRenderer.invoke("credentials:setMasterPassword", password),
+    clearMasterPassword: (): Promise<void> =>
+      ipcRenderer.invoke("credentials:clearMasterPassword"),
+    hasMasterPassword: (): Promise<boolean> =>
+      ipcRenderer.invoke("credentials:hasMasterPassword"),
+    needsMasterPassword: (sources: import("../shared/types").RemoteSource[]): Promise<boolean> =>
+      ipcRenderer.invoke("credentials:needsMasterPassword", sources),
+    needsSessionReauth: (sources: import("../shared/types").RemoteSource[]): Promise<import("../shared/types").RemoteSource[]> =>
+      ipcRenderer.invoke("credentials:needsSessionReauth", sources),
   },
 };
 

@@ -125,6 +125,10 @@ if (isDev) {
 let mainWindow: BrowserWindow | null = null;
 let libretroWindow: BrowserWindow | null = null;
 
+export function getMainWindow(): BrowserWindow | null {
+  return mainWindow;
+}
+
 export function getLibretroWindow(): BrowserWindow | null {
   return libretroWindow;
 }
@@ -330,6 +334,94 @@ app.whenReady().then(async () => {
 
   protocol.handle("ember", async (request) => {
     const url = new URL(request.url);
+
+    // Remote source proxy: ember://remote/<sourceId>/<path...>
+    if (url.hostname === "remote") {
+      const segments = url.pathname.split("/").filter(Boolean).map(decodeURIComponent);
+      const sourceId = segments[0];
+      const remotePath = segments.slice(1).join("/");
+      if (!sourceId) {
+        return new Response("Bad Request", { status: 400 });
+      }
+
+      const { getServePort } = await import("./services/rclone-manager");
+      const { RemoteSourceRepo } = await import("./db/repository");
+      const port = await getServePort(sourceId);
+      if (!port) {
+        log.error("ember:protocol", `no serve available for ${sourceId}`);
+        return new Response("Remote source not serving", { status: 503 });
+      }
+
+      // Look up the source's remotePath so we can strip it from the URL.
+      // rclone serve is rooted at source.remotePath, so the HTTP path
+      // must be relative to that root.
+      let proxyPath = remotePath;
+      try {
+        const sources = await RemoteSourceRepo.list();
+        const source = sources.find((s) => s.id === sourceId);
+        const basePath = (source?.remotePath || "/").replace(/^\//, ""); // e.g. "TV"
+        if (basePath && proxyPath.toLowerCase().startsWith(basePath.toLowerCase() + "/")) {
+          proxyPath = proxyPath.slice(basePath.length + 1); // strip "TV/"
+        } else if (basePath && proxyPath.toLowerCase() === basePath.toLowerCase()) {
+          proxyPath = "";
+        }
+      } catch (err) {
+        log.warn("ember:protocol", `failed to look up source ${sourceId}: ${err}`);
+      }
+
+      const proxyUrl = `http://localhost:${port}/${proxyPath.split("/").map(encodeURIComponent).join("/")}`;
+      log.info("ember:protocol", `proxy ${request.url} -> ${proxyUrl} (method=${request.method})`);
+      try {
+        // Forward range requests and other headers for video streaming
+        const headers = new Headers();
+        const forwarded: string[] = [];
+        for (const [key, value] of request.headers.entries()) {
+          headers.set(key, value);
+          forwarded.push(`${key}: ${value}`);
+        }
+        log.debug("ember:protocol", `forwarding headers: ${forwarded.join(", ")}`);
+        const response = await fetch(proxyUrl, {
+          method: request.method,
+          headers,
+          signal: AbortSignal.timeout(30000),
+        });
+        const respHeaders = new Headers(response.headers);
+        const respHeaderLog: string[] = [];
+        response.headers.forEach((v, k) => respHeaderLog.push(`${k}: ${v}`));
+        log.info("ember:protocol", `response ${response.status} for ${proxyUrl}, headers=[${respHeaderLog.join(", ")}]`);
+        if (!response.ok) {
+          log.warn("ember:protocol", `proxy returned ${response.status} for ${proxyUrl}`);
+        }
+        // Ensure video files have a proper Content-Type so the browser demuxer works
+        const contentType = respHeaders.get("content-type");
+        const ext = proxyPath.split("/").pop()?.toLowerCase();
+        const FALLBACK_TYPES: Record<string, string> = {
+          ".mkv": "video/x-matroska",
+          ".mp4": "video/mp4",
+          ".m4v": "video/mp4",
+          ".webm": "video/webm",
+          ".avi": "video/x-msvideo",
+          ".mov": "video/quicktime",
+          ".wmv": "video/x-ms-wmv",
+          ".ts": "video/mp2t",
+          ".m2ts": "video/mp2t",
+        };
+        if (!contentType || contentType.includes("text/plain") || contentType.includes("application/octet-stream")) {
+          if (ext && FALLBACK_TYPES[ext]) {
+            log.info("ember:protocol", `overriding Content-Type ${contentType} -> ${FALLBACK_TYPES[ext]} for ${ext}`);
+            respHeaders.set("content-type", FALLBACK_TYPES[ext]);
+          }
+        }
+        return new Response(response.body, {
+          status: response.status,
+          statusText: response.statusText,
+          headers: respHeaders,
+        });
+      } catch (err) {
+        log.error("ember:protocol", `proxy fetch failed for ${proxyUrl}: ${err}`);
+        return new Response("Remote unavailable", { status: 504 });
+      }
+    }
 
     let filePath: string;
     if (url.hostname === "media") {

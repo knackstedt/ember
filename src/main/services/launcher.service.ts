@@ -204,9 +204,10 @@ export async function launchGame(game: Game): Promise<void> {
       });
       steamProc.unref();
 
-      // Update lastPlayed for the recently-played list, but do not start
-      // interval-based playtime tracking — the dispatcher process exits
-      // immediately and we have no way to know when the actual game closes.
+      // Steam dispatcher exits immediately; we cannot track lifetime.
+      // Fire after-start immediately and document that after-close/after-crash
+      // are not supported for steam:// launches.
+      void runSessionHooks(game, "after-start");
       GameRepo.setLastPlayed(game.id, Date.now()).catch((err) => {
         log.warn("launcher", `Failed to set lastPlayed for ${game.id}: ${err}`);
       });
@@ -337,6 +338,7 @@ export async function launchGame(game: Game): Promise<void> {
 
     proc.on("spawn", () => {
       spawnOk = true;
+      startPlayTimeTracking(game.id);
       setTimeout(() => {
         if (settled) return;
         settled = true;
@@ -369,26 +371,24 @@ export async function launchGame(game: Game): Promise<void> {
         reject(new Error(reason));
       }
     });
-
-    // Start playtime tracking once the process spawns successfully
-    proc.on("spawn", () => {
-      startPlayTimeTracking(game.id);
-    });
   });
 }
 
 export function startPlayTimeTracking(gameId: string): void {
   stopPlayTimeTracking(gameId);
   const startTime = Date.now();
+  let lastReported = 0;
   // Immediately update lastPlayed so the recently-played list reflects the launch
   GameRepo.setLastPlayed(gameId, startTime).catch((err) => {
     log.warn("launcher", `Failed to set lastPlayed for ${gameId}: ${err}`);
   });
   const timer = setInterval(async () => {
     const elapsed = Math.floor((Date.now() - startTime) / 1000);
-    if (elapsed > 0) {
+    const delta = elapsed - lastReported;
+    if (delta > 0) {
+      lastReported = elapsed;
       try {
-        await GameRepo.addPlayTime(gameId, elapsed);
+        await GameRepo.addPlayTime(gameId, delta);
         await GameRepo.setLastPlayed(gameId, Date.now());
       } catch (err) {
         log.warn("launcher", `Failed to update playtime for ${gameId}: ${err}`);

@@ -5,6 +5,7 @@ interface GamesState {
   games: Game[];
   loading: boolean;
   scanning: boolean;
+  remoteScanning: boolean;
   activeFilter: GamePlatform | "all" | "couch-coop" | "favorites";
   searchQuery: string;
   regeneratingIds: Set<string>;
@@ -40,6 +41,7 @@ export const useGamesStore = create<GamesState>((set, get) => ({
   games: [],
   loading: false,
   scanning: false,
+  remoteScanning: false,
   activeFilter: "all",
   searchQuery: "",
   regeneratingIds: new Set(),

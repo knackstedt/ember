@@ -31,6 +31,7 @@ import {
   Loader,
   Sparkles,
   X,
+  Globe,
 } from "lucide-react";
 import { useCollectionsStore, evaluateSmartFilter, sortByCollection } from "../../store/collections.store";
 import { CollectionsBar } from "../../components/CollectionsBar/CollectionsBar";
@@ -38,6 +39,7 @@ import { CollectionManager } from "../../components/CollectionManager/Collection
 import { useToastStore } from "../../store/toast.store";
 import { AiGroup } from "../../../../shared/types";
 import { DynamicFacetFilters, FacetField } from "../../components/DynamicFacetFilters/DynamicFacetFilters";
+import { getSourceBadge } from "../../lib/source-badge";
 
 const LazyMusicCard: React.FC<{
   track: MusicTrack;
@@ -49,6 +51,7 @@ const LazyMusicCard: React.FC<{
   const loadThumbnail = useMusicStore((s) => s.loadThumbnail);
   const cachedUrl = useCoverCacheStore((s) => s.urls[track.id]);
   const coverUrl = track.albumArtUrl ?? cachedUrl;
+  const source = getSourceBadge(track.sourceLocation);
 
   useEffect(() => {
     if (!coverUrl) {
@@ -63,6 +66,8 @@ const LazyMusicCard: React.FC<{
       title={track.title}
       subtitle={track.artist ?? track.album}
       coverUrl={coverUrl}
+      badge={source.badge}
+      badgeColor={source.badgeColor}
       aspectRatio="1/1"
       isFavorite={track.isFavorite}
       isFocused={index === focusedIndex}
@@ -85,6 +90,7 @@ export const MusicTab: React.FC = () => {
   const tracks = useMusicStore((s) => s.tracks);
   const loading = useMusicStore((s) => s.loading);
   const scanning = useMusicStore((s) => s.scanning);
+  const remoteScanning = useMusicStore((s) => s.remoteScanning);
   const searchQuery = useMusicStore((s) => s.searchQuery);
   const activeArtist = useMusicStore((s) => s.activeArtist);
   const activeAlbum = useMusicStore((s) => s.activeAlbum);
@@ -663,6 +669,20 @@ export const MusicTab: React.FC = () => {
               >
                 {scanning ? <><Loader size={14} className="animate-spin" /> Scanning…</> : <><RotateCw size={14} /> Scan</>}
               </motion.button>
+              <motion.button
+                className="px-3 py-1.5 rounded-[var(--radius-card)] text-xs font-medium flex items-center gap-1"
+                style={{
+                  background: "var(--color-surface-raised)",
+                  color: "var(--color-text)",
+                  border: "1px solid var(--color-border)",
+                }}
+                onClick={() => {
+                  window.dispatchEvent(new CustomEvent("htpc:switch-tab", { detail: { tab: "settings" } }));
+                }}
+                whileTap={{ scale: 0.96 }}
+              >
+                <Globe size={14} /> Remote
+              </motion.button>
             </>
           )}
           {/* Active tab chip */}
@@ -986,7 +1006,7 @@ export const MusicTab: React.FC = () => {
               >
                 Loading music…
               </div>
-            ) : scanning && trackItems.length === 0 && groupItems.length === 0 ? (
+            ) : (scanning || remoteScanning) && trackItems.length === 0 && groupItems.length === 0 ? (
               <div
                 className="flex flex-col items-center justify-center gap-3"
                 style={{ color: "var(--color-text-dim)", minHeight: 200 }}
@@ -1096,6 +1116,9 @@ export const MusicTab: React.FC = () => {
                       label: "Duration",
                       value: `${Math.floor(selected.duration / 60)}:${String(Math.round(selected.duration % 60)).padStart(2, "0")}`,
                     }
+                  : null,
+                selected.sourceLocation
+                  ? { label: "Source", value: getSourceBadge(selected.sourceLocation).badge ?? selected.sourceLocation }
                   : null,
               ].filter(Boolean) as { label: string; value: string }[])
             : []

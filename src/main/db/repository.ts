@@ -12,6 +12,7 @@ import {
   SmartFilterGroup,
   StreamingService,
   SessionHook,
+  RemoteSource,
 } from "../../shared/types";
 
 export function escapeId(id: string): string {
@@ -65,6 +66,7 @@ export const GameRepo = {
     if (normalized.rating === undefined) normalized.rating = 0;
     if (normalized.lastPlayed === undefined) normalized.lastPlayed = 0;
     if (normalized.hidden === undefined) normalized.hidden = false;
+    if (normalized.sourceLocation === undefined) normalized.sourceLocation = "local";
     await db.query(`UPSERT game:⟨${escapeId(game.id)}⟩ CONTENT $game`, { game: normalized });
   },
 
@@ -126,24 +128,34 @@ export const GameRepo = {
     },
   ): Promise<void> {
     const db = getDb();
-    const updates: string[] = [];
+    const params: Record<string, unknown> = {};
+    const sets: string[] = [];
+    let idx = 0;
+    const add = (field: string, value: unknown) => {
+      const key = `p${idx++}`;
+      params[key] = value;
+      sets.push(`${field} = $${key}`);
+    };
     if (config.launchCommand !== undefined) {
-      updates.push(`launchCommand = ${config.launchCommand === null ? "NONE" : JSON.stringify(config.launchCommand)}`);
+      add("launchCommand", config.launchCommand);
     }
     if (config.launchArgs !== undefined) {
-      updates.push(`launchArgs = ${config.launchArgs === null ? "NONE" : JSON.stringify(config.launchArgs)}`);
+      add("launchArgs", config.launchArgs);
     }
     if (config.launchWorkingDir !== undefined) {
-      updates.push(`launchWorkingDir = ${config.launchWorkingDir === null ? "NONE" : JSON.stringify(config.launchWorkingDir)}`);
+      add("launchWorkingDir", config.launchWorkingDir);
     }
     if (config.launchEnv !== undefined) {
-      updates.push(`launchEnv = ${config.launchEnv === null ? "NONE" : JSON.stringify(config.launchEnv)}`);
+      add("launchEnv", config.launchEnv);
     }
     if (config.sessionHooks !== undefined) {
-      updates.push(`sessionHooks = ${config.sessionHooks === null ? "NONE" : JSON.stringify(config.sessionHooks)}`);
+      add("sessionHooks", config.sessionHooks);
     }
-    if (updates.length > 0) {
-      await db.query(`UPDATE game:⟨${escapeId(id)}⟩ SET ${updates.join(", ")}`);
+    if (sets.length > 0) {
+      await db.query(
+        `UPDATE game:⟨${escapeId(id)}⟩ SET ${sets.join(", ")}`,
+        params,
+      );
     }
   },
 };
@@ -169,6 +181,7 @@ export const MovieRepo = {
     if (normalized.isFavorite === undefined) normalized.isFavorite = false;
     if (normalized.tags === undefined) normalized.tags = [];
     if (normalized.hidden === undefined) normalized.hidden = false;
+    if (normalized.sourceLocation === undefined) normalized.sourceLocation = "local";
     await db.query(`UPSERT movie:⟨${escapeId(movie.id)}⟩ CONTENT $movie`, { movie: normalized });
   },
 
@@ -224,6 +237,7 @@ export const MusicRepo = {
     if (normalized.isFavorite === undefined) normalized.isFavorite = false;
     if (normalized.tags === undefined) normalized.tags = [];
     if (normalized.hidden === undefined) normalized.hidden = false;
+    if (normalized.sourceLocation === undefined) normalized.sourceLocation = "local";
     await db.query(`UPSERT music_track:⟨${escapeId(track.id)}⟩ CONTENT $track`, { track: normalized });
   },
 
@@ -269,6 +283,7 @@ export const TVRepo = {
     if (normalized.isFavorite === undefined) normalized.isFavorite = false;
     if (normalized.tags === undefined) normalized.tags = [];
     if (normalized.hidden === undefined) normalized.hidden = false;
+    if (normalized.sourceLocation === undefined) normalized.sourceLocation = "local";
     await db.query(`UPSERT tv_show:⟨${escapeId(show.id)}⟩ CONTENT $show`, { show: normalized });
   },
 
@@ -579,6 +594,47 @@ export const StreamingServiceRepo = {
     const db = getDb();
     await db.query(
       `UPDATE streaming_service:⟨${escapeId(id)}⟩ SET enabled = $value`,
+      { value },
+    );
+  },
+};
+
+/* ------------------------------------------------------------------ */
+/*  Remote Source Repository                                           */
+/* ------------------------------------------------------------------ */
+
+export const RemoteSourceRepo = {
+  async list(): Promise<RemoteSource[]> {
+    const db = getDb();
+    const result = await db.query<[RemoteSource[]]>(
+      "SELECT * FROM remote_source ORDER BY name ASC",
+    );
+    const sources = (result[0] ?? []) as RemoteSource[];
+    return sources.map((s) => ({
+      ...s,
+      id: typeof s.id === "string" ? s.id : ((s.id as any)?.id ?? String(s.id)),
+    }));
+  },
+
+  async upsert(source: RemoteSource): Promise<void> {
+    const db = getDb();
+    const normalized: Record<string, unknown> = { ...source };
+    if (normalized.enabled === undefined) normalized.enabled = true;
+    await db.query(
+      `UPSERT remote_source:⟨${escapeId(source.id)}⟩ CONTENT $source`,
+      { source: normalized },
+    );
+  },
+
+  async delete(id: string): Promise<void> {
+    const db = getDb();
+    await db.query(`DELETE remote_source:⟨${escapeId(id)}⟩`);
+  },
+
+  async setEnabled(id: string, value: boolean): Promise<void> {
+    const db = getDb();
+    await db.query(
+      `UPDATE remote_source:⟨${escapeId(id)}⟩ SET enabled = $value`,
       { value },
     );
   },

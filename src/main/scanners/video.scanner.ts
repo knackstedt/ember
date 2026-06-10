@@ -6,6 +6,7 @@ import { promisify } from "util";
 import { app } from "electron";
 import { getXdgVideosDir } from "./xdg";
 import { Movie, TVShow, TVSeason, TVEpisode } from "../../shared/types";
+import { resolveSourceLocation } from "../../shared/path-utils";
 import { createLogger } from "../util/logger";
 
 const log = createLogger("info");
@@ -94,6 +95,33 @@ async function probVideo(filePath: string): Promise<{
   }
 }
 
+function isConnectionError(err: unknown): boolean {
+  const msg = String(err);
+  return msg.includes("Connection refused") || msg.includes("ECONNREFUSED");
+}
+
+function summarizeExecError(err: unknown): string {
+  const stderr = (err as any)?.stderr;
+  const msg = typeof stderr === "string" && stderr.trim()
+    ? stderr
+    : String(err);
+  const lines = msg.split(/\r?\n/);
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i].trim();
+    if (
+      line &&
+      !line.startsWith("built with") &&
+      !line.startsWith("configuration:") &&
+      !line.startsWith("  --") &&
+      !line.startsWith("lib") &&
+      !line.startsWith("WARNING:")
+    ) {
+      return line;
+    }
+  }
+  return msg.slice(0, 200);
+}
+
 async function extractEmbeddedVideoCover(
   filePath: string,
   dest: string,
@@ -124,9 +152,12 @@ async function extractEmbeddedVideoCover(
     }
     return false;
   } catch (err) {
+    if (isConnectionError(err)) {
+      throw err; // Let caller retry with restarted serve
+    }
     log.error(
       "video.scanner",
-      `extractEmbeddedVideoCover failed for ${filePath}: ${err}`,
+      `extractEmbeddedVideoCover failed: ${summarizeExecError(err)}`,
     );
     return false;
   }
@@ -159,9 +190,12 @@ async function generateFrameThumbnail(
     }
     return false;
   } catch (err) {
+    if (isConnectionError(err)) {
+      throw err; // Let caller retry with restarted serve
+    }
     log.error(
       "video.scanner",
-      `generateFrameThumbnail failed for ${filePath}: ${err}`,
+      `generateFrameThumbnail failed: ${summarizeExecError(err)}`,
     );
     return false;
   }
@@ -172,6 +206,7 @@ export async function generateMovieThumbnail(
   id: string,
   duration?: number,
 ): Promise<string | undefined> {
+  log.debug("video.scanner", `generateMovieThumbnail filePath=${filePath}`);
   const dest = join(movieThumbCache, `${id}.jpg`);
   if (existsSync(dest)) {
     try {
@@ -290,6 +325,7 @@ export async function scanMovieFiles(
         codec: probe?.codec,
         tags: [],
         hidden: false,
+        sourceLocation: resolveSourceLocation(filePath),
       });
     } catch (err) {
       log.error(
@@ -356,7 +392,7 @@ export async function scanTvShows(
     const id = createHash("md5").update(dirPath).digest("hex").slice(0, 16);
     const coverUrl = await generateShowThumbnail(dirPath, episodes, id);
 
-    shows.push({ id, title, dirPath, seasons, coverUrl, tags: [] });
+    shows.push({ id, title, dirPath, seasons, coverUrl, tags: [], sourceLocation: resolveSourceLocation(dirPath) });
   }
 
   return shows;

@@ -4,6 +4,7 @@ import { createHash } from "crypto";
 import { loadMusicMetadata } from "music-metadata";
 import { getXdgMusicDir } from "./xdg";
 import { MusicTrack } from "../../shared/types";
+import { resolveSourceLocation } from "../../shared/path-utils";
 import { createLogger } from "../util/logger";
 
 const log = createLogger("info");
@@ -90,6 +91,7 @@ export async function scanMusicFiles(
         duration: meta.format.duration,
         tags: [],
         hidden: false,
+        sourceLocation: resolveSourceLocation(filePath),
       });
     } catch (err: any) {
       log.error(

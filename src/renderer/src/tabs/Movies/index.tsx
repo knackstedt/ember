@@ -11,6 +11,7 @@ import { DetailPanel } from "../../components/DetailPanel/DetailPanel";
 import { OskInput } from "../../components/OnScreenKeyboard/OnScreenKeyboard";
 import { RecentlyPlayedRow } from "../../components/RecentlyPlayedRow/RecentlyPlayedRow";
 import { Movie } from "../../../../shared/types";
+import { resolveMediaUrl } from "../../../../shared/path-utils";
 import { useVideoPlayerStore } from "../../store/videoPlayer.store";
 import { StreamingTile } from "../../components/StreamingTile/StreamingTile";
 import { StreamingService } from "../../../../shared/types";
@@ -30,6 +31,7 @@ import {
   Sparkles,
   Play,
   X,
+  Globe,
 } from "lucide-react";
 import { useCollectionsStore, evaluateSmartFilter, sortByCollection } from "../../store/collections.store";
 import { CollectionsBar } from "../../components/CollectionsBar/CollectionsBar";
@@ -37,6 +39,7 @@ import { CollectionManager } from "../../components/CollectionManager/Collection
 import { useToastStore } from "../../store/toast.store";
 import { AiGroup } from "../../../../shared/types";
 import { DynamicFacetFilters, FacetField } from "../../components/DynamicFacetFilters/DynamicFacetFilters";
+import { getSourceBadge } from "../../lib/source-badge";
 
 type SubTab = "local" | "streaming" | "ai-groups";
 
@@ -44,6 +47,7 @@ export const MoviesTab: React.FC = () => {
   const movies = useMoviesStore((s) => s.movies);
   const loading = useMoviesStore((s) => s.loading);
   const scanning = useMoviesStore((s) => s.scanning);
+  const remoteScanning = useMoviesStore((s) => s.remoteScanning);
   const searchQuery = useMoviesStore((s) => s.searchQuery);
   const activeGenre = useMoviesStore((s) => s.activeGenre);
   const load = useMoviesStore((s) => s.load);
@@ -312,23 +316,28 @@ export const MoviesTab: React.FC = () => {
   });
 
   const renderItem = useCallback(
-    (movie: Movie, index: number) => (
-      <div className="p-1.5 w-full h-full flex flex-col min-w-0" {...bindItem(movie, index)}>
-        <MediaCard
-          key={movie.id}
-          id={movie.id}
-          title={movie.title}
-          subtitle={movie.releaseYear ? String(movie.releaseYear) : undefined}
-          coverUrl={movie.coverUrl}
-          isFavorite={movie.isFavorite}
-          isFocused={index === focusedIndex}
-          isLoading={regeneratingIds.has(movie.id)}
-          progress={movie.watchProgress}
-          onSelect={() => { setFocusedIndex(index); setSelected(movie); }}
-          onFavorite={() => toggleFavorite(movie.id)}
-        />
-      </div>
-    ),
+    (movie: Movie, index: number) => {
+      const source = getSourceBadge(movie.sourceLocation);
+      return (
+        <div className="p-1.5 w-full h-full flex flex-col min-w-0" {...bindItem(movie, index)}>
+          <MediaCard
+            key={movie.id}
+            id={movie.id}
+            title={movie.title}
+            subtitle={movie.releaseYear ? String(movie.releaseYear) : undefined}
+            coverUrl={movie.coverUrl}
+            badge={source.badge}
+            badgeColor={source.badgeColor}
+            isFavorite={movie.isFavorite}
+            isFocused={index === focusedIndex}
+            isLoading={regeneratingIds.has(movie.id)}
+            progress={movie.watchProgress}
+            onSelect={() => { setFocusedIndex(index); setSelected(movie); }}
+            onFavorite={() => toggleFavorite(movie.id)}
+          />
+        </div>
+      );
+    },
     [bindItem, focusedIndex, setFocusedIndex, regeneratingIds, toggleFavorite],
   );
 
@@ -341,7 +350,7 @@ export const MoviesTab: React.FC = () => {
     enabled: !!selected,
     onConfirm: () => {
       if (selected?.filePath) {
-        openVideo(`ember://media/${selected.filePath}`, selected.title, selected.id, selected.watchProgress);
+        openVideo(resolveMediaUrl(selected.filePath)!, selected.title, selected.id, selected.watchProgress);
         setSelected(null);
       }
     },
@@ -365,7 +374,7 @@ export const MoviesTab: React.FC = () => {
                 const movie = movies.find((m) => m.id === id);
                 if (movie)
                   openVideo(
-                    `ember://media/${movie.filePath}`,
+                    resolveMediaUrl(movie.filePath)!,
                     movie.title,
                     movie.id,
                     movie.watchProgress,
@@ -409,6 +418,20 @@ export const MoviesTab: React.FC = () => {
                 disabled={scanning}
               >
                 {scanning ? <><Loader size={14} className="animate-spin" /> Scanning…</> : <><RotateCw size={14} /> Scan</>}
+              </motion.button>
+              <motion.button
+                className="px-3 py-1.5 rounded-[var(--radius-card)] text-xs font-medium flex items-center gap-1"
+                style={{
+                  background: "var(--color-surface-raised)",
+                  color: "var(--color-text)",
+                  border: "1px solid var(--color-border)",
+                }}
+                onClick={() => {
+                  window.dispatchEvent(new CustomEvent("htpc:switch-tab", { detail: { tab: "settings" } }));
+                }}
+                whileTap={{ scale: 0.96 }}
+              >
+                <Globe size={14} /> Remote
               </motion.button>
             </>
           )}
@@ -613,7 +636,7 @@ export const MoviesTab: React.FC = () => {
               >
                 Loading movies…
               </div>
-            ) : scanning && items.length === 0 ? (
+            ) : (scanning || remoteScanning) && items.length === 0 ? (
               <div
                 className="flex flex-col items-center justify-center gap-3"
                 style={{ color: "var(--color-text-dim)", minHeight: 200 }}
@@ -714,6 +737,9 @@ export const MoviesTab: React.FC = () => {
                 selected.codec
                   ? { label: "Codec", value: selected.codec }
                   : null,
+                selected.sourceLocation
+                  ? { label: "Source", value: getSourceBadge(selected.sourceLocation).badge ?? selected.sourceLocation }
+                  : null,
               ].filter(Boolean) as { label: string; value: string }[])
             : []
         }
@@ -732,7 +758,7 @@ export const MoviesTab: React.FC = () => {
                 }}
                 onClick={() => {
                   openVideo(
-                    `ember://media/${selected!.filePath}`,
+                    resolveMediaUrl(selected!.filePath)!,
                     selected!.title,
                     selected!.id,
                     selected!.watchProgress,

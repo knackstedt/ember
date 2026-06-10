@@ -9,6 +9,7 @@ import { MediaCard } from "../../components/MediaCard/MediaCard";
 import { DetailPanel } from "../../components/DetailPanel/DetailPanel";
 import { OskInput } from "../../components/OnScreenKeyboard/OnScreenKeyboard";
 import { TVShow } from "../../../../shared/types";
+import { resolveMediaUrl } from "../../../../shared/path-utils";
 import { useVideoPlayerStore } from "../../store/videoPlayer.store";
 import { useGridFocus } from "../../hooks/useGridFocus";
 import { useDetailController } from "../../hooks/useDetailController";
@@ -184,7 +185,7 @@ export const TVShowsTab: React.FC = () => {
       const ep = currentSeasonEpisodes[0];
       if (ep?.filePath) {
         openVideo(
-          `ember://media/${ep.filePath}`,
+          resolveMediaUrl(ep.filePath)!,
           ep.title ?? `Episode ${ep.episodeNumber}`,
         );
         setSelected(null);
@@ -697,7 +698,7 @@ export const TVShowsTab: React.FC = () => {
                     }}
                     onClick={() =>
                       openVideo(
-                        `ember://media/${ep.filePath}`,
+                        resolveMediaUrl(ep.filePath)!,
                         ep.title ?? `Episode ${ep.episodeNumber}`,
                       )
                     }

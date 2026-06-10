@@ -7,6 +7,7 @@ interface MoviesState {
   movies: Movie[];
   loading: boolean;
   scanning: boolean;
+  remoteScanning: boolean;
   searchQuery: string;
   activeGenre: string | null;
   activeYear: number | null;
@@ -30,6 +31,7 @@ export const useMoviesStore = create<MoviesState>((set, get) => ({
   movies: [],
   loading: false,
   scanning: false,
+  remoteScanning: false,
   searchQuery: "",
   activeGenre: null,
   activeYear: null,
@@ -151,6 +153,7 @@ interface MusicState {
   tracks: MusicTrack[];
   loading: boolean;
   scanning: boolean;
+  remoteScanning: boolean;
   searchQuery: string;
   activeArtist: string | null;
   activeAlbum: string | null;
@@ -180,6 +183,7 @@ export const useMusicStore = create<MusicState>((set, get) => ({
   tracks: [],
   loading: false,
   scanning: false,
+  remoteScanning: false,
   searchQuery: "",
   activeArtist: null,
   activeAlbum: null,

@@ -2,6 +2,7 @@ import { existsSync, readdirSync, readFileSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 import { Game, GamePlatform } from "../../shared/types";
+import { resolveSourceLocation } from "../../shared/path-utils";
 import { createLogger } from "../util/logger";
 
 const log = createLogger("info");
@@ -97,6 +98,7 @@ function parseLibrary(
         developer: g.developer,
         description: g.extra?.about?.longDescription,
         tags: [],
+        sourceLocation: resolveSourceLocation(g.install?.executable),
       }));
   } catch {
     log.error("parseLibrary", `Failed to parse Heroic library: ${path}`);
