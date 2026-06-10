@@ -209,9 +209,9 @@ export const LibretroPlayer: React.FC = () => {
           gl.activeTexture(gl.TEXTURE0);
           gl.bindTexture(gl.TEXTURE_2D, textureRef.current);
 
-          const pixelData = new Uint8Array(frame.data);
+          // Worker sends frame data as base64 to survive IPC serialization.
+          const pixelData = Uint8Array.from(atob(frame.data as unknown as string), (c) => c.charCodeAt(0));
 
-          // getFrame always returns RGBA data
           gl.texImage2D(
             gl.TEXTURE_2D,
             0,

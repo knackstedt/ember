@@ -3,7 +3,7 @@ import { readFileSync, rmSync, mkdirSync, readdirSync, existsSync } from "fs";
 import { BrowserWindow, ipcMain, app, dialog, shell, session } from "electron";
 import { spawn, ChildProcess } from "child_process";
 import { homedir } from "os";
-import { createLibretroWindow } from "..";
+import { getMainWindow } from "..";
 import {
   getSettings,
   setSettings,
@@ -175,27 +175,99 @@ function ensureLibretroWorker(): ChildProcess {
     }
   });
 
+  const NOISY_PATTERNS = [
+    /^PU region/i,
+    /^PU: region/i,
+    /^unknown ARM9 IO write32/i,
+    /^remapping (DTCM|SWRAM)/i,
+    /^SET DATAPERM/i,
+    /^done resetting jit mem/i,
+    /^\s*\d{8}\/\d{8}\s*$/, // standalone permission hex lines like "00000000/00000000"
+    /^\s*\d{8}\/\d{8}\s+\S+$/, // lines with hex data trailing
+  ];
+
+  function shouldLogWorkerLine(line: string): boolean {
+    const trimmed = line.trim();
+    if (!trimmed) return false;
+    return !NOISY_PATTERNS.some((p) => p.test(trimmed));
+  }
+
   worker.stdout!.on("data", (chunk: Buffer) => {
-    log.info("libretro-worker", chunk.toString("utf8").trim());
+    const lines = chunk.toString("utf8").split("\n");
+    for (const line of lines) {
+      if (shouldLogWorkerLine(line)) {
+        log.info("libretro-worker", line.trim());
+      }
+    }
   });
 
   worker.stderr!.on("data", (chunk: Buffer) => {
-    log.info("libretro-worker", chunk.toString("utf8").trim());
+    const lines = chunk.toString("utf8").split("\n");
+    for (const line of lines) {
+      if (shouldLogWorkerLine(line)) {
+        log.info("libretro-worker", line.trim());
+      }
+    }
   });
 
   worker.on("exit", (code: number | null, signal: NodeJS.Signals | null) => {
     log.warn("libretro", `Worker exited code=${code} signal=${signal}`);
-    if (libretroWorker === worker) {
+    const isCurrent = libretroWorker === worker;
+    if (isCurrent) {
       libretroWorker = null;
+      // Only clear pending requests for the currently-tracked worker.
+      // If this worker was intentionally killed (e.g. after unloadAll),
+      // workerPending was already cleared and a new worker may have
+      // started its own requests — we must not touch those.
+      for (const pending of workerPending.values()) {
+        pending.reject(new Error("Libretro worker crashed"));
+      }
+      workerPending.clear();
     }
-    for (const pending of workerPending.values()) {
-      pending.reject(new Error("Libretro worker crashed"));
-    }
-    workerPending.clear();
   });
 
   libretroWorker = worker;
   return worker;
+}
+
+async function destroyWorker(): Promise<void> {
+  if (!libretroWorker) return;
+  const dyingWorker = libretroWorker;
+  libretroWorker = null;
+  workerPending.clear();
+  workerReqId = 0;
+
+  return new Promise((resolve) => {
+    let resolved = false;
+    const done = () => {
+      if (resolved) return;
+      resolved = true;
+      resolve();
+    };
+
+    dyingWorker.once("exit", done);
+
+    // First try graceful disconnect (triggers worker's process.exit(0)).
+    try {
+      dyingWorker.disconnect();
+    } catch {
+      // Already disconnected.
+    }
+
+    // If the worker hasn't exited within 500 ms, force-kill it.
+    // SIGKILL bypasses all signal handlers and JIT state; the kernel
+    // reaps the process immediately.  This is the only reliable way to
+    // terminate a dynarec core that may have corrupted its own mappings.
+    setTimeout(() => {
+      if (resolved) return;
+      try {
+        dyingWorker.kill("SIGKILL");
+      } catch {
+        // Already dead.
+      }
+      done();
+    }, 500);
+  });
 }
 
 function workerCall(method: string, ...args: any[]): Promise<any> {
@@ -296,7 +368,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     shader?: string;
     corePath?: string;
   }) => {
-    createLibretroWindow(opts);
+    sendToWindow(window, "libretro:open", opts);
     return true;
   });
 
@@ -305,6 +377,13 @@ export function registerIpcHandlers(window: BrowserWindow): void {
       const result = await workerCall(method, ...args);
       if (!["getFrameBuffer", "getFrame", "setInputState", "setAnalogState"].includes(method)) {
         log.info("libretro", `worker.${method}() -> ${JSON.stringify(result).slice(0, 200)}`);
+      }
+      // Dynarec cores (melonDS, etc.) leak JIT pages and callback state across
+      // sessions.  Re-using the same child process eventually segfaults.
+      // Destroy the worker after unloadAll so every game gets a fresh process.
+      if (method === "unloadAll" && libretroWorker) {
+        log.info("libretro", "Destroying worker after unloadAll");
+        await destroyWorker();
       }
       return result;
     } catch (err: any) {

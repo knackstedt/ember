@@ -118,37 +118,7 @@ function useVisibleTabs(settings: AppSettings | null) {
   return TABS.filter((t) => !disabled.has(t.id));
 }
 
-const isLibretroWindow = new URLSearchParams(window.location.search).has("libretro");
-
-function LibretroWindow(): React.ReactElement {
-  const launch = useLibretroPlayerStore((s) => s.launch);
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const romPath = params.get("romPath");
-    const title = params.get("title") ?? "";
-    const platform = params.get("platform") ?? "";
-    const gameId = params.get("gameId") ?? "";
-    const shader = params.get("shader") ?? undefined;
-    const corePath = params.get("corePath") ?? undefined;
-
-    if (romPath) {
-      void launch({ romPath, title, platform: platform as any, gameId, shader, corePath });
-    }
-  }, [launch]);
-
-  return (
-    <div className="flex items-center justify-center h-screen w-screen bg-black">
-      <LibretroPlayer />
-    </div>
-  );
-}
-
 export default function App(): React.ReactElement {
-  if (isLibretroWindow) {
-    return <LibretroWindow />;
-  }
-
   const settings = useSettingsStore((s) => s.settings);
   const loading = useSettingsStore((s) => s.loading);
   const load = useSettingsStore((s) => s.load);
@@ -341,7 +311,11 @@ export default function App(): React.ReactElement {
       });
     });
 
-    return () => { unsubScan(); unsubCores(); unsubHook(); };
+    const unsubLibretro = window.htpc.libretro.onOpen((opts) => {
+      useLibretroPlayerStore.getState().launch(opts);
+    });
+
+    return () => { unsubScan(); unsubCores(); unsubHook(); unsubLibretro(); };
   }, []);
 
   useEffect(() => {

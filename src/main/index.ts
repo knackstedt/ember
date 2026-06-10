@@ -3,7 +3,7 @@ import path, { join } from "path";
 import { readFileSync, createReadStream, statSync, lstatSync, readlinkSync, unlinkSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { initDb } from "./db";
 import { registerIpcHandlers } from "./ipc";
-import { initInputSystem, destroyInputSystem, setLibretroWindowGetter } from "./input/evdev";
+import { initInputSystem, destroyInputSystem } from "./input/evdev";
 import { getSettings } from "./services/settings.service";
 import { getWindowState, saveWindowState } from "./services/window-state.service";
 import { createLogger } from "./util/logger";
@@ -123,85 +123,9 @@ if (isDev) {
 }
 
 let mainWindow: BrowserWindow | null = null;
-let libretroWindow: BrowserWindow | null = null;
 
 export function getMainWindow(): BrowserWindow | null {
   return mainWindow;
-}
-
-export function getLibretroWindow(): BrowserWindow | null {
-  return libretroWindow;
-}
-
-export function createLibretroWindow(opts: {
-  romPath: string;
-  title: string;
-  platform: string;
-  gameId: string;
-  shader?: string;
-  corePath?: string;
-}): BrowserWindow {
-  if (libretroWindow && !libretroWindow.isDestroyed()) {
-    libretroWindow.close();
-  }
-
-  libretroWindow = new BrowserWindow({
-    width: 1280,
-    height: 720,
-    show: false,
-    backgroundColor: "#000000",
-    fullscreen: true,
-    autoHideMenuBar: true,
-    webPreferences: {
-      preload: join(__dirname, "../preload/index.js"),
-      sandbox: false,
-      contextIsolation: true,
-      nodeIntegration: false,
-      devTools: true,
-    },
-  });
-
-  const query = new URLSearchParams();
-  query.set("libretro", "1");
-  query.set("romPath", opts.romPath);
-  query.set("title", opts.title);
-  query.set("platform", opts.platform);
-  query.set("gameId", opts.gameId);
-  if (opts.shader) query.set("shader", opts.shader);
-  if (opts.corePath) query.set("corePath", opts.corePath);
-
-  const loadUrl = isDev && process.env["ELECTRON_RENDERER_URL"]
-    ? `${process.env["ELECTRON_RENDERER_URL"]}?${query.toString()}`
-    : join(__dirname, "../renderer/index.html");
-
-  if (isDev && process.env["ELECTRON_RENDERER_URL"]) {
-    libretroWindow.loadURL(loadUrl);
-  } else {
-    libretroWindow.loadFile(loadUrl, { query: Object.fromEntries(query) });
-  }
-
-  libretroWindow.once("ready-to-show", () => {
-    libretroWindow?.show();
-    libretroWindow?.focus();
-  });
-
-  setLibretroWindowGetter(() => libretroWindow);
-
-  libretroWindow.on("closed", () => {
-    setLibretroWindowGetter(null);
-    libretroWindow = null;
-  });
-
-  libretroWindow.webContents.on("render-process-gone", (_event, details) => {
-    log.error("libretro", `render-process-gone: ${details.reason} (exitCode=${details.exitCode})`);
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send("libretro:crashed", { exitCode: details.exitCode, reason: details.reason });
-    }
-    setLibretroWindowGetter(null);
-    libretroWindow = null;
-  });
-
-  return libretroWindow;
 }
 
 async function createWindow(): Promise<void> {

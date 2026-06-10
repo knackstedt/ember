@@ -340,6 +340,25 @@ const htpc = {
       shader?: string;
       corePath?: string;
     }): Promise<boolean> => ipcRenderer.invoke("libretro:launch", opts),
+    onOpen: (cb: (opts: {
+      romPath: string;
+      title: string;
+      platform: string;
+      gameId: string;
+      shader?: string;
+      corePath?: string;
+    }) => void) => {
+      const handler = (_: Electron.IpcRendererEvent, payload: {
+        romPath: string;
+        title: string;
+        platform: string;
+        gameId: string;
+        shader?: string;
+        corePath?: string;
+      }) => cb(payload);
+      ipcRenderer.on("libretro:open", handler);
+      return () => ipcRenderer.removeListener("libretro:open", handler);
+    },
     onCoreListChanged: (cb: () => void) => {
       const handler = () => {
         libretroApi.invalidateCoreCache();

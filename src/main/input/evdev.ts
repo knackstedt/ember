@@ -29,23 +29,6 @@ const INPUT_DIR = "/dev/input";
 let watcher: ReturnType<typeof setInterval> | null = null;
 const activeDevices = new Map<string, { device: unknown; close: () => void }>();
 
-// When a libretro window is open, input events should go there instead of the main window.
-let getLibretroWindowRef: (() => BrowserWindow | null) | null = null;
-
-export function setLibretroWindowGetter(getter: (() => BrowserWindow | null) | null): void {
-  getLibretroWindowRef = getter;
-}
-
-function getInputTargetWindow(): BrowserWindow | null {
-  if (getLibretroWindowRef) {
-    const win = getLibretroWindowRef();
-    if (win && !win.isDestroyed()) {
-      return win;
-    }
-  }
-  return null;
-}
-
 const ABS_AXIS_MAP: Record<number, string> = {
   0: "left_x",
   1: "left_y",
@@ -200,10 +183,8 @@ async function openDevice(
     buttonCount: 16,
   };
 
-  const libretroWindow = getInputTargetWindow();
-  const targetWindow = libretroWindow ?? window;
-  if (!targetWindow.isDestroyed() && !targetWindow.webContents.isDestroyed()) {
-    targetWindow.webContents.send("input:device-connected", deviceInfo);
+  if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
+    window.webContents.send("input:device-connected", deviceInfo);
   }
 
   // Pure Node.js binary reader — struct input_event is 24 bytes on 64-bit Linux
@@ -260,12 +241,7 @@ async function openDevice(
         }
 
         if (inputEvent) {
-          const libretroWindow = getInputTargetWindow();
-          if (libretroWindow) {
-            if (!libretroWindow.isDestroyed() && !libretroWindow.webContents.isDestroyed()) {
-              libretroWindow.webContents.send("input:event", inputEvent);
-            }
-          } else if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
+          if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
             window.webContents.send("input:event", inputEvent);
           }
         }
@@ -276,10 +252,8 @@ async function openDevice(
     stream.on("error", (err) => {
       log.warn("evdev", `Error reading ${eventPath} (${info.name}): ${err}`);
       activeDevices.delete(eventPath);
-      const libretroWindow = getInputTargetWindow();
-      const targetWindow = libretroWindow ?? window;
-      if (!targetWindow.isDestroyed() && !targetWindow.webContents.isDestroyed()) {
-        targetWindow.webContents.send("input:device-disconnected", deviceId);
+      if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
+        window.webContents.send("input:device-disconnected", deviceId);
       }
     });
 

@@ -65,11 +65,14 @@ process.on("message", (req: any) => {
       case "getFrame": {
         const frame = Frontend.getFrame(args[0]);
         if (frame && frame.data) {
-          const src = new Uint8Array(frame.data);
+          // napi-rs returns Vec<u8> as a Node.js Buffer.  Structured clone of
+          // TypedArrays across child_process IPC is unreliable (frames arrive
+          // truncated), so encode as base64 for a single string copy.
+          const buf = Buffer.from(frame.data);
           result = {
             width: frame.width,
             height: frame.height,
-            data: Array.from(src),
+            data: buf.toString("base64"),
           };
         } else {
           result = frame;
@@ -79,13 +82,13 @@ process.on("message", (req: any) => {
       case "getFrameBuffer": {
         const frame = Frontend.getFrameBuffer(args[0]);
         if (frame && frame.data) {
-          const src = new Uint8Array(frame.data);
+          const buf = Buffer.from(frame.data);
           result = {
             width: frame.width,
             height: frame.height,
             pitch: frame.pitch,
             format: frame.format,
-            data: Array.from(src),
+            data: buf.toString("base64"),
           };
         } else {
           result = frame;
@@ -112,11 +115,13 @@ process.on("message", (req: any) => {
 });
 
 process.on("disconnect", () => {
-  Frontend.unloadAll();
+  // Parent already called unloadAll(); just exit cleanly.
+  // Calling Frontend.unloadAll() from a disconnect handler can segfault
+  // because dynarec cores may have signal handlers / JIT pages in an
+  // inconsistent state.  Exiting directly is the safest teardown.
   process.exit(0);
 });
 
 process.on("SIGTERM", () => {
-  Frontend.unloadAll();
   process.exit(0);
 });

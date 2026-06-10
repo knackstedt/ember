@@ -97,10 +97,9 @@ export const useLibretroPlayerStore = create<LibretroPlayerState>((set, get) => 
         return;
       }
 
-      // Unload any existing core first
-      if (state.coreId !== null) {
-        await window.htpc.libretro.unload(state.coreId);
-      }
+      // Unload any existing core first.
+      // unloadAll() stops runners, unloads cores, and clears the vector.
+      // Do NOT call unload(coreId) before it — that would double-deinit.
       await window.htpc.libretro.unloadAll();
 
       const coreInfo = await window.htpc.libretro.loadCore(corePath);
@@ -131,10 +130,15 @@ export const useLibretroPlayerStore = create<LibretroPlayerState>((set, get) => 
 
   async close() {
     const state = get();
+    // Hide the player immediately so the render loop stops and we don't
+    // hammer the worker with getFrame() calls while it's being torn down.
+    set({ open: false, isRunning: false });
+
     if (state.coreId !== null) {
       try {
-        await window.htpc.libretro.stop(state.coreId);
-        await window.htpc.libretro.unload(state.coreId);
+        // unloadAll() stops runners, unloads cores, and clears the vector.
+        // Do NOT call stop() or unload() before it — that would double-deinit.
+        await window.htpc.libretro.unloadAll();
       } catch (err) {
         console.error("[libretro] close error:", err);
       }
@@ -143,7 +147,6 @@ export const useLibretroPlayerStore = create<LibretroPlayerState>((set, get) => 
       window.htpc.games.playTime.stop(state.gameId).catch(() => {});
     }
     set({
-      open: false,
       romPath: "",
       title: "",
       platform: "unknown",
@@ -152,7 +155,6 @@ export const useLibretroPlayerStore = create<LibretroPlayerState>((set, get) => 
       coreId: null,
       detectedCore: null,
       avInfo: null,
-      isRunning: false,
       isLoading: false,
       error: null,
     });

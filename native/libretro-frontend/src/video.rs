@@ -188,6 +188,7 @@ pub struct VideoState {
     pub pixel_format: std::sync::Arc<std::sync::atomic::AtomicU32>,
     pub av_info: std::sync::Arc<std::sync::Mutex<Option<crate::ffi::RetroSystemAvInfo>>>,
     pub double_buffer: std::sync::Arc<DoubleBuffer>,
+    pub shared_buffer: std::sync::Arc<std::sync::Mutex<Option<crate::shared_buffer::SharedFrameBuffer>>>,
 }
 
 impl VideoState {
@@ -197,11 +198,19 @@ impl VideoState {
             pixel_format: std::sync::Arc::new(std::sync::atomic::AtomicU32::new(crate::ffi::RETRO_PIXEL_FORMAT_XRGB8888)),
             av_info: std::sync::Arc::new(std::sync::Mutex::new(None)),
             double_buffer: std::sync::Arc::new(DoubleBuffer::new()),
+            shared_buffer: std::sync::Arc::new(std::sync::Mutex::new(None)),
         }
+    }
+
+    pub fn set_shared_buffer(&self, sab: crate::shared_buffer::SharedFrameBuffer) {
+        *self.shared_buffer.lock().unwrap() = Some(sab);
     }
 
     pub fn set_frame(&self, frame: VideoFrame) {
         self.double_buffer.publish_frame(&frame);
+        if let Some(ref sab) = *self.shared_buffer.lock().unwrap() {
+            sab.publish_frame(frame.width, frame.height, frame.pitch, frame.format, &frame.data);
+        }
         *self.current_frame.lock().unwrap() = Some(frame);
     }
 

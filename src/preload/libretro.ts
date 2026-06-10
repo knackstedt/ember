@@ -252,10 +252,10 @@ export const libretroApi = {
   unloadAll: (): Promise<boolean> =>
     ipcRenderer.invoke("libretro:addon", "unloadAll"),
 
-  getFrame: (coreId: number): Promise<{ width: number; height: number; data: Uint8Array } | null> =>
+  getFrame: (coreId: number): Promise<{ width: number; height: number; data: string } | null> =>
     ipcRenderer.invoke("libretro:addon", "getFrame", coreId),
 
-  getFrameBuffer: (coreId: number): Promise<{ width: number; height: number; pitch: number; format: number; data: ArrayBuffer } | null> =>
+  getFrameBuffer: (coreId: number): Promise<{ width: number; height: number; pitch: number; format: number; data: string } | null> =>
     ipcRenderer.invoke("libretro:addon", "getFrameBuffer", coreId),
 
   getAvInfo: (coreId: number): Promise<{ fps: number; sampleRate: number; baseWidth: number; baseHeight: number; maxWidth: number; maxHeight: number; aspectRatio: number } | null> =>

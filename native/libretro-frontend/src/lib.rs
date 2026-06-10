@@ -3,11 +3,14 @@ mod buffer;
 mod core;
 mod ffi;
 mod input;
+mod shared_buffer;
 mod thread;
 mod video;
 
 use core::CoreInstance;
 use napi::bindgen_prelude::*;
+use napi::JsArrayBuffer;
+use napi::NapiRaw;
 use napi_derive::napi;
 use parking_lot::Mutex;
 use std::sync::Arc;
@@ -265,6 +268,40 @@ impl LibretroFrontend {
             handle.core.lock().unload();
         }
         cores.clear();
+        Ok(true)
+    }
+
+    /// Attach a SharedArrayBuffer to a core for zero-copy frame delivery.
+    /// The buffer must follow the SharedFrameBuffer ABI (see shared_buffer.rs).
+    #[napi]
+    pub fn attach_shared_buffer(&self, core_id: i32, buffer: JsArrayBuffer, env: Env) -> Result<bool> {
+        let cores = self.cores.lock();
+        let handle = cores
+            .get(core_id as usize)
+            .ok_or_else(|| Error::new(Status::InvalidArg, "Invalid core ID"))?;
+
+        let mut data_ptr: *mut std::ffi::c_void = std::ptr::null_mut();
+        let mut data_len: usize = 0;
+        let status = unsafe {
+            napi::sys::napi_get_arraybuffer_info(
+                env.raw(),
+                buffer.raw(),
+                &mut data_ptr,
+                &mut data_len,
+            )
+        };
+        if status != napi::Status::Ok as i32 {
+            return Err(Error::new(Status::GenericFailure, "Failed to get ArrayBuffer info"));
+        }
+
+        let sab = unsafe { shared_buffer::SharedFrameBuffer::from_raw(data_ptr as *mut u8, data_len) };
+        sab.init(
+            shared_buffer::DEFAULT_MAX_WIDTH,
+            shared_buffer::DEFAULT_MAX_HEIGHT,
+            shared_buffer::DEFAULT_SLOT_COUNT as u32,
+        );
+
+        handle.core.lock().video.set_shared_buffer(sab);
         Ok(true)
     }
 }
