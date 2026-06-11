@@ -202,8 +202,28 @@ export const VideoPlayer: React.FC = () => {
       window.removeEventListener("beforeunload", onBeforeUnload);
       removeSaveStateListener?.();
       if (progressSaveTimer.current) clearInterval(progressSaveTimer.current);
+      // Stop and fully release the media element so that if the next video
+      // uses the native decoder (useNative = true) the HTML5 pipeline doesn't
+      // keep running in the background — producing a second audio track and
+      // holding Chromium media buffers in memory.
+      v.pause();
+      v.removeAttribute("src");
+      v.load();
     };
   }, [src, movieId, updateMovieProgress, useNative]);
+
+  // When switching to native decoder mode make sure the HTML5 <video> element
+  // is fully stopped, even if the standard-video cleanup hasn't run yet
+  // (e.g. src went from a non-native file directly to a native file in a
+  // single store update without going through null).
+  useEffect(() => {
+    if (!useNative) return;
+    const v = videoRef.current;
+    if (!v) return;
+    v.pause();
+    v.removeAttribute("src");
+    v.load();
+  }, [useNative]);
 
   // Native video progress save (best-effort)
   useEffect(() => {
@@ -241,6 +261,9 @@ export const VideoPlayer: React.FC = () => {
   }, [src, movieId, updateMovieProgress, useNative, native.state.duration, native.state.currentTime]);
 
   const handleClose = useCallback(async () => {
+    if (useNative) {
+      native.controls.destroy();
+    }
     if (movieId) {
       let current = 0;
       let dur = 0;
@@ -266,7 +289,7 @@ export const VideoPlayer: React.FC = () => {
       }
     }
     close();
-  }, [movieId, close, updateMovieProgress, useNative, native.state.currentTime, native.state.duration]);
+  }, [movieId, close, updateMovieProgress, useNative, native.state.currentTime, native.state.duration, native.controls]);
 
   useEffect(() => {
     if (!lastEvent || !src) return;
@@ -454,6 +477,7 @@ export const VideoPlayer: React.FC = () => {
       {useNative ? (
         <canvas
           ref={nativeCanvasRef}
+          id={native.canvasId}
           style={{ width: "100%", height: "100%", display: "block" }}
           onClick={togglePlay}
         />

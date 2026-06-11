@@ -23,13 +23,14 @@ import {
 } from "../shared/types";
 import { GameMetadata } from "../shared/metadata";
 import { libretroApi } from "./libretro";
+import { WebGLVideoRenderer } from "./webgl-renderer";
 
 // ---------------------------------------------------------------------------
 // Native video decoder — loaded in preload (Node.js context) and exposed
-// to renderer via contextBridge.  The decoder returns frame data as a
-// plain Uint8Array (one copy from Rust → JS) which can cross contextBridge.
-// SharedArrayBuffer cannot be serialized across contextBridge, so we do
-// not use zero-copy SAB for the renderer → WebGL path.
+// to renderer via contextBridge.  Uses a pre-allocated ArrayBuffer for
+// zero-copy frame delivery: Rust writes directly into it, JS creates
+// Uint8Array views into the same memory for WebGL texImage2D.
+// No per-frame allocations.
 // ---------------------------------------------------------------------------
 
 const arch = process.arch === "arm64" ? "arm64" : "x64";
@@ -77,9 +78,15 @@ function getVideoDecoderClass(): any {
 }
 
 const videoDecoders = new Map<string, any>();
+const videoBuffers = new Map<string, ArrayBuffer>();
+const videoRenderers = new Map<string, WebGLVideoRenderer>();
 
 const videoDecoderApi = {
   create(id: string): boolean {
+    if (videoDecoders.has(id)) {
+      console.warn("[VideoDecoder] create() called for existing id:", id);
+      this.destroy(id); // tear down the old one before creating fresh
+    }
     const DecoderClass = getVideoDecoderClass();
     const decoder = new DecoderClass();
     videoDecoders.set(id, decoder);
@@ -131,32 +138,60 @@ const videoDecoderApi = {
 
     throw new Error(lastError);
   },
-  decodeNextFrame(id: string): {
-    width: number;
-    height: number;
-    y: Uint8Array;
-    uv: Uint8Array;
-  } | null {
+  attachCanvas(id: string, canvasId: string): boolean {
+    const canvas = document.getElementById(canvasId) as HTMLCanvasElement | null;
+    if (!canvas) throw new Error(`Canvas #${canvasId} not found`);
+    const renderer = new WebGLVideoRenderer(canvas);
+    videoRenderers.set(id, renderer);
+    return true;
+  },
+  resizeCanvas(id: string, width: number, height: number): void {
+    const renderer = videoRenderers.get(id);
+    if (renderer) renderer.resize(width, height);
+  },
+  renderNextFrame(id: string): { width: number; height: number } | null {
     const decoder = videoDecoders.get(id);
     if (!decoder) throw new Error("Decoder not found");
-    const t0 = Date.now();
-    const frame = decoder.decodeNextFrame();
-    const t1 = Date.now();
-    if (!frame) return null;
-    console.log(`[VideoDecoder] decodeNextFrame took ${t1 - t0}ms | y type: ${(frame.y as any).constructor?.name || typeof frame.y} | y length: ${frame.y.length}`);
-    // NAPI-RS returns Vec<u8> as Node.js Buffer (a Uint8Array subclass).
-    // Return it directly — WebGL texImage2D accepts Buffer/Uint8Array.
-    return {
-      width: frame.width,
-      height: frame.height,
-      y: frame.y as Uint8Array,
-      uv: frame.uv as Uint8Array,
-    };
+    const renderer = videoRenderers.get(id);
+    if (!renderer) throw new Error("Renderer not attached — call attachCanvas first");
+
+    // Lazy zero-copy buffer setup
+    let buf = videoBuffers.get(id);
+    if (!buf) {
+      const meta = decoder.getMetadata();
+      const maxPixels = meta.width * meta.height;
+      const bufSize = Math.max(maxPixels + maxPixels / 2, 16_777_216);
+      buf = new ArrayBuffer(bufSize);
+      videoBuffers.set(id, buf);
+      decoder.attachSharedBuffer(buf);
+    }
+
+    const meta = decoder.decodeNextFrameSab();
+    if (!meta) return null;
+    const ySize = meta.width * meta.height;
+    const uvSize = ySize / 2;
+    renderer.render(
+      new Uint8Array(buf, 0, ySize),
+      new Uint8Array(buf, ySize, uvSize),
+      meta.width,
+      meta.height
+    );
+    return { width: meta.width, height: meta.height };
   },
   seek(id: string, timestampMs: number): void {
     const decoder = videoDecoders.get(id);
     if (!decoder) throw new Error("Decoder not found");
     decoder.seek(timestampMs);
+  },
+  pause(id: string): void {
+    const decoder = videoDecoders.get(id);
+    if (!decoder) throw new Error("Decoder not found");
+    decoder.pause();
+  },
+  resume(id: string): void {
+    const decoder = videoDecoders.get(id);
+    if (!decoder) throw new Error("Decoder not found");
+    decoder.resume();
   },
   getMetadata(id: string): {
     backend: string;
@@ -172,9 +207,16 @@ const videoDecoderApi = {
   destroy(id: string): void {
     const decoder = videoDecoders.get(id);
     if (decoder) {
+      try { decoder.pause(); } catch { /* ignore */ }
       try { decoder.close(); } catch { /* ignore */ }
       videoDecoders.delete(id);
     }
+    const renderer = videoRenderers.get(id);
+    if (renderer) {
+      try { renderer.destroy(); } catch { /* ignore */ }
+      videoRenderers.delete(id);
+    }
+    videoBuffers.delete(id);
   },
   resolveUrl(path: string): Promise<string> {
     return ipcRenderer.invoke("videoDecoder:resolveUrl", path);

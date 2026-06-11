@@ -4,6 +4,7 @@ mod shared_buffer;
 
 use decoder::VideoDecoderState;
 use napi::bindgen_prelude::*;
+use napi::{Env, JsArrayBuffer, NapiRaw};
 use napi_derive::napi;
 
 #[napi(object)]
@@ -59,10 +60,62 @@ impl VideoDecoder {
         }
     }
 
+    /// Attach a SharedArrayBuffer for zero-copy frame delivery.
+    /// The SAB must be large enough for the video (width*height*1.5 bytes).
+    #[napi]
+    pub fn attach_shared_buffer(&mut self, buffer: JsArrayBuffer, env: Env) -> Result<bool> {
+        let mut data_ptr: *mut std::ffi::c_void = std::ptr::null_mut();
+        let mut data_len: usize = 0;
+        let status = unsafe {
+            napi::sys::napi_get_arraybuffer_info(
+                env.raw(),
+                buffer.raw(),
+                &mut data_ptr,
+                &mut data_len,
+            )
+        };
+        if status != napi::Status::Ok as i32 {
+            return Err(Error::new(Status::GenericFailure, "Failed to get ArrayBuffer info"));
+        }
+        unsafe {
+            self.state.attach_shared_buffer(data_ptr as *mut u8, data_len);
+        }
+        Ok(true)
+    }
+
+    /// Decode the next frame into the attached SharedArrayBuffer.
+    /// Returns width/height metadata or None on EOS.
+    #[napi]
+    pub fn decode_next_frame_sab(&mut self) -> Result<Option<VideoMetadata>> {
+        match self.state.decode_next_frame_sab() {
+            Ok(Some((width, height))) => Ok(Some(VideoMetadata {
+                backend: String::new(),
+                width,
+                height,
+                duration_ms: 0,
+                frame_rate: 0.0,
+            })),
+            Ok(None) => Ok(None),
+            Err(e) => Err(Error::new(Status::GenericFailure, e)),
+        }
+    }
+
     /// Seek to the given timestamp in milliseconds.
     #[napi]
     pub fn seek(&mut self, timestamp_ms: i64) -> Result<()> {
         self.state.seek(timestamp_ms).map_err(|e| Error::new(Status::GenericFailure, e))
+    }
+
+    /// Pause playback (stops pipeline clock, keeps resources allocated).
+    #[napi]
+    pub fn pause(&mut self) -> Result<()> {
+        self.state.pause().map_err(|e| Error::new(Status::GenericFailure, e))
+    }
+
+    /// Resume playback.
+    #[napi]
+    pub fn resume(&mut self) -> Result<()> {
+        self.state.resume().map_err(|e| Error::new(Status::GenericFailure, e))
     }
 
     /// Get current video metadata.

@@ -1,5 +1,5 @@
 /**
- * WebGL renderer for NV12 frames.
+ * WebGL renderer for NV12 frames (preload version).
  *
  * Uploads Y and UV planes as two separate textures and performs
  * YUV→RGB conversion in the fragment shader.
@@ -19,13 +19,20 @@ precision mediump float;
 varying vec2 v_uv;
 uniform sampler2D u_y;
 uniform sampler2D u_uv;
+
+// BT.709 YUV->RGB
+vec3 yuv2rgb(float y, float u, float v) {
+  float r = y + 1.5748 * v;
+  float g = y - 0.1873 * u - 0.4681 * v;
+  float b = y + 1.8556 * u;
+  return vec3(r, g, b);
+}
+
 void main() {
   float y = texture2D(u_y, v_uv).r;
   vec2 uv = texture2D(u_uv, v_uv).ra - vec2(0.5, 0.5);
-  float r = y + 1.5748 * uv.g;
-  float g = y - 0.1873 * uv.r - 0.4681 * uv.g;
-  float b = y + 1.8556 * uv.r;
-  gl_FragColor = vec4(r, g, b, 1.0);
+  vec3 rgb = yuv2rgb(y, uv.r, uv.g);
+  gl_FragColor = vec4(clamp(rgb, 0.0, 1.0), 1.0);
 }
 `;
 
@@ -90,7 +97,6 @@ export class WebGLVideoRenderer {
     this.yLoc = gl.getUniformLocation(prog, "u_y");
     this.uvLoc = gl.getUniformLocation(prog, "u_uv");
 
-    // Fullscreen triangle strip quad
     this.buf = gl.createBuffer()!;
     gl.bindBuffer(gl.ARRAY_BUFFER, this.buf);
     gl.bufferData(
@@ -99,7 +105,6 @@ export class WebGLVideoRenderer {
       gl.STATIC_DRAW
     );
 
-    // Y texture (LUMINANCE = single-channel)
     this.texY = gl.createTexture()!;
     gl.bindTexture(gl.TEXTURE_2D, this.texY);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -107,7 +112,6 @@ export class WebGLVideoRenderer {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 
-    // UV texture (LUMINANCE_ALPHA = two-channel)
     this.texUV = gl.createTexture()!;
     gl.bindTexture(gl.TEXTURE_2D, this.texUV);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);

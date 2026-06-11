@@ -144,11 +144,100 @@ impl VideoDecoderBackend for FfmpegDecoder {
         }
     }
 
+    fn decode_frame_nv12_into(
+        &mut self,
+        y_buf: &mut [u8],
+        uv_buf: &mut [u8],
+    ) -> Result<Option<(u32, u32)>, String> {
+        let dst_width = self.native_width;
+        let dst_height = self.native_height;
+
+        if self.scaler.is_none() || self.scaler_dst_width != dst_width || self.scaler_dst_height != dst_height {
+            self.scaler = Some(
+                SendableScaler(
+                    ffmpeg_next::software::scaling::Context::get(
+                        self.decoder.format(),
+                        self.native_width,
+                        self.native_height,
+                        ffmpeg_next::format::Pixel::NV12,
+                        dst_width,
+                        dst_height,
+                        ffmpeg_next::software::scaling::Flags::FAST_BILINEAR,
+                    )
+                    .map_err(|e| format!("Scaler creation failed: {}", e))?
+                ),
+            );
+            self.scaler_dst_width = dst_width;
+            self.scaler_dst_height = dst_height;
+        }
+
+        let scaler = &mut self.scaler.as_mut().unwrap().0;
+
+        loop {
+            match self.input.packets().next() {
+                Some((stream, packet)) => {
+                    if stream.index() != self.stream_index {
+                        continue;
+                    }
+                    self.decoder.send_packet(&packet)
+                        .map_err(|e| format!("Send packet failed: {}", e))?;
+
+                    let mut frame = ffmpeg_next::frame::Video::empty();
+                    match self.decoder.receive_frame(&mut frame) {
+                        Ok(()) => {
+                            let mut nv12 = ffmpeg_next::frame::Video::empty();
+                            nv12.set_format(ffmpeg_next::format::Pixel::NV12);
+                            nv12.set_width(dst_width);
+                            nv12.set_height(dst_height);
+
+                            scaler.run(&frame, &mut nv12)
+                                .map_err(|e| format!("Scale failed: {}", e))?;
+
+                            let y_stride = nv12.stride(0);
+                            let uv_stride = nv12.stride(1);
+                            let y_data = nv12.data(0);
+                            let uv_data = nv12.data(1);
+
+                            let y_size = y_stride * dst_height as usize;
+                            let uv_size = uv_stride * dst_height as usize / 2;
+
+                            let y_src = &y_data[..y_size];
+                            let uv_src = &uv_data[..uv_size];
+
+                            if y_buf.len() < y_src.len() || uv_buf.len() < uv_src.len() {
+                                return Err("Output buffer too small".to_string());
+                            }
+
+                            y_buf[..y_src.len()].copy_from_slice(y_src);
+                            uv_buf[..uv_src.len()].copy_from_slice(uv_src);
+
+                            return Ok(Some((dst_width, dst_height)));
+                        }
+                        Err(ffmpeg_next::Error::Eof) => return Ok(None),
+                        Err(ffmpeg_next::Error::Other { errno }) if errno == 11 => {
+                            continue;
+                        }
+                        Err(e) => return Err(format!("Receive frame failed: {}", e)),
+                    }
+                }
+                None => return Ok(None),
+            }
+        }
+    }
+
     fn seek(&mut self, timestamp_ms: i64) -> Result<(), String> {
         let ts = timestamp_ms * 1000; // convert to FFmpeg time_base units (microseconds)
         self.input.seek(ts, ts..)
             .map_err(|e| format!("Seek failed: {}", e))?;
         self.scaler = None;
+        Ok(())
+    }
+
+    fn pause(&mut self) -> Result<(), String> {
+        Ok(())
+    }
+
+    fn resume(&mut self) -> Result<(), String> {
         Ok(())
     }
 

@@ -12,8 +12,23 @@ pub trait VideoDecoderBackend: Send {
     /// y_data is width*height bytes, uv_data is width*height/2 bytes (interleaved UV).
     fn decode_frame_nv12(&mut self) -> Result<Option<(Vec<u8>, Vec<u8>)>, String>;
 
+    /// Decode the next frame directly into pre-allocated Y and UV buffers.
+    /// Returns `(width, height)` on success, `None` on EOS.
+    /// Buffers must be large enough for the frame dimensions.
+    fn decode_frame_nv12_into(
+        &mut self,
+        y_buf: &mut [u8],
+        uv_buf: &mut [u8],
+    ) -> Result<Option<(u32, u32)>, String>;
+
     /// Seek to a timestamp (milliseconds).
     fn seek(&mut self, timestamp_ms: i64) -> Result<(), String>;
+
+    /// Pause playback (stop the pipeline clock but keep resources allocated).
+    fn pause(&mut self) -> Result<(), String>;
+
+    /// Resume playback.
+    fn resume(&mut self) -> Result<(), String>;
 
     /// Total duration in milliseconds, if known.
     fn duration_ms(&self) -> i64;
@@ -37,13 +52,25 @@ pub trait VideoDecoderBackend: Send {
 /// Wrapper that owns a backend and handles frame decoding.
 pub struct VideoDecoderState {
     pub backend: Option<Box<dyn VideoDecoderBackend>>,
+    sab_ptr: Option<*mut u8>,
+    sab_len: usize,
 }
 
 impl VideoDecoderState {
     pub fn new() -> Self {
         Self {
             backend: None,
+            sab_ptr: None,
+            sab_len: 0,
         }
+    }
+
+    /// Attach a SharedArrayBuffer for zero-copy frame delivery.
+    /// # Safety
+    /// `ptr` must remain valid for `len` bytes until detached or closed.
+    pub unsafe fn attach_shared_buffer(&mut self, ptr: *mut u8, len: usize) {
+        self.sab_ptr = Some(ptr);
+        self.sab_len = len;
     }
 
     pub fn open(&mut self, path: &str) -> Result<String, String> {
@@ -82,9 +109,39 @@ impl VideoDecoderState {
         }
     }
 
+    /// Decode the next frame into the attached SharedArrayBuffer.
+    /// Returns `(width, height)` on success, `None` on EOS.
+    /// Requires that `attach_shared_buffer` was called first.
+    pub fn decode_next_frame_sab(&mut self) -> Result<Option<(u32, u32)>, String> {
+        let backend = self.backend.as_mut().ok_or("Decoder not opened")?;
+        let ptr = self.sab_ptr.ok_or("No shared buffer attached")?;
+        let width = backend.video_width();
+        let height = backend.video_height();
+        let y_size = (width * height) as usize;
+        let uv_size = y_size / 2;
+        if y_size + uv_size > self.sab_len {
+            return Err(format!("SAB too small: need {}B have {}B", y_size + uv_size, self.sab_len));
+        }
+        unsafe {
+            let y_slice = std::slice::from_raw_parts_mut(ptr, y_size);
+            let uv_slice = std::slice::from_raw_parts_mut(ptr.add(y_size), uv_size);
+            backend.decode_frame_nv12_into(y_slice, uv_slice)
+        }
+    }
+
     pub fn seek(&mut self, timestamp_ms: i64) -> Result<(), String> {
         let backend = self.backend.as_mut().ok_or("Decoder not opened")?;
         backend.seek(timestamp_ms)
+    }
+
+    pub fn pause(&mut self) -> Result<(), String> {
+        let backend = self.backend.as_mut().ok_or("Decoder not opened")?;
+        backend.pause()
+    }
+
+    pub fn resume(&mut self) -> Result<(), String> {
+        let backend = self.backend.as_mut().ok_or("Decoder not opened")?;
+        backend.resume()
     }
 
     pub fn get_metadata(&self) -> VideoMetadata {
