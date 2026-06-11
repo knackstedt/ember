@@ -2,6 +2,7 @@ use crate::decoder::VideoDecoderBackend;
 use gstreamer as gst;
 use gstreamer_app as gst_app;
 use gstreamer::prelude::{Cast, ElementExt, ElementExtManual, GstBinExtManual, GstObjectExt, PadExt, PluginFeatureExtManual};
+use gstreamer_video as gst_video;
 
 pub struct GstreamerDecoder {
     pipeline: gst::Pipeline,
@@ -352,15 +353,36 @@ impl VideoDecoderBackend for GstreamerDecoder {
         let map = buffer.map_readable().map_err(|e| format!("Buffer map failed: {:?}", e))?;
         let data = map.as_slice();
 
-        let stride_y = s.get::<i32>("stride")
-            .ok()
-            .map(|v| v as usize)
-            .unwrap_or(width as usize);
-        let y_size = stride_y * height as usize;
-        let uv_size = stride_y * height as usize / 2;
+        // Use VideoInfo to get the real stride and plane offsets.  The caps
+        // "stride" field we tried before does not exist — it only lives in
+        // GstVideoMeta.  For hardware-decoded padded buffers, falling back to
+        // width silently corrupts the UV plane (reads trailing Y padding as UV).
+        let info = gst_video::VideoInfo::from_caps(&caps)
+            .map_err(|e| format!("Failed to parse video info from caps: {}", e))?;
+        let y_stride = info.stride()[0] as usize;
+        let uv_stride = info.stride()[1] as usize;
+        let y_offset = info.offset()[0] as usize;
+        let uv_offset = info.offset()[1] as usize;
+        let w = width as usize;
+        let h = height as usize;
 
-        let y = data[..y_size.min(data.len())].to_vec();
-        let uv = data[y_size..(y_size + uv_size).min(data.len())].to_vec();
+        if y_stride != w || uv_stride != w {
+            eprintln!(
+                "[GStreamer] padded buffer: stride_y={} stride_uv={} width={}",
+                y_stride, uv_stride, w
+            );
+        }
+
+        let mut y = Vec::with_capacity(w * h);
+        let mut uv = Vec::with_capacity(w * h / 2);
+        for row in 0..h {
+            let src_start = y_offset + row * y_stride;
+            y.extend_from_slice(&data[src_start..src_start + w]);
+        }
+        for row in 0..h / 2 {
+            let src_start = uv_offset + row * uv_stride;
+            uv.extend_from_slice(&data[src_start..src_start + w]);
+        }
 
         Ok(Some((y, uv)))
     }
@@ -420,22 +442,41 @@ impl VideoDecoderBackend for GstreamerDecoder {
         let map = buffer.map_readable().map_err(|e| format!("Buffer map failed: {:?}", e))?;
         let data = map.as_slice();
 
-        let stride_y = s.get::<i32>("stride")
-            .ok()
-            .map(|v| v as usize)
-            .unwrap_or(width as usize);
-        let y_size = stride_y * height as usize;
-        let uv_size = stride_y * height as usize / 2;
+        let info = gst_video::VideoInfo::from_caps(&caps)
+            .map_err(|e| format!("Failed to parse video info from caps: {}", e))?;
+        let y_stride = info.stride()[0] as usize;
+        let uv_stride = info.stride()[1] as usize;
+        let y_offset = info.offset()[0] as usize;
+        let uv_offset = info.offset()[1] as usize;
+        let w = width as usize;
+        let h = height as usize;
 
-        let y_src = &data[..y_size.min(data.len())];
-        let uv_src = &data[y_size..(y_size + uv_size).min(data.len())];
-
-        if y_buf.len() < y_src.len() || uv_buf.len() < uv_src.len() {
-            return Err("Output buffer too small".to_string());
+        if y_stride != w || uv_stride != w {
+            eprintln!(
+                "[GStreamer] padded buffer: stride_y={} stride_uv={} width={}",
+                y_stride, uv_stride, w
+            );
         }
 
-        y_buf[..y_src.len()].copy_from_slice(y_src);
-        uv_buf[..uv_src.len()].copy_from_slice(uv_src);
+        let y_tight = w * h;
+        let uv_tight = w * h / 2;
+        if y_buf.len() < y_tight || uv_buf.len() < uv_tight {
+            return Err(format!(
+                "Output buffer too small: need {}+{} have {}+{}",
+                y_tight, uv_tight, y_buf.len(), uv_buf.len()
+            ));
+        }
+
+        for row in 0..h {
+            let src_start = y_offset + row * y_stride;
+            let dst_start = row * w;
+            y_buf[dst_start..dst_start + w].copy_from_slice(&data[src_start..src_start + w]);
+        }
+        for row in 0..h / 2 {
+            let src_start = uv_offset + row * uv_stride;
+            let dst_start = row * w;
+            uv_buf[dst_start..dst_start + w].copy_from_slice(&data[src_start..src_start + w]);
+        }
 
         Ok(Some((width, height)))
     }

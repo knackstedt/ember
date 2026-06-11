@@ -140,6 +140,10 @@ function yuvMatrixFromColorimetry(colorimetry: string): {
   }
 
   console.log(`[WebGL] colorimetry="${colorimetry}" → matrix=${matrix}, limited=${limited}`);
+  // Log the actual values uploaded to the GPU so the user can verify them.
+  console.log(
+    `[WebGL] mat=[${Array.from(mat).map((v) => v.toFixed(4)).join(", ")}]  off=[${Array.from(off).map((v) => v.toFixed(4)).join(", ")}]`
+  );
 
   // --- build the 3×3 matrix ---
   // The GLSL mat3 is column-major: mat[col][row].
@@ -183,6 +187,10 @@ function yuvMatrixFromColorimetry(colorimetry: string): {
   return { mat, off };
 }
 
+// Build identifier — change this string whenever the shader changes so
+// the user can confirm in DevTools that the new bundle is loaded.
+const RENDERER_BUILD_ID = "webgl-2025-01-28-v2";
+
 export class WebGLVideoRenderer {
   private gl: WebGLRenderingContext;
   private program: WebGLProgram;
@@ -198,6 +206,7 @@ export class WebGLVideoRenderer {
   private canvas: HTMLCanvasElement;
 
   constructor(canvas: HTMLCanvasElement) {
+    console.log(`[WebGL] renderer init  build=${RENDERER_BUILD_ID}`);
     this.canvas = canvas;
     const gl = canvas.getContext("webgl", {
       alpha: false,
