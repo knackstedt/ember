@@ -14,6 +14,12 @@ pub struct VideoMetadata {
     pub height: u32,
     pub duration_ms: i64,
     pub frame_rate: f64,
+    /// Colorimetry string from caps (e.g. "bt709", "bt601", "2:4:5:1").
+    pub colorimetry: String,
+    /// Pixel aspect ratio numerator (1 for square pixels).
+    pub par_n: u32,
+    /// Pixel aspect ratio denominator (1 for square pixels).
+    pub par_d: u32,
 }
 
 #[napi(object)]
@@ -94,6 +100,9 @@ impl VideoDecoder {
                 height,
                 duration_ms: 0,
                 frame_rate: 0.0,
+                colorimetry: String::new(),
+                par_n: 1,
+                par_d: 1,
             })),
             Ok(None) => Ok(None),
             Err(e) => Err(Error::new(Status::GenericFailure, e)),
@@ -128,6 +137,9 @@ impl VideoDecoder {
             height: m.height,
             duration_ms: m.duration_ms,
             frame_rate: m.frame_rate,
+            colorimetry: m.colorimetry,
+            par_n: m.par_n,
+            par_d: m.par_d,
         })
     }
 

@@ -20,22 +20,16 @@ varying vec2 v_uv;
 uniform sampler2D u_y;
 uniform sampler2D u_uv;
 
-// BT.709 limited-range YCbCr -> RGB
-// Y in [16/255, 235/255]; Cb/Cr centred on 128/255 (range 16-240).
-// The 1.164 factor restores the full luma swing; coefficients match the
-// ITU-R BT.709 limited-range matrix.
-vec3 yuv2rgb(float y, float u, float v) {
-  float yy = 1.164 * (y - 16.0 / 255.0);
-  float r = yy + 1.793 * v;
-  float g = yy - 0.213 * u - 0.533 * v;
-  float b = yy + 2.112 * u;
-  return vec3(r, g, b);
-}
+// Column-major 3x3 matrix that converts (Y-yOff, Cb-cOff, Cr-cOff) -> RGB.
+// Computed in JS from the video's actual colorimetry caps string so we
+// correctly handle BT.601, BT.709, BT.2020, full-range, and limited-range.
+uniform mat3 u_yuv_mat;
+uniform vec3 u_yuv_off;
 
 void main() {
-  float y = texture2D(u_y, v_uv).r;
-  vec2 uv = texture2D(u_uv, v_uv).ra - vec2(0.5, 0.5);
-  vec3 rgb = yuv2rgb(y, uv.r, uv.g);
+  float y  = texture2D(u_y,  v_uv).r;
+  vec2  uv = texture2D(u_uv, v_uv).ra;
+  vec3  rgb = u_yuv_mat * (vec3(y, uv.x, uv.y) - u_yuv_off);
   gl_FragColor = vec4(clamp(rgb, 0.0, 1.0), 1.0);
 }
 `;
@@ -67,12 +61,103 @@ function createProgram(gl: WebGLRenderingContext, vert: string, frag: string): W
   return prog;
 }
 
+// ---------------------------------------------------------------------------
+// YUV→RGB matrix helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Parse the GStreamer colorimetry string and return the column-major mat3
+ * (Float32Array[9]) and vec3 offset (Float32Array[3]) ready for
+ * gl.uniformMatrix3fv / gl.uniform3fv.
+ *
+ * GStreamer colorimetry can be a shorthand ("bt709", "bt601") or a
+ * detailed four-field string "primaries:transfer:matrix:range" where
+ * matrix values are: 1=RGB, 2=FCC, 3=BT709, 4=BT601, 5=SMPTE240M,
+ * 6=BT2020 and range values are: 1=full(0-255), 2=limited(16-235).
+ */
+function yuvMatrixFromColorimetry(colorimetry: string): {
+  mat: Float32Array;
+  off: Float32Array;
+} {
+  const lower = colorimetry.toLowerCase();
+  const parts = lower.split(":");
+
+  // --- detect color range ---
+  let limited = true; // default: limited (studio-swing, most video content)
+  if (parts.length === 4) {
+    const range = parseInt(parts[3], 10);
+    if (range === 1) limited = false; // GST_VIDEO_COLOR_RANGE_0_255 = full
+    if (range === 2) limited = true;  // GST_VIDEO_COLOR_RANGE_16_235 = limited
+  } else if (lower.includes("full")) {
+    limited = false;
+  }
+
+  // --- detect color matrix ---
+  type Matrix = "bt601" | "bt709" | "bt2020";
+  let matrix: Matrix = "bt709"; // safe HD default
+  if (parts.length === 4) {
+    const m = parseInt(parts[2], 10);
+    if (m === 4) matrix = "bt601";
+    else if (m === 3 || m === 5) matrix = "bt709";
+    else if (m === 6) matrix = "bt2020";
+  } else if (lower.includes("bt601") || lower.includes("sdtv") || lower.includes("smpte170")) {
+    matrix = "bt601";
+  } else if (lower.includes("bt2020") || lower.includes("2020")) {
+    matrix = "bt2020";
+  }
+
+  console.log(`[WebGL] colorimetry="${colorimetry}" → matrix=${matrix}, limited=${limited}`);
+
+  // --- build the 3×3 matrix ---
+  // The GLSL mat3 is column-major: mat[col][row].
+  // We want:  rgb = M * (yuv - off)
+  // where yuv = [Y, Cb, Cr], off = [yOff, cbOff, crOff].
+  //
+  // Row layout:   R = M[0][0]*Yd + M[1][0]*Cbd + M[2][0]*Crd
+  //               G = M[0][1]*Yd + M[1][1]*Cbd + M[2][1]*Crd
+  //               B = M[0][2]*Yd + M[1][2]*Cbd + M[2][2]*Crd
+  //
+  // col0 = Y coefficients  [R_y, G_y, B_y]
+  // col1 = Cb coefficients [R_cb, G_cb, B_cb]
+  // col2 = Cr coefficients [R_cr, G_cr, B_cr]
+  //
+  // Standard limited-range: all three rows share the same Y gain (1.164).
+  // Full-range: Y gain = 1, yOff = 0.
+
+  const yGain = limited ? 1.164 : 1.0;
+  const yOff  = limited ? 16 / 255 : 0.0;
+  const cOff  = 128 / 255; // Cb/Cr are always centred at 128 regardless of range
+
+  // Chroma coefficients (same for limited and full range — the range only
+  // changes the luma offset/gain, not the colour difference factors).
+  let rCr: number, gCb: number, gCr: number, bCb: number;
+  if (matrix === "bt601") {
+    rCr = 1.596; gCb = -0.392; gCr = -0.813; bCb = 2.017;
+  } else if (matrix === "bt2020") {
+    rCr = 1.678; gCb = -0.188; gCr = -0.652; bCb = 2.142;
+  } else {
+    // BT.709 (default)
+    rCr = 1.793; gCb = -0.213; gCr = -0.533; bCb = 2.112;
+  }
+
+  // Float32Array in column-major order for gl.uniformMatrix3fv:
+  const mat = new Float32Array([
+    yGain, yGain, yGain, // col 0: Y  → R, G, B
+    0,     gCb,   bCb,   // col 1: Cb → R, G, B
+    rCr,   gCr,   0,     // col 2: Cr → R, G, B
+  ]);
+  const off = new Float32Array([yOff, cOff, cOff]);
+  return { mat, off };
+}
+
 export class WebGLVideoRenderer {
   private gl: WebGLRenderingContext;
   private program: WebGLProgram;
   private posLoc: number;
   private yLoc: WebGLUniformLocation | null;
   private uvLoc: WebGLUniformLocation | null;
+  private matLoc: WebGLUniformLocation | null;
+  private offLoc: WebGLUniformLocation | null;
   private texY: WebGLTexture;
   private texUV: WebGLTexture;
   private buf: WebGLBuffer;
@@ -98,8 +183,10 @@ export class WebGLVideoRenderer {
     const prog = createProgram(gl, VERT, FRAG);
     this.program = prog;
     this.posLoc = gl.getAttribLocation(prog, "a_pos");
-    this.yLoc = gl.getUniformLocation(prog, "u_y");
-    this.uvLoc = gl.getUniformLocation(prog, "u_uv");
+    this.yLoc   = gl.getUniformLocation(prog, "u_y");
+    this.uvLoc  = gl.getUniformLocation(prog, "u_uv");
+    this.matLoc = gl.getUniformLocation(prog, "u_yuv_mat");
+    this.offLoc = gl.getUniformLocation(prog, "u_yuv_off");
 
     this.buf = gl.createBuffer()!;
     gl.bindBuffer(gl.ARRAY_BUFFER, this.buf);
@@ -127,7 +214,35 @@ export class WebGLVideoRenderer {
     gl.uniform1i(this.yLoc, 0);
     gl.uniform1i(this.uvLoc, 1);
 
+    // Seed BT.709 limited-range defaults; overwritten by setColorimetry()
+    // once the decoder reports the real caps colorimetry.
+    const defaultCm = yuvMatrixFromColorimetry("bt709");
+    gl.uniformMatrix3fv(this.matLoc, false, defaultCm.mat);
+    gl.uniform3fv(this.offLoc, defaultCm.off);
+
     gl.clearColor(0, 0, 0, 1);
+  }
+
+  // Pixel-aspect-ratio correction: display aspect = (width * parN/parD) / height.
+  // Stored as a ratio (not individual n/d) to keep render() simple.
+  // 0 means "use coded dimensions" (default for square pixels).
+  private _parRatio = 0;
+
+  /**
+   * Call once after opening the file, passing the colorimetry string from
+   * the decoder metadata (e.g. "bt709", "bt601", "2:4:5:1") and the
+   * pixel-aspect-ratio from caps (1/1 for square pixels).
+   * The renderer computes the correct YCbCr→RGB matrix and uploads it,
+   * and caches the PAR for use in render().
+   */
+  setColorimetry(colorimetry: string, parN = 1, parD = 1) {
+    const { gl } = this;
+    gl.useProgram(this.program);
+    const { mat, off } = yuvMatrixFromColorimetry(colorimetry);
+    gl.uniformMatrix3fv(this.matLoc, false, mat);
+    gl.uniform3fv(this.offLoc, off);
+    // Store PAR ratio — only non-trivial when parN !== parD
+    this._parRatio = (parN === parD || parD === 0) ? 0 : parN / parD;
   }
 
   /**
@@ -165,7 +280,10 @@ export class WebGLVideoRenderer {
     // Letterbox / pillarbox: fit the video inside the canvas while preserving
     // the video's own aspect ratio.  The remainder of the canvas is painted
     // black.
-    const videoAspect  = width  / height;
+    // Apply pixel-aspect-ratio correction for anamorphic sources (PAR ≠ 1:1).
+    const videoAspect = this._parRatio
+      ? (width * this._parRatio) / height
+      : width / height;
     const canvasAspect = backW / backH;
     let vx: number, vy: number, vw: number, vh: number;
     if (videoAspect > canvasAspect) {

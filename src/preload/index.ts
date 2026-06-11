@@ -199,10 +199,23 @@ const videoDecoderApi = {
     height: number;
     durationMs: number;
     frameRate: number;
+    colorimetry: string;
+    parN: number;
+    parD: number;
   } {
     const decoder = videoDecoders.get(id);
     if (!decoder) throw new Error("Decoder not found");
     return decoder.getMetadata();
+  },
+  /**
+   * Tell the WebGL renderer which YCbCr→RGB matrix to use, derived from the
+   * colorimetry string in the decoder caps (e.g. "bt709", "bt601", "2:4:5:1").
+   * Also forwards the pixel-aspect-ratio so the renderer can letterbox
+   * anamorphic content correctly.
+   */
+  setColorimetry(id: string, colorimetry: string, parN: number, parD: number): void {
+    const renderer = videoRenderers.get(id);
+    if (renderer) renderer.setColorimetry(colorimetry, parN, parD);
   },
   destroy(id: string): void {
     const decoder = videoDecoders.get(id);

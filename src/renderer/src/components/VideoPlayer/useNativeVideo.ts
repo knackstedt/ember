@@ -123,6 +123,13 @@ export function useNativeVideo(
         // 4. Attach WebGL renderer in preload (direct DOM access)
         window.htpc.videoDecoder.attachCanvas(decoderId, canvasId);
         window.htpc.videoDecoder.resizeCanvas(decoderId, meta.width, meta.height);
+        // Apply the correct YCbCr→RGB matrix and PAR from the actual caps.
+        window.htpc.videoDecoder.setColorimetry(
+          decoderId,
+          meta.colorimetry ?? "bt709",
+          meta.parN ?? 1,
+          meta.parD ?? 1,
+        );
 
         updateState({
           duration: meta.durationMs / 1000,

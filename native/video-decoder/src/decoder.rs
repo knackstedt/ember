@@ -45,6 +45,16 @@ pub trait VideoDecoderBackend: Send {
     /// Human-readable backend name (e.g. "ffmpeg", "gstreamer").
     fn backend_name(&self) -> &'static str;
 
+    /// Colorimetry string from the negotiated caps (e.g. "bt709", "bt601",
+    /// "2:4:5:1").  Forwarded verbatim to the WebGL shader.
+    fn colorimetry(&self) -> &str { "bt709" }
+
+    /// Pixel aspect ratio numerator (1 for square pixels).
+    fn par_n(&self) -> u32 { 1 }
+
+    /// Pixel aspect ratio denominator (1 for square pixels).
+    fn par_d(&self) -> u32 { 1 }
+
     /// Clean up resources.
     fn close(&mut self);
 }
@@ -152,6 +162,9 @@ impl VideoDecoderState {
                 height: b.video_height(),
                 duration_ms: b.duration_ms(),
                 frame_rate: b.frame_rate(),
+                colorimetry: b.colorimetry().to_string(),
+                par_n: b.par_n(),
+                par_d: b.par_d(),
             },
             None => VideoMetadata::default(),
         }
@@ -171,4 +184,7 @@ pub struct VideoMetadata {
     pub height: u32,
     pub duration_ms: i64,
     pub frame_rate: f64,
+    pub colorimetry: String,
+    pub par_n: u32,
+    pub par_d: u32,
 }

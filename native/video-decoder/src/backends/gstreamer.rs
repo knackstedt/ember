@@ -11,6 +11,15 @@ pub struct GstreamerDecoder {
     native_height: u32,
     duration_ms: i64,
     frame_rate: f64,
+    /// Colorimetry string from the negotiated caps (e.g. "bt709", "bt601",
+    /// or "2:4:5:1").  Forwarded to the WebGL renderer so it can pick the
+    /// correct YCbCr→RGB matrix.
+    colorimetry: String,
+    /// Pixel aspect ratio — numerator and denominator.  Most modern content
+    /// has square pixels (1:1).  Anamorphic sources (e.g. 1440×1080 with
+    /// PAR 4:3) need the display width adjusted accordingly.
+    par_n: u32,
+    par_d: u32,
     /// True when the next decode call should use pull_preroll() to get the
     /// first frame at a new seek position without waiting for clock sync.
     needs_preroll: bool,
@@ -198,6 +207,23 @@ impl VideoDecoderBackend for GstreamerDecoder {
             .map(|t| t.mseconds() as i64)
             .unwrap_or(0);
 
+        // Colorimetry string — forwarded to the JS shader so it can choose
+        // the right YCbCr→RGB matrix and range.  Log it for diagnostics.
+        let colorimetry = s.get::<String>("colorimetry")
+            .unwrap_or_else(|_| "bt709".to_string());
+
+        // Pixel-aspect-ratio (PAR).  Most content is 1:1 (square pixels).
+        // Anamorphic sources (e.g. 1440×1080 @ 4:3 PAR) need the display
+        // width corrected to par_n/par_d * coded_width.
+        let (par_n, par_d) = s.get::<gst::Fraction>("pixel-aspect-ratio")
+            .map(|f| (f.numer().max(1) as u32, f.denom().max(1) as u32))
+            .unwrap_or((1, 1));
+
+        eprintln!(
+            "[GStreamer] caps: {}x{} @ {:.3} fps | colorimetry={} | PAR={}/{}",
+            width, height, fps, colorimetry, par_n, par_d
+        );
+
         if width == 0 || height == 0 {
             pipeline.set_state(gst::State::Null).ok();
             return Err("Failed to negotiate video caps — width or height is zero".to_string());
@@ -211,6 +237,9 @@ impl VideoDecoderBackend for GstreamerDecoder {
             native_height: height,
             duration_ms: dur,
             frame_rate: fps,
+            colorimetry,
+            par_n,
+            par_d,
             // Pipeline is intentionally left in PAUSED.  Audio does NOT play
             // until resume() is called by the JS pump.  No frames are produced,
             // so there is nothing to accumulate during initialisation.
@@ -424,6 +453,13 @@ impl VideoDecoderBackend for GstreamerDecoder {
     fn backend_name(&self) -> &'static str {
         "gstreamer"
     }
+
+    fn colorimetry(&self) -> &str {
+        &self.colorimetry
+    }
+
+    fn par_n(&self) -> u32 { self.par_n }
+    fn par_d(&self) -> u32 { self.par_d }
 
     fn close(&mut self) {
         self.pipeline.set_state(gst::State::Null).ok();
