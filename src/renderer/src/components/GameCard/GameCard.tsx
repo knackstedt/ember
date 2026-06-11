@@ -172,7 +172,7 @@ export const GameCard: React.FC<GameCardProps> = React.memo(({
       <div className="gc-card-shell">
         <section className="gc-card">
           <div className="gc-inside">
-            {/* <div className="gc-shine" /> */}
+            <div className="gc-shine" />
 
             {isThumbnailPending && (
               <div className="gc-loading-overlay">
