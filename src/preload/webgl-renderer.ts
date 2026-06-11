@@ -20,11 +20,15 @@ varying vec2 v_uv;
 uniform sampler2D u_y;
 uniform sampler2D u_uv;
 
-// BT.709 YUV->RGB
+// BT.709 limited-range YCbCr -> RGB
+// Y in [16/255, 235/255]; Cb/Cr centred on 128/255 (range 16-240).
+// The 1.164 factor restores the full luma swing; coefficients match the
+// ITU-R BT.709 limited-range matrix.
 vec3 yuv2rgb(float y, float u, float v) {
-  float r = y + 1.5748 * v;
-  float g = y - 0.1873 * u - 0.4681 * v;
-  float b = y + 1.8556 * u;
+  float yy = 1.164 * (y - 16.0 / 255.0);
+  float r = yy + 1.793 * v;
+  float g = yy - 0.213 * u - 0.533 * v;
+  float b = yy + 2.112 * u;
   return vec3(r, g, b);
 }
 
