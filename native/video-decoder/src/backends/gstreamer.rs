@@ -45,16 +45,39 @@ impl VideoDecoderBackend for GstreamerDecoder {
             format!("file://{}", abs_path.display())
         };
 
-        // Boost VAAPI decoder rank above software decoders so uridecodebin picks them.
+        // Boost every known hardware decoder above software alternatives so that
+        // uridecodebin prefers them.  We try both the legacy gstreamer-vaapi names
+        // (vaapih26Xdec) and the newer GStreamer-1.20+ VA plug-in (vah26Xdec /
+        // vavp9dec), Intel Quick Sync (msdkh26Xdec), and NVIDIA NVDEC (nvh26Xdec /
+        // nvav1dec).  Elements that are not installed are silently skipped.
         fn boost_rank(name: &str) {
             if let Some(factory) = gst::ElementFactory::find(name) {
                 factory.set_rank(gst::Rank::PRIMARY + 100);
+                eprintln!("[GStreamer] hardware decoder available: {}", name);
             }
         }
+        // Legacy gstreamer-vaapi (gstreamer1.0-vaapi package)
         boost_rank("vaapih265dec");
         boost_rank("vaapih264dec");
+        boost_rank("vaapiav1dec");
+        boost_rank("vaapivp9dec");
+        boost_rank("vaapivp8dec");
+        // New GStreamer-1.20+ VA plug-in (gstreamer1.0-plugins-bad on modern distros)
+        boost_rank("vah265dec");
+        boost_rank("vah264dec");
+        boost_rank("vavp9dec");
+        boost_rank("vavp8dec");
+        boost_rank("vaav1dec");
+        // Intel Quick Sync / Media SDK (gstreamer1.0-plugins-bad, requires libmfx)
+        boost_rank("msdkh265dec");
+        boost_rank("msdkh264dec");
+        boost_rank("qsvh265dec");
+        boost_rank("qsvh264dec");
+        // NVIDIA NVDEC (gstreamer1.0-plugins-bad with CUDA support)
         boost_rank("nvh265dec");
         boost_rank("nvh264dec");
+        boost_rank("nvav1dec");
+        boost_rank("nvvp9dec");
 
         // Build pipeline programmatically so we can route both audio and video.
         let uridecodebin = gst::ElementFactory::make("uridecodebin")
@@ -62,8 +85,13 @@ impl VideoDecoderBackend for GstreamerDecoder {
             .build()
             .map_err(|e| format!("Failed to create uridecodebin: {}", e))?;
 
+        // One buffer in the video queue so the decoder cannot run more than one
+        // frame ahead of the display clock.  Fewer buffers = less CPU wasted on
+        // speculative decoding that will be dropped before it is ever shown.
         let vq = gst::ElementFactory::make("queue")
-            .property("max-size-buffers", 3u32)
+            .property("max-size-buffers", 1u32)
+            .property("max-size-bytes", 0u32)    // unlimited; let buffer count limit
+            .property("max-size-time", 0u64)     // unlimited
             .build()
             .map_err(|e| format!("Failed to create video queue: {}", e))?;
         let vconv = gst::ElementFactory::make("videoconvert")
@@ -75,8 +103,13 @@ impl VideoDecoderBackend for GstreamerDecoder {
             // Without this limit, frames accumulate without bound when the pipeline
             // is left in Playing state but nobody calls pull_sample() (e.g. after a
             // seek while paused), causing an OOM crash in the renderer process.
-            .property("max-buffers", 2u32)
-            .property("drop", true)
+            // 1 buffer with drop=false: appsink back-pressures the pipeline so
+            // the decoder only runs when we are ready to consume the frame.
+            // This prevents the GStreamer threads from burning CPU decoding
+            // frames faster than wall-clock time, which is the main cause of
+            // 90-100% CPU during software-decoded playback.
+            .property("max-buffers", 1u32)
+            .property("drop", false)
             .property("emit-signals", true)
             .property("sync", true)
             .build()
@@ -180,11 +213,33 @@ impl VideoDecoderBackend for GstreamerDecoder {
             }
         };
 
-        // Recursively log all elements so we can see the actual decoder inside uridecodebin.
+        // Recursively log all elements.  At depth > 0 (inside uridecodebin)
+        // we look for the actual video-decoder element and call it out clearly
+        // so the user can tell whether hardware or software decoding is active.
         fn log_elements(el: &gst::Element, depth: usize) {
-            let name = el.factory().map(|f| f.name().to_string()).unwrap_or_default();
+            let fname = el.factory().map(|f| f.name().to_string()).unwrap_or_default();
             let indent = "  ".repeat(depth);
-            eprintln!("[GStreamer] {}{}", indent, name);
+
+            // Classify the element
+            let hw_names = ["vaapi", "vah26", "vavp", "vaav", "nvh26", "nvav", "nvvp",
+                             "msdk", "qsv", "d3d11", "cudah"];
+            let sw_names = ["avdec_h265", "avdec_h264", "avdec_vp9", "avdec_vp8",
+                             "openh264", "theoradec", "vp8dec", "vp9dec"];
+            let is_hw = hw_names.iter().any(|p| fname.contains(p));
+            let is_sw_codec = sw_names.iter().any(|p| fname.starts_with(p));
+
+            eprintln!("[GStreamer] {}{}", indent, fname);
+
+            if is_hw {
+                eprintln!("[GStreamer] ✔ HARDWARE decoder in use: {} — expect low CPU", fname);
+            } else if is_sw_codec {
+                eprintln!("[GStreamer] ✘ SOFTWARE decoder in use: {} — expect high CPU.", fname);
+                eprintln!("[GStreamer]   Install hardware-decode GStreamer plug-ins to reduce CPU:");
+                eprintln!("[GStreamer]     Intel/AMD VA-API : sudo apt install gstreamer1.0-vaapi");
+                eprintln!("[GStreamer]     or newer VA plug-in : sudo apt install gstreamer1.0-plugins-bad");
+                eprintln!("[GStreamer]     NVIDIA NVDEC     : sudo apt install gstreamer1.0-plugins-bad (with CUDA)");
+            }
+
             if let Ok(bin) = el.clone().downcast::<gst::Bin>() {
                 for iter in bin.iterate_elements() {
                     if let Ok(child) = iter {

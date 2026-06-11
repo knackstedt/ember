@@ -54,44 +54,14 @@ vec2 upsampleUV(vec2 lumaUV) {
   return mix(mix(s00, s10, f.x), mix(s01, s11, f.x), f.y);
 }
 
-// ===========================================================================
-// Transfer-function correction: BT.709 encoded -> linear -> sRGB encoded
-// ===========================================================================
-// Chromium's compositor treats canvas pixels as sRGB.  BT.709 and sRGB share
-// the same primaries but differ in their transfer functions:
-//
-//   sRGB   breakpoint 0.0031308 linear (encoded ~0.040), exponent 1/2.4
-//   BT.709 breakpoint 0.018     linear (encoded  0.081), exponent 1/0.45
-//
-// Without this correction the compositor decodes the BT.709 "linear segment"
-// (0.040-0.081 encoded) using the sRGB gamma curve instead, causing visible
-// shadow crush and mid-tone shifts compared to players like mpv/Celluloid.
-//
-// Cost: ~10 ALU ops per pixel — completely negligible on any modern GPU.
-
-// BT.709 EOTF: gamma-encoded BT.709 -> linear light
-vec3 eotf_bt709(vec3 v) {
-  return mix(v / 4.5,
-             pow((v + 0.099) / 1.099, vec3(1.0 / 0.45)),
-             step(vec3(0.081), v));
-}
-
-// sRGB OETF: linear light -> sRGB-encoded (matches Chromium compositor)
-vec3 oetf_srgb(vec3 v) {
-  return mix(v * 12.92,
-             1.055 * pow(v, vec3(1.0 / 2.4)) - 0.055,
-             step(vec3(0.0031308), v));
-}
-
 void main() {
   float y  = texture2D(u_y, v_uv).r;
   vec2  uv = upsampleUV(v_uv);
 
-  // YCbCr -> BT.709-encoded RGB
+  // YCbCr -> RGB using the colour-space matrix set by setColorimetry().
+  // The matrix already handles the limited/full range offset and the correct
+  // BT.601 / BT.709 / BT.2020 coefficients for the stream being decoded.
   vec3 rgb = clamp(u_yuv_mat * (vec3(y, uv.x, uv.y) - u_yuv_off), 0.0, 1.0);
-
-  // BT.709 encoded -> linear light -> sRGB encoded
-  rgb = oetf_srgb(eotf_bt709(rgb));
 
   gl_FragColor = vec4(rgb, 1.0);
 }
