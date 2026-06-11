@@ -139,12 +139,6 @@ function yuvMatrixFromColorimetry(colorimetry: string): {
     matrix = "bt2020";
   }
 
-  console.log(`[WebGL] colorimetry="${colorimetry}" → matrix=${matrix}, limited=${limited}`);
-  // Log the actual values uploaded to the GPU so the user can verify them.
-  console.log(
-    `[WebGL] mat=[${Array.from(mat).map((v) => v.toFixed(4)).join(", ")}]  off=[${Array.from(off).map((v) => v.toFixed(4)).join(", ")}]`
-  );
-
   // --- build the 3×3 matrix ---
   // The GLSL mat3 is column-major: mat[col][row].
   // We want:  rgb = M * (yuv - off)
@@ -184,6 +178,12 @@ function yuvMatrixFromColorimetry(colorimetry: string): {
     rCr,   gCr,   0,     // col 2: Cr → R, G, B
   ]);
   const off = new Float32Array([yOff, cOff, cOff]);
+
+  console.log(`[WebGL] colorimetry="${colorimetry}" → matrix=${matrix}, limited=${limited}`);
+  console.log(
+    `[WebGL] mat=[${Array.from(mat).map((v) => v.toFixed(4)).join(", ")}]  off=[${Array.from(off).map((v) => v.toFixed(4)).join(", ")}]`
+  );
+
   return { mat, off };
 }
 
