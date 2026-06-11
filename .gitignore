@@ -11,6 +11,9 @@ resources/v86-bios/
 # Rust / native addon build artifacts
 native/libretro-frontend/target/
 native/libretro-frontend/Cargo.lock
+native/video-decoder/target/
+native/video-decoder/Cargo.lock
 resources/*.node
+resources/rclone*
 
 release

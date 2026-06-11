@@ -134,7 +134,6 @@ import {
   getToolAvailability,
   canCompress,
 } from "../services/compression.service";
-
 const log = createLogger("info");
 
 // ---------------------------------------------------------------------------
@@ -390,6 +389,159 @@ export function registerIpcHandlers(window: BrowserWindow): void {
       log.error("libretro", `Worker method ${method} failed: ${err}`);
       throw err;
     }
+  });
+
+  // ---------------------------------------------------------------------------
+  // Video decoder — URL resolution for remote ember:// URLs.
+  // The decoder itself runs in the renderer preload (same process as WebGL)
+  // so SharedArrayBuffer can be used without IPC serialization blocks.
+  // ---------------------------------------------------------------------------
+  ipcMain.handle("videoDecoder:resolveUrl", async (_e, path: string) => {
+    if (!path.startsWith("ember://remote/")) return path;
+
+    const url = new URL(path);
+    const segments = url.pathname.split("/").filter(Boolean).map(decodeURIComponent);
+    const sourceId = segments[0];
+    const remotePath = segments.slice(1).join("/");
+    const { getServePort } = await import("../services/rclone-manager");
+    const { RemoteSourceRepo } = await import("../db/repository");
+    const port = await getServePort(sourceId);
+    if (!port) throw new Error(`Remote source ${sourceId} is not serving`);
+    let proxyPath = remotePath;
+    try {
+      const sources = await RemoteSourceRepo.list();
+      const source = sources.find((s: any) => s.id === sourceId);
+      const basePath = (source?.remotePath || "/").replace(/^\//, "");
+      if (basePath && proxyPath.toLowerCase().startsWith(basePath.toLowerCase() + "/")) {
+        proxyPath = proxyPath.slice(basePath.length + 1);
+      } else if (basePath && proxyPath.toLowerCase() === basePath.toLowerCase()) {
+        proxyPath = "";
+      }
+    } catch {
+      // ignore
+    }
+    return `http://localhost:${port}/${proxyPath.split("/").map(encodeURIComponent).join("/")}`;
+  });
+
+  // ---------------------------------------------------------------------------
+  // System diagnostics — hardware, software versions, installed components
+  // ---------------------------------------------------------------------------
+  ipcMain.handle("system:getDiagnostics", async () => {
+    const os = await import("os");
+    const fs = await import("fs");
+    const path = await import("path");
+    const { execSync } = await import("child_process");
+    const electron = await import("electron");
+
+    // App version from package.json
+    let appVersion = "unknown";
+    try {
+      const pkgPath = path.join(__dirname, "..", "..", "package.json");
+      const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
+      appVersion = pkg.version ?? "unknown";
+    } catch { /* ignore */ }
+
+    // Gather video decoder backend availability
+    const videoDecoders: { name: string; available: boolean; path?: string }[] = [];
+    const arch = process.arch === "arm64" ? "arm64" : "x64";
+    const decoderAddons = [
+      `video-decoder-ffmpeg.linux-${arch}-gnu.node`,
+      `video-decoder-gstreamer.linux-${arch}-gnu.node`,
+    ];
+    for (const name of decoderAddons) {
+      const candidates = [
+        path.join(process.resourcesPath, name),
+        path.join(__dirname, "..", "..", "resources", name),
+      ];
+      let found = false;
+      let foundPath: string | undefined;
+      for (const p of candidates) {
+        if (fs.existsSync(p)) {
+          found = true;
+          foundPath = p;
+          break;
+        }
+      }
+      videoDecoders.push({
+        name: name.replace(/\.linux-.*$/, ""),
+        available: found,
+        path: foundPath,
+      });
+    }
+
+    // Check FFmpeg codecs (if ffmpeg CLI available)
+    let ffmpegCodecs: string[] = [];
+    try {
+      const output = execSync("ffmpeg -codecs 2>/dev/null || echo ''", { encoding: "utf8", timeout: 5000 });
+      // Extract codec names from the output
+      // Lines look like: " D.V.LS h264 ..."
+      ffmpegCodecs = output
+        .split("\n")
+        .filter((line) => line.startsWith(" "))
+        .map((line) => line.trim().split(/\s+/)[1])
+        .filter((name) => name && name.length > 0 && name !== "=");
+    } catch { /* ignore */ }
+
+    // Check available hwaccels via ffmpeg
+    let hwaccels: string[] = [];
+    try {
+      const output = execSync("ffmpeg -hwaccels 2>/dev/null || echo ''", { encoding: "utf8", timeout: 5000 });
+      hwaccels = output
+        .split("\n")
+        .slice(1) // skip header
+        .map((l) => l.trim())
+        .filter((l) => l && !l.startsWith("Hardware"));
+    } catch { /* ignore */ }
+
+    // GPU info via Electron
+    let gpuInfo: any = null;
+    try {
+      gpuInfo = await electron.app.getGPUInfo("complete");
+    } catch { /* ignore */ }
+
+    // Display info
+    const displays = electron.screen.getAllDisplays().map((d: any) => ({
+      id: d.id,
+      resolution: `${d.size.width}x${d.size.height}`,
+      scaleFactor: d.scaleFactor,
+      rotation: d.rotation,
+      internal: d.internal,
+      primary: d.id === electron.screen.getPrimaryDisplay().id,
+    }));
+
+    return {
+      app: {
+        name: "Ember",
+        version: appVersion,
+      },
+      runtime: {
+        electron: process.versions.electron,
+        node: process.versions.node,
+        chrome: process.versions.chrome,
+        v8: process.versions.v8,
+      },
+      os: {
+        platform: os.platform(),
+        release: os.release(),
+        arch: os.arch(),
+        hostname: os.hostname(),
+        type: os.type(),
+      },
+      cpu: {
+        model: os.cpus()[0]?.model ?? "unknown",
+        cores: os.cpus().length,
+        speed: os.cpus()[0]?.speed ?? 0,
+      },
+      memory: {
+        total: os.totalmem(),
+        free: os.freemem(),
+      },
+      displays,
+      gpu: gpuInfo,
+      videoDecoders,
+      ffmpegCodecs,
+      hwaccels,
+    };
   });
 
   ipcMain.handle("games:favorite", async (_e, id: string, value: boolean) => {

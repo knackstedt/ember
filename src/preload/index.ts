@@ -1,4 +1,7 @@
 import { contextBridge, ipcRenderer, shell } from "electron";
+import { join } from "path";
+import { existsSync } from "fs";
+import { homedir } from "os";
 import {
   AppSettings,
   Game,
@@ -20,6 +23,163 @@ import {
 } from "../shared/types";
 import { GameMetadata } from "../shared/metadata";
 import { libretroApi } from "./libretro";
+
+// ---------------------------------------------------------------------------
+// Native video decoder — loaded in preload (Node.js context) and exposed
+// to renderer via contextBridge.  The decoder returns frame data as a
+// plain Uint8Array (one copy from Rust → JS) which can cross contextBridge.
+// SharedArrayBuffer cannot be serialized across contextBridge, so we do
+// not use zero-copy SAB for the renderer → WebGL path.
+// ---------------------------------------------------------------------------
+
+const arch = process.arch === "arm64" ? "arm64" : "x64";
+const VIDEO_DECODER_BACKENDS = [
+  `video-decoder-ffmpeg.linux-${arch}-gnu.node`,
+  `video-decoder-gstreamer.linux-${arch}-gnu.node`,
+];
+
+function findAllVideoDecoderAddons(): string[] {
+  const paths = new Set<string>();
+  for (const name of VIDEO_DECODER_BACKENDS) {
+    const p = join((process as any).resourcesPath, name);
+    if (existsSync(p)) paths.add(p);
+    const dev = join(__dirname, "..", "..", "resources", name);
+    if (existsSync(dev)) paths.add(dev);
+  }
+  return [...paths];
+}
+
+const videoDecoderClasses: any[] = [];
+function getVideoDecoderClasses(): any[] {
+  if (videoDecoderClasses.length === 0) {
+    for (const path of findAllVideoDecoderAddons()) {
+      try {
+        const addon = require(path);
+        if (addon.VideoDecoder) {
+          videoDecoderClasses.push(addon.VideoDecoder);
+          console.log(`[VideoDecoder] Loaded addon: ${path}`);
+        } else {
+          console.warn(`[VideoDecoder] Addon missing VideoDecoder export: ${path}`);
+        }
+      } catch (e) {
+        console.warn(`[VideoDecoder] Failed to load ${path}:`, e);
+      }
+    }
+    if (videoDecoderClasses.length === 0) {
+      throw new Error("No video decoder backend available. Install FFmpeg or GStreamer runtime libraries.");
+    }
+  }
+  return videoDecoderClasses;
+}
+
+function getVideoDecoderClass(): any {
+  return getVideoDecoderClasses()[0];
+}
+
+const videoDecoders = new Map<string, any>();
+
+const videoDecoderApi = {
+  create(id: string): boolean {
+    const DecoderClass = getVideoDecoderClass();
+    const decoder = new DecoderClass();
+    videoDecoders.set(id, decoder);
+    return true;
+  },
+  open(id: string, path: string): string {
+    let decoder = videoDecoders.get(id);
+    if (!decoder) throw new Error("Decoder not found");
+
+    // Resolve bare filenames against the XDG Videos directory.
+    let resolvedPath = path;
+    if (
+      path &&
+      !path.startsWith("/") &&
+      !path.startsWith("http://") &&
+      !path.startsWith("https://") &&
+      !path.startsWith("file://") &&
+      !path.startsWith("ember://")
+    ) {
+      const videosDir = join(
+        process.env.XDG_VIDEOS_DIR ?? join(homedir(), "Videos"),
+      );
+      const candidate = join(videosDir, path);
+      if (existsSync(candidate)) {
+        resolvedPath = candidate;
+        console.log(`[VideoDecoder] Resolved relative path: ${path} -> ${candidate}`);
+      }
+    }
+
+    const classes = getVideoDecoderClasses();
+    let lastError = "";
+
+    for (let i = 0; i < classes.length; i++) {
+      try {
+        console.log(`[VideoDecoder] Trying backend #${i} for ${resolvedPath}`);
+        const backend = decoder.open(resolvedPath);
+        videoDecoders.set(id, decoder);
+        console.log(`[VideoDecoder] Backend #${i} succeeded: ${backend}`);
+        return backend;
+      } catch (e: any) {
+        lastError = e.message || String(e);
+        console.warn(`[VideoDecoder] Backend #${i} failed:`, lastError);
+        try { decoder.close(); } catch { /* ignore */ }
+        if (i + 1 < classes.length) {
+          decoder = new classes[i + 1]();
+        }
+      }
+    }
+
+    throw new Error(lastError);
+  },
+  decodeNextFrame(id: string): {
+    width: number;
+    height: number;
+    y: Uint8Array;
+    uv: Uint8Array;
+  } | null {
+    const decoder = videoDecoders.get(id);
+    if (!decoder) throw new Error("Decoder not found");
+    const t0 = Date.now();
+    const frame = decoder.decodeNextFrame();
+    const t1 = Date.now();
+    if (!frame) return null;
+    console.log(`[VideoDecoder] decodeNextFrame took ${t1 - t0}ms | y type: ${(frame.y as any).constructor?.name || typeof frame.y} | y length: ${frame.y.length}`);
+    // NAPI-RS returns Vec<u8> as Node.js Buffer (a Uint8Array subclass).
+    // Return it directly — WebGL texImage2D accepts Buffer/Uint8Array.
+    return {
+      width: frame.width,
+      height: frame.height,
+      y: frame.y as Uint8Array,
+      uv: frame.uv as Uint8Array,
+    };
+  },
+  seek(id: string, timestampMs: number): void {
+    const decoder = videoDecoders.get(id);
+    if (!decoder) throw new Error("Decoder not found");
+    decoder.seek(timestampMs);
+  },
+  getMetadata(id: string): {
+    backend: string;
+    width: number;
+    height: number;
+    durationMs: number;
+    frameRate: number;
+  } {
+    const decoder = videoDecoders.get(id);
+    if (!decoder) throw new Error("Decoder not found");
+    return decoder.getMetadata();
+  },
+  destroy(id: string): void {
+    const decoder = videoDecoders.get(id);
+    if (decoder) {
+      try { decoder.close(); } catch { /* ignore */ }
+      videoDecoders.delete(id);
+    }
+  },
+  resolveUrl(path: string): Promise<string> {
+    return ipcRenderer.invoke("videoDecoder:resolveUrl", path);
+  },
+};
 
 const htpc = {
   settings: {
@@ -474,6 +634,13 @@ const htpc = {
     const handler = (_: Electron.IpcRendererEvent, p: ScanProgress) => cb(p);
     ipcRenderer.on("scan:progress", handler);
     return () => ipcRenderer.removeListener("scan:progress", handler);
+  },
+
+  videoDecoder: videoDecoderApi,
+
+  system: {
+    getDiagnostics: (): Promise<any> =>
+      ipcRenderer.invoke("system:getDiagnostics"),
   },
 
   onSaveState: (cb: () => void) => {

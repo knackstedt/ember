@@ -1,5 +1,5 @@
 import { existsSync, readdirSync, statSync, mkdirSync, unlinkSync } from "fs";
-import { join, extname, basename } from "path";
+import { join, extname, basename, resolve } from "path";
 import { createHash } from "crypto";
 import { exec } from "child_process";
 import { promisify } from "util";
@@ -289,7 +289,9 @@ export async function scanMovieFiles(
   extraPaths: string[] = [],
   onProgress?: (current: number, total: number) => void,
 ): Promise<Movie[]> {
-  const roots = [getXdgVideosDir(), ...extraPaths].filter(existsSync);
+  const roots = [getXdgVideosDir(), ...extraPaths]
+    .map((p) => resolve(p))
+    .filter(existsSync);
   const allFiles: string[] = [];
   for (const root of roots) walkDir(root, allFiles);
 

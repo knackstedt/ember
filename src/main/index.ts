@@ -7,6 +7,8 @@ import { initInputSystem, destroyInputSystem } from "./input/evdev";
 import { getSettings } from "./services/settings.service";
 import { getWindowState, saveWindowState } from "./services/window-state.service";
 import { createLogger } from "./util/logger";
+import { getXdgVideosDir } from "./scanners/xdg";
+import { MovieRepo } from "./db/repository";
 
 const log = createLogger("info");
 
@@ -130,6 +132,31 @@ export function getMainWindow(): BrowserWindow | null {
 
 async function createWindow(): Promise<void> {
   await initDb();
+
+  // Migration: fix movies that were stored with bare filenames instead of
+  // absolute paths. Prepend the XDG Videos directory if the file exists there.
+  try {
+    const movies = await MovieRepo.list();
+    const videosDir = getXdgVideosDir();
+    for (const movie of movies) {
+      if (
+        movie.filePath &&
+        !movie.filePath.startsWith("/") &&
+        !movie.filePath.startsWith("ember://")
+      ) {
+        const candidate = join(videosDir, movie.filePath);
+        if (existsSync(candidate)) {
+          await MovieRepo.upsert({ ...movie, filePath: candidate });
+          log.info("migration", `fixed relative filePath for ${movie.title}: ${candidate}`);
+        } else {
+          log.warn("migration", `could not resolve relative filePath for ${movie.title}: ${movie.filePath}`);
+        }
+      }
+    }
+  } catch (err) {
+    log.warn("migration", `failed to fix relative filePaths: ${err}`);
+  }
+
   const settings = await getSettings();
   const winState = getWindowState();
   log.info("window-state", `creating window with ${JSON.stringify(winState)}`);

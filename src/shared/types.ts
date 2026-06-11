@@ -556,3 +556,13 @@ export interface SmartFilterGroup {
   conditions: SmartFilterCondition[];
   groups?: SmartFilterGroup[];
 }
+
+export interface VideoDecoderMetadata {
+  backend: string;
+  width: number;
+  height: number;
+  durationMs: number;
+  frameRate: number;
+}
+
+

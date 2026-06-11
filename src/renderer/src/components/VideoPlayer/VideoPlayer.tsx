@@ -13,6 +13,7 @@ import { useVideoPlayerStore } from "../../store/videoPlayer.store";
 import { useInputStore } from "../../store/input.store";
 import { shouldClearProgress } from "../../../../shared/progress";
 import { useMoviesStore } from "../../store/media.store";
+import { useNativeVideo, shouldUseNativeDecoder } from "./useNativeVideo";
 
 const INACTIVITY_MS = 3000;
 const PROGRESS_SAVE_INTERVAL_MS = 180000; // 3 minutes
@@ -29,7 +30,6 @@ function fmt(s: number): string {
 
 function deriveSubtitleUrls(videoSrc: string): string[] {
   if (videoSrc.startsWith("ember://remote/")) {
-    // Remote videos: subtitles are served from the same rclone HTTP endpoint
     const base = videoSrc.replace(/\.[^.]+$/, "");
     return [`${base}.vtt`, `${base}.srt`];
   }
@@ -43,11 +43,15 @@ export const VideoPlayer: React.FC = () => {
   const lastEvent = useInputStore((s) => s.lastEvent);
 
   const videoRef = useRef<HTMLVideoElement>(null);
+  const nativeCanvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const inactivityTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const progressSaveTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const hasResumed = useRef(false);
   const lastProgressRef = useRef<{ movieId: string; pct: number } | null>(null);
+
+  const useNative = !!src && shouldUseNativeDecoder(src);
+  const native = useNativeVideo(src, nativeCanvasRef);
 
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -60,6 +64,12 @@ export const VideoPlayer: React.FC = () => {
   const [activeSubtitle, setActiveSubtitle] = useState<number>(-1);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [seeking, setSeeking] = useState(false);
+
+  // Unified state from either backend
+  const isPlaying = useNative ? native.state.playing : playing;
+  const currentTimeDisplay = useNative ? native.state.currentTime : currentTime;
+  const durationDisplay = useNative ? native.state.duration : duration;
+  const errorDisplay = useNative ? native.state.error : null;
 
   const showControls = useCallback(() => {
     setControlsVisible(true);
@@ -76,7 +86,9 @@ export const VideoPlayer: React.FC = () => {
     };
   }, []);
 
+  // Standard <video> element event handlers
   useEffect(() => {
+    if (useNative) return;
     const v = videoRef.current;
     if (!v) return;
     const onPlay = (): void => setPlaying(true);
@@ -95,7 +107,6 @@ export const VideoPlayer: React.FC = () => {
     const onDuration = (): void => {
       const dur = isFinite(v.duration) ? v.duration : 0;
       setDuration(dur);
-      // Resume from saved progress once when duration is known
       if (!hasResumed.current && movieId && watchProgress != null && dur > 0) {
         const target = watchProgress * dur;
         if (target > 0 && target < dur - 1) {
@@ -120,7 +131,7 @@ export const VideoPlayer: React.FC = () => {
       v.removeEventListener("durationchange", onDuration);
       v.textTracks.removeEventListener("change", onTracksChange);
     };
-  }, [src, movieId, watchProgress]);
+  }, [src, movieId, watchProgress, useNative]);
 
   useEffect(() => {
     const onFs = (): void => setIsFullscreen(!!document.fullscreenElement);
@@ -128,8 +139,9 @@ export const VideoPlayer: React.FC = () => {
     return () => document.removeEventListener("fullscreenchange", onFs);
   }, []);
 
+  // Standard video src setup
   useEffect(() => {
-    if (!src) return;
+    if (!src || useNative) return;
     hasResumed.current = false;
     const v = videoRef.current;
     if (!v) return;
@@ -158,7 +170,7 @@ export const VideoPlayer: React.FC = () => {
     setBuffered(0);
     setPlaying(false);
     setActiveSubtitle(-1);
-    // Periodic progress save
+
     if (progressSaveTimer.current) clearInterval(progressSaveTimer.current);
     progressSaveTimer.current = setInterval(() => {
       if (movieId && v.duration > 0 && isFinite(v.duration)) {
@@ -169,7 +181,6 @@ export const VideoPlayer: React.FC = () => {
       }
     }, PROGRESS_SAVE_INTERVAL_MS);
 
-    // Save progress on window/app close (renderer process termination)
     const onBeforeUnload = (): void => {
       const last = lastProgressRef.current;
       if (last?.movieId && window.htpc.movies.setProgressSync) {
@@ -178,7 +189,6 @@ export const VideoPlayer: React.FC = () => {
     };
     window.addEventListener("beforeunload", onBeforeUnload);
 
-    // Listen for main-process quit signal
     const removeSaveStateListener = window.htpc.onSaveState?.(() => {
       const last = lastProgressRef.current;
       if (last?.movieId) {
@@ -193,110 +203,214 @@ export const VideoPlayer: React.FC = () => {
       removeSaveStateListener?.();
       if (progressSaveTimer.current) clearInterval(progressSaveTimer.current);
     };
-  }, [src, movieId, updateMovieProgress]);
+  }, [src, movieId, updateMovieProgress, useNative]);
+
+  // Native video progress save (best-effort)
+  useEffect(() => {
+    if (!useNative || !src) return;
+    if (progressSaveTimer.current) clearInterval(progressSaveTimer.current);
+    progressSaveTimer.current = setInterval(() => {
+      if (movieId && native.state.duration > 0) {
+        const pct = native.state.currentTime / native.state.duration;
+        lastProgressRef.current = { movieId, pct };
+        void window.htpc.movies.setProgress(movieId, pct);
+        updateMovieProgress(movieId, pct);
+      }
+    }, PROGRESS_SAVE_INTERVAL_MS);
+
+    const onBeforeUnload = (): void => {
+      const last = lastProgressRef.current;
+      if (last?.movieId && window.htpc.movies.setProgressSync) {
+        window.htpc.movies.setProgressSync(last.movieId, last.pct);
+      }
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+
+    const removeSaveStateListener = window.htpc.onSaveState?.(() => {
+      const last = lastProgressRef.current;
+      if (last?.movieId) {
+        void window.htpc.movies.setProgress(last.movieId, last.pct);
+      }
+    });
+
+    return () => {
+      window.removeEventListener("beforeunload", onBeforeUnload);
+      removeSaveStateListener?.();
+      if (progressSaveTimer.current) clearInterval(progressSaveTimer.current);
+    };
+  }, [src, movieId, updateMovieProgress, useNative, native.state.duration, native.state.currentTime]);
 
   const handleClose = useCallback(async () => {
-    const v = videoRef.current;
-    if (movieId && v && v.duration > 0 && isFinite(v.duration)) {
-      const current = v.currentTime;
-      const dur = v.duration;
-      if (shouldClearProgress(current, dur)) {
-        await window.htpc.movies.setProgress(movieId, null);
-        updateMovieProgress(movieId, null);
+    if (movieId) {
+      let current = 0;
+      let dur = 0;
+      if (useNative) {
+        current = native.state.currentTime;
+        dur = native.state.duration;
       } else {
-        const pct = current / dur;
-        await window.htpc.movies.setProgress(movieId, pct);
-        updateMovieProgress(movieId, pct);
+        const v = videoRef.current;
+        if (v && v.duration > 0 && isFinite(v.duration)) {
+          current = v.currentTime;
+          dur = v.duration;
+        }
+      }
+      if (dur > 0) {
+        if (shouldClearProgress(current, dur)) {
+          await window.htpc.movies.setProgress(movieId, null);
+          updateMovieProgress(movieId, null);
+        } else {
+          const pct = current / dur;
+          await window.htpc.movies.setProgress(movieId, pct);
+          updateMovieProgress(movieId, pct);
+        }
       }
     }
     close();
-  }, [movieId, close, updateMovieProgress]);
+  }, [movieId, close, updateMovieProgress, useNative, native.state.currentTime, native.state.duration]);
 
   useEffect(() => {
     if (!lastEvent || !src) return;
     const { type, action } = lastEvent;
     if (type !== "button_press") return;
-    const v = videoRef.current;
-    if (!v) return;
     showControls();
     if (action === "south") {
-      playing ? v.pause() : void v.play();
+      if (useNative) native.controls.toggle();
+      else {
+        const v = videoRef.current;
+        if (v) playing ? v.pause() : void v.play();
+      }
     } else if (action === "east") {
       handleClose();
     } else if (action === "dpad_left") {
-      v.currentTime = Math.max(0, v.currentTime - 10);
+      const target = Math.max(0, currentTimeDisplay - 10);
+      if (useNative) native.controls.seek(target);
+      else {
+        const v = videoRef.current;
+        if (v) v.currentTime = target;
+      }
     } else if (action === "dpad_right") {
-      v.currentTime = Math.min(v.duration || 0, v.currentTime + 10);
+      const target = Math.min(durationDisplay || 0, currentTimeDisplay + 10);
+      if (useNative) native.controls.seek(target);
+      else {
+        const v = videoRef.current;
+        if (v) v.currentTime = target;
+      }
     } else if (action === "dpad_up") {
-      const newVol = Math.min(1, v.volume + 0.1);
-      v.volume = newVol;
-      setVolumeState(newVol);
+      if (!useNative) {
+        const v = videoRef.current;
+        if (v) {
+          const newVol = Math.min(1, v.volume + 0.1);
+          v.volume = newVol;
+          setVolumeState(newVol);
+        }
+      }
     } else if (action === "dpad_down") {
-      const newVol = Math.max(0, v.volume - 0.1);
-      v.volume = newVol;
-      setVolumeState(newVol);
+      if (!useNative) {
+        const v = videoRef.current;
+        if (v) {
+          const newVol = Math.max(0, v.volume - 0.1);
+          v.volume = newVol;
+          setVolumeState(newVol);
+        }
+      }
     }
-  }, [lastEvent, src]);
+  }, [lastEvent, src, useNative, native.controls, playing, currentTimeDisplay, durationDisplay, showControls, handleClose]);
 
   useEffect(() => {
     if (!src) return;
     const onKey = (e: KeyboardEvent): void => {
-      const v = videoRef.current;
-      if (!v) return;
       showControls();
       if (e.code === "Space" || e.key === " ") {
         e.preventDefault();
-        playing ? v.pause() : void v.play();
+        if (useNative) native.controls.toggle();
+        else {
+          const v = videoRef.current;
+          if (v) playing ? v.pause() : void v.play();
+        }
       } else if (e.code === "ArrowLeft") {
         e.preventDefault();
-        v.currentTime = Math.max(0, v.currentTime - 10);
+        const target = Math.max(0, currentTimeDisplay - 10);
+        if (useNative) native.controls.seek(target);
+        else {
+          const v = videoRef.current;
+          if (v) v.currentTime = target;
+        }
       } else if (e.code === "ArrowRight") {
         e.preventDefault();
-        v.currentTime = Math.min(v.duration || 0, v.currentTime + 10);
+        const target = Math.min(durationDisplay || 0, currentTimeDisplay + 10);
+        if (useNative) native.controls.seek(target);
+        else {
+          const v = videoRef.current;
+          if (v) v.currentTime = target;
+        }
       } else if (e.code === "Escape") {
         handleClose();
-      } else if (e.code === "KeyM") {
-        v.muted = !v.muted;
-        setMuted(v.muted);
+      } else if (e.code === "KeyM" && !useNative) {
+        const v = videoRef.current;
+        if (v) {
+          v.muted = !v.muted;
+          setMuted(v.muted);
+        }
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [src, playing, handleClose, showControls]);
+  }, [src, playing, handleClose, showControls, useNative, native.controls, currentTimeDisplay, durationDisplay]);
 
   const togglePlay = (): void => {
-    const v = videoRef.current;
-    if (!v) return;
-    playing ? v.pause() : void v.play();
+    if (useNative) {
+      native.controls.toggle();
+    } else {
+      const v = videoRef.current;
+      if (!v) return;
+      playing ? v.pause() : void v.play();
+    }
   };
 
   const toggleMute = (): void => {
-    const v = videoRef.current;
-    if (!v) return;
-    v.muted = !v.muted;
-    setMuted(v.muted);
+    if (useNative) {
+      // TODO: native audio mute
+      setMuted((m) => !m);
+    } else {
+      const v = videoRef.current;
+      if (!v) return;
+      v.muted = !v.muted;
+      setMuted(v.muted);
+    }
   };
 
   const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
-    const v = videoRef.current;
-    if (!v) return;
     const val = parseFloat(e.target.value);
-    v.volume = val;
-    setVolumeState(val);
-    if (val > 0 && v.muted) {
-      v.muted = false;
-      setMuted(false);
+    if (useNative) {
+      native.controls.setVolume(val);
+      setVolumeState(val);
+      if (val > 0 && muted) setMuted(false);
+    } else {
+      const v = videoRef.current;
+      if (!v) return;
+      v.volume = val;
+      setVolumeState(val);
+      if (val > 0 && v.muted) {
+        v.muted = false;
+        setMuted(false);
+      }
     }
   };
 
   const handleSeekChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
-    const v = videoRef.current;
-    if (!v) return;
-    v.currentTime = parseFloat(e.target.value);
-    setCurrentTime(v.currentTime);
+    const val = parseFloat(e.target.value);
+    if (useNative) {
+      native.controls.seek(val);
+    } else {
+      const v = videoRef.current;
+      if (!v) return;
+      v.currentTime = val;
+      setCurrentTime(v.currentTime);
+    }
   };
 
   const handleSubtitleChange = (idx: number): void => {
+    if (useNative) return; // TODO: native subtitles
     const v = videoRef.current;
     if (!v) return;
     Array.from(v.textTracks).forEach((t, i) => {
@@ -317,8 +431,8 @@ export const VideoPlayer: React.FC = () => {
 
   if (!src) return null;
 
-  const bufferedPct = duration > 0 ? (buffered / duration) * 100 : 0;
-  const currentPct = duration > 0 ? (currentTime / duration) * 100 : 0;
+  const bufferedPct = durationDisplay > 0 ? (buffered / durationDisplay) * 100 : 0;
+  const currentPct = durationDisplay > 0 ? (currentTimeDisplay / durationDisplay) * 100 : 0;
 
   return (
     <motion.div
@@ -337,16 +451,51 @@ export const VideoPlayer: React.FC = () => {
       onMouseMove={showControls}
       onMouseDown={showControls}
     >
-      <video
-        ref={videoRef}
-        style={{ width: "100%", height: "100%", display: "block" }}
-        crossOrigin="anonymous"
-        onClick={togglePlay}
-      >
-        {subtitleUrls.map((url, i) => (
-          <track key={url} kind="subtitles" src={url} default={i === 0} />
-        ))}
-      </video>
+      {useNative ? (
+        <canvas
+          ref={nativeCanvasRef}
+          style={{ width: "100%", height: "100%", display: "block" }}
+          onClick={togglePlay}
+        />
+      ) : (
+        <video
+          ref={videoRef}
+          style={{ width: "100%", height: "100%", display: "block" }}
+          crossOrigin="anonymous"
+          onClick={togglePlay}
+        >
+          {subtitleUrls.map((url, i) => (
+            <track key={url} kind="subtitles" src={url} default={i === 0} />
+          ))}
+        </video>
+      )}
+
+      {errorDisplay && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "rgba(0,0,0,0.7)",
+          }}
+        >
+          <div
+            className="text-sm"
+            style={{
+              color: "#ff5555",
+              background: "rgba(0,0,0,0.8)",
+              padding: "12px 20px",
+              borderRadius: 8,
+              maxWidth: "80%",
+              textAlign: "center",
+            }}
+          >
+            {errorDisplay}
+          </div>
+        </div>
+      )}
 
       <AnimatePresence>
         {controlsVisible && (
@@ -377,29 +526,38 @@ export const VideoPlayer: React.FC = () => {
               style={{ color: "rgba(255,255,255,0.9)" }}
             >
               {title}
+              {useNative && native.state.backend && (
+                <span
+                  className="ml-2 text-xs"
+                  style={{ color: "rgba(255,255,255,0.5)" }}
+                >
+                  ({native.state.backend})
+                </span>
+              )}
             </div>
 
             {/* Seek bar */}
             <div className="relative mb-3" style={{ height: 4 }}>
-              {/* Buffered track */}
-              <div
-                style={{
-                  position: "absolute",
-                  top: 0,
-                  left: 0,
-                  height: "100%",
-                  width: `${bufferedPct}%`,
-                  background: "rgba(255,255,255,0.25)",
-                  borderRadius: 2,
-                  pointerEvents: "none",
-                }}
-              />
+              {!useNative && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    height: "100%",
+                    width: `${bufferedPct}%`,
+                    background: "rgba(255,255,255,0.25)",
+                    borderRadius: 2,
+                    pointerEvents: "none",
+                  }}
+                />
+              )}
               <input
                 type="range"
                 min={0}
-                max={duration || 100}
+                max={durationDisplay || 100}
                 step={0.5}
-                value={currentTime}
+                value={currentTimeDisplay}
                 onMouseDown={() => setSeeking(true)}
                 onMouseUp={() => {
                   setSeeking(false);
@@ -470,10 +628,10 @@ export const VideoPlayer: React.FC = () => {
                   color: "#000",
                   flexShrink: 0,
                 }}
-                aria-label={playing ? "Pause" : "Play"}
-                title={playing ? "Pause (Space)" : "Play (Space)"}
+                aria-label={isPlaying ? "Pause" : "Play"}
+                title={isPlaying ? "Pause (Space)" : "Play (Space)"}
               >
-                {playing ? <Pause size={18} /> : <Play size={18} />}
+                {isPlaying ? <Pause size={18} /> : <Play size={18} />}
               </button>
 
               {/* Time display */}
@@ -481,13 +639,13 @@ export const VideoPlayer: React.FC = () => {
                 className="text-xs tabular-nums flex-shrink-0"
                 style={{ color: "rgba(255,255,255,0.8)" }}
               >
-                {fmt(currentTime)} / {fmt(duration)}
+                {fmt(currentTimeDisplay)} / {fmt(durationDisplay)}
               </span>
 
               <div className="flex-1" />
 
               {/* Subtitle selector */}
-              {subtitleTracks.length > 0 && (
+              {!useNative && subtitleTracks.length > 0 && (
                 <div className="flex items-center gap-1 flex-shrink-0">
                   <span
                     className="text-xs"

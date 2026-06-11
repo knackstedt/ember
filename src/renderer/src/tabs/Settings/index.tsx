@@ -11,6 +11,7 @@ import {
   Settings,
   Keyboard,
   Globe,
+  Monitor,
 } from "lucide-react";
 import { AppearanceTab } from "./AppearanceTab";
 import { GeneralTab } from "./GeneralTab";
@@ -22,6 +23,7 @@ import { DependenciesTab } from "./DependenciesTab";
 import { InputTab } from "./InputTab";
 import { DangerZoneTab } from "./DangerZoneTab";
 import { RemoteSourcesTab } from "./RemoteSourcesTab";
+import { SystemInfoTab } from "./SystemInfoTab";
 
 const SUB_TABS = [
   { id: "general", label: "General", Icon: Settings },
@@ -33,6 +35,7 @@ const SUB_TABS = [
   { id: "emulators", label: "Emulators", Icon: Gamepad2 },
   { id: "plugins", label: "Plugins", Icon: Plug },
   { id: "dependencies", label: "Dependencies", Icon: Package },
+  { id: "system-info", label: "System Info", Icon: Monitor },
   { id: "danger-zone", label: "Danger Zone", Icon: AlertTriangle },
 ] as const;
 
@@ -48,6 +51,7 @@ const TAB_COMPONENTS: Record<SubTabId, React.FC> = {
   emulators: EmulatorsTab,
   plugins: PluginsTab,
   dependencies: DependenciesTab,
+  "system-info": SystemInfoTab,
   "danger-zone": DangerZoneTab,
 };
 
