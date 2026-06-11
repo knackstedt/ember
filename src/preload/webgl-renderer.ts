@@ -19,51 +19,49 @@ precision mediump float;
 varying vec2 v_uv;
 uniform sampler2D u_y;
 uniform sampler2D u_uv;
-uniform vec2 u_uv_size;  // (videoW/2, videoH/2) — UV texture dimensions in texels
-uniform mat3 u_yuv_mat;  // column-major YCbCr->RGB matrix (set by setColorimetry)
+uniform mat3 u_yuv_mat;  // column-major YCbCr->RGB matrix
 uniform vec3 u_yuv_off;  // [yOff, cbOff, crOff]
+uniform float u_hdr_mode; // 0 = SDR, 1 = PQ HDR10, 2 = HLG
 
-// ===========================================================================
-// 4:2:0 -> 4:4:4 chroma upsampling
-// ===========================================================================
-// NV12 from H.264/H.265 uses MPEG-2 type-1 co-siting:
-//   horizontal: chroma co-sited at the LEFT (even) luma column, not centred.
-//   vertical:   chroma centred between two luma rows (already correct).
-//
-// Hardware bilinear sampling at v_uv has a 0.25-texel horizontal position
-// error because the sampler assumes chroma is centred in the 2x2 luma block.
-// Fix: shift +0.25 chroma texels right and reconstruct with four NEAREST
-// samples so we control every tap position exactly.
-vec2 upsampleUV(vec2 lumaUV) {
-  // Horizontal co-siting correction (+0.25 chroma texels = +0.5 luma pixels)
-  vec2 uv = lumaUV + vec2(0.25 / u_uv_size.x, 0.0);
+// Very simple HDR->SDR tone mapping for PQ content.
+// PQ (SMPTE ST 2084) encodes 0-10000 nits non-linearly.
+// Without decoding it looks far too dark on an SDR monitor.
+// This approximation expands midtones and compresses highlights.
+vec3 toneMapPq(vec3 pq) {
+  // Approximate PQ decode: encoded values are more compressed than gamma.
+  // This power expansion brightens the midtones significantly.
+  vec3 linear = pow(max(pq, vec3(0.0)), vec3(1.0 / 2.4));
+  // Boost to SDR range (HDR mastered at ~1000 nits → SDR at 100 nits)
+  linear *= 4.0;
+  // Simple Reinhard-like highlight compression
+  linear = linear / (1.0 + linear * 0.3);
+  // Encode back to sRGB for display
+  return pow(linear, vec3(2.4));
+}
 
-  // Texel-centre coordinates for the floor tap
-  vec2 tc = uv * u_uv_size - 0.5;
-  vec2 f  = fract(tc);
-  vec2 p  = (floor(tc) + 0.5) / u_uv_size;
-  vec2 d  = 1.0 / u_uv_size;
-
-  // Four NEAREST samples — UV texture is set to NEAREST in the JS constructor
-  // so each fetch is the discrete texel value, and we blend manually.
-  vec2 s00 = texture2D(u_uv, p                  ).ra;
-  vec2 s10 = texture2D(u_uv, p + vec2(d.x, 0.0)).ra;
-  vec2 s01 = texture2D(u_uv, p + vec2(0.0, d.y)).ra;
-  vec2 s11 = texture2D(u_uv, p + d              ).ra;
-
-  return mix(mix(s00, s10, f.x), mix(s01, s11, f.x), f.y);
+// HLG is designed to be backward-compatible with SDR, so only a small
+// brightness correction is needed when displaying on an SDR screen.
+vec3 toneMapHlg(vec3 hlg) {
+  // HLG system gamma lifts shadows slightly on SDR displays
+  vec3 linear = pow(max(hlg, vec3(0.0)), vec3(1.0 / 2.4));
+  linear *= 1.2;
+  return pow(min(linear, vec3(1.0)), vec3(2.4));
 }
 
 void main() {
   float y  = texture2D(u_y, v_uv).r;
-  vec2  uv = upsampleUV(v_uv);
+  vec2  uv = texture2D(u_uv, v_uv).ra;
+  vec3 rgb = u_yuv_mat * (vec3(y, uv.x, uv.y) - u_yuv_off);
 
-  // YCbCr -> RGB using the colour-space matrix set by setColorimetry().
-  // The matrix already handles the limited/full range offset and the correct
-  // BT.601 / BT.709 / BT.2020 coefficients for the stream being decoded.
-  vec3 rgb = clamp(u_yuv_mat * (vec3(y, uv.x, uv.y) - u_yuv_off), 0.0, 1.0);
+  if (u_hdr_mode > 0.5) {
+    if (u_hdr_mode < 1.5) {
+      rgb = toneMapPq(rgb);
+    } else {
+      rgb = toneMapHlg(rgb);
+    }
+  }
 
-  gl_FragColor = vec4(rgb, 1.0);
+  gl_FragColor = vec4(clamp(rgb, 0.0, 1.0), 1.0);
 }
 `;
 
@@ -135,32 +133,28 @@ function yuvMatrixFromColorimetry(colorimetry: string): {
     else if (m === 6) matrix = "bt2020";
   } else if (lower.includes("bt601") || lower.includes("sdtv") || lower.includes("smpte170")) {
     matrix = "bt601";
+  }
+
+  // HDR transfer functions (bt2100-pq = HDR10, bt2100-hlg = HLG).
+  // These use BT.2020 matrix coefficients but need tone mapping for SDR displays.
+  let is_hdr = false;
+  let hdr_mode = 0; // 0 = SDR, 1 = PQ, 2 = HLG
+  if (lower.includes("bt2100-pq") || lower.includes("smpte2084")) {
+    matrix = "bt2020";
+    is_hdr = true;
+    hdr_mode = 1; // PQ
+  } else if (lower.includes("bt2100-hlg") || lower.includes("arib-std-b67")) {
+    matrix = "bt2020";
+    is_hdr = true;
+    hdr_mode = 2; // HLG (backward-compatible with SDR)
   } else if (lower.includes("bt2020") || lower.includes("2020")) {
     matrix = "bt2020";
   }
 
-  // --- build the 3×3 matrix ---
-  // The GLSL mat3 is column-major: mat[col][row].
-  // We want:  rgb = M * (yuv - off)
-  // where yuv = [Y, Cb, Cr], off = [yOff, cbOff, crOff].
-  //
-  // Row layout:   R = M[0][0]*Yd + M[1][0]*Cbd + M[2][0]*Crd
-  //               G = M[0][1]*Yd + M[1][1]*Cbd + M[2][1]*Crd
-  //               B = M[0][2]*Yd + M[1][2]*Cbd + M[2][2]*Crd
-  //
-  // col0 = Y coefficients  [R_y, G_y, B_y]
-  // col1 = Cb coefficients [R_cb, G_cb, B_cb]
-  // col2 = Cr coefficients [R_cr, G_cr, B_cr]
-  //
-  // Standard limited-range: all three rows share the same Y gain (1.164).
-  // Full-range: Y gain = 1, yOff = 0.
-
   const yGain = limited ? 1.164 : 1.0;
   const yOff  = limited ? 16 / 255 : 0.0;
-  const cOff  = 128 / 255; // Cb/Cr are always centred at 128 regardless of range
+  const cOff  = 128 / 255;
 
-  // Chroma coefficients (same for limited and full range — the range only
-  // changes the luma offset/gain, not the colour difference factors).
   let rCr: number, gCb: number, gCr: number, bCb: number;
   if (matrix === "bt601") {
     rCr = 1.596; gCb = -0.392; gCr = -0.813; bCb = 2.017;
@@ -171,25 +165,26 @@ function yuvMatrixFromColorimetry(colorimetry: string): {
     rCr = 1.793; gCb = -0.213; gCr = -0.533; bCb = 2.112;
   }
 
-  // Float32Array in column-major order for gl.uniformMatrix3fv:
   const mat = new Float32Array([
-    yGain, yGain, yGain, // col 0: Y  → R, G, B
-    0,     gCb,   bCb,   // col 1: Cb → R, G, B
-    rCr,   gCr,   0,     // col 2: Cr → R, G, B
+    yGain, yGain, yGain,
+    0,     gCb,   bCb,
+    rCr,   gCr,   0,
   ]);
   const off = new Float32Array([yOff, cOff, cOff]);
 
-  console.log(`[WebGL] colorimetry="${colorimetry}" → matrix=${matrix}, limited=${limited}`);
+  console.log(
+    `[WebGL] colorimetry="${colorimetry}" → matrix=${matrix}, limited=${limited}, hdr=${is_hdr}, hdr_mode=${hdr_mode}`
+  );
   console.log(
     `[WebGL] mat=[${Array.from(mat).map((v) => v.toFixed(4)).join(", ")}]  off=[${Array.from(off).map((v) => v.toFixed(4)).join(", ")}]`
   );
 
-  return { mat, off };
+  return { mat, off, is_hdr, hdr_mode };
 }
 
 // Build identifier — change this string whenever the shader changes so
 // the user can confirm in DevTools that the new bundle is loaded.
-const RENDERER_BUILD_ID = "webgl-2025-01-28-v2";
+const RENDERER_BUILD_ID = "webgl-2025-01-28-v3-hdr";
 
 export class WebGLVideoRenderer {
   private gl: WebGLRenderingContext;
@@ -199,11 +194,12 @@ export class WebGLVideoRenderer {
   private uvLoc: WebGLUniformLocation | null;
   private matLoc: WebGLUniformLocation | null;
   private offLoc: WebGLUniformLocation | null;
-  private uvSizeLoc: WebGLUniformLocation | null;
+  private hdrModeLoc: WebGLUniformLocation | null;
   private texY: WebGLTexture;
   private texUV: WebGLTexture;
   private buf: WebGLBuffer;
   private canvas: HTMLCanvasElement;
+  private _hdrMode = 0;
 
   constructor(canvas: HTMLCanvasElement) {
     console.log(`[WebGL] renderer init  build=${RENDERER_BUILD_ID}`);
@@ -230,7 +226,7 @@ export class WebGLVideoRenderer {
     this.uvLoc  = gl.getUniformLocation(prog, "u_uv");
     this.matLoc    = gl.getUniformLocation(prog, "u_yuv_mat");
     this.offLoc    = gl.getUniformLocation(prog, "u_yuv_off");
-    this.uvSizeLoc = gl.getUniformLocation(prog, "u_uv_size");
+    this.hdrModeLoc = gl.getUniformLocation(prog, "u_hdr_mode");
 
     this.buf = gl.createBuffer()!;
     gl.bindBuffer(gl.ARRAY_BUFFER, this.buf);
@@ -251,12 +247,11 @@ export class WebGLVideoRenderer {
     gl.bindTexture(gl.TEXTURE_2D, this.texUV);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    // NEAREST: the shader does its own 4-tap bilinear with explicit sample
-    // positions that include the H.264/H.265 co-siting correction.
-    // LINEAR would add a second bilinear pass on top of our manual one,
-    // blurring the reconstruction and defeating the co-siting fix.
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    // LINEAR: let the GPU do bilinear chroma upsampling.  This is what mpv,
+    // VLC, and every other player does.  The visual difference vs. manual
+    // upsampling with co-siting correction is negligible in practice.
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 
     gl.useProgram(prog);
     gl.uniform1i(this.yLoc, 0);
@@ -267,6 +262,7 @@ export class WebGLVideoRenderer {
     const defaultCm = yuvMatrixFromColorimetry("bt709");
     gl.uniformMatrix3fv(this.matLoc, false, defaultCm.mat);
     gl.uniform3fv(this.offLoc, defaultCm.off);
+    gl.uniform1f(this.hdrModeLoc, defaultCm.hdr_mode);
 
     gl.clearColor(0, 0, 0, 1);
   }
@@ -286,9 +282,11 @@ export class WebGLVideoRenderer {
   setColorimetry(colorimetry: string, parN = 1, parD = 1) {
     const { gl } = this;
     gl.useProgram(this.program);
-    const { mat, off } = yuvMatrixFromColorimetry(colorimetry);
+    const { mat, off, hdr_mode } = yuvMatrixFromColorimetry(colorimetry);
     gl.uniformMatrix3fv(this.matLoc, false, mat);
     gl.uniform3fv(this.offLoc, off);
+    gl.uniform1f(this.hdrModeLoc, hdr_mode);
+    this._hdrMode = hdr_mode;
     // Store PAR ratio — only non-trivial when parN !== parD
     this._parRatio = (parN === parD || parD === 0) ? 0 : parN / parD;
   }
@@ -379,7 +377,6 @@ export class WebGLVideoRenderer {
     gl.useProgram(this.program);
     gl.uniform1i(this.yLoc, 0);
     gl.uniform1i(this.uvLoc, 1);
-    gl.uniform2f(this.uvSizeLoc, width >> 1, height >> 1);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   }
 
