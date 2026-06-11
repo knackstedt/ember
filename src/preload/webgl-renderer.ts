@@ -19,18 +19,81 @@ precision mediump float;
 varying vec2 v_uv;
 uniform sampler2D u_y;
 uniform sampler2D u_uv;
+uniform vec2 u_uv_size;  // (videoW/2, videoH/2) — UV texture dimensions in texels
+uniform mat3 u_yuv_mat;  // column-major YCbCr->RGB matrix (set by setColorimetry)
+uniform vec3 u_yuv_off;  // [yOff, cbOff, crOff]
 
-// Column-major 3x3 matrix that converts (Y-yOff, Cb-cOff, Cr-cOff) -> RGB.
-// Computed in JS from the video's actual colorimetry caps string so we
-// correctly handle BT.601, BT.709, BT.2020, full-range, and limited-range.
-uniform mat3 u_yuv_mat;
-uniform vec3 u_yuv_off;
+// ===========================================================================
+// 4:2:0 -> 4:4:4 chroma upsampling
+// ===========================================================================
+// NV12 from H.264/H.265 uses MPEG-2 type-1 co-siting:
+//   horizontal: chroma co-sited at the LEFT (even) luma column, not centred.
+//   vertical:   chroma centred between two luma rows (already correct).
+//
+// Hardware bilinear sampling at v_uv has a 0.25-texel horizontal position
+// error because the sampler assumes chroma is centred in the 2x2 luma block.
+// Fix: shift +0.25 chroma texels right and reconstruct with four NEAREST
+// samples so we control every tap position exactly.
+vec2 upsampleUV(vec2 lumaUV) {
+  // Horizontal co-siting correction (+0.25 chroma texels = +0.5 luma pixels)
+  vec2 uv = lumaUV + vec2(0.25 / u_uv_size.x, 0.0);
+
+  // Texel-centre coordinates for the floor tap
+  vec2 tc = uv * u_uv_size - 0.5;
+  vec2 f  = fract(tc);
+  vec2 p  = (floor(tc) + 0.5) / u_uv_size;
+  vec2 d  = 1.0 / u_uv_size;
+
+  // Four NEAREST samples — UV texture is set to NEAREST in the JS constructor
+  // so each fetch is the discrete texel value, and we blend manually.
+  vec2 s00 = texture2D(u_uv, p                  ).ra;
+  vec2 s10 = texture2D(u_uv, p + vec2(d.x, 0.0)).ra;
+  vec2 s01 = texture2D(u_uv, p + vec2(0.0, d.y)).ra;
+  vec2 s11 = texture2D(u_uv, p + d              ).ra;
+
+  return mix(mix(s00, s10, f.x), mix(s01, s11, f.x), f.y);
+}
+
+// ===========================================================================
+// Transfer-function correction: BT.709 encoded -> linear -> sRGB encoded
+// ===========================================================================
+// Chromium's compositor treats canvas pixels as sRGB.  BT.709 and sRGB share
+// the same primaries but differ in their transfer functions:
+//
+//   sRGB   breakpoint 0.0031308 linear (encoded ~0.040), exponent 1/2.4
+//   BT.709 breakpoint 0.018     linear (encoded  0.081), exponent 1/0.45
+//
+// Without this correction the compositor decodes the BT.709 "linear segment"
+// (0.040-0.081 encoded) using the sRGB gamma curve instead, causing visible
+// shadow crush and mid-tone shifts compared to players like mpv/Celluloid.
+//
+// Cost: ~10 ALU ops per pixel — completely negligible on any modern GPU.
+
+// BT.709 EOTF: gamma-encoded BT.709 -> linear light
+vec3 eotf_bt709(vec3 v) {
+  return mix(v / 4.5,
+             pow((v + 0.099) / 1.099, vec3(1.0 / 0.45)),
+             step(vec3(0.081), v));
+}
+
+// sRGB OETF: linear light -> sRGB-encoded (matches Chromium compositor)
+vec3 oetf_srgb(vec3 v) {
+  return mix(v * 12.92,
+             1.055 * pow(v, vec3(1.0 / 2.4)) - 0.055,
+             step(vec3(0.0031308), v));
+}
 
 void main() {
-  float y  = texture2D(u_y,  v_uv).r;
-  vec2  uv = texture2D(u_uv, v_uv).ra;
-  vec3  rgb = u_yuv_mat * (vec3(y, uv.x, uv.y) - u_yuv_off);
-  gl_FragColor = vec4(clamp(rgb, 0.0, 1.0), 1.0);
+  float y  = texture2D(u_y, v_uv).r;
+  vec2  uv = upsampleUV(v_uv);
+
+  // YCbCr -> BT.709-encoded RGB
+  vec3 rgb = clamp(u_yuv_mat * (vec3(y, uv.x, uv.y) - u_yuv_off), 0.0, 1.0);
+
+  // BT.709 encoded -> linear light -> sRGB encoded
+  rgb = oetf_srgb(eotf_bt709(rgb));
+
+  gl_FragColor = vec4(rgb, 1.0);
 }
 `;
 
@@ -158,6 +221,7 @@ export class WebGLVideoRenderer {
   private uvLoc: WebGLUniformLocation | null;
   private matLoc: WebGLUniformLocation | null;
   private offLoc: WebGLUniformLocation | null;
+  private uvSizeLoc: WebGLUniformLocation | null;
   private texY: WebGLTexture;
   private texUV: WebGLTexture;
   private buf: WebGLBuffer;
@@ -185,8 +249,9 @@ export class WebGLVideoRenderer {
     this.posLoc = gl.getAttribLocation(prog, "a_pos");
     this.yLoc   = gl.getUniformLocation(prog, "u_y");
     this.uvLoc  = gl.getUniformLocation(prog, "u_uv");
-    this.matLoc = gl.getUniformLocation(prog, "u_yuv_mat");
-    this.offLoc = gl.getUniformLocation(prog, "u_yuv_off");
+    this.matLoc    = gl.getUniformLocation(prog, "u_yuv_mat");
+    this.offLoc    = gl.getUniformLocation(prog, "u_yuv_off");
+    this.uvSizeLoc = gl.getUniformLocation(prog, "u_uv_size");
 
     this.buf = gl.createBuffer()!;
     gl.bindBuffer(gl.ARRAY_BUFFER, this.buf);
@@ -207,8 +272,12 @@ export class WebGLVideoRenderer {
     gl.bindTexture(gl.TEXTURE_2D, this.texUV);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    // NEAREST: the shader does its own 4-tap bilinear with explicit sample
+    // positions that include the H.264/H.265 co-siting correction.
+    // LINEAR would add a second bilinear pass on top of our manual one,
+    // blurring the reconstruction and defeating the co-siting fix.
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
 
     gl.useProgram(prog);
     gl.uniform1i(this.yLoc, 0);
@@ -331,6 +400,7 @@ export class WebGLVideoRenderer {
     gl.useProgram(this.program);
     gl.uniform1i(this.yLoc, 0);
     gl.uniform1i(this.uvLoc, 1);
+    gl.uniform2f(this.uvSizeLoc, width >> 1, height >> 1);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   }
 
