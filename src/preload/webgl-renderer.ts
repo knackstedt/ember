@@ -21,47 +21,12 @@ uniform sampler2D u_y;
 uniform sampler2D u_uv;
 uniform mat3 u_yuv_mat;  // column-major YCbCr->RGB matrix
 uniform vec3 u_yuv_off;  // [yOff, cbOff, crOff]
-uniform float u_hdr_mode; // 0 = SDR, 1 = PQ HDR10, 2 = HLG
-
-// Very simple HDR->SDR tone mapping for PQ content.
-// PQ (SMPTE ST 2084) encodes 0-10000 nits non-linearly.
-// Without decoding it looks far too dark on an SDR monitor.
-// This approximation expands midtones and compresses highlights.
-vec3 toneMapPq(vec3 pq) {
-  // Approximate PQ decode: encoded values are more compressed than gamma.
-  // This power expansion brightens the midtones significantly.
-  vec3 linear = pow(max(pq, vec3(0.0)), vec3(1.0 / 2.4));
-  // Boost to SDR range (HDR mastered at ~1000 nits → SDR at 100 nits)
-  linear *= 4.0;
-  // Simple Reinhard-like highlight compression
-  linear = linear / (1.0 + linear * 0.3);
-  // Encode back to sRGB for display
-  return pow(linear, vec3(2.4));
-}
-
-// HLG is designed to be backward-compatible with SDR, so only a small
-// brightness correction is needed when displaying on an SDR screen.
-vec3 toneMapHlg(vec3 hlg) {
-  // HLG system gamma lifts shadows slightly on SDR displays
-  vec3 linear = pow(max(hlg, vec3(0.0)), vec3(1.0 / 2.4));
-  linear *= 1.2;
-  return pow(min(linear, vec3(1.0)), vec3(2.4));
-}
 
 void main() {
   float y  = texture2D(u_y, v_uv).r;
   vec2  uv = texture2D(u_uv, v_uv).ra;
-  vec3 rgb = u_yuv_mat * (vec3(y, uv.x, uv.y) - u_yuv_off);
-
-  if (u_hdr_mode > 0.5) {
-    if (u_hdr_mode < 1.5) {
-      rgb = toneMapPq(rgb);
-    } else {
-      rgb = toneMapHlg(rgb);
-    }
-  }
-
-  gl_FragColor = vec4(clamp(rgb, 0.0, 1.0), 1.0);
+  vec3 rgb = clamp(u_yuv_mat * (vec3(y, uv.x, uv.y) - u_yuv_off), 0.0, 1.0);
+  gl_FragColor = vec4(rgb, 1.0);
 }
 `;
 
@@ -184,7 +149,7 @@ function yuvMatrixFromColorimetry(colorimetry: string): {
 
 // Build identifier — change this string whenever the shader changes so
 // the user can confirm in DevTools that the new bundle is loaded.
-const RENDERER_BUILD_ID = "webgl-2025-01-28-v3-hdr";
+const RENDERER_BUILD_ID = "webgl-2025-01-28-v4";
 
 export class WebGLVideoRenderer {
   private gl: WebGLRenderingContext;
@@ -194,12 +159,10 @@ export class WebGLVideoRenderer {
   private uvLoc: WebGLUniformLocation | null;
   private matLoc: WebGLUniformLocation | null;
   private offLoc: WebGLUniformLocation | null;
-  private hdrModeLoc: WebGLUniformLocation | null;
   private texY: WebGLTexture;
   private texUV: WebGLTexture;
   private buf: WebGLBuffer;
   private canvas: HTMLCanvasElement;
-  private _hdrMode = 0;
 
   constructor(canvas: HTMLCanvasElement) {
     console.log(`[WebGL] renderer init  build=${RENDERER_BUILD_ID}`);
@@ -226,7 +189,6 @@ export class WebGLVideoRenderer {
     this.uvLoc  = gl.getUniformLocation(prog, "u_uv");
     this.matLoc    = gl.getUniformLocation(prog, "u_yuv_mat");
     this.offLoc    = gl.getUniformLocation(prog, "u_yuv_off");
-    this.hdrModeLoc = gl.getUniformLocation(prog, "u_hdr_mode");
 
     this.buf = gl.createBuffer()!;
     gl.bindBuffer(gl.ARRAY_BUFFER, this.buf);
@@ -262,7 +224,6 @@ export class WebGLVideoRenderer {
     const defaultCm = yuvMatrixFromColorimetry("bt709");
     gl.uniformMatrix3fv(this.matLoc, false, defaultCm.mat);
     gl.uniform3fv(this.offLoc, defaultCm.off);
-    gl.uniform1f(this.hdrModeLoc, defaultCm.hdr_mode);
 
     gl.clearColor(0, 0, 0, 1);
   }
@@ -282,11 +243,9 @@ export class WebGLVideoRenderer {
   setColorimetry(colorimetry: string, parN = 1, parD = 1) {
     const { gl } = this;
     gl.useProgram(this.program);
-    const { mat, off, hdr_mode } = yuvMatrixFromColorimetry(colorimetry);
+    const { mat, off } = yuvMatrixFromColorimetry(colorimetry);
     gl.uniformMatrix3fv(this.matLoc, false, mat);
     gl.uniform3fv(this.offLoc, off);
-    gl.uniform1f(this.hdrModeLoc, hdr_mode);
-    this._hdrMode = hdr_mode;
     // Store PAR ratio — only non-trivial when parN !== parD
     this._parRatio = (parN === parD || parD === 0) ? 0 : parN / parD;
   }
