@@ -130,49 +130,80 @@ export class WebGLVideoRenderer {
     gl.clearColor(0, 0, 0, 1);
   }
 
-  resize(width: number, height: number) {
+  /**
+   * Call once after the canvas is mounted and whenever the video dimensions
+   * are known.  The canvas backing-store is set to its CSS layout size (×dpr)
+   * so one CSS pixel == one physical pixel.  If the canvas hasn't been laid
+   * out yet (clientWidth === 0) we fall back to the video dimensions so the
+   * element has a sensible initial size.
+   */
+  resize(videoWidth: number, videoHeight: number) {
     const { canvas, gl } = this;
     const dpr = window.devicePixelRatio || 1;
-    canvas.width = Math.floor(width * dpr);
-    canvas.height = Math.floor(height * dpr);
+    const cssW = canvas.clientWidth  || videoWidth;
+    const cssH = canvas.clientHeight || videoHeight;
+    canvas.width  = Math.floor(cssW * dpr);
+    canvas.height = Math.floor(cssH * dpr);
     gl.viewport(0, 0, canvas.width, canvas.height);
   }
 
   render(y: Uint8Array, uv: Uint8Array, width: number, height: number) {
-    const { gl } = this;
+    const { gl, canvas } = this;
+
+    // Keep the canvas backing-store in sync with its CSS display size.
+    // This must happen every frame because the window (or container) may be
+    // resized at any time.  Changing canvas.width/height only when the size
+    // actually differs avoids the expensive framebuffer recreation on every frame.
+    const dpr = window.devicePixelRatio || 1;
+    const backW = Math.max(1, Math.floor((canvas.clientWidth  || width)  * dpr));
+    const backH = Math.max(1, Math.floor((canvas.clientHeight || height) * dpr));
+    if (canvas.width !== backW || canvas.height !== backH) {
+      canvas.width  = backW;
+      canvas.height = backH;
+    }
+
+    // Letterbox / pillarbox: fit the video inside the canvas while preserving
+    // the video's own aspect ratio.  The remainder of the canvas is painted
+    // black.
+    const videoAspect  = width  / height;
+    const canvasAspect = backW / backH;
+    let vx: number, vy: number, vw: number, vh: number;
+    if (videoAspect > canvasAspect) {
+      // Video is wider than the canvas → horizontal bars top and bottom.
+      vw = backW;
+      vh = Math.round(backW / videoAspect);
+      vx = 0;
+      vy = Math.round((backH - vh) / 2);
+    } else {
+      // Video is taller than the canvas → vertical bars left and right.
+      vh = backH;
+      vw = Math.round(backH * videoAspect);
+      vx = Math.round((backW - vw) / 2);
+      vy = 0;
+    }
+
+    // Clear the full canvas to black so the letterbox bars are painted.
+    gl.viewport(0, 0, backW, backH);
+    gl.clearColor(0, 0, 0, 1);
     gl.clear(gl.COLOR_BUFFER_BIT);
 
-    const yW = width;
-    const yH = height;
-    const uvW = width / 2;
-    const uvH = height / 2;
+    // Constrain subsequent rendering to the video area only.
+    gl.viewport(vx, vy, vw, vh);
 
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, this.texY);
     gl.texImage2D(
-      gl.TEXTURE_2D,
-      0,
-      gl.LUMINANCE,
-      yW,
-      yH,
-      0,
-      gl.LUMINANCE,
-      gl.UNSIGNED_BYTE,
-      y
+      gl.TEXTURE_2D, 0, gl.LUMINANCE,
+      width, height, 0,
+      gl.LUMINANCE, gl.UNSIGNED_BYTE, y
     );
 
     gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_2D, this.texUV);
     gl.texImage2D(
-      gl.TEXTURE_2D,
-      0,
-      gl.LUMINANCE_ALPHA,
-      uvW,
-      uvH,
-      0,
-      gl.LUMINANCE_ALPHA,
-      gl.UNSIGNED_BYTE,
-      uv
+      gl.TEXTURE_2D, 0, gl.LUMINANCE_ALPHA,
+      width >> 1, height >> 1, 0,
+      gl.LUMINANCE_ALPHA, gl.UNSIGNED_BYTE, uv
     );
 
     gl.bindBuffer(gl.ARRAY_BUFFER, this.buf);
