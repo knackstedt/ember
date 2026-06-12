@@ -1,0 +1,43 @@
+---
+title: Ember
+description: A Home Theater PC frontend for Linux. Browse and launch games, movies, TV shows, and music from the couch with controller support.
+template: splash
+hero:
+  tagline: Browse and launch games, movies, TV shows, and music from the couch with full controller support.
+  image:
+    dark: ../../assets/logo-dark.svg
+    light: ../../assets/logo-light.svg
+  actions:
+    - text: Get Started
+      link: /htpc/getting-started/introduction/
+      icon: right-arrow
+    - text: Download
+      link: https://github.com/apophis/htpc/releases
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## Everything in one place
+
+<CardGrid stagger>
+	<Card title="Games" icon="rocket">
+		Launch Steam, Heroic, Lutris, and local ROMs. Native GameCube & Wii emulation via Dolphin.
+	</Card>
+	<Card title="Movies & TV" icon="video">
+		Play local MKV, MP4, and HEVC files with hardware-accelerated decoding and a beautiful WebGL renderer.
+	</Card>
+	<Card title="Music" icon="seti:audio">
+		Browse your music library and launch tracks with the system default player.
+	</Card>
+	<Card title="Controller First" icon="gamepad">
+		Navigate the entire UI from the couch. No keyboard required.
+	</Card>
+	<Card title="Linux Native" icon="linux">
+		Built for Linux with Flatpak support, ARM64 builds, and distro-agnostic packaging.
+	</Card>
+	<Card title="Open Source" icon="github">
+		Free and open source. Built with Electron, Rust, and React.
+	</Card>
+</CardGrid>

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="none">
+  <rect width="256" height="256" rx="48" fill="#fff8f5" stroke="#f0ddd5" stroke-width="2"/>
+  <path d="M128 48C96 96 64 128 64 176c0 35.346 28.654 64 64 64s64-28.654 64-64c0-48-32-80-64-128z" fill="#f97316"/>
+  <path d="M128 96c-16 32-32 48-32 80 0 17.673 14.327 32 32 32s32-14.327 32-32c0-32-16-48-32-80z" fill="#fb923c"/>
+  <text x="128" y="220" text-anchor="middle" font-family="system-ui, sans-serif" font-size="28" font-weight="700" fill="#1f0f0a">EMBER</text>
+</svg>
