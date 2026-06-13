@@ -170,6 +170,8 @@ const htpc = {
       mounts: string[];
     }> =>
       ipcRenderer.invoke("app:xdg-defaults"),
+    getPreloadPath: (name: string): Promise<string> =>
+      ipcRenderer.invoke("app:getPreloadPath", name),
   },
 
   games: {
@@ -558,6 +560,22 @@ const htpc = {
       ipcRenderer.invoke("streaming:detectDesktopApp", command),
     launch: (service: StreamingService): Promise<void> =>
       ipcRenderer.invoke("streaming:launch", service),
+    frontpage: {
+      report: (serviceId: string, items: import("../shared/types").StreamingFrontpageItem[]): Promise<{ success: boolean; count: number }> =>
+        ipcRenderer.invoke("streaming:frontpage:report", serviceId, items),
+      list: (serviceId: string): Promise<import("../shared/types").StreamingFrontpageItem[]> =>
+        ipcRenderer.invoke("streaming:frontpage:list", serviceId),
+      listAll: (): Promise<import("../shared/types").StreamingFrontpageItem[]> =>
+        ipcRenderer.invoke("streaming:frontpage:listAll"),
+      clear: (maxAgeMs?: number): Promise<{ success: boolean }> =>
+        ipcRenderer.invoke("streaming:frontpage:clear", maxAgeMs),
+    },
+    usage: {
+      start: (id: string): Promise<{ success: boolean }> =>
+        ipcRenderer.invoke("streaming:usage:start", id),
+      stop: (id: string, seconds: number): Promise<{ success: boolean }> =>
+        ipcRenderer.invoke("streaming:usage:stop", id, seconds),
+    },
     extensions: {
       ensureDefaults: (): Promise<void> =>
         ipcRenderer.invoke("streaming:extensions:ensureDefaults"),

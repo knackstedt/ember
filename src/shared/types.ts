@@ -557,6 +557,25 @@ export interface StreamingService {
   sortOrder?: number;
   /** Whether the service should open in an embedded webview instead of externally */
   embed?: boolean;
+  /** Whether frontpage scraping is enabled for this service */
+  frontpageEnabled?: boolean;
+  /** Total seconds spent in this service (tracked for sorting) */
+  playTime?: number;
+  /** Last time this service was opened */
+  lastPlayed?: number;
+}
+
+export interface StreamingFrontpageItem {
+  id: string;
+  serviceId: string;
+  title: string;
+  url: string;
+  thumbnailUrl?: string;
+  description?: string;
+  duration?: string;
+  type?: "video" | "show" | "movie" | "live" | "playlist" | "channel";
+  scrapedAt?: number;
+  sortIndex?: number;
 }
 
 export interface StreamingExtension {

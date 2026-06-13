@@ -81,6 +81,10 @@ import {
   detectDesktopApp,
 } from "../services/streaming.service";
 import {
+  StreamingServiceRepo,
+  StreamingFrontpageItemRepo,
+} from "../db/repository";
+import {
   downloadExtension,
   loadExtensionIntoSession,
   unloadExtensionFromSession,
@@ -1801,6 +1805,42 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     } else {
       await shell.openExternal(service.url);
     }
+  });
+
+  /* ------------------------------------------------------------------ */
+  /*  Streaming Frontpage Items                                          */
+  /* ------------------------------------------------------------------ */
+
+  ipcMain.handle("streaming:frontpage:report", async (_e, serviceId: string, items: import("../../shared/types").StreamingFrontpageItem[]) => {
+    await StreamingFrontpageItemRepo.replaceForService(serviceId, items);
+    return { success: true, count: items.length };
+  });
+
+  ipcMain.handle("streaming:frontpage:list", async (_e, serviceId: string) => {
+    return StreamingFrontpageItemRepo.listByService(serviceId);
+  });
+
+  ipcMain.handle("streaming:frontpage:listAll", async () => {
+    return StreamingFrontpageItemRepo.listAll();
+  });
+
+  ipcMain.handle("streaming:frontpage:clear", async (_e, maxAgeMs?: number) => {
+    await StreamingFrontpageItemRepo.clearOld(maxAgeMs ?? 7 * 24 * 60 * 60 * 1000);
+    return { success: true };
+  });
+
+  ipcMain.handle("streaming:usage:start", async (_e, id: string) => {
+    await StreamingServiceRepo.setLastPlayed(id, Date.now());
+    return { success: true };
+  });
+
+  ipcMain.handle("streaming:usage:stop", async (_e, id: string, seconds: number) => {
+    await StreamingServiceRepo.addPlayTime(id, seconds);
+    return { success: true };
+  });
+
+  ipcMain.handle("app:getPreloadPath", async (_e, name: string) => {
+    return join(__dirname, "../preload", `${name}.js`);
   });
 
   /* ------------------------------------------------------------------ */

@@ -194,6 +194,18 @@ export default defineConfig({
   },
   preload: {
     plugins: [externalizeDepsPlugin()],
+    build: {
+      // @ts-expect-error electron-vite build.rollupOptions typing mismatch
+      rollupOptions: {
+        input: {
+          index: resolve("src/preload/index.ts"),
+          "streaming-preload": resolve("src/preload/streaming-preload.ts"),
+        },
+        output: {
+          entryFileNames: "[name].js",
+        },
+      },
+    },
     resolve: {
       alias: {
         "@shared": resolve("src/shared"),

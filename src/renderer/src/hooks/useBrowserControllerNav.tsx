@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { useInputStore } from "../store/input.store";
 import { getCursorManager, DeviceCursor } from "./browserControllerManager";
 import { CursorStyle } from "../components/VirtualCursor/VirtualCursor";
+import { findInputElement, useControllerOskStore } from "../store/controllerOsk.store";
 
 interface UseBrowserControllerNavOptions {
   enabled?: boolean;
@@ -136,7 +137,15 @@ export function useBrowserControllerNav({
       return state;
     };
 
-    const sendMouseEvent = (type: string, x: number, y: number, button?: string) => {
+    const isInsideOSK = (el: Element | null): boolean => {
+      while (el) {
+        if (el.getAttribute?.("data-controller-osk") === "true") return true;
+        el = el.parentElement;
+      }
+      return false;
+    };
+
+    const sendMouseEvent = (type: string, x: number, y: number, button?: string, deviceId?: string) => {
       const webview = findWebviewAt(x, y);
       if (webview) {
         try {
@@ -151,6 +160,60 @@ export function useBrowserControllerNav({
             clickCount: 1,
           });
         } catch {}
+
+        // Webview input detection: after a click, check if an input inside the webview got focused
+        if (deviceId && type === "mouseUp" && button === "left") {
+          const oskStore = useControllerOskStore.getState();
+          const wasOpen = oskStore.isOpen(deviceId);
+
+          // Small delay so the webview can process the click and update activeElement
+          setTimeout(() => {
+            try {
+              webview.executeJavaScript(`
+                (() => {
+                  const el = document.activeElement;
+                  if (!el) return null;
+                  if (el.tagName === 'INPUT') {
+                    const t = el.type;
+                    if (['text','number','password','email','url','search','tel'].includes(t)) {
+                      return { tag: 'INPUT', type: t, value: el.value, placeholder: el.placeholder || '' };
+                    }
+                  }
+                  if (el.tagName === 'TEXTAREA') {
+                    return { tag: 'TEXTAREA', type: 'text', value: el.value, placeholder: el.placeholder || '' };
+                  }
+                  if (el.isContentEditable) {
+                    return { tag: 'DIV', type: 'text', value: el.textContent || '', placeholder: '' };
+                  }
+                  return null;
+                })()
+              `).then((result: any) => {
+                if (!result) {
+                  if (wasOpen) oskStore.close(deviceId);
+                  return;
+                }
+                if (wasOpen) {
+                  const session = oskStore.getSession(deviceId)!;
+                  // Only switch if it's a different input
+                  const sameInput = result.value === session.value && result.type === session.inputType;
+                  if (!sameInput) {
+                    oskStore.close(deviceId);
+                    oskStore.open(deviceId, webview as unknown as HTMLElement, result.value, result.type, result.placeholder, true);
+                  } else {
+                    oskStore.close(deviceId);
+                  }
+                } else {
+                  // Store webview reference; actual input is inside webview
+                  oskStore.open(deviceId, webview as unknown as HTMLElement, result.value, result.type, result.placeholder, true);
+                }
+              }).catch(() => {
+                if (wasOpen) oskStore.close(deviceId);
+              });
+            } catch {
+              if (wasOpen) oskStore.close(deviceId);
+            }
+          }, 50);
+        }
         return;
       }
 
@@ -158,6 +221,57 @@ export function useBrowserControllerNav({
       try {
         const target = document.elementFromPoint(x, y);
         if (!target) return;
+
+        // Check for input element on left mouseUp before dispatching click
+        if (deviceId && type === "mouseUp" && button === "left") {
+          const oskStore = useControllerOskStore.getState();
+
+          // If OSK already open for this device, close it on click-away
+          if (oskStore.isOpen(deviceId)) {
+            // Don't close if the click is inside the keyboard itself
+            if (isInsideOSK(target)) {
+              // Continue with normal click dispatch so keyboard buttons work
+            } else {
+              const inputEl = findInputElement(target);
+              const session = oskStore.getSession(deviceId)!;
+              if (inputEl && inputEl !== session.targetElement) {
+                // Switch to new input
+                oskStore.close(deviceId);
+                inputEl.focus();
+                const initial =
+                  inputEl instanceof HTMLInputElement || inputEl instanceof HTMLTextAreaElement
+                    ? inputEl.value
+                    : inputEl.textContent ?? "";
+                oskStore.open(deviceId, inputEl, initial, inputEl instanceof HTMLInputElement ? inputEl.type : "text");
+              } else if (!inputEl) {
+                // Clicked outside input, close OSK but still dispatch click
+                oskStore.close(deviceId);
+              } else {
+                // Clicked same input, just close OSK and let click through
+                oskStore.close(deviceId);
+              }
+            }
+            // Continue with normal click dispatch below
+          } else {
+            const inputEl = findInputElement(target);
+            if (inputEl) {
+              inputEl.focus();
+              const initial =
+                inputEl instanceof HTMLInputElement || inputEl instanceof HTMLTextAreaElement
+                  ? inputEl.value
+                  : inputEl.textContent ?? "";
+              oskStore.open(
+                deviceId,
+                inputEl,
+                initial,
+                inputEl instanceof HTMLInputElement ? inputEl.type : "text",
+                inputEl instanceof HTMLInputElement ? inputEl.placeholder : undefined,
+              );
+              return; // Suppress normal click
+            }
+          }
+        }
+
         const ev = new MouseEvent(type === "mouseDown" ? "mousedown" : type === "mouseUp" ? "mouseup" : "mousemove", {
           bubbles: true,
           cancelable: true,
@@ -291,10 +405,13 @@ export function useBrowserControllerNav({
         // Cache webview under this device's cursor for the entire frame
         const webviewUnderCursor = findWebviewAt(dev.posRef.current.x, dev.posRef.current.y);
 
+        const oskOpen = useControllerOskStore.getState().isOpen(deviceId);
+
         const rawRightX = axes.right_x ?? 0;
         const rawRightY = axes.right_y ?? 0;
         const [rightX, rightY] = applyDeadzone(rawRightX, rawRightY, AXIS_THRESHOLD);
 
+        // Cursor movement always works (even when OSK is open)
         if (rightX !== 0 || rightY !== 0) {
           anyInput = true;
 
@@ -334,7 +451,8 @@ export function useBrowserControllerNav({
         const rawLeftY = axes.left_y ?? 0;
         const [leftX, leftY] = applyDeadzone(rawLeftX, rawLeftY, SCROLL_THRESHOLD);
 
-        if (leftX !== 0 || leftY !== 0) {
+        // Block scroll when OSK is open (left stick is used for OSK nav instead)
+        if (!oskOpen && (leftX !== 0 || leftY !== 0)) {
           anyInput = true;
           if (webviewUnderCursor) {
             try {
@@ -353,10 +471,10 @@ export function useBrowserControllerNav({
           return pressed && !wasPressed;
         };
 
-        const scheduleMouseUp = (x: number, y: number, button: string) => {
+        const scheduleMouseUp = (x: number, y: number, button: string, devId: string) => {
           const t = setTimeout(() => {
             pendingTimeouts.delete(t);
-            sendMouseEvent("mouseUp", x, y, button);
+            sendMouseEvent("mouseUp", x, y, button, devId);
           }, 80);
           pendingTimeouts.add(t);
         };
@@ -364,42 +482,45 @@ export function useBrowserControllerNav({
         // When evdev devices are present, button actions are already handled
         // by the evdev path in App.tsx. Skip synthetic mouse/keyboard events
         // to avoid double-firing UI actions.
+        // Always allow left-click (south) so virtual cursor can click-away from OSK.
         if (!evdevActive) {
           if (check("south")) {
             anyInput = true;
             dev.clickRef.current = (dev.clickRef.current || 0) + 1;
-            sendMouseEvent("mouseDown", dev.posRef.current.x, dev.posRef.current.y, "left");
-            scheduleMouseUp(dev.posRef.current.x, dev.posRef.current.y, "left");
+            sendMouseEvent("mouseDown", dev.posRef.current.x, dev.posRef.current.y, "left", deviceId);
+            scheduleMouseUp(dev.posRef.current.x, dev.posRef.current.y, "left", deviceId);
           }
-          if (check("east")) {
-            anyInput = true;
-            if (webviewUnderCursor && webviewUnderCursor.canGoBack && webviewUnderCursor.canGoBack()) {
-              webviewUnderCursor.goBack();
-            }
-          }
-          if (check("west")) {
-            anyInput = true;
-            dev.clickRef.current = (dev.clickRef.current || 0) + 1;
-            sendMouseEvent("mouseDown", dev.posRef.current.x, dev.posRef.current.y, "right");
-            scheduleMouseUp(dev.posRef.current.x, dev.posRef.current.y, "right");
-          }
-          if (check("north")) {
-            anyInput = true;
-            if (webviewUnderCursor && webviewUnderCursor.canGoForward && webviewUnderCursor.canGoForward()) {
-              webviewUnderCursor.goForward();
-            }
-          }
-          // Only send Tab keys for bumpers when cursor is inside a webview.
-          // In main mode the app already handles bumper tab switching
-          // directly via evdev / useGamepadApi to avoid double-firing.
-          if (webviewUnderCursor) {
-            if (check("left_bumper")) {
+          if (!oskOpen) {
+            if (check("east")) {
               anyInput = true;
-              sendKey("Tab", dev.posRef.current.x, dev.posRef.current.y, ["shift"]);
+              if (webviewUnderCursor && webviewUnderCursor.canGoBack && webviewUnderCursor.canGoBack()) {
+                webviewUnderCursor.goBack();
+              }
             }
-            if (check("right_bumper")) {
+            if (check("west")) {
               anyInput = true;
-              sendKey("Tab", dev.posRef.current.x, dev.posRef.current.y);
+              dev.clickRef.current = (dev.clickRef.current || 0) + 1;
+              sendMouseEvent("mouseDown", dev.posRef.current.x, dev.posRef.current.y, "right", deviceId);
+              scheduleMouseUp(dev.posRef.current.x, dev.posRef.current.y, "right", deviceId);
+            }
+            if (check("north")) {
+              anyInput = true;
+              if (webviewUnderCursor && webviewUnderCursor.canGoForward && webviewUnderCursor.canGoForward()) {
+                webviewUnderCursor.goForward();
+              }
+            }
+            // Only send Tab keys for bumpers when cursor is inside a webview.
+            // In main mode the app already handles bumper tab switching
+            // directly via evdev / useGamepadApi to avoid double-firing.
+            if (webviewUnderCursor) {
+              if (check("left_bumper")) {
+                anyInput = true;
+                sendKey("Tab", dev.posRef.current.x, dev.posRef.current.y, ["shift"]);
+              }
+              if (check("right_bumper")) {
+                anyInput = true;
+                sendKey("Tab", dev.posRef.current.x, dev.posRef.current.y);
+              }
             }
           }
         }
@@ -419,23 +540,27 @@ export function useBrowserControllerNav({
         dev.prevTriggers["left"] = ltPressed;
         dev.prevTriggers["right"] = rtPressed;
 
-        if (ltPressed && !wasLtPressed) {
-          anyInput = true;
-          dev.clickRef.current = (dev.clickRef.current || 0) + 1;
-          sendMouseEvent("mouseDown", dev.posRef.current.x, dev.posRef.current.y, "right");
-          scheduleMouseUp(dev.posRef.current.x, dev.posRef.current.y, "right");
-        }
+        // RT = left click, always allow (click-away from OSK)
         if (rtPressed && !wasRtPressed) {
           anyInput = true;
           dev.clickRef.current = (dev.clickRef.current || 0) + 1;
-          sendMouseEvent("mouseDown", dev.posRef.current.x, dev.posRef.current.y, "left");
-          scheduleMouseUp(dev.posRef.current.x, dev.posRef.current.y, "left");
+          sendMouseEvent("mouseDown", dev.posRef.current.x, dev.posRef.current.y, "left", deviceId);
+          scheduleMouseUp(dev.posRef.current.x, dev.posRef.current.y, "left", deviceId);
         }
 
-        if (check("dpad_up")) sendKey("ArrowUp", dev.posRef.current.x, dev.posRef.current.y);
-        if (check("dpad_down")) sendKey("ArrowDown", dev.posRef.current.x, dev.posRef.current.y);
-        if (check("dpad_left")) sendKey("ArrowLeft", dev.posRef.current.x, dev.posRef.current.y);
-        if (check("dpad_right")) sendKey("ArrowRight", dev.posRef.current.x, dev.posRef.current.y);
+        if (!oskOpen) {
+          if (ltPressed && !wasLtPressed) {
+            anyInput = true;
+            dev.clickRef.current = (dev.clickRef.current || 0) + 1;
+            sendMouseEvent("mouseDown", dev.posRef.current.x, dev.posRef.current.y, "right", deviceId);
+            scheduleMouseUp(dev.posRef.current.x, dev.posRef.current.y, "right", deviceId);
+          }
+
+          if (check("dpad_up")) sendKey("ArrowUp", dev.posRef.current.x, dev.posRef.current.y);
+          if (check("dpad_down")) sendKey("ArrowDown", dev.posRef.current.x, dev.posRef.current.y);
+          if (check("dpad_left")) sendKey("ArrowLeft", dev.posRef.current.x, dev.posRef.current.y);
+          if (check("dpad_right")) sendKey("ArrowRight", dev.posRef.current.x, dev.posRef.current.y);
+        }
 
         if (anyInput) {
           dev.lastInputTime = Date.now();

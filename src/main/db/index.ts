@@ -263,6 +263,22 @@ async function runMigrations(db: Surreal): Promise<void> {
     DEFINE FIELD IF NOT EXISTS isBuiltin ON streaming_service TYPE bool DEFAULT false;
     DEFINE FIELD IF NOT EXISTS sortOrder ON streaming_service TYPE int DEFAULT 0;
     DEFINE FIELD IF NOT EXISTS embed ON streaming_service TYPE option<bool>;
+    DEFINE FIELD IF NOT EXISTS frontpageEnabled ON streaming_service TYPE bool DEFAULT true;
+    DEFINE FIELD IF NOT EXISTS playTime ON streaming_service TYPE int DEFAULT 0;
+    DEFINE FIELD IF NOT EXISTS lastPlayed ON streaming_service TYPE option<int>;
+
+    DEFINE TABLE IF NOT EXISTS streaming_frontpage_item SCHEMAFULL;
+    DEFINE FIELD IF NOT EXISTS id ON streaming_frontpage_item TYPE string;
+    DEFINE FIELD IF NOT EXISTS serviceId ON streaming_frontpage_item TYPE string;
+    DEFINE FIELD IF NOT EXISTS title ON streaming_frontpage_item TYPE string;
+    DEFINE FIELD IF NOT EXISTS url ON streaming_frontpage_item TYPE string;
+    DEFINE FIELD IF NOT EXISTS thumbnailUrl ON streaming_frontpage_item TYPE option<string>;
+    DEFINE FIELD IF NOT EXISTS description ON streaming_frontpage_item TYPE option<string>;
+    DEFINE FIELD IF NOT EXISTS duration ON streaming_frontpage_item TYPE option<string>;
+    DEFINE FIELD IF NOT EXISTS type ON streaming_frontpage_item TYPE option<string>;
+    DEFINE FIELD IF NOT EXISTS scrapedAt ON streaming_frontpage_item TYPE option<int>;
+    DEFINE FIELD IF NOT EXISTS sortIndex ON streaming_frontpage_item TYPE option<int>;
+    DEFINE INDEX IF NOT EXISTS frontpage_item_service ON streaming_frontpage_item FIELDS serviceId;
 
     DEFINE TABLE IF NOT EXISTS remote_source SCHEMAFULL;
     DEFINE FIELD IF NOT EXISTS id ON remote_source TYPE string;

@@ -19,7 +19,9 @@ export const StreamingWebview = forwardRef<StreamingWebviewHandle, Props>(
   ({ service, partition, extensions }, ref) => {
     const webviewRef = useRef<Electron.WebviewTag | null>(null);
     const [showSpinner, setShowSpinner] = useState(true);
+    const [preloadPath, setPreloadPath] = useState<string>("");
     const extensionsAppliedRef = useRef(false);
+    const startTimeRef = useRef<number>(Date.now());
 
     useImperativeHandle(ref, () => ({
       goBack: () => webviewRef.current?.goBack(),
@@ -27,6 +29,26 @@ export const StreamingWebview = forwardRef<StreamingWebviewHandle, Props>(
       reload: () => webviewRef.current?.reload(),
       getURL: () => webviewRef.current?.getURL() ?? service.url,
     }));
+
+    // Resolve preload path
+    useEffect(() => {
+      window.htpc.app
+        .getPreloadPath("streaming-preload")
+        .then((path) => setPreloadPath(path))
+        .catch(() => setPreloadPath(""));
+    }, []);
+
+    // Track usage
+    useEffect(() => {
+      startTimeRef.current = Date.now();
+      window.htpc.streaming.usage.start(service.id).catch(() => {});
+      return () => {
+        const seconds = Math.round((Date.now() - startTimeRef.current) / 1000);
+        if (seconds > 0) {
+          window.htpc.streaming.usage.stop(service.id, seconds).catch(() => {});
+        }
+      };
+    }, [service.id]);
 
     // Auto-hide spinner after initial load period
     useEffect(() => {
@@ -81,21 +103,24 @@ export const StreamingWebview = forwardRef<StreamingWebviewHandle, Props>(
           )}
         </AnimatePresence>
 
-        <webview
-          ref={(el) => {
-            webviewRef.current = el as any;
-          }}
-          src={service.url}
-          partition={partition}
-          style={{
-            width: "100%",
-            height: "100%",
-            border: "none",
-            display: "flex",
-          }}
-          allowpopups="false"
-          webpreferences="contextIsolation=yes,nodeIntegration=no,sandbox=yes"
-        />
+        {preloadPath && (
+          <webview
+            ref={(el) => {
+              webviewRef.current = el as any;
+            }}
+            src={service.url}
+            partition={partition}
+            preload={preloadPath}
+            style={{
+              width: "100%",
+              height: "100%",
+              border: "none",
+              display: "flex",
+            }}
+            allowpopups="false"
+            webpreferences="contextIsolation=yes,nodeIntegration=no,sandbox=yes"
+          />
+        )}
       </div>
     );
   },

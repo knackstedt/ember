@@ -11,6 +11,7 @@ import {
   CollectionItem,
   SmartFilterGroup,
   StreamingService,
+  StreamingFrontpageItem,
   SessionHook,
   RemoteSource,
 } from "../../shared/types";
@@ -596,6 +597,89 @@ export const StreamingServiceRepo = {
       `UPDATE streaming_service:⟨${escapeId(id)}⟩ SET enabled = $value`,
       { value },
     );
+  },
+
+  async setLastPlayed(id: string, timestamp: number): Promise<void> {
+    const db = getDb();
+    await db.query(
+      `UPDATE streaming_service:⟨${escapeId(id)}⟩ SET lastPlayed = $ts`,
+      { ts: timestamp },
+    );
+  },
+
+  async addPlayTime(id: string, seconds: number): Promise<void> {
+    const db = getDb();
+    await db.query(
+      `UPDATE streaming_service:⟨${escapeId(id)}⟩ SET playTime += $seconds`,
+      { seconds },
+    );
+  },
+};
+
+/* ------------------------------------------------------------------ */
+/*  Streaming Frontpage Item Repository                              */
+/* ------------------------------------------------------------------ */
+
+export const StreamingFrontpageItemRepo = {
+  async listByService(serviceId: string): Promise<StreamingFrontpageItem[]> {
+    const db = getDb();
+    const result = await db.query<[StreamingFrontpageItem[]]>(
+      `SELECT * FROM streaming_frontpage_item WHERE serviceId = $serviceId ORDER BY sortIndex ASC`,
+      { serviceId },
+    );
+    const items = (result[0] ?? []) as StreamingFrontpageItem[];
+    return items.map((it) => ({
+      ...it,
+      id: typeof it.id === "string" ? it.id : ((it.id as any)?.id ?? String(it.id)),
+    }));
+  },
+
+  async listAll(): Promise<StreamingFrontpageItem[]> {
+    const db = getDb();
+    const result = await db.query<[StreamingFrontpageItem[]]>(
+      `SELECT * FROM streaming_frontpage_item ORDER BY sortIndex ASC`,
+    );
+    const items = (result[0] ?? []) as StreamingFrontpageItem[];
+    return items.map((it) => ({
+      ...it,
+      id: typeof it.id === "string" ? it.id : ((it.id as any)?.id ?? String(it.id)),
+    }));
+  },
+
+  async upsert(item: StreamingFrontpageItem): Promise<void> {
+    const db = getDb();
+    const normalized: Record<string, unknown> = { ...item };
+    if (normalized.scrapedAt === undefined) normalized.scrapedAt = Date.now();
+    if (normalized.sortIndex === undefined) normalized.sortIndex = 0;
+    await db.query(
+      `UPSERT streaming_frontpage_item:⟨${escapeId(item.id)}⟩ CONTENT $item`,
+      { item: normalized },
+    );
+  },
+
+  async replaceForService(serviceId: string, items: StreamingFrontpageItem[]): Promise<void> {
+    const db = getDb();
+    await db.query(`DELETE streaming_frontpage_item WHERE serviceId = $serviceId`, { serviceId });
+    for (const item of items) {
+      const normalized: Record<string, unknown> = { ...item };
+      if (normalized.scrapedAt === undefined) normalized.scrapedAt = Date.now();
+      if (normalized.sortIndex === undefined) normalized.sortIndex = 0;
+      await db.query(
+        `UPSERT streaming_frontpage_item:⟨${escapeId(item.id)}⟩ CONTENT $item`,
+        { item: normalized },
+      );
+    }
+  },
+
+  async delete(id: string): Promise<void> {
+    const db = getDb();
+    await db.query(`DELETE streaming_frontpage_item:⟨${escapeId(id)}⟩`);
+  },
+
+  async clearOld(maxAgeMs: number): Promise<void> {
+    const db = getDb();
+    const cutoff = Date.now() - maxAgeMs;
+    await db.query(`DELETE streaming_frontpage_item WHERE scrapedAt < $cutoff`, { cutoff });
   },
 };
 

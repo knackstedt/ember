@@ -121,6 +121,16 @@ export const IPC_CHANNELS = {
     setEnabled: "streaming:setEnabled",
     detectDesktopApp: "streaming:detectDesktopApp",
     launch: "streaming:launch",
+    frontpage: {
+      report: "streaming:frontpage:report",
+      list: "streaming:frontpage:list",
+      listAll: "streaming:frontpage:listAll",
+      clear: "streaming:frontpage:clear",
+    },
+    usage: {
+      start: "streaming:usage:start",
+      stop: "streaming:usage:stop",
+    },
   },
   packages: {
     list: "packages:list",

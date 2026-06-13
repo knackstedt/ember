@@ -52,6 +52,8 @@ import { useBrowserControllerNav } from "./hooks/useBrowserControllerNav";
 import { CursorOverlay } from "./components/CursorOverlay/CursorOverlay";
 import { useFocusZoneStore } from "./store/focusZone.store";
 import { CommandDefinition, COMMAND_DEFINITIONS } from "../../shared/commands";
+import { ControllerOSKOverlay } from "./components/ControllerOSKOverlay/ControllerOSKOverlay";
+import { useControllerOskStore } from "./store/controllerOsk.store";
 
 function normalizeShortcut(e: KeyboardEvent): string {
   const parts: string[] = [];
@@ -520,6 +522,11 @@ export default function App(): React.ReactElement {
         return;
       }
 
+      // Suppress axis navigation when this device has an OSK open
+      if (ev.type === "axis" && useControllerOskStore.getState().isOpen(ev.deviceId)) {
+        return;
+      }
+
       if (ev.type === "axis" && ev.axis) {
         const axis = ev.axis ?? "";
         const prev = axisValuesRef.current[axis] ?? 0;
@@ -559,6 +566,11 @@ export default function App(): React.ReactElement {
       }
 
       if (ev.type !== "button_press") return;
+
+      // Suppress controller navigation when this device has an OSK open
+      if (useControllerOskStore.getState().isOpen(ev.deviceId)) {
+        return;
+      }
 
       // Check custom controller mappings first
       const ctrlMap = customControllerMapRef.current;
@@ -850,6 +862,7 @@ export default function App(): React.ReactElement {
       <ToastContainer />
       <ThemeBackground />
       <CursorOverlay />
+      <ControllerOSKOverlay />
 
       <AnimatePresence>
         {videoOpen && (
