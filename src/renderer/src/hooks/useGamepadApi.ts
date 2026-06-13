@@ -101,7 +101,9 @@ export function useGamepadApi(enabled: boolean, _activeTab: TabId) {
             productId,
             axisCount: gp.axes.length,
             buttonCount: gp.buttons.length,
+            connectionType: "unknown",
           };
+          useInputStore.getState().addDevice(device);
           const worker = getControllerWorker();
           if (worker) {
             worker.postMessage({

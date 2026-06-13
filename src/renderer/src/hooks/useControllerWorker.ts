@@ -53,12 +53,18 @@ function getOrCreateWorker(): Worker {
 
     switch (msg.type) {
       case "device-connected": {
-        const device: ControllerDevice = {
+        // Prefer the full device record already in the store (added by IPC or
+        // useGamepadApi) so metadata like connectionType / latency is preserved.
+        const existing = useInputStore.getState().devices.find(
+          (d) => d.id === msg.deviceId,
+        );
+        const device: ControllerDevice = existing ?? {
           id: msg.deviceId,
           name: msg.name,
           type: msg.deviceType,
           axisCount: 8,
           buttonCount: 16,
+          connectionType: "unknown",
         };
         const next = [...globalDevices];
         next[msg.controllerIdx as number] = device;
@@ -274,6 +280,10 @@ export function useControllerWorker(): ControllerWorkerState {
     if (!ipcListenersRegistered) {
       ipcListenersRegistered = true;
       unsubConnect = window.htpc.input.onDeviceConnected((dev) => {
+        // Store the full device record immediately so metadata like
+        // connectionType / latency is preserved. The worker will echo back
+        // a stub message later, and the handler below will reuse this record.
+        useInputStore.getState().addDevice(dev);
         worker.postMessage({
           type: "connect",
           controllerIdx: dev.controllerIdx ?? 0,
@@ -303,6 +313,7 @@ export function useControllerWorker(): ControllerWorkerState {
       // Sync already-connected devices that may have been missed before listener registration
       window.htpc.input.devices().then((existingDevices) => {
         for (const dev of existingDevices) {
+          useInputStore.getState().addDevice(dev);
           worker.postMessage({
             type: "connect",
             controllerIdx: dev.controllerIdx ?? 0,

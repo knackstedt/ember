@@ -19,6 +19,7 @@ import {
   InputSource,
   ControllerDevice,
   ControllerType,
+  ControllerConnectionType,
 } from "../../shared/types";
 import { createLogger } from "../util/logger";
 import {
@@ -32,7 +33,16 @@ const log = createLogger("info");
 const INPUT_DIR = "/dev/input";
 
 let watcher: ReturnType<typeof setInterval> | null = null;
-const activeDevices = new Map<string, { device: unknown; close: () => void; info: ControllerDevice; controllerIdx: number }>();
+interface ActiveDeviceEntry {
+  device: unknown;
+  close: () => void;
+  info: ControllerDevice;
+  controllerIdx: number;
+  /** Rolling window of recent event latencies (ms) */
+  latencySamples: number[];
+  lastActivityAt: number;
+}
+const activeDevices = new Map<string, ActiveDeviceEntry>();
 
 /** Allocate a free controller index (0..7). Returns -1 if full. */
 function allocControllerIdx(): number {
@@ -44,6 +54,137 @@ function allocControllerIdx(): number {
 
 function freeControllerIdx(idx: number): void {
   // No-op; allocation just scans for gaps.
+}
+
+/* ─── Connection & sysfs helpers ─── */
+
+function readSysfsText(path: string): string | null {
+  try {
+    if (existsSync(path)) return readFileSync(path, "utf-8").trim();
+  } catch { /* ignore */ }
+  return null;
+}
+
+function readSysfsInt(path: string): number | undefined {
+  const text = readSysfsText(path);
+  if (text === null) return undefined;
+  const n = parseInt(text, 10);
+  return Number.isNaN(n) ? undefined : n;
+}
+
+const MAC_RE = /^[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}$/;
+
+function detectConnectionType(
+  phys: string | null,
+  vendorId: number,
+  productId: number,
+): ControllerConnectionType {
+  const p = (phys ?? "").trim();
+  // Bluetooth phys is a MAC address or contains "bluetooth"
+  if (MAC_RE.test(p) || p.toLowerCase().includes("bluetooth")) return "bluetooth";
+  // USB Xbox Wireless Adapter (vendor-only detection since there are
+  // several product IDs for the adapter and its firmware variants)
+  if (vendorId === 0x045e) {
+    const dongleProducts = new Set([0x02fe, 0x02fd, 0x0916, 0x0b4f, 0x0816]);
+    if (dongleProducts.has(productId)) return "dongle";
+  }
+  // Sony wireless adapter
+  if (vendorId === 0x054c && productId === 0x0ba0) return "dongle";
+  // 8BitDo wireless USB adapter
+  if (vendorId === 0x2dc8) return "dongle";
+  // Generic USB — could be wired or a dongle we don't recognise.
+  if (p.startsWith("usb-")) return "wired";
+  // Default to wired for everything else. Most controllers on a desktop
+  // PC are physically connected; "unknown" is unhelpful noise.
+  return "wired";
+}
+
+/** Walk up the sysfs tree looking for a bluetooth device RSSI. */
+function findBluetoothRssi(inputSysPath: string): number | undefined {
+  try {
+    const { realpathSync } = require("fs");
+    let cur = realpathSync(inputSysPath);
+    for (let depth = 0; depth < 6; depth++) {
+      const rssiPath = join(cur, "rssi");
+      const rssi = readSysfsInt(rssiPath);
+      if (rssi !== undefined) {
+        // RSSI is negative dBm; map typical gamepad range (-90..-30) to 0..100
+        const clamped = Math.max(-90, Math.min(-30, rssi));
+        return Math.round(((clamped + 90) / 60) * 100);
+      }
+      const parent = join(cur, "..");
+      cur = realpathSync(parent);
+    }
+  } catch { /* ignore */ }
+  return undefined;
+}
+
+/** Try to find a battery capacity for a bluetooth MAC-matched power_supply. */
+function findBatteryLevel(macHint: string | null): number | undefined {
+  if (!macHint) return undefined;
+  try {
+    const psDir = "/sys/class/power_supply";
+    if (!existsSync(psDir)) return undefined;
+    for (const entry of readdirSync(psDir)) {
+      const macPath = join(psDir, entry, "mac");
+      if (existsSync(macPath)) {
+        const mac = readFileSync(macPath, "utf-8").trim().toLowerCase();
+        if (mac === macHint.toLowerCase()) {
+          return readSysfsInt(join(psDir, entry, "capacity"));
+        }
+      }
+    }
+  } catch { /* ignore */ }
+  return undefined;
+}
+
+function getDeviceDriver(inputSysPath: string): string | undefined {
+  try {
+    const { realpathSync } = require("fs");
+    const driverLink = join(realpathSync(inputSysPath), "driver");
+    const resolved = realpathSync(driverLink);
+    return resolved.split("/").pop();
+  } catch { /* ignore */ }
+  return undefined;
+}
+
+interface ExtraDeviceInfo {
+  connectionType: ControllerConnectionType;
+  driverName?: string;
+  physPath?: string;
+  signalStrengthPercent?: number;
+  batteryPercent?: number;
+}
+
+function getExtraDeviceInfo(
+  eventPath: string,
+  vendorId: number,
+  productId: number,
+): ExtraDeviceInfo {
+  const deviceNum = eventPath.replace("/dev/input/event", "");
+  const sysPath = `/sys/class/input/event${deviceNum}/device`;
+  const phys = readSysfsText(join(sysPath, "phys"));
+  const connectionType = detectConnectionType(phys, vendorId, productId);
+  const driverName = getDeviceDriver(sysPath);
+
+  let signalStrengthPercent: number | undefined;
+  let batteryPercent: number | undefined;
+
+  if (connectionType === "bluetooth") {
+    signalStrengthPercent = findBluetoothRssi(sysPath);
+    // phys for bluetooth is usually the MAC address
+    if (phys && MAC_RE.test(phys)) {
+      batteryPercent = findBatteryLevel(phys);
+    }
+  }
+
+  return {
+    connectionType,
+    driverName,
+    physPath: phys ?? undefined,
+    signalStrengthPercent,
+    batteryPercent,
+  };
 }
 
 /* ─── Axis layouts ───
@@ -277,7 +418,7 @@ async function openDevice(
   eventPath: string,
   window: BrowserWindow,
   info: { name: string; vendorId: number; productId: number },
-): Promise<{ device: unknown; close: () => void; info: ControllerDevice; controllerIdx: number } | null> {
+): Promise<ActiveDeviceEntry | null> {
 
   const controllerType = detectControllerType(
     info.name,
@@ -291,6 +432,8 @@ async function openDevice(
     return null;
   }
 
+  const extra = getExtraDeviceInfo(eventPath, info.vendorId, info.productId);
+  const now = Date.now();
   const deviceInfo: ControllerDevice = {
     id: deviceId,
     name: info.name,
@@ -300,6 +443,9 @@ async function openDevice(
     axisCount: 6,
     buttonCount: 16,
     controllerIdx,
+    connectedAt: now,
+    lastActivityAt: now,
+    ...extra,
   };
 
   if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
@@ -331,10 +477,21 @@ async function openDevice(
       let buf = Buffer.concat([remainder, data]);
 
       while (buf.length >= EVENT_SIZE) {
+        const tvSec = Number(buf.readBigUInt64LE(0));
+        const tvUsec = Number(buf.readBigUInt64LE(8));
         const type = buf.readUInt16LE(16);
         const code = buf.readUInt16LE(18);
         const value = buf.readInt32LE(20);
         buf = buf.subarray(EVENT_SIZE);
+
+        const kernelMs = tvSec * 1000 + tvUsec / 1000;
+        const latency = Math.max(0, Date.now() - kernelMs);
+        const entry = activeDevices.get(eventPath);
+        if (entry) {
+          entry.lastActivityAt = Date.now();
+          entry.latencySamples.push(latency);
+          if (entry.latencySamples.length > 50) entry.latencySamples.shift();
+        }
 
         if (type === EV_SYN) continue;
 
@@ -400,6 +557,8 @@ async function openDevice(
       device: stream,
       info: deviceInfo,
       controllerIdx,
+      latencySamples: [],
+      lastActivityAt: Date.now(),
       close: () => {
         stream.destroy();
         if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
@@ -496,5 +655,24 @@ export async function destroyInputSystem(): Promise<void> {
 }
 
 export function getConnectedDevices(): ControllerDevice[] {
-  return Array.from(activeDevices.values()).map((h) => h.info);
+  return Array.from(activeDevices.values()).map((h) => {
+    const info = { ...h.info };
+    // Refresh dynamic fields
+    const avgLatency =
+      h.latencySamples.length > 0
+        ? h.latencySamples.reduce((a, b) => a + b, 0) / h.latencySamples.length
+        : undefined;
+    if (avgLatency !== undefined) info.latencyMs = Math.round(avgLatency);
+    info.lastActivityAt = h.lastActivityAt;
+    // Re-read wireless signal strength in case it changed
+    if (info.connectionType === "bluetooth" && info.physPath) {
+      const deviceNum = info.id.replace("/dev/input/event", "");
+      const sysPath = `/sys/class/input/event${deviceNum}/device`;
+      info.signalStrengthPercent = findBluetoothRssi(sysPath);
+      if (MAC_RE.test(info.physPath)) {
+        info.batteryPercent = findBatteryLevel(info.physPath);
+      }
+    }
+    return info;
+  });
 }

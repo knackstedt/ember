@@ -1,6 +1,26 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Gamepad2, Lock, Unlock, ChevronDown, ChevronRight } from "lucide-react";
+import {
+  Gamepad2,
+  Lock,
+  Unlock,
+  ChevronDown,
+  ChevronRight,
+  Usb,
+  Bluetooth,
+  Wifi,
+  HelpCircle,
+  Zap,
+  Battery,
+  BatteryMedium,
+  BatteryLow,
+  BatteryWarning,
+  BatteryFull,
+  BatteryCharging,
+  Activity,
+  Cpu,
+  Clock,
+} from "lucide-react";
 import { useInputStore } from "../../store/input.store";
 import type { LiveControllerState } from "../../store/input.store";
 import {
@@ -33,6 +53,60 @@ const CONTROLLER_ICONS: Record<ControllerType, React.ReactNode> = {
   wiimote: <Gamepad2 size={CONTROLLER_ICON_SIZE} />,
   generic: <Gamepad2 size={CONTROLLER_ICON_SIZE} />,
 };
+
+const CONNECTION_ICONS: Record<string, React.ReactNode> = {
+  wired: <Usb size={14} />,
+  bluetooth: <Bluetooth size={14} />,
+  dongle: <Wifi size={14} />,
+  wireless: <Wifi size={14} />,
+  unknown: <HelpCircle size={14} />,
+};
+
+const CONNECTION_LABELS: Record<string, string> = {
+  wired: "Wired",
+  bluetooth: "Bluetooth",
+  dongle: "Wireless Dongle",
+  wireless: "Wireless",
+  unknown: "Unknown",
+};
+
+function formatDuration(ms: number): string {
+  const seconds = Math.floor(ms / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours}h ${minutes % 60}m`;
+}
+
+function BatteryIcon({ level }: { level?: number }) {
+  if (level === undefined) return <Battery size={14} />;
+  if (level >= 95) return <BatteryFull size={14} />;
+  if (level >= 70) return <BatteryMedium size={14} />;
+  if (level >= 40) return <Battery size={14} />;
+  if (level >= 20) return <BatteryLow size={14} />;
+  if (level > 0) return <BatteryWarning size={14} />;
+  return <BatteryCharging size={14} />;
+}
+
+function SignalStrengthBar({ pct }: { pct?: number }) {
+  if (pct === undefined) return null;
+  const color = pct >= 70 ? "#4ade80" : pct >= 40 ? "#facc15" : "#f87171";
+  return (
+    <div className="flex items-center gap-1.5">
+      <Activity size={14} style={{ color }} />
+      <div className="w-16 h-1.5 rounded-full overflow-hidden" style={{ background: "var(--color-surface-raised)" }}>
+        <div
+          className="h-full rounded-full"
+          style={{ width: `${pct}%`, background: color }}
+        />
+      </div>
+      <span className="text-[10px] font-mono" style={{ color: "var(--color-text-dim)" }}>
+        {pct}%
+      </span>
+    </div>
+  );
+}
 
 const DEFAULT_ACTIONS = [
   "confirm",
@@ -471,8 +545,25 @@ export const ControllersTab: React.FC = () => {
                 onClick={() => setSelectedDevice(dev)}
                 whileTap={{ scale: 0.98 }}
               >
-                {CONTROLLER_ICONS[dev.type]}
-                <div className="flex flex-col min-w-0">
+                <div className="relative shrink-0">
+                  {CONTROLLER_ICONS[dev.type]}
+                  {dev.connectionType && (
+                    <span
+                      className="absolute -bottom-0.5 -right-0.5 inline-flex items-center justify-center w-4 h-4 rounded-full"
+                      style={{
+                        background: "var(--color-surface-raised)",
+                        border: "1px solid var(--color-border)",
+                      }}
+                      title={CONNECTION_LABELS[dev.connectionType]}
+                    >
+                      {React.cloneElement(
+                        CONNECTION_ICONS[dev.connectionType] as React.ReactElement,
+                        { size: 10 },
+                      )}
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-col min-w-0 flex-1">
                   <span
                     className="text-sm font-medium truncate"
                     style={{ color: "var(--color-text)" }}
@@ -480,7 +571,7 @@ export const ControllersTab: React.FC = () => {
                     {dev.name}
                   </span>
                   <span
-                    className="text-xs capitalize"
+                    className="text-[10px] capitalize"
                     style={{ color: "var(--color-text-dim)" }}
                   >
                     {dev.type}
@@ -527,23 +618,85 @@ export const ControllersTab: React.FC = () => {
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 {CONTROLLER_ICONS[selectedDevice.type]}
-                <div>
+                <div className="flex flex-col gap-1">
                   <h2
                     className="text-lg font-semibold"
                     style={{ color: "var(--color-text)" }}
                   >
                     {selectedDevice.name}
                   </h2>
-                  <p
-                    className="text-sm capitalize"
-                    style={{ color: "var(--color-text-dim)" }}
-                  >
-                    {selectedDevice.type} · {selectedDevice.buttonCount}b ·{" "}
-                    {selectedDevice.axisCount}ax
-                    {selectedDevice.vendorId
-                      ? ` · ${selectedDevice.vendorId.toString(16).padStart(4, "0")}:${selectedDevice.productId?.toString(16).padStart(4, "0")}`
-                      : ""}
-                  </p>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs" style={{ color: "var(--color-text-dim)" }}>
+                    <span className="capitalize">{selectedDevice.type}</span>
+                    <span>·</span>
+                    <span>{selectedDevice.buttonCount}b {selectedDevice.axisCount}ax</span>
+                    {selectedDevice.vendorId && (
+                      <>
+                        <span>·</span>
+                        <span className="font-mono">
+                          {selectedDevice.vendorId.toString(16).padStart(4, "0")}:{selectedDevice.productId?.toString(16).padStart(4, "0")}
+                        </span>
+                      </>
+                    )}
+                    {selectedDevice.connectionType && (
+                      <>
+                        <span>·</span>
+                        <span className="inline-flex items-center gap-1 capitalize">
+                          {CONNECTION_ICONS[selectedDevice.connectionType]}
+                          {CONNECTION_LABELS[selectedDevice.connectionType]}
+                        </span>
+                      </>
+                    )}
+                    {selectedDevice.latencyMs !== undefined && (
+                      <>
+                        <span>·</span>
+                        <span className="inline-flex items-center gap-1" title="Average event latency">
+                          <Zap size={12} />
+                          {selectedDevice.latencyMs} ms
+                        </span>
+                      </>
+                    )}
+                    {selectedDevice.signalStrengthPercent !== undefined && (
+                      <>
+                        <span>·</span>
+                        <SignalStrengthBar pct={selectedDevice.signalStrengthPercent} />
+                      </>
+                    )}
+                    {selectedDevice.batteryPercent !== undefined && (
+                      <>
+                        <span>·</span>
+                        <span className="inline-flex items-center gap-1" title={`Battery ${selectedDevice.batteryPercent}%`}>
+                          <BatteryIcon level={selectedDevice.batteryPercent} />
+                          {selectedDevice.batteryPercent}%
+                        </span>
+                      </>
+                    )}
+                    {selectedDevice.driverName && (
+                      <>
+                        <span>·</span>
+                        <span className="inline-flex items-center gap-1" title="Linux input driver">
+                          <Cpu size={12} />
+                          {selectedDevice.driverName}
+                        </span>
+                      </>
+                    )}
+                    {selectedDevice.connectedAt && (
+                      <>
+                        <span>·</span>
+                        <span className="inline-flex items-center gap-1" title="Connected for">
+                          <Clock size={12} />
+                          {formatDuration(Date.now() - selectedDevice.connectedAt)}
+                        </span>
+                      </>
+                    )}
+                    {selectedDevice.lastActivityAt && (
+                      <>
+                        <span>·</span>
+                        <span title="Last input activity">
+                          idle {formatDuration(Date.now() - selectedDevice.lastActivityAt)}
+                        </span>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
               {/* Reset to default */}

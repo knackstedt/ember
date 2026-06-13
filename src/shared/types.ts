@@ -286,6 +286,13 @@ export type ControllerType =
   | "wiimote"
   | "generic";
 
+export type ControllerConnectionType =
+  | "wired"
+  | "bluetooth"
+  | "dongle"
+  | "wireless"
+  | "unknown";
+
 export interface ControllerDevice {
   id: string;
   name: string;
@@ -295,6 +302,22 @@ export interface ControllerDevice {
   axisCount: number;
   buttonCount: number;
   controllerIdx?: number;
+  /** Connection type inferred from sysfs / phys path */
+  connectionType?: ControllerConnectionType;
+  /** Estimated latency in ms (kernel event time → Node.js processing) */
+  latencyMs?: number;
+  /** Signal strength 0–100 for wireless connections, if available */
+  signalStrengthPercent?: number;
+  /** Battery level 0–100, if available from sysfs/upower */
+  batteryPercent?: number;
+  /** Linux input driver name */
+  driverName?: string;
+  /** sysfs physical path (e.g. usb-… or bluetooth MAC) */
+  physPath?: string;
+  /** When the device was first seen (epoch ms) */
+  connectedAt?: number;
+  /** Last input event timestamp (epoch ms) */
+  lastActivityAt?: number;
 }
 
 export interface ButtonMapping {
