@@ -51,6 +51,7 @@ export function useBrowserControllerNav({
 
     interface DeviceState {
       posRef: { current: { x: number; y: number } };
+      clickRef: { current: number };
       prevButtons: Record<string, boolean>;
       prevTriggers: Record<string, boolean>;
       wiggleSamples: { dx: number; dy: number }[];
@@ -116,6 +117,7 @@ export function useBrowserControllerNav({
         const lastInputTime = saved?.lastInputTime ?? Date.now();
         state = {
           posRef,
+          clickRef: { current: 0 },
           prevButtons: seedButtons(liveStates, deviceId),
           prevTriggers: seedTriggers(liveStates, deviceId),
           wiggleSamples: [],
@@ -245,6 +247,7 @@ export function useBrowserControllerNav({
         return {
           deviceId: instancePrefix + id,
           posRef: dev.posRef,
+          clickRef: dev.clickRef,
           hue: [22, 210, 140, 280, 45, 330, 180, 0][idx % 8],
           visible: dev.visible,
           hoverStyle: dev.hoverStyle,
@@ -364,6 +367,7 @@ export function useBrowserControllerNav({
         if (!evdevActive) {
           if (check("south")) {
             anyInput = true;
+            dev.clickRef.current = (dev.clickRef.current || 0) + 1;
             sendMouseEvent("mouseDown", dev.posRef.current.x, dev.posRef.current.y, "left");
             scheduleMouseUp(dev.posRef.current.x, dev.posRef.current.y, "left");
           }
@@ -375,6 +379,7 @@ export function useBrowserControllerNav({
           }
           if (check("west")) {
             anyInput = true;
+            dev.clickRef.current = (dev.clickRef.current || 0) + 1;
             sendMouseEvent("mouseDown", dev.posRef.current.x, dev.posRef.current.y, "right");
             scheduleMouseUp(dev.posRef.current.x, dev.posRef.current.y, "right");
           }
@@ -416,11 +421,13 @@ export function useBrowserControllerNav({
 
         if (ltPressed && !wasLtPressed) {
           anyInput = true;
+          dev.clickRef.current = (dev.clickRef.current || 0) + 1;
           sendMouseEvent("mouseDown", dev.posRef.current.x, dev.posRef.current.y, "right");
           scheduleMouseUp(dev.posRef.current.x, dev.posRef.current.y, "right");
         }
         if (rtPressed && !wasRtPressed) {
           anyInput = true;
+          dev.clickRef.current = (dev.clickRef.current || 0) + 1;
           sendMouseEvent("mouseDown", dev.posRef.current.x, dev.posRef.current.y, "left");
           scheduleMouseUp(dev.posRef.current.x, dev.posRef.current.y, "left");
         }

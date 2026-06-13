@@ -7,6 +7,8 @@ export interface DeviceCursor {
   visible: boolean;
   hoverStyle: CursorStyle;
   expanded: boolean;
+  /** Click flash intensity (0..1), mutated by controller nav and read by rAF loop */
+  clickRef: { current: number };
 }
 
 export interface CursorManager {

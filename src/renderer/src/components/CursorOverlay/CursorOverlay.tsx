@@ -23,6 +23,7 @@ export const CursorOverlay: React.FC = () => {
           hoverStyle={cursor.hoverStyle}
           expanded={cursor.expanded}
           hue={cursor.hue}
+          clickRef={cursor.clickRef}
         />
       ))}
     </>

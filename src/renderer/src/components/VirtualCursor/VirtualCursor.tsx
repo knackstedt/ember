@@ -23,6 +23,8 @@ interface VirtualCursorProps {
   expanded?: boolean;
   /** Base hue (0-360) for this controller's color */
   hue?: number;
+  /** Mutable ref for click flash intensity (0..1), read by rAF loop */
+  clickRef?: React.RefObject<number>;
 }
 
 function arrowPath(ctx: CanvasRenderingContext2D, x: number, y: number, s = 1) {
@@ -43,7 +45,8 @@ function drawCursor(
   y: number,
   flash: number,
   hue: number,
-  style: CursorStyle
+  style: CursorStyle,
+  clickFlash: number
 ) {
   const glow = `hsl(${hue}, 100%, 60%)`;
   const fillDark = `rgba(10,10,10,${0.90 + flash * 0.08})`;
@@ -108,6 +111,23 @@ function drawCursor(
   ctx.fillStyle = dotColor;
   ctx.fill();
 
+  // Click ripple
+  if (clickFlash > 0) {
+    const rippleRadius = 8 + clickFlash * 28;
+    const rippleAlpha = clickFlash * 0.7;
+    ctx.beginPath();
+    ctx.arc(x + 2, y + 3, rippleRadius, 0, Math.PI * 2);
+    ctx.strokeStyle = `hsla(${hue}, 100%, 65%, ${rippleAlpha})`;
+    ctx.lineWidth = 2 + clickFlash * 1.5;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(x + 2, y + 3, rippleRadius * 0.6, 0, Math.PI * 2);
+    ctx.strokeStyle = `hsla(${hue}, 100%, 75%, ${rippleAlpha * 0.6})`;
+    ctx.lineWidth = 1 + clickFlash;
+    ctx.stroke();
+  }
+
   // Style-specific badge
   if (style === "pointer") {
     ctx.beginPath();
@@ -156,10 +176,13 @@ export const VirtualCursor: React.FC<VirtualCursorProps> = ({
   hoverStyle = "default",
   expanded = false,
   hue = 22,
+  clickRef,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animRef = useRef<number>(0);
   const flashRef = useRef(0);
+  const clickFlashRef = useRef(0);
+  const lastClickTriggerRef = useRef(0);
   const lastRef = useRef<number>(0);
   const lastPosRef = useRef({ x: 0, y: 0 });
 
@@ -179,6 +202,14 @@ export const VirtualCursor: React.FC<VirtualCursorProps> = ({
       lastRef.current = ts;
       flashRef.current = Math.max(0, flashRef.current - dt * 5.8);
 
+      // Detect click trigger spike
+      const clickTrigger = clickRef?.current ?? 0;
+      if (clickTrigger > 0 && clickTrigger !== lastClickTriggerRef.current) {
+        clickFlashRef.current = 1;
+        lastClickTriggerRef.current = clickTrigger;
+      }
+      clickFlashRef.current = Math.max(0, clickFlashRef.current - dt * 6);
+
       const pos = posRef.current ?? { x: 0, y: 0 };
 
       const dx = pos.x - lastPosRef.current.x;
@@ -197,13 +228,14 @@ export const VirtualCursor: React.FC<VirtualCursorProps> = ({
 
       if (visible) {
         const fl = flashRef.current;
+        const cfl = clickFlashRef.current;
         if (expanded) {
           ctx.save();
           ctx.translate(pos.x, pos.y);
           ctx.scale(2, 2);
           ctx.translate(-pos.x, -pos.y);
         }
-        drawCursor(ctx, pos.x, pos.y, fl, hue, hoverStyle);
+        drawCursor(ctx, pos.x, pos.y, fl, hue, hoverStyle, cfl);
         if (expanded) {
           ctx.restore();
         }
