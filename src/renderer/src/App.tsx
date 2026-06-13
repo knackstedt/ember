@@ -32,10 +32,8 @@ import { FlashPlayer } from "./components/FlashPlayer/FlashPlayer";
 import { useFlashPlayerStore } from "./store/flashPlayer.store";
 import { JsnesPlayer } from "./components/JsnesPlayer/JsnesPlayer";
 import { useJsnesPlayerStore } from "./store/jsnesPlayer.store";
-import { EmulatorJSPlayer } from "./components/EmulatorJSPlayer/EmulatorJSPlayer";
-import { useEmulatorjsPlayerStore } from "./store/emulatorjsPlayer.store";
-import { V86Player } from "./components/V86Player/V86Player";
-import { useV86PlayerStore } from "./store/v86Player.store";
+import { PluginPlayer } from "./components/PluginPlayer/PluginPlayer";
+import { usePluginPlayerStore } from "./store/pluginPlayer.store";
 import { LibretroPlayer } from "./components/LibretroPlayer/LibretroPlayer";
 import { useLibretroPlayerStore } from "./store/libretroPlayer.store";
 import { useContextMenuStore } from "./store/contextMenu.store";
@@ -140,10 +138,9 @@ export default function App(): React.ReactElement {
   const videoOpen = useVideoPlayerStore((s) => !!s.src);
   const flashOpen = useFlashPlayerStore((s) => s.open);
   const jsnesOpen = useJsnesPlayerStore((s) => s.open);
-  const emulatorjsOpen = useEmulatorjsPlayerStore((s) => s.open);
-  const v86Open = useV86PlayerStore((s) => s.open);
+  const pluginOpen = usePluginPlayerStore((s) => s.open);
   const libretroOpen = useLibretroPlayerStore((s) => s.open);
-  const anyEmulatorOpen = flashOpen || jsnesOpen || emulatorjsOpen || v86Open || libretroOpen;
+  const anyEmulatorOpen = flashOpen || jsnesOpen || pluginOpen || libretroOpen;
   const activeTabRef = useRef<TabId>(activeTab);
   activeTabRef.current = activeTab;
   const [evdevGamepadActive, setEvdevGamepadActive] = useState(false);
@@ -178,27 +175,21 @@ export default function App(): React.ReactElement {
   const unlockTimerRef = useRef<number | null>(null);
   const unlockIntervalRef = useRef<number | null>(null);
 
-  /** Return a stick threshold appropriate for the driver's value range. */
-  function getAxisThreshold(value: number): number {
-    if (Math.abs(value) <= 1) return 0.5;     // already normalised -1..1
-    if (Math.abs(value) <= 255) return 64;    // raw 0..255 (center 128)
-    return 16384;                               // signed-16
-  }
+  const AXIS_THRESHOLD = 0.5;
 
   function getAxisNavAction(axis: string, value: number): string | null {
-    const thr = getAxisThreshold(value);
     if (axis === "dpad_x") {
-      if (value < -thr) return "left";
-      if (value > thr) return "right";
+      if (value < 0) return "left";
+      if (value > 0) return "right";
     } else if (axis === "dpad_y") {
-      if (value < -thr) return "up";
-      if (value > thr) return "down";
+      if (value < 0) return "up";
+      if (value > 0) return "down";
     } else if (axis === "left_x") {
-      if (value < -thr) return "left";
-      if (value > thr) return "right";
+      if (value < -AXIS_THRESHOLD) return "left";
+      if (value > AXIS_THRESHOLD) return "right";
     } else if (axis === "left_y") {
-      if (value < -thr) return "up";
-      if (value > thr) return "down";
+      if (value < -AXIS_THRESHOLD) return "up";
+      if (value > AXIS_THRESHOLD) return "down";
     }
     return null;
   }
@@ -463,8 +454,7 @@ export default function App(): React.ReactElement {
       const emuOpen =
         useFlashPlayerStore.getState().open ||
         useJsnesPlayerStore.getState().open ||
-        useEmulatorjsPlayerStore.getState().open ||
-        useV86PlayerStore.getState().open ||
+        usePluginPlayerStore.getState().open ||
         useLibretroPlayerStore.getState().open;
       if (emuOpen) {
         if (ev.type === "axis") return;
@@ -646,8 +636,7 @@ export default function App(): React.ReactElement {
       const emuOpen =
         useFlashPlayerStore.getState().open ||
         useJsnesPlayerStore.getState().open ||
-        useEmulatorjsPlayerStore.getState().open ||
-        useV86PlayerStore.getState().open ||
+        usePluginPlayerStore.getState().open ||
         useLibretroPlayerStore.getState().open;
       if (emuOpen && !(e.key === "Escape" || e.key === "F11")) {
         return;
@@ -869,10 +858,7 @@ export default function App(): React.ReactElement {
         <JsnesPlayer />
       </ErrorBoundary>
       <ErrorBoundary variant="section">
-        <EmulatorJSPlayer />
-      </ErrorBoundary>
-      <ErrorBoundary variant="section">
-        <V86Player />
+        <PluginPlayer />
       </ErrorBoundary>
 
       <div className="relative z-10 flex flex-col h-full">

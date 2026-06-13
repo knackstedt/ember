@@ -422,6 +422,15 @@ const htpc = {
   plugins: {
     list: (): Promise<unknown[]> => ipcRenderer.invoke("plugins:list"),
     reload: (): Promise<unknown[]> => ipcRenderer.invoke("plugins:reload"),
+    discover: (): Promise<unknown[]> => ipcRenderer.invoke("plugins:discover"),
+    discoverAll: (): Promise<unknown[]> => ipcRenderer.invoke("plugins:discover-all"),
+    managedList: (): Promise<unknown[]> => ipcRenderer.invoke("plugins:managed-list"),
+    install: (plugin: unknown): Promise<boolean> => ipcRenderer.invoke("plugins:install", plugin),
+    uninstall: (id: string): Promise<boolean> => ipcRenderer.invoke("plugins:uninstall", id),
+    update: (plugin: unknown): Promise<boolean> => ipcRenderer.invoke("plugins:update", plugin),
+    setEnabled: (id: string, enabled: boolean): Promise<boolean> => ipcRenderer.invoke("plugins:set-enabled", id, enabled),
+    launchGame: (game: unknown): Promise<{ type: string; url?: string; pluginId: string } | null> =>
+      ipcRenderer.invoke("plugins:launch-game", game),
   },
 
   db: {

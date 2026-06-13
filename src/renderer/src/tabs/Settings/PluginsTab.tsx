@@ -1,7 +1,104 @@
-import React from "react";
-import { motion } from "framer-motion";
+import React, { useEffect, useState, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Download, Trash2, RefreshCw, Power, Globe, Package, CheckCircle, AlertCircle } from "lucide-react";
+import { DiscoveredPlugin } from "../../../shared/types";
 
 export const PluginsTab: React.FC = () => {
+  const [installed, setInstalled] = useState<DiscoveredPlugin[]>([]);
+  const [discovered, setDiscovered] = useState<DiscoveredPlugin[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [discovering, setDiscovering] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [actionId, setActionId] = useState<string | null>(null);
+
+  const loadInstalled = useCallback(async () => {
+    try {
+      const list = await window.htpc.plugins.managedList();
+      setInstalled(list as DiscoveredPlugin[]);
+    } catch (err) {
+      setError(`Failed to list plugins: ${err}`);
+    }
+  }, []);
+
+  const discover = useCallback(async () => {
+    setDiscovering(true);
+    setError(null);
+    try {
+      const list = await window.htpc.plugins.discoverAll();
+      setDiscovered(list as DiscoveredPlugin[]);
+    } catch (err) {
+      setError(`Failed to discover plugins: ${err}`);
+    } finally {
+      setDiscovering(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadInstalled();
+  }, [loadInstalled]);
+
+  const handleInstall = async (plugin: DiscoveredPlugin) => {
+    setActionId(plugin.id);
+    setError(null);
+    try {
+      await window.htpc.plugins.install(plugin);
+      await loadInstalled();
+      // Refresh discovered to update installed status
+      setDiscovered((prev) =>
+        prev.map((p) =>
+          p.id === plugin.id ? { ...p, installed: true, installedVersion: plugin.version } : p,
+        ),
+      );
+    } catch (err) {
+      setError(`Install failed: ${err}`);
+    } finally {
+      setActionId(null);
+    }
+  };
+
+  const handleUninstall = async (id: string) => {
+    setActionId(id);
+    setError(null);
+    try {
+      await window.htpc.plugins.uninstall(id);
+      await loadInstalled();
+      setDiscovered((prev) =>
+        prev.map((p) => (p.id === id ? { ...p, installed: false, installedVersion: undefined } : p)),
+      );
+    } catch (err) {
+      setError(`Uninstall failed: ${err}`);
+    } finally {
+      setActionId(null);
+    }
+  };
+
+  const handleUpdate = async (plugin: DiscoveredPlugin) => {
+    setActionId(plugin.id);
+    setError(null);
+    try {
+      await window.htpc.plugins.update(plugin);
+      await loadInstalled();
+    } catch (err) {
+      setError(`Update failed: ${err}`);
+    } finally {
+      setActionId(null);
+    }
+  };
+
+  const handleToggleEnabled = async (id: string, enabled: boolean) => {
+    try {
+      await window.htpc.plugins.setEnabled(id, enabled);
+      await loadInstalled();
+    } catch (err) {
+      setError(`Toggle failed: ${err}`);
+    }
+  };
+
+  const isUpdateAvailable = (plugin: DiscoveredPlugin) => {
+    if (!plugin.installed || !plugin.installedVersion) return false;
+    return plugin.version !== plugin.installedVersion;
+  };
+
   return (
     <div className="flex flex-col gap-8">
       <section className="flex flex-col gap-4">
@@ -9,33 +106,187 @@ export const PluginsTab: React.FC = () => {
           Plugins
         </h2>
         <p className="text-sm" style={{ color: "var(--color-text-dim)" }}>
-          Drop TypeScript files or folders into{" "}
-          <code
-            className="px-1.5 py-0.5 rounded text-xs"
-            style={{
-              background: "var(--color-surface-raised)",
-              fontFamily: "var(--font-mono)",
-            }}
-          >
-            ~/.config/htpc/plugins/
-          </code>
+          Install plugins from GitHub releases to add emulator support and other features.
+          Plugins are downloaded as{" "}
+          <code className="px-1 py-0.5 rounded text-xs" style={{ background: "var(--color-surface-raised)", fontFamily: "var(--font-mono)" }}>
+            ember-plugin-&lt;name&gt;-&lt;version&gt;.tar.gz
+          </code>{" "}
+          release assets.
         </p>
-        <motion.button
-          className="self-start px-4 py-2 rounded-[var(--radius-card)] text-sm flex items-center gap-1.5"
-          style={{
-            background: "var(--color-surface-raised)",
-            color: "var(--color-text)",
-            border: "1px solid var(--color-border)",
-          }}
-          onClick={() => window.htpc.plugins.reload()}
-          whileTap={{ scale: 0.96 }}
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3" />
-          </svg>
-          Reload Plugins
-        </motion.button>
+
+        {error && (
+          <div className="flex items-center gap-2 px-3 py-2 rounded text-sm" style={{ background: "rgba(255,0,0,0.1)", color: "#ff6666" }}>
+            <AlertCircle size={14} />
+            {error}
+          </div>
+        )}
+
+        <div className="flex gap-2">
+          <motion.button
+            className="self-start px-4 py-2 rounded-[var(--radius-card)] text-sm flex items-center gap-1.5"
+            style={{ background: "var(--color-surface-raised)", color: "var(--color-text)", border: "1px solid var(--color-border)" }}
+            onClick={() => window.htpc.plugins.reload()}
+            whileTap={{ scale: 0.96 }}
+          >
+            <RefreshCw size={14} />
+            Reload Plugins
+          </motion.button>
+          <motion.button
+            className="self-start px-4 py-2 rounded-[var(--radius-card)] text-sm flex items-center gap-1.5"
+            style={{ background: "var(--color-accent)", color: "#fff" }}
+            onClick={discover}
+            whileTap={{ scale: 0.96 }}
+          >
+            <Globe size={14} />
+            {discovering ? "Discovering..." : "Discover Plugins"}
+          </motion.button>
+        </div>
       </section>
+
+      {/* Installed plugins */}
+      {installed.length > 0 && (
+        <section className="flex flex-col gap-3">
+          <h3 className="text-sm font-semibold uppercase tracking-wide" style={{ color: "var(--color-text-dim)" }}>
+            Installed
+          </h3>
+          <div className="flex flex-col gap-2">
+            {installed.map((plugin) => (
+              <PluginCard
+                key={plugin.id}
+                plugin={plugin}
+                isUpdateAvailable={isUpdateAvailable(
+                  discovered.find((d) => d.id === plugin.id) ?? plugin,
+                )}
+                actionId={actionId}
+                onInstall={() =>
+                  handleUpdate(discovered.find((d) => d.id === plugin.id) ?? plugin)
+                }
+                onUninstall={() => handleUninstall(plugin.id)}
+                onToggleEnabled={(enabled) => handleToggleEnabled(plugin.id, enabled)}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Discovered plugins */}
+      <AnimatePresence>
+        {discovered.length > 0 && (
+          <motion.section
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            className="flex flex-col gap-3"
+          >
+            <h3 className="text-sm font-semibold uppercase tracking-wide" style={{ color: "var(--color-text-dim)" }}>
+              Available from GitHub
+            </h3>
+            <div className="flex flex-col gap-2">
+              {discovered
+                .filter((d) => !d.installed)
+                .map((plugin) => (
+                  <PluginCard
+                    key={plugin.id}
+                    plugin={plugin}
+                    actionId={actionId}
+                    onInstall={() => handleInstall(plugin)}
+                    onUninstall={() => handleUninstall(plugin.id)}
+                    onToggleEnabled={(enabled) => handleToggleEnabled(plugin.id, enabled)}
+                  />
+                ))}
+            </div>
+          </motion.section>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
+const PluginCard: React.FC<{
+  plugin: DiscoveredPlugin;
+  isUpdateAvailable?: boolean;
+  actionId: string | null;
+  onInstall: () => void;
+  onUninstall: () => void;
+  onToggleEnabled: (enabled: boolean) => void;
+}> = ({ plugin, isUpdateAvailable, actionId, onInstall, onUninstall, onToggleEnabled }) => {
+  const busy = actionId === plugin.id;
+
+  return (
+    <div
+      className="flex items-center gap-3 px-4 py-3 rounded-[var(--radius-card)]"
+      style={{ background: "var(--color-surface-raised)", border: "1px solid var(--color-border)" }}
+    >
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium truncate" style={{ color: "var(--color-text)" }}>
+            {plugin.displayName || plugin.name}
+          </span>
+          <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: "var(--color-surface)", color: "var(--color-text-dim)" }}>
+            v{plugin.version}
+          </span>
+          {plugin.installed && (
+            <span className="flex items-center gap-1 text-xs" style={{ color: "#4ade80" }}>
+              <CheckCircle size={12} />
+              Installed
+            </span>
+          )}
+        </div>
+        {plugin.description && (
+          <p className="text-xs truncate mt-0.5" style={{ color: "var(--color-text-dim)" }}>
+            {plugin.description}
+          </p>
+        )}
+      </div>
+
+      <div className="flex items-center gap-2 flex-shrink-0">
+        {plugin.installed && (
+          <>
+            <button
+              onClick={() => onToggleEnabled(!plugin.enabled)}
+              className="p-1.5 rounded transition-colors"
+              style={{
+                color: plugin.enabled ? "#4ade80" : "var(--color-text-dim)",
+                background: "transparent",
+              }}
+              title={plugin.enabled ? "Enabled" : "Disabled"}
+            >
+              <Power size={14} />
+            </button>
+            {isUpdateAvailable && (
+              <button
+                onClick={onInstall}
+                disabled={busy}
+                className="px-3 py-1.5 rounded text-xs font-medium flex items-center gap-1 transition-colors"
+                style={{ background: "var(--color-accent)", color: "#fff", opacity: busy ? 0.6 : 1 }}
+              >
+                <RefreshCw size={12} className={busy ? "animate-spin" : ""} />
+                Update
+              </button>
+            )}
+            <button
+              onClick={onUninstall}
+              disabled={busy}
+              className="p-1.5 rounded transition-colors"
+              style={{ color: "#ff6666", background: "transparent", opacity: busy ? 0.6 : 1 }}
+              title="Uninstall"
+            >
+              <Trash2 size={14} />
+            </button>
+          </>
+        )}
+        {!plugin.installed && (
+          <button
+            onClick={onInstall}
+            disabled={busy}
+            className="px-3 py-1.5 rounded text-xs font-medium flex items-center gap-1 transition-colors"
+            style={{ background: "var(--color-accent)", color: "#fff", opacity: busy ? 0.6 : 1 }}
+          >
+            <Download size={12} />
+            {busy ? "Installing..." : "Install"}
+          </button>
+        )}
+      </div>
     </div>
   );
 };

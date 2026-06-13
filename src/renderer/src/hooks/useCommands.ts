@@ -16,8 +16,7 @@ import { useMusicPlayerStore } from "../store/musicPlayer.store";
 import { useVideoPlayerStore } from "../store/videoPlayer.store";
 import { useFlashPlayerStore } from "../store/flashPlayer.store";
 import { useJsnesPlayerStore } from "../store/jsnesPlayer.store";
-import { useEmulatorjsPlayerStore } from "../store/emulatorjsPlayer.store";
-import { useV86PlayerStore } from "../store/v86Player.store";
+import { usePluginPlayerStore } from "../store/pluginPlayer.store";
 import { useLibretroPlayerStore } from "../store/libretroPlayer.store";
 import { useFocusZoneStore } from "../store/focusZone.store";
 
@@ -87,8 +86,7 @@ export function useCommands(
 
   const closeFlash = useFlashPlayerStore((s) => s.close);
   const closeJsnes = useJsnesPlayerStore((s) => s.close);
-  const closeEmulatorjs = useEmulatorjsPlayerStore((s) => s.close);
-  const closeV86 = useV86PlayerStore((s) => s.close);
+  const closePlugin = usePluginPlayerStore((s) => s.close);
   const closeLibretro = useLibretroPlayerStore((s) => s.close);
 
   const settings = useSettingsStore((s) => s.settings);
@@ -101,10 +99,9 @@ export function useCommands(
   const videoOpen = useVideoPlayerStore((s) => !!s.src);
   const flashOpen = useFlashPlayerStore((s) => s.open);
   const jsnesOpen = useJsnesPlayerStore((s) => s.open);
-  const emulatorjsOpen = useEmulatorjsPlayerStore((s) => s.open);
-  const v86Open = useV86PlayerStore((s) => s.open);
+  const pluginOpen = usePluginPlayerStore((s) => s.open);
   const libretroOpen = useLibretroPlayerStore((s) => s.open);
-  const anyEmulatorOpen = flashOpen || jsnesOpen || emulatorjsOpen || v86Open || libretroOpen;
+  const anyEmulatorOpen = flashOpen || jsnesOpen || pluginOpen || libretroOpen;
   const anyPlayerOpen = hasPlayer || videoOpen || anyEmulatorOpen;
 
   /* ── execute ── */
@@ -253,8 +250,7 @@ export function useCommands(
         case "gaming.emulator.stop":
           closeFlash();
           closeJsnes();
-          closeEmulatorjs();
-          closeV86();
+          closePlugin();
           closeLibretro();
           break;
         case "gaming.shader.clear": {
@@ -386,8 +382,7 @@ export function useCommands(
           closeVideoPlayer();
           closeFlash();
           closeJsnes();
-          closeEmulatorjs();
-          closeV86();
+          closePlugin();
           closeLibretro();
           break;
         case "player.volume-up": {
@@ -410,8 +405,7 @@ export function useCommands(
           closeVideoPlayer();
           closeFlash();
           closeJsnes();
-          closeEmulatorjs();
-          closeV86();
+          closePlugin();
           closeLibretro();
           break;
         case "player.toggle-queue":
@@ -429,8 +423,7 @@ export function useCommands(
           /* Stops any active emulator to clear shader state */
           closeFlash();
           closeJsnes();
-          closeEmulatorjs();
-          closeV86();
+          closePlugin();
           closeLibretro();
           break;
         case "visual.filter.clear": {
@@ -514,8 +507,7 @@ export function useCommands(
       closeVideoPlayer,
       closeFlash,
       closeJsnes,
-      closeEmulatorjs,
-      closeV86,
+      closePlugin,
       closeLibretro,
       settings,
       setTheme,

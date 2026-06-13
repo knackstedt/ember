@@ -1,0 +1,13 @@
+{
+  "id": "v86",
+  "name": "v86",
+  "displayName": "v86 PC Emulator",
+  "version": "0.5.359",
+  "description": "x86 PC emulator for running DOS and legacy PC software.",
+  "author": "v86 Project",
+  "entryPoint": "index.js",
+  "assetsPath": "assets",
+  "hooks": ["onPluginInstall", "onPluginStart", "onGameStart"],
+  "platforms": ["dos"],
+  "sourceUrl": "https://github.com/dotglitch/ember-plugins"
+}

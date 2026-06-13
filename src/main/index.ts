@@ -10,6 +10,7 @@ import { createLogger } from "./util/logger";
 import { getXdgVideosDir } from "./scanners/xdg";
 import { MovieRepo, RemoteSourceRepo } from "./db/repository";
 import { getServePort } from "./services/rclone-manager";
+import { bootPlugins, shutdownPlugins } from "./plugins/loader";
 
 const log = createLogger("info");
 
@@ -278,6 +279,12 @@ async function createWindow(): Promise<void> {
 
   registerIpcHandlers(mainWindow);
 
+  try {
+    await bootPlugins();
+  } catch (err) {
+    log.warn("plugins", `Failed to boot plugins: ${err}`);
+  }
+
   const loadUrl = isDev && process.env["ELECTRON_RENDERER_URL"]
     ? process.env["ELECTRON_RENDERER_URL"]
     : join(__dirname, "../renderer/index.html");
@@ -404,6 +411,73 @@ app.whenReady().then(async () => {
       }
     }
 
+    // Plugin asset serving: ember://plugin/<id>/<path>
+    if (url.hostname === "plugin") {
+      const segments = url.pathname.split("/").filter(Boolean);
+      const pluginId = segments[0];
+      const assetPath = segments.slice(1).join("/");
+      if (!pluginId) {
+        return new Response("Bad Request", { status: 400 });
+      }
+      const pluginDir = join(app.getPath("home") || process.cwd(), ".config", "htpc", "plugins", pluginId);
+      filePath = join(pluginDir, "assets", assetPath);
+      if (!filePath || filePath.includes("..")) {
+        return new Response("Forbidden", { status: 403 });
+      }
+      let stats;
+      try {
+        stats = statSync(filePath);
+      } catch {
+        return new Response("Not Found", { status: 404 });
+      }
+      const ext = filePath.toLowerCase().slice(filePath.lastIndexOf("."));
+      let contentType = "application/octet-stream";
+      if (ext === ".html" || ext === ".htm") contentType = "text/html";
+      else if (ext === ".js" || ext === ".mjs") contentType = "application/javascript";
+      else if (ext === ".css") contentType = "text/css";
+      else if (ext === ".json") contentType = "application/json";
+      else if (ext === ".wasm") contentType = "application/wasm";
+      else if (ext === ".jpg" || ext === ".jpeg") contentType = "image/jpeg";
+      else if (ext === ".png") contentType = "image/png";
+      else if (ext === ".svg") contentType = "image/svg+xml";
+      else if (ext === ".webp") contentType = "image/webp";
+      else if (ext === ".gif") contentType = "image/gif";
+      else if (ext === ".ico") contentType = "image/x-icon";
+      else if (ext === ".mp3") contentType = "audio/mpeg";
+      else if (ext === ".ogg") contentType = "audio/ogg";
+      else if (ext === ".wav") contentType = "audio/wav";
+      else if (ext === ".bin") contentType = "application/octet-stream";
+      else if (ext === ".data") contentType = "application/octet-stream";
+      const range = request.headers.get("Range") || "";
+      if (range) {
+        const match = range.match(/bytes=(\d+)-(\d*)/);
+        if (match) {
+          const start = parseInt(match[1], 10);
+          const end = match[2] ? parseInt(match[2], 10) : stats.size - 1;
+          const length = end - start + 1;
+          const stream = createReadStream(filePath, { start, end });
+          return new Response(stream as any, {
+            status: 206,
+            headers: {
+              "Content-Type": contentType,
+              "Content-Length": String(length),
+              "Accept-Ranges": "bytes",
+              "Content-Range": `bytes ${start}-${end}/${stats.size}`,
+            },
+          });
+        }
+      }
+      const stream = createReadStream(filePath);
+      return new Response(stream as any, {
+        status: 200,
+        headers: {
+          "Content-Type": contentType,
+          "Content-Length": String(stats.size),
+          "Accept-Ranges": "bytes",
+        },
+      });
+    }
+
     let filePath: string;
     if (url.hostname === "media") {
       filePath = decodeURIComponent(url.pathname.slice(1));
@@ -488,7 +562,7 @@ app.whenReady().then(async () => {
   });
 });
 
-app.on("before-quit", (e) => {
+app.on("before-quit", async (e) => {
   // Give renderers a brief moment to fire any pending beforeunload / IPC saves
   const windows = BrowserWindow.getAllWindows();
   if (windows.length > 0) {
@@ -498,6 +572,11 @@ app.on("before-quit", (e) => {
         win.webContents.send("app:save-state");
       }
     }
+    try {
+      await shutdownPlugins();
+    } catch (err) {
+      log.warn("plugins", `Shutdown error: ${err}`);
+    }
     setTimeout(() => {
       app.quit();
     }, 300);
@@ -506,5 +585,10 @@ app.on("before-quit", (e) => {
 
 app.on("window-all-closed", async () => {
   await destroyInputSystem();
+  try {
+    await shutdownPlugins();
+  } catch (err) {
+    log.warn("plugins", `Shutdown error: ${err}`);
+  }
   if (process.platform !== "darwin") app.quit();
 });

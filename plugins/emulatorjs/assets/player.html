@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="emulator.css">
+  <style>
+    body { margin: 0; background: #000; overflow: hidden; }
+    #emulator { width: 100vw; height: 100vh; }
+  </style>
+</head>
+<body>
+  <div id="emulator"></div>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const romPath = params.get("rom");
+    const core = params.get("core");
+    const platform = params.get("platform");
+    const shader = params.get("shader") || "";
+
+    window.EJS_player = "#emulator";
+    window.EJS_pathtodata = "/plugin/emulatorjs/";
+    window.EJS_startOnLoaded = true;
+    window.EJS_gameID = romPath;
+    if (shader) window.EJS_Shader = shader;
+
+    window.addEventListener("keydown", function(e) {
+      if (e.code === "Escape") {
+        window.parent.postMessage({ type: "plugin-close" }, "*");
+      }
+    });
+
+    async function loadRom() {
+      if (!romPath) return;
+      try {
+        const res = await fetch(`ember://media/${encodeURIComponent(romPath)}`);
+        if (!res.ok) throw new Error("Failed to load ROM");
+        const blob = await res.blob();
+        window.EJS_core = core;
+        window.EJS_gameUrl = URL.createObjectURL(blob);
+        var script = document.createElement("script");
+        script.src = "/plugin/emulatorjs/loader.js";
+        document.head.appendChild(script);
+      } catch (err) {
+        console.error("[EmulatorJS] Failed to load ROM:", err);
+        document.getElementById("emulator").textContent = "Error loading ROM: " + err.message;
+      }
+    }
+
+    loadRom();
+  </script>
+</body>
+</html>

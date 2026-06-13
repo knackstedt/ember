@@ -7,10 +7,10 @@
   "homepage": "https://github.com/dotglitch/ember",
   "main": "out/main/index.js",
   "scripts": {
-    "postinstall": "node node_modules/electron/install.js && bun scripts/setup-v86.ts && bun scripts/setup-libretro.ts && bun scripts/setup-video-decoder.ts && bun scripts/setup-rclone.ts && cd native/libretro-frontend && cargo fetch",
+    "postinstall": "node node_modules/electron/install.js && bun scripts/setup-libretro.ts && bun scripts/setup-video-decoder.ts && bun scripts/setup-rclone.ts && cd native/libretro-frontend && cargo fetch",
     "dev": "bun scripts/dev.ts",
     "build": "electron-vite build",
-    "predist": "bun scripts/setup-libretro.ts && bun scripts/setup-video-decoder.ts",
+    "predist": "bun scripts/setup-libretro.ts && bun scripts/setup-video-decoder.ts && bun scripts/package-plugins.ts",
     "dist": "electron-builder",
     "dist:x64:tar.gz": "electron-builder --linux tar.gz --x64",
     "dist:x64:appimage": "electron-builder --linux AppImage --x64",
@@ -21,7 +21,6 @@
     "retag": "VERSION=$(jq -r '.version' package.json) && git push origin :refs/tags/v${VERSION} 2>/dev/null || true && git tag -d v${VERSION} 2>/dev/null || true && git tag v${VERSION} && git push origin v${VERSION} --force"
   },
   "dependencies": {
-    "@emulatorjs/emulatorjs": "^4.2.3",
     "@ruffle-rs/ruffle": "^0.2.0",
     "@surrealdb/node": "^3.0.0",
     "@xenova/transformers": "^2.17.2",
@@ -38,7 +37,6 @@
     "simple-icons": "^16.22.0",
     "source-map": "^0.7.4",
     "surrealdb": "^2.0.1",
-    "v86": "^0.5.359",
     "virtua": "^0.38.0",
     "zustand": "^4.5.4"
   },

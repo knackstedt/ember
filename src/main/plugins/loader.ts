@@ -10,21 +10,45 @@ import {
   createPluginApi,
   PluginModule,
 } from "./api";
+import {
+  registerInstalledPlugin,
+  unregisterInstalledPlugin,
+  setPluginActive,
+  setPluginInactive,
+  clearRegistry,
+} from "./plugin-registry";
 import { createLogger } from "../util/logger";
 
 const log = createLogger("info");
 
-let PLUGINS_DIR;
+let PLUGINS_DIR: string;
 try { PLUGINS_DIR = join(app.getPath("home"), ".config", "htpc", "plugins"); } catch { PLUGINS_DIR = join(process.cwd(), ".config", "htpc", "plugins"); }
-let PLUGIN_BUILD_DIR;
+let PLUGIN_BUILD_DIR: string;
 try { PLUGIN_BUILD_DIR = join(app.getPath("userData"), "plugin-builds"); } catch { PLUGIN_BUILD_DIR = join(process.cwd(), "plugin-builds"); }
 
 mkdirSync(PLUGINS_DIR, { recursive: true });
 mkdirSync(PLUGIN_BUILD_DIR, { recursive: true });
 
+(global as any).__PLUGINS_DIR__ = PLUGINS_DIR;
+
 interface BuildResult {
   code: string;
   map: string;
+}
+
+interface PluginState {
+  enabled: boolean;
+  installedAt: string;
+}
+
+function readPluginState(id: string): PluginState | null {
+  const path = join(PLUGINS_DIR, `.${id}.state.json`);
+  if (!existsSync(path)) return null;
+  try {
+    return JSON.parse(readFileSync(path, "utf-8"));
+  } catch {
+    return null;
+  }
 }
 
 async function compilePlugin(entryPoint: string): Promise<BuildResult> {
@@ -90,6 +114,16 @@ async function loadPluginFromDir(
     return null;
   }
 
+  const state = readPluginState(manifest.id);
+  if (state && !state.enabled) {
+    log.info("plugins", `Plugin ${manifest.id} is disabled, skipping`);
+    return {
+      manifest,
+      module: {},
+      enabled: false,
+    };
+  }
+
   const entryPath = join(pluginDir, manifest.entryPoint);
   if (!existsSync(entryPath)) {
     log.error("plugins", `Entry point not found: ${entryPath}`);
@@ -141,6 +175,8 @@ async function loadPluginFromDir(
     error: errorMsg,
   };
 
+  registerInstalledPlugin(plugin);
+
   if (!errorMsg && pluginModule.activate) {
     try {
       pluginModule.activate(createPluginApi(manifest));
@@ -151,6 +187,21 @@ async function loadPluginFromDir(
       );
       plugin.enabled = false;
       plugin.error = `Activation error:\n${resolved}`;
+    }
+  }
+
+  // Call onPluginStart if available
+  if (!errorMsg && pluginModule.onPluginStart) {
+    try {
+      await pluginModule.onPluginStart(createPluginApi(manifest));
+      setPluginActive(manifest.id, plugin);
+    } catch (err) {
+      const resolved = await resolveSourceMappedStack(
+        err as Error,
+        buildResult.map,
+      );
+      plugin.enabled = false;
+      plugin.error = `onPluginStart error:\n${resolved}`;
     }
   }
 
@@ -170,8 +221,17 @@ export async function reloadPlugins(): Promise<RegisteredPlugin[]> {
         /* */
       }
     }
+    if (plugin.module.onPluginStop) {
+      try {
+        await plugin.module.onPluginStop();
+      } catch {
+        /* */
+      }
+    }
+    setPluginInactive(plugin.manifest.id);
   }
   registeredPlugins.length = 0;
+  clearRegistry();
 
   if (!existsSync(PLUGINS_DIR)) return [];
 
@@ -183,6 +243,7 @@ export async function reloadPlugins(): Promise<RegisteredPlugin[]> {
   }
 
   for (const entry of entries) {
+    if (entry.startsWith(".")) continue;
     const fullPath = join(PLUGINS_DIR, entry);
     let plugin: RegisteredPlugin | null = null;
 
@@ -199,8 +260,91 @@ export async function reloadPlugins(): Promise<RegisteredPlugin[]> {
       plugin = await loadPluginFromDir(fullPath);
     }
 
-    if (plugin) registeredPlugins.push(plugin);
+    if (plugin) {
+      registeredPlugins.push(plugin);
+    }
   }
 
   return registeredPlugins;
+}
+
+export async function unloadPlugin(id: string): Promise<void> {
+  const idx = registeredPlugins.findIndex((p) => p.manifest.id === id);
+  if (idx >= 0) {
+    const plugin = registeredPlugins[idx];
+    if (plugin.module.onPluginStop) {
+      try {
+        await plugin.module.onPluginStop();
+      } catch {
+        /* */
+      }
+    }
+    if (plugin.module.deactivate) {
+      try {
+        plugin.module.deactivate();
+      } catch {
+        /* */
+      }
+    }
+    setPluginInactive(id);
+    registeredPlugins.splice(idx, 1);
+  }
+  unregisterInstalledPlugin(id);
+}
+
+export async function callPluginHook<T>(
+  hookName: keyof PluginModule,
+  ...args: unknown[]
+): Promise<T | undefined> {
+  for (const plugin of registeredPlugins) {
+    if (!plugin.enabled) continue;
+    const hook = plugin.module[hookName] as (...args: unknown[]) => Promise<T | undefined> | T | undefined;
+    if (typeof hook === "function") {
+      try {
+        const result = await hook(createPluginApi(plugin.manifest), ...args);
+        if (result !== null && result !== undefined) {
+          return result;
+        }
+      } catch (err) {
+        log.error("plugins", `Hook ${String(hookName)} failed in ${plugin.manifest.id}: ${err}`);
+      }
+    }
+  }
+  return undefined;
+}
+
+export async function bootPlugins(): Promise<void> {
+  await reloadPlugins();
+  for (const plugin of registeredPlugins) {
+    if (!plugin.enabled) continue;
+    if (plugin.module.onApplicationBoot) {
+      try {
+        await plugin.module.onApplicationBoot(createPluginApi(plugin.manifest));
+      } catch (err) {
+        log.error("plugins", `onApplicationBoot failed in ${plugin.manifest.id}: ${err}`);
+      }
+    }
+  }
+}
+
+export async function shutdownPlugins(): Promise<void> {
+  for (const plugin of registeredPlugins) {
+    if (!plugin.enabled) continue;
+    if (plugin.module.onApplicationShutdown) {
+      try {
+        await plugin.module.onApplicationShutdown();
+      } catch {
+        /* ignore */
+      }
+    }
+    if (plugin.module.deactivate) {
+      try {
+        plugin.module.deactivate();
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+  registeredPlugins.length = 0;
+  clearRegistry();
 }

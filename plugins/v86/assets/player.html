@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { margin: 0; background: #000; overflow: hidden; }
+    #screen { width: 100vw; height: 100vh; }
+  </style>
+</head>
+<body>
+  <div id="screen"></div>
+  <script src="/plugin/v86/build/libv86.js"></script>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const romPath = params.get("rom");
+
+    async function init() {
+      if (!romPath) {
+        document.getElementById("screen").textContent = "No ROM path provided";
+        return;
+      }
+
+      try {
+        const res = await fetch(`ember://media/${encodeURIComponent(romPath)}`);
+        if (!res.ok) throw new Error("Failed to load disk image");
+        const arrayBuffer = await res.arrayBuffer();
+        const buffer = arrayBuffer;
+        const size = buffer.byteLength;
+
+        // Determine disk type from extension and size
+        const ext = romPath.slice(romPath.lastIndexOf(".")).toLowerCase();
+        const isFloppy = ext === ".flp" || ext === ".vfd" || ext === ".ima" ||
+          (ext === ".img" && [368640, 737280, 1228800, 1474560, 2949120].includes(size));
+
+        const config = {
+          screen_container: document.getElementById("screen"),
+          bios: { url: "/plugin/v86/bios/seabios.bin" },
+          vga_bios: { url: "/plugin/v86/bios/vgabios.bin" },
+          autostart: true,
+          wasm_path: "/plugin/v86/build/v86.wasm",
+          memory_size: 64 * 1024 * 1024,
+        };
+
+        if (ext === ".iso") {
+          config.cdrom = { buffer };
+        } else if (isFloppy) {
+          config.fda = { buffer };
+        } else {
+          config.hda = { buffer };
+        }
+
+        if (window.V86) {
+          new window.V86(config);
+        } else {
+          document.getElementById("screen").textContent = "v86 library failed to load";
+        }
+      } catch (err) {
+        console.error("[v86] Failed to start:", err);
+        document.getElementById("screen").textContent = "Error: " + err.message;
+      }
+    }
+
+    window.addEventListener("keydown", function(e) {
+      if (e.code === "Escape") {
+        window.parent.postMessage({ type: "plugin-close" }, "*");
+      }
+    });
+
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", init);
+    } else {
+      init();
+    }
+  </script>
+</body>
+</html>

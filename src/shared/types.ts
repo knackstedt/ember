@@ -582,7 +582,46 @@ export interface VideoDecoderMetadata {
 export interface PluginManifest {
   id: string;
   name: string;
+  displayName?: string;
   version: string;
+  description?: string;
+  author?: string;
+  sourceUrl?: string;
   entryPoint: string;
+  assetsPath?: string;
+  hooks?: PluginHookName[];
+  platforms?: string[];
+}
+
+export type PluginHookName =
+  | "onPluginInstall"
+  | "onPluginUninstall"
+  | "onPluginStart"
+  | "onPluginStop"
+  | "onPluginUpdate"
+  | "onApplicationBoot"
+  | "onApplicationShutdown"
+  | "onGameStart"
+  | "onGameStop"
+  | "onGameCrash";
+
+export interface PluginLaunchResult {
+  type: "iframe" | "component" | "external";
+  url?: string;
+  pluginId: string;
+}
+
+export interface DiscoveredPlugin {
+  id: string;
+  name: string;
+  displayName: string;
+  version: string;
+  description?: string;
+  author?: string;
+  sourceUrl?: string;
+  downloadUrl: string;
+  installed: boolean;
+  installedVersion?: string;
+  enabled: boolean;
 }
 

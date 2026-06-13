@@ -22,8 +22,7 @@ import { useContextMenu } from "../../hooks/useContextMenu";
 import { ContextMenuOption } from "../../components/ContextMenu/ContextMenu";
 import { useFlashPlayerStore } from "../../store/flashPlayer.store";
 import { useJsnesPlayerStore } from "../../store/jsnesPlayer.store";
-import { useEmulatorjsPlayerStore } from "../../store/emulatorjsPlayer.store";
-import { useV86PlayerStore } from "../../store/v86Player.store";
+import { usePluginPlayerStore } from "../../store/pluginPlayer.store";
 import { useLibretroPlayerStore } from "../../store/libretroPlayer.store";
 import { SHADER_PRESETS } from "../../components/LibretroPlayer/shaders";
 import { useToastStore } from "../../store/toast.store";
@@ -603,14 +602,17 @@ export const GamingTab: React.FC = () => {
     //   useJsnesPlayerStore.getState().launch(romPath, game.title, game.id);
     //   return;
     // }
-    if ((game.platform === "snes" || game.platform === "gb" || game.platform === "gba") && romPath) {
-      const shader = await resolveShader(game);
-      useEmulatorjsPlayerStore.getState().launch(romPath, game.title, game.platform, game.id, shader);
-      return;
-    }
-    if (game.platform === "dos" && romPath) {
-      useV86PlayerStore.getState().launch(romPath, game.title, game.id);
-      return;
+    // Try plugins first for emulator platforms
+    if (romPath) {
+      try {
+        const pluginResult = await window.htpc.plugins.launchGame(game);
+        if (pluginResult?.type === "iframe" && pluginResult.url) {
+          usePluginPlayerStore.getState().launch(pluginResult.url, game.title, game.id, pluginResult.pluginId);
+          return;
+        }
+      } catch {
+        // Plugin launch failed, fall through to other methods
+      }
     }
     if (LIBRETRO_PLATFORMS.includes(game.platform) && romPath) {
       const shader = await resolveShader(game);

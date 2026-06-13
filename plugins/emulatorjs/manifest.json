@@ -1,0 +1,13 @@
+{
+  "id": "emulatorjs",
+  "name": "emulatorjs",
+  "displayName": "EmulatorJS",
+  "version": "4.2.3",
+  "description": "Browser-based multi-system emulator supporting NES, SNES, Game Boy, and GBA.",
+  "author": "EmulatorJS Team",
+  "entryPoint": "index.js",
+  "assetsPath": "assets",
+  "hooks": ["onPluginInstall", "onPluginStart", "onGameStart"],
+  "platforms": ["nes", "snes", "gb", "gba"],
+  "sourceUrl": "https://github.com/dotglitch/ember-plugins"
+}

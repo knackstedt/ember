@@ -86,83 +86,6 @@ function copyDirRecursive(src: string, dest: string): void {
   }
 }
 
-// Core packages needed for supported platforms
-const CORE_PACKAGES: Record<string, string> = {
-  nestopia: "@emulatorjs/core-nestopia",
-  snes9x: "@emulatorjs/core-snes9x",
-  gambatte: "@emulatorjs/core-gambatte",
-  mgba: "@emulatorjs/core-mgba",
-};
-
-function findCoreFile(fileName: string): string | null {
-  for (const pkgName of Object.values(CORE_PACKAGES)) {
-    const filePath = resolve("node_modules", pkgName, fileName);
-    if (existsSync(filePath) && statSync(filePath).isFile()) {
-      return filePath;
-    }
-  }
-  return null;
-}
-
-function emulatorjsStaticPlugin(): Plugin {
-  const ejsNpmDir = resolve("node_modules/@emulatorjs/emulatorjs/data");
-
-  return {
-    name: "emulatorjs-static",
-    configureServer(server) {
-      server.middlewares.use("/emulatorjs", (req, res, next) => {
-        try {
-          decodeURI(req.url ?? "");
-        } catch {
-          res.statusCode = 400;
-          res.end("Bad Request");
-          return;
-        }
-        const fileName = req.url?.replace(/^\/+/, "") ?? "";
-        if (!fileName) {
-          res.statusCode = 404;
-          res.end("Not found");
-          return;
-        }
-        // Serve files directly from the @emulatorjs/emulatorjs data directory
-        let filePath = resolve(ejsNpmDir, fileName);
-        if (!existsSync(filePath) || !statSync(filePath).isFile()) {
-          // Fall back to core packages for cores/*.data files
-          if (fileName.startsWith("cores/")) {
-            const corePath = findCoreFile(fileName.slice(6));
-            if (corePath) filePath = corePath;
-          }
-        }
-        if (!existsSync(filePath) || !statSync(filePath).isFile()) {
-          next();
-          return;
-        }
-        res.setHeader("Content-Type", getMimeType(filePath));
-        res.end(readFileSync(filePath));
-      });
-    },
-    writeBundle(options) {
-      const outDir = options.dir;
-      if (!outDir) return;
-      const destDir = resolve(outDir, "emulatorjs");
-      // Copy npm package data (includes src/, localization/, etc.)
-      copyDirRecursive(ejsNpmDir, destDir);
-      // Copy core .data files from the specific core packages we need
-      const coresDestDir = resolve(destDir, "cores");
-      if (!existsSync(coresDestDir)) mkdirSync(coresDestDir, { recursive: true });
-      for (const pkgName of Object.values(CORE_PACKAGES)) {
-        const pkgDir = resolve("node_modules", pkgName);
-        if (!existsSync(pkgDir)) continue;
-        for (const file of readdirSync(pkgDir)) {
-          if (file.endsWith(".data")) {
-            copyFileSync(resolve(pkgDir, file), resolve(coresDestDir, file));
-          }
-        }
-      }
-    },
-  };
-}
-
 function libretroStaticPlugin(): Plugin {
   const arches = ["x64", "arm64"];
 
@@ -201,14 +124,13 @@ function libretroStaticPlugin(): Plugin {
   };
 }
 
-function v86StaticPlugin(): Plugin {
-  const v86BuildDir = resolve("node_modules/v86/build");
-  const v86BiosDir = resolve("resources/v86-bios");
+function pluginStaticPlugin(): Plugin {
+  const pluginsDir = resolve(process.env.HOME || process.env.USERPROFILE || "", ".config/htpc/plugins");
 
   return {
-    name: "v86-static",
+    name: "plugin-static",
     configureServer(server) {
-      server.middlewares.use("/v86", (req, res, next) => {
+      server.middlewares.use("/plugin", (req, res, next) => {
         try {
           decodeURI(req.url ?? "");
         } catch {
@@ -222,16 +144,15 @@ function v86StaticPlugin(): Plugin {
           res.end("Not found");
           return;
         }
-        let filePath: string;
-        if (fileName.startsWith("build/")) {
-          filePath = resolve(v86BuildDir, fileName.slice(6));
-        } else if (fileName.startsWith("bios/")) {
-          filePath = resolve(v86BiosDir, fileName.slice(5));
-        } else {
+        const segments = fileName.split("/").filter(Boolean);
+        const pluginId = segments[0];
+        const assetPath = segments.slice(1).join("/");
+        if (!pluginId || !assetPath) {
           res.statusCode = 404;
           res.end("Not found");
           return;
         }
+        const filePath = resolve(pluginsDir, pluginId, "assets", assetPath);
         if (!existsSync(filePath) || !statSync(filePath).isFile()) {
           next();
           return;
@@ -240,11 +161,8 @@ function v86StaticPlugin(): Plugin {
         res.end(readFileSync(filePath));
       });
     },
-    writeBundle(options) {
-      const outDir = options.dir;
-      if (!outDir) return;
-      copyDirRecursive(v86BuildDir, resolve(outDir, "v86", "build"));
-      copyDirRecursive(v86BiosDir, resolve(outDir, "v86", "bios"));
+    writeBundle() {
+      // Plugin assets are served via ember://plugin/ protocol in production
     },
   };
 }
@@ -290,6 +208,6 @@ export default defineConfig({
         "@shared": resolve("src/shared"),
       },
     },
-    plugins: [react(), ruffleStaticPlugin(), emulatorjsStaticPlugin(), v86StaticPlugin(), libretroStaticPlugin()],
+    plugins: [react(), ruffleStaticPlugin(), libretroStaticPlugin(), pluginStaticPlugin()],
   },
 });
