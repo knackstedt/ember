@@ -63,7 +63,7 @@ export async function scanMusicFiles(
   for (let i = 0; i < allFiles.length; i++) {
     const filePath = allFiles[i];
     if (i % 100 === 0)
-      log.info(
+      log.debug(
         "music:scan",
         `parsing ${i + 1}/${allFiles.length} ${filePath}`,
       );

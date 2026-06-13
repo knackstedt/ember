@@ -150,7 +150,7 @@ export function useCommands(
             gaming: scanGames,
             movies: scanMovies,
             music: scanMusic,
-            "tv-shows": scanTv,
+            streaming: scanTv,
           };
           scanMap[context.activeTab]?.();
           break;
@@ -186,7 +186,7 @@ export function useCommands(
           setActiveTab("music");
           break;
         case "nav.tab.tv":
-          setActiveTab("tv-shows");
+          setActiveTab("streaming");
           break;
         case "nav.tab.settings":
           setActiveTab("settings");
@@ -531,7 +531,7 @@ export function useCommands(
         case "music-artist-available":
           return context.activeTab === "music" && !!context.selectedMusicArtist;
         case "tv-selected":
-          return context.activeTab === "tv-shows" && !!context.selectedTvId;
+          return context.activeTab === "streaming" && !!context.selectedTvId;
         case "gaming-tab":
           return context.activeTab === "gaming";
         case "movies-tab":
@@ -539,7 +539,7 @@ export function useCommands(
         case "music-tab":
           return context.activeTab === "music";
         case "tv-tab":
-          return context.activeTab === "tv-shows";
+          return context.activeTab === "streaming";
         case "player-open":
           return anyPlayerOpen;
         case "emulator-open":

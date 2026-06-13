@@ -24,7 +24,7 @@ const ITEM_TYPE_LABELS: Record<CollectionItemType, string> = {
   game: "Games",
   movie: "Movies",
   music: "Music",
-  tv: "TV Shows",
+  tv: "Streaming",
   mixed: "Mixed",
 };
 

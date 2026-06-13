@@ -137,7 +137,7 @@ export function scanFlashGames(): Game[] {
       const ext = extname(fullPath).toLowerCase();
       if (!FLASH_EXTS.has(ext)) return;
       if (seen.has(fullPath)) {
-        log.info("flash", `skip duplicate path: ${fullPath}`);
+        log.debug("flash", `skip duplicate path: ${fullPath}`);
         return;
       }
       seen.add(fullPath);

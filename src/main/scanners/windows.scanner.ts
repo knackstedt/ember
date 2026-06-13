@@ -81,17 +81,17 @@ export function scanWindowsGames(): Game[] {
       const ext = extname(fullPath).toLowerCase();
       if (ext !== ".exe") return;
       if (seen.has(fullPath)) {
-        log.info("windows", `skip duplicate path: ${fullPath}`);
+        log.debug("windows", `skip duplicate path: ${fullPath}`);
         return;
       }
 
       const base = basename(fullPath, ".exe").toLowerCase();
       if (SKIP_NAMES.has(base)) {
-        log.info("windows", `skip junk exe: ${fullPath}`);
+        log.debug("windows", `skip junk exe: ${fullPath}`);
         return;
       }
       if (base.endsWith("_data") || base.startsWith("unity")) {
-        log.info("windows", `skip unity data exe: ${fullPath}`);
+        log.debug("windows", `skip unity data exe: ${fullPath}`);
         return;
       }
 

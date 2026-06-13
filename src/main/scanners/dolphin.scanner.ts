@@ -124,14 +124,14 @@ export function scanDolphinGames(extraPaths: string[] = []): Game[] {
         return;
       }
       if (seen.has(fullPath)) {
-        log.info("dolphin", `skip duplicate path: ${fullPath}`);
+        log.debug("dolphin", `skip duplicate path: ${fullPath}`);
         return;
       }
 
       seen.add(fullPath);
       const platform = platformFromExt(ext, fullPath);
       if (!platform) {
-        log.info("dolphin", `skip unknown ISO: ${fullPath}`);
+        log.debug("dolphin", `skip unknown ISO: ${fullPath}`);
         return;
       }
       const title = titleFromFilename(basename(fullPath));

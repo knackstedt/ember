@@ -26,7 +26,7 @@ const CATEGORY_LABELS: Record<CommandCategory, string> = {
   gaming: "Gaming",
   movies: "Movies",
   music: "Music",
-  tv: "TV Shows",
+  tv: "Streaming",
   player: "Player",
   visual: "Visual",
   settings: "Settings",

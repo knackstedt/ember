@@ -19,6 +19,8 @@ import {
   CollectionItem,
   SmartFilterGroup,
   StreamingService,
+  ExtensionInstallResult,
+  StreamingExtension,
   ManagedPackage,
   PackageOperationProgress,
 } from "../shared/types";
@@ -556,6 +558,20 @@ const htpc = {
       ipcRenderer.invoke("streaming:detectDesktopApp", command),
     launch: (service: StreamingService): Promise<void> =>
       ipcRenderer.invoke("streaming:launch", service),
+    extensions: {
+      ensureDefaults: (): Promise<void> =>
+        ipcRenderer.invoke("streaming:extensions:ensureDefaults"),
+      download: (extId: string, url: string, version: string): Promise<ExtensionInstallResult> =>
+        ipcRenderer.invoke("streaming:extensions:download", extId, url, version),
+      load: (extId: string, partition: string): Promise<{ success: boolean; error?: string }> =>
+        ipcRenderer.invoke("streaming:extensions:load", extId, partition),
+      unload: (extId: string, partition: string): Promise<void> =>
+        ipcRenderer.invoke("streaming:extensions:unload", extId, partition),
+      remove: (extId: string): Promise<void> =>
+        ipcRenderer.invoke("streaming:extensions:remove", extId),
+      apply: (partition: string, extensions: StreamingExtension[]): Promise<void> =>
+        ipcRenderer.invoke("streaming:extensions:apply", partition, extensions),
+    },
   },
 
   packages: {

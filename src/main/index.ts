@@ -1,16 +1,20 @@
 import { app, BrowserWindow, shell, protocol, Menu } from "electron";
+import { EventEmitter } from "events";
 import path, { join } from "path";
 import { readFileSync, createReadStream, statSync, lstatSync, readlinkSync, unlinkSync, writeFileSync, existsSync, mkdirSync, readdirSync } from "fs";
 import { initDb } from "./db";
 import { registerIpcHandlers } from "./ipc";
 import { initInputSystem, destroyInputSystem } from "./input/evdev";
-import { getSettings } from "./services/settings.service";
+import { getSettings, setSetting } from "./services/settings.service";
 import { getWindowState, saveWindowState } from "./services/window-state.service";
 import { createLogger } from "./util/logger";
 import { getXdgVideosDir } from "./scanners/xdg";
 import { MovieRepo, RemoteSourceRepo } from "./db/repository";
 import { getServePort } from "./services/rclone-manager";
 import { bootPlugins, shutdownPlugins } from "./plugins/loader";
+
+// Suppress MaxListenersExceededWarning from Electron internals (webviews, extensions)
+EventEmitter.defaultMaxListeners = 30;
 
 const log = createLogger("info");
 
@@ -191,6 +195,22 @@ async function createWindow(): Promise<void> {
   }
 
   const settings = await getSettings();
+
+  // Migration: rename tv-shows tab to streaming in user settings
+  try {
+    if (settings.defaultTab === "tv-shows") {
+      await setSetting("defaultTab", "streaming");
+    }
+    if (settings.disabledTabs?.includes("tv-shows")) {
+      await setSetting(
+        "disabledTabs",
+        settings.disabledTabs.map((t) => (t === "tv-shows" ? "streaming" : t)),
+      );
+    }
+  } catch (err) {
+    log.warn("migration", `failed to migrate tab settings: ${err}`);
+  }
+
   const winState = getWindowState();
   log.info("window-state", `creating window with ${JSON.stringify(winState)}`);
 

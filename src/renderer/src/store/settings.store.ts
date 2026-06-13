@@ -27,6 +27,8 @@ const defaults: AppSettings = {
   emulatorShaders: {},
   commandKeybinds: {},
   commandControllerMap: {},
+  streamingExtensions: [],
+  streamingExtensionPromptDismissed: [],
   flashSettings: {
     aspectRatio: "free",
     canvasSize: "window",

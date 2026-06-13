@@ -11,7 +11,7 @@ const CATEGORY_ORDER: CommandCategory[] = [
 
 const CATEGORY_LABELS: Record<CommandCategory, string> = {
   global: "Global", navigation: "Navigation", gaming: "Gaming",
-  movies: "Movies", music: "Music", tv: "TV Shows",
+  movies: "Movies", music: "Music", tv: "Streaming",
   player: "Player", visual: "Visual", settings: "Settings",
 };
 

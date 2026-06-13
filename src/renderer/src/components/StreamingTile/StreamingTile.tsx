@@ -4,12 +4,19 @@ import { StreamingService } from "../../../../shared/types";
 
 interface Props {
   services: StreamingService[];
+  onLaunch?: (svc: StreamingService) => void;
 }
 
-export const StreamingTile: React.FC<Props> = ({ services }) => {
+export const StreamingTile: React.FC<Props> = ({ services, onLaunch }) => {
   const handleLaunch = (svc: StreamingService) => {
-    void window.htpc.streaming.launch(svc);
+    if (onLaunch) {
+      onLaunch(svc);
+    } else {
+      void window.htpc.streaming.launch(svc);
+    }
   };
+
+  const hasEmbed = services.some((s) => s.embed ?? true);
 
   return (
     <div className="flex flex-col gap-2 flex-shrink-0">
@@ -54,7 +61,11 @@ export const StreamingTile: React.FC<Props> = ({ services }) => {
         className="text-xs select-none"
         style={{ color: "var(--color-text-dim)" }}
       >
-        Opens in your default browser or desktop app
+        {hasEmbed && !onLaunch
+          ? "Opens in your default browser or desktop app"
+          : onLaunch
+            ? "Click to open"
+            : "Opens in your default browser or desktop app"}
       </p>
     </div>
   );

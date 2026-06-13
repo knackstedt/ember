@@ -19,6 +19,8 @@ const DEFAULTS: AppSettings = {
   emulatorShaders: {},
   commandKeybinds: {},
   commandControllerMap: {},
+  streamingExtensions: [],
+  streamingExtensionPromptDismissed: [],
 };
 
 export async function getSettings(): Promise<AppSettings> {

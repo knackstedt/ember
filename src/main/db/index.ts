@@ -262,6 +262,7 @@ async function runMigrations(db: Surreal): Promise<void> {
     DEFINE FIELD IF NOT EXISTS enabled ON streaming_service TYPE bool DEFAULT true;
     DEFINE FIELD IF NOT EXISTS isBuiltin ON streaming_service TYPE bool DEFAULT false;
     DEFINE FIELD IF NOT EXISTS sortOrder ON streaming_service TYPE int DEFAULT 0;
+    DEFINE FIELD IF NOT EXISTS embed ON streaming_service TYPE option<bool>;
 
     DEFINE TABLE IF NOT EXISTS remote_source SCHEMAFULL;
     DEFINE FIELD IF NOT EXISTS id ON remote_source TYPE string;

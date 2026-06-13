@@ -15,7 +15,7 @@ import { ThemeBackground } from "./components/ThemeBackground/ThemeBackground";
 import { GamingTab } from "./tabs/Gaming";
 import { MoviesTab } from "./tabs/Movies";
 import { MusicTab } from "./tabs/Music";
-import { TVShowsTab } from "./tabs/TVShows";
+import { StreamingTab } from "./tabs/Streaming";
 import { StoreTab } from "./tabs/Store";
 import { SettingsTab } from "./tabs/Settings";
 import { ControllersTab } from "./tabs/Controllers";
@@ -104,7 +104,7 @@ const TABS: TabDef[] = [
   { id: "gaming", label: "Gaming", Icon: Gamepad2, component: GamingTab },
   { id: "movies", label: "Movies", Icon: Film, component: MoviesTab },
   { id: "music", label: "Music", Icon: Music, component: MusicTab },
-  { id: "tv-shows", label: "TV Shows", Icon: Tv, component: TVShowsTab },
+  { id: "streaming", label: "Streaming", Icon: Tv, component: StreamingTab },
   { id: "store", label: "Store", Icon: Store, component: StoreTab },
   {
     id: "controllers",
@@ -794,7 +794,7 @@ export default function App(): React.ReactElement {
           gaming: () => useGamesStore.getState().scan(),
           movies: () => useMoviesStore.getState().scan(),
           music: () => useMusicStore.getState().scan(),
-          "tv-shows": () => useTvStore.getState().scan(),
+          streaming: () => useTvStore.getState().scan(),
         };
         scanMap[activeTabRef.current]?.();
       } else if (e.type === "keydown" && e.key === "f" && e.ctrlKey) {

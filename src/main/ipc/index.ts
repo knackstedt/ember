@@ -81,6 +81,14 @@ import {
   detectDesktopApp,
 } from "../services/streaming.service";
 import {
+  downloadExtension,
+  loadExtensionIntoSession,
+  unloadExtensionFromSession,
+  removeExtension,
+  applyExtensionsToPartition,
+  ensureDefaultExtensions,
+} from "../services/extension-manager.service";
+import {
   initRcloneManager,
   listRemotes,
   addRemote,
@@ -117,6 +125,7 @@ import {
   AppSettings,
   GameEmulatorConfig,
   StreamingService,
+  StreamingExtension,
   WineRunner,
   DiscoveredPlugin,
 } from "../../shared/types";
@@ -1159,7 +1168,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
 
   ipcMain.handle("movies:list", async () => {
     const movies = await MovieRepo.list();
-    log.info(
+    log.debug(
       "movies:list",
       `returning ${movies.length} movies, coverUrl samples: ${JSON.stringify(
         movies.slice(0, 3).map((m) => ({ title: m.title, coverUrl: m.coverUrl })),
@@ -1792,6 +1801,34 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     } else {
       await shell.openExternal(service.url);
     }
+  });
+
+  /* ------------------------------------------------------------------ */
+  /*  Streaming Extension Manager                                        */
+  /* ------------------------------------------------------------------ */
+
+  ipcMain.handle("streaming:extensions:ensureDefaults", async () => {
+    return ensureDefaultExtensions();
+  });
+
+  ipcMain.handle("streaming:extensions:download", async (_e, extId: string, url: string, version: string) => {
+    return downloadExtension(url, extId, version);
+  });
+
+  ipcMain.handle("streaming:extensions:load", async (_e, extId: string, partition: string) => {
+    return loadExtensionIntoSession(extId, partition);
+  });
+
+  ipcMain.handle("streaming:extensions:unload", async (_e, extId: string, partition: string) => {
+    return unloadExtensionFromSession(extId, partition);
+  });
+
+  ipcMain.handle("streaming:extensions:remove", async (_e, extId: string) => {
+    return removeExtension(extId);
+  });
+
+  ipcMain.handle("streaming:extensions:apply", async (_e, partition: string, extensions: StreamingExtension[]) => {
+    return applyExtensionsToPartition(partition, extensions);
   });
 
   /* ------------------------------------------------------------------ */

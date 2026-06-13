@@ -14,7 +14,7 @@ export type TabId =
   | "gaming"
   | "movies"
   | "music"
-  | "tv-shows"
+  | "streaming"
   | "store"
   | "settings"
   | "controllers";
@@ -498,6 +498,10 @@ export interface AppSettings {
   commandControllerMap?: Record<string, string>;
   controllerBrowser?: ControllerBrowserSettings;
   remoteSources?: RemoteSource[];
+  /** Chrome extensions installed for streaming webviews */
+  streamingExtensions?: StreamingExtension[];
+  /** Streaming services that have had their first-launch extension prompt dismissed */
+  streamingExtensionPromptDismissed?: string[];
   /** Tabs hidden from the main navigation bar */
   disabledTabs?: TabId[];
   /** Tab to open on app launch */
@@ -543,7 +547,34 @@ export interface StreamingService {
   name: string;
   url: string;
   icon?: string;
-  category: "game" | "media" | "utility";
+  category: "video" | "music" | "game" | "media" | "utility";
+  color?: string;
+  textColor?: string;
+  desktopApp?: string;
+  desktopAppArgs?: string[];
+  enabled?: boolean;
+  isBuiltin?: boolean;
+  sortOrder?: number;
+  /** Whether the service should open in an embedded webview instead of externally */
+  embed?: boolean;
+}
+
+export interface StreamingExtension {
+  id: string;
+  name: string;
+  sourceUrl: string;
+  version: string;
+  installedVersion?: string;
+  installPath?: string;
+  enabled: boolean;
+  /** Which service IDs this extension applies to. Empty = all services. */
+  serviceIds?: string[];
+}
+
+export interface ExtensionInstallResult {
+  success: boolean;
+  error?: string;
+  extension?: StreamingExtension;
 }
 
 export interface Collection {

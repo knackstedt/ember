@@ -97,7 +97,7 @@ function detectIsoPlatform(filePath: string): GamePlatform | null {
 
     const str = buf.toString("ascii", 0, bytesRead);
     const hexPreview = buf.toString("hex", 0, 32);
-    log.info("rom", `ISO header at 0x8000: "${str.slice(0, 96).replace(/[^\x20-\x7E]/g, '.')}" (hex: ${hexPreview})`);
+    log.debug("rom", `ISO header at 0x8000: "${str.slice(0, 96).replace(/[^\x20-\x7E]/g, '.')}" (hex: ${hexPreview})`);
 
     // PSP UMD ISO: "PSP GAME" in system identifier area
     if (str.includes("PSP GAME")) {
@@ -125,7 +125,7 @@ function detectIsoPlatform(filePath: string): GamePlatform | null {
         }
       }
       // No PS1 EXE header → PS2
-      log.info("rom", `PLAYSTATION header without PS1 EXE, detecting as ps2: ${filePath}`);
+      log.debug("rom", `PLAYSTATION header without PS1 EXE, detecting as ps2: ${filePath}`);
       closeSync(fd);
       return "ps2";
     }
@@ -211,14 +211,14 @@ export function scanRomGames(): Game[] {
           const baseName = basename(fullPath, ".bin");
           const cuePath = join(dirname(fullPath), baseName + ".cue");
           if (!existsSync(cuePath)) {
-            log.info("rom", `skip .bin without .cue: ${fullPath}`);
+            log.debug("rom", `skip .bin without .cue: ${fullPath}`);
             return;
           }
         }
 
         platform = detectIsoPlatform(fullPath);
         if (!platform) {
-          log.info("rom", `skip unknown ISO/BIN: ${fullPath}`);
+          log.debug("rom", `skip unknown ISO/BIN: ${fullPath}`);
           return;
         }
       }
@@ -227,7 +227,7 @@ export function scanRomGames(): Game[] {
       if (!platform && ext === ".chd") {
         platform = detectChdPlatform(fullPath);
         if (!platform) {
-          log.info("rom", `skip unknown CHD platform: ${fullPath}`);
+          log.debug("rom", `skip unknown CHD platform: ${fullPath}`);
           return;
         }
       }

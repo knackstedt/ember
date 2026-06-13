@@ -129,6 +129,7 @@ const BUILTIN_SERVICES: StreamingService[] = [
     enabled: true,
     isBuiltin: true,
     sortOrder: 0,
+    embed: true,
   },
   {
     id: "prime",
@@ -141,6 +142,7 @@ const BUILTIN_SERVICES: StreamingService[] = [
     enabled: true,
     isBuiltin: true,
     sortOrder: 1,
+    embed: true,
   },
   {
     id: "youtube",
@@ -153,6 +155,7 @@ const BUILTIN_SERVICES: StreamingService[] = [
     enabled: true,
     isBuiltin: true,
     sortOrder: 2,
+    embed: true,
   },
   {
     id: "disney",
@@ -165,6 +168,7 @@ const BUILTIN_SERVICES: StreamingService[] = [
     enabled: true,
     isBuiltin: true,
     sortOrder: 3,
+    embed: true,
   },
   {
     id: "hbomax",
@@ -177,6 +181,7 @@ const BUILTIN_SERVICES: StreamingService[] = [
     enabled: true,
     isBuiltin: true,
     sortOrder: 4,
+    embed: true,
   },
   {
     id: "appletv",
@@ -189,6 +194,7 @@ const BUILTIN_SERVICES: StreamingService[] = [
     enabled: true,
     isBuiltin: true,
     sortOrder: 5,
+    embed: true,
   },
   {
     id: "hulu",
@@ -201,6 +207,7 @@ const BUILTIN_SERVICES: StreamingService[] = [
     enabled: true,
     isBuiltin: true,
     sortOrder: 6,
+    embed: true,
   },
   {
     id: "paramount",
@@ -213,6 +220,7 @@ const BUILTIN_SERVICES: StreamingService[] = [
     enabled: true,
     isBuiltin: true,
     sortOrder: 7,
+    embed: true,
   },
   {
     id: "peacock",
@@ -225,6 +233,7 @@ const BUILTIN_SERVICES: StreamingService[] = [
     enabled: true,
     isBuiltin: true,
     sortOrder: 8,
+    embed: true,
   },
   {
     id: "crunchyroll",
@@ -237,6 +246,7 @@ const BUILTIN_SERVICES: StreamingService[] = [
     enabled: true,
     isBuiltin: true,
     sortOrder: 9,
+    embed: true,
   },
   {
     id: "plex",
@@ -249,6 +259,7 @@ const BUILTIN_SERVICES: StreamingService[] = [
     enabled: true,
     isBuiltin: true,
     sortOrder: 10,
+    embed: true,
   },
   {
     id: "twitch",
@@ -261,6 +272,7 @@ const BUILTIN_SERVICES: StreamingService[] = [
     enabled: true,
     isBuiltin: true,
     sortOrder: 11,
+    embed: true,
   },
 ];
 

@@ -359,7 +359,7 @@ export const AppearanceTab: React.FC = () => {
             ["gaming", "Gaming", Gamepad2],
             ["movies", "Movies", Film],
             ["music", "Music", Music],
-            ["tv-shows", "TV Shows", Tv],
+            ["streaming", "Streaming", Tv],
             ["controllers", "Controllers", Gamepad2],
           ] as [TabId, string, React.ComponentType<{ size?: number }>][]
         ).map(([id, label, Icon]) => {
