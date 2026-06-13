@@ -67,6 +67,56 @@ function getAxisMap(name: string): Record<number, string> {
   return XBOX_AXIS_MAP;
 }
 
+/** Normalise raw axis values to the standard -1..1 (sticks) or 0..1
+ *  (triggers) range so downstream code doesn't need to guess driver formats.
+ *
+ *  Linux drivers report wildly different raw ranges:
+ *    - hid-generic (Gamepad P5 etc): everything 0..255, center 128
+ *    - xpad (Xbox): sticks signed-16, triggers 0..1023
+ *    - ds4drv (PS4): sticks signed-16, triggers 0..255
+ *  We auto-detect by value magnitude so name matching isn't required.
+ */
+function normalizeAxis(value: number, code: number, axisName?: string): number {
+  // EV_ABS value is signed 32-bit from kernel, but the actual range
+  // depends on the HID descriptor the driver loaded.
+
+  // Use the mapped axis name for trigger detection so alternate layouts
+  // (e.g. generic HID pads that put right_x on code 2) are handled correctly.
+  const isTrigger = axisName
+    ? axisName.includes("trigger")
+    : code === 2 || code === 5 || code === 9 || code === 10;
+
+  // D-pad axes are digital directions, not analog — the kernel reports
+  // small discrete values (-1, 0, 1 or similar). Pass through unchanged.
+  if (axisName === "dpad_x" || axisName === "dpad_y") return value;
+
+  // Already normalised float (some drivers report -1..1 floats).
+  // Integer values must go through the normal path so raw 0 from
+  // 0..255 drivers is mapped to the minimum, not centre.
+  if (Math.abs(value) < 1 && !Number.isInteger(value)) return value;
+
+  if (value >= 0 && value <= 255) {
+    // 0..255 range: generic HID pad (or ds4drv triggers)
+    if (isTrigger) return value / 255;
+    // Stick deadzone: ±8 around center (128) so imperfect centering reads as 0
+    const centered = value - 128;
+    if (Math.abs(centered) <= 8) return 0;
+    return centered / 128;
+  }
+
+  if (value > 255 && value <= 1023) {
+    // 0..1023 range: xpad triggers
+    if (isTrigger) return value / 1023;
+    return value / 32767; // should not happen for sticks, but safe fallback
+  }
+
+  // Signed-16 range: xpad / ds4drv sticks (and any other signed-16 axes)
+  if (isTrigger) return Math.max(0, value) / 32767;
+  // Stick deadzone: ±1024 (~3%) around center so drift is reported as 0
+  if (Math.abs(value) <= 1024) return 0;
+  return value / 32767;
+}
+
 const BTN_MAP: Record<number, string> = {
   304: "south",
   305: "east",
@@ -195,7 +245,7 @@ async function openDevice(
   eventPath: string,
   window: BrowserWindow,
   info: { name: string; vendorId: number; productId: number },
-): Promise<{ device: unknown; close: () => void } | null> {
+): Promise<{ device: unknown; close: () => void; info: ControllerDevice } | null> {
 
   const controllerType = detectControllerType(
     info.name,
@@ -231,12 +281,13 @@ async function openDevice(
     const stream = createReadStream(eventPath);
     let remainder = Buffer.alloc(0);
 
-    stream.on("data", (chunk: Buffer) => {
+    stream.on("data", (chunk) => {
       if (window.isDestroyed()) {
         stream.destroy();
         return;
       }
-      let buf = Buffer.concat([remainder, chunk]);
+      const data = chunk as Buffer;
+      let buf = Buffer.concat([remainder, data]);
 
       while (buf.length >= EVENT_SIZE) {
         const type = buf.readUInt16LE(16);
@@ -262,13 +313,14 @@ async function openDevice(
             timestamp: Date.now(),
           };
         } else if (type === EV_ABS) {
+          const mappedAxis = axisMap[code] ?? `abs_${code}`;
           inputEvent = {
             source: "gamepad",
             deviceId,
             deviceName: info.name,
             type: "axis",
-            axis: axisMap[code] ?? `abs_${code}`,
-            value,
+            axis: mappedAxis,
+            value: normalizeAxis(value, code, mappedAxis),
             rawCode: code,
             timestamp: Date.now(),
           };

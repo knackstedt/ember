@@ -230,7 +230,7 @@ export default function App(): React.ReactElement {
   executeCommandRef.current = executeCommand;
 
   // Fallback gamepad input via browser Gamepad API (works without evdev permissions)
-  useGamepadApi(!anyEmulatorOpen && inputDevices.length === 0 && !evdevGamepadActive);
+  useGamepadApi(!anyEmulatorOpen && inputDevices.length === 0 && !evdevGamepadActive, activeTab);
 
   useEffect(() => {
     load();

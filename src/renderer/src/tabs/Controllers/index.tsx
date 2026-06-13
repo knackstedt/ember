@@ -687,21 +687,37 @@ export const ControllersTab: React.FC = () => {
                 {Object.keys(liveState.axes).length > 0 && (
                   <div className="flex flex-col gap-2">
                     {Object.entries(liveState.axes).map(([axis, value]) => {
-                      /* Normalise raw value to a 0..1 or -1..1 display range.
-                         Drivers report different ranges; detect from magnitude. */
-                      let normalized = 0;
-                      if (typeof value === "number") {
-                        if (Math.abs(value) <= 1) {
-                          normalized = value; // already normalised
-                        } else if (value >= 0 && value <= 255) {
-                          // Raw 0..255: triggers (0..255) or sticks (center 128)
-                          normalized = axis.includes("trigger")
-                            ? value / 255
-                            : (value - 128) / 128;
-                        } else {
-                          // Signed-16
-                          normalized = Math.max(-1, Math.min(1, value / 32767));
-                        }
+                      const isTrigger = axis.includes("trigger");
+                      const normalized = isTrigger
+                        ? Math.max(0, Math.min(1, value ?? 0))
+                        : Math.max(-1, Math.min(1, value ?? 0));
+                      if (isTrigger) {
+                        const pct = normalized * 100;
+                        return (
+                          <div key={axis} className="flex items-center gap-3">
+                            <span
+                              className="text-[10px] font-mono uppercase w-20 shrink-0"
+                              style={{ color: "var(--color-text-dim)" }}
+                            >
+                              {axis}
+                            </span>
+                            <div className="flex-1 h-3 rounded-full relative overflow-hidden" style={{ background: "var(--color-surface-raised)" }}>
+                              <div
+                                className="absolute top-0 bottom-0 left-0 rounded-full transition-all"
+                                style={{
+                                  width: `${pct}%`,
+                                  background: pct < 5 ? "var(--color-border)" : "var(--color-accent)",
+                                }}
+                              />
+                            </div>
+                            <span
+                              className="text-[10px] font-mono w-10 text-right shrink-0"
+                              style={{ color: "var(--color-text-dim)" }}
+                            >
+                              {typeof value === "number" ? value.toFixed(2) : value}
+                            </span>
+                          </div>
+                        );
                       }
                       const isCenter = Math.abs(normalized) < 0.05;
                       const pct = ((normalized + 1) / 2) * 100;
@@ -742,7 +758,7 @@ export const ControllersTab: React.FC = () => {
                             className="text-[10px] font-mono w-10 text-right shrink-0"
                             style={{ color: "var(--color-text-dim)" }}
                           >
-                            {typeof value === "number" ? value.toFixed(0) : value}
+                            {typeof value === "number" ? value.toFixed(2) : value}
                           </span>
                         </div>
                       );

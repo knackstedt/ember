@@ -31,7 +31,7 @@ export function useBrowserControllerNav({
     const SCROLL_THRESHOLD = 0.15;
     const MOUSE_SPEED = 4;
     const SCROLL_SPEED = 10;
-    const TRIGGER_THRESHOLD = 700 / 32767;
+    const TRIGGER_THRESHOLD = 0.3; // triggers are normalised 0..1
     const WIGGLE_EXPAND_MS = 2000;
     const WIGGLE_SAMPLE_COUNT = 6;
     const WIGGLE_ANGLE_THRESHOLD = 1.8;
@@ -45,18 +45,9 @@ export function useBrowserControllerNav({
       return [x * scale, y * scale];
     };
 
-    /** Normalise raw axis values to signed-16 range or -1..1.
-     *  Drivers report different ranges; detect from magnitude. */
-    function normStick(value: number): number {
-      if (Math.abs(value) <= 1) return value;          // already normalised
-      if (value >= 0 && value <= 255) return (value - 128) / 128; // raw 0..255
-      return value / 32767;                             // signed-16
-    }
-    function normTrigger(value: number): number {
-      if (value >= 0 && value <= 1) return value;       // already normalised
-      if (value >= 0 && value <= 255) return value / 255; // raw 0..255
-      return value / 32767;                              // signed-16
-    }
+    // Axis values from evdev are now normalised in the main process.
+    // Gamepad API fallback also returns normalised -1..1 values.
+    // We only need to apply deadzone here.
 
     interface DeviceState {
       posRef: { current: { x: number; y: number } };
@@ -94,8 +85,8 @@ export function useBrowserControllerNav({
       const axes = liveStates[deviceId]?.axes;
       const buttons = liveStates[deviceId]?.buttons;
       if (!axes || !buttons) return {};
-      const ltAxis = normTrigger(axes.left_trigger ?? 0);
-      const rtAxis = normTrigger(axes.right_trigger ?? 0);
+      const ltAxis = axes.left_trigger ?? 0;
+      const rtAxis = axes.right_trigger ?? 0;
       const ltBtn = buttons["left_trigger_btn"] ?? false;
       const rtBtn = buttons["right_trigger_btn"] ?? false;
       const ltBtnFallback = buttons["left_trigger"] ?? false;
@@ -297,8 +288,8 @@ export function useBrowserControllerNav({
         // Cache webview under this device's cursor for the entire frame
         const webviewUnderCursor = findWebviewAt(dev.posRef.current.x, dev.posRef.current.y);
 
-        const rawRightX = normStick(axes.right_x ?? 0);
-        const rawRightY = normStick(axes.right_y ?? 0);
+        const rawRightX = axes.right_x ?? 0;
+        const rawRightY = axes.right_y ?? 0;
         const [rightX, rightY] = applyDeadzone(rawRightX, rawRightY, AXIS_THRESHOLD);
 
         if (rightX !== 0 || rightY !== 0) {
@@ -336,8 +327,8 @@ export function useBrowserControllerNav({
           dev.expanded = Date.now() < dev.wiggleEndTime;
         }
 
-        const rawLeftX = normStick(axes.left_x ?? 0);
-        const rawLeftY = normStick(axes.left_y ?? 0);
+        const rawLeftX = axes.left_x ?? 0;
+        const rawLeftY = axes.left_y ?? 0;
         const [leftX, leftY] = applyDeadzone(rawLeftX, rawLeftY, SCROLL_THRESHOLD);
 
         if (leftX !== 0 || leftY !== 0) {
@@ -408,8 +399,8 @@ export function useBrowserControllerNav({
           }
         }
 
-        const ltAxis = normTrigger(axes.left_trigger ?? 0);
-        const rtAxis = normTrigger(axes.right_trigger ?? 0);
+        const ltAxis = axes.left_trigger ?? 0;
+        const rtAxis = axes.right_trigger ?? 0;
         const ltBtn = buttons["left_trigger_btn"] ?? false;
         const rtBtn = buttons["right_trigger_btn"] ?? false;
         const ltBtnFallback = buttons["left_trigger"] ?? false;

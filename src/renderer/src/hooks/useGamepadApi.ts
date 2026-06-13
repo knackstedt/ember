@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useInputStore } from "../store/input.store";
-import { ControllerDevice, ControllerType } from "../../../shared/types";
+import { ControllerDevice, ControllerType, TabId } from "../../../shared/types";
 
 /**
  * Fallback gamepad input using the browser Gamepad API.
@@ -78,7 +78,7 @@ function dispatchNav(action: string) {
   window.dispatchEvent(new CustomEvent("htpc:nav", { detail: { action } }));
 }
 
-export function useGamepadApi(enabled: boolean) {
+export function useGamepadApi(enabled: boolean, activeTab: TabId) {
   const prevStateRef = useRef<Record<string, {
     buttons: (boolean | undefined)[];
     axes: number[];
@@ -87,8 +87,12 @@ export function useGamepadApi(enabled: boolean) {
   const cooldownRef = useRef<Record<string, number>>({});
   const longPressTimersRef = useRef<Record<number, number>>({});
   const lockedRef = useRef(true);
+  const activeTabRef = useRef<TabId>(activeTab);
+  activeTabRef.current = activeTab;
   /** Map from combined gamepad id (gp.id + gp.index) to deviceId */
   const registeredDevicesRef = useRef<Map<string, string>>(new Map());
+  const unlockTimerRef = useRef<number | null>(null);
+  const unlockIntervalRef = useRef<number | null>(null);
 
   useEffect(() => {
     const unsub = useInputStore.subscribe((state) => {
@@ -149,6 +153,7 @@ export function useGamepadApi(enabled: boolean) {
         const nextAxes: number[] = [...gp.axes];
 
         // Build live state for the Controllers tab readout
+        const deviceId = registeredDevicesRef.current.get(id)!;
         const liveButtons: Record<string, boolean> = {};
         const liveAxes: Record<string, number> = {};
         const gamepadBtnToAction: Record<number, string> = {
@@ -181,18 +186,22 @@ export function useGamepadApi(enabled: boolean) {
           }
         }
         for (let i = 0; i < gp.axes.length; i++) {
-          const val = gp.axes[i] ?? 0;
-          nextAxes[i] = val;
+          let val = gp.axes[i] ?? 0;
           const axisName = i === 0 ? "left_x" : i === 1 ? "left_y" : i === 2 ? "right_x" : i === 3 ? "right_y" : `axis_${i}`;
+          // Apply deadzone so stick drift near center is reported as 0
+          if (!axisName.includes("trigger") && Math.abs(val) < 0.08) {
+            val = 0;
+          }
+          nextAxes[i] = val;
           liveAxes[axisName] = val;
           if (val !== (prev.axes[i] ?? 0)) liveChanged = true;
         }
         if (liveChanged) {
-          const existing = useInputStore.getState().liveStates[id];
+          const existing = useInputStore.getState().liveStates[deviceId];
           useInputStore.setState({
             liveStates: {
               ...useInputStore.getState().liveStates,
-              [id]: {
+              [deviceId]: {
                 buttons: { ...(existing?.buttons ?? {}), ...liveButtons },
                 axes: { ...(existing?.axes ?? {}), ...liveAxes },
                 lastUpdated: Date.now(),
@@ -201,8 +210,50 @@ export function useGamepadApi(enabled: boolean) {
           });
         }
 
-        // Skip navigation dispatch when the Controllers tab is locked
-        if (lockedRef.current) continue;
+        // Controllers tab lock / unlock logic (mirrors App.tsx evdev path)
+        const onControllersTab = activeTabRef.current === "controllers";
+        if (onControllersTab && lockedRef.current) {
+          for (let i = 0; i < gp.buttons.length; i++) {
+            const pressed = gp.buttons[i]?.pressed;
+            if (i === 2) {
+              // west / X / Square button
+              if (pressed && !prev.buttons[i]) {
+                if (!unlockTimerRef.current) {
+                  const startTime = Date.now();
+                  unlockIntervalRef.current = window.setInterval(() => {
+                    const elapsed = Date.now() - startTime;
+                    const progress = Math.min(elapsed / 5000, 1);
+                    useInputStore.getState().setControllersTabUnlockProgress(progress);
+                    if (progress >= 1) {
+                      useInputStore.getState().setControllersTabLocked(false);
+                      if (unlockTimerRef.current) {
+                        clearTimeout(unlockTimerRef.current);
+                        unlockTimerRef.current = null;
+                      }
+                      if (unlockIntervalRef.current) {
+                        clearInterval(unlockIntervalRef.current);
+                        unlockIntervalRef.current = null;
+                      }
+                    }
+                  }, 50);
+                  unlockTimerRef.current = window.setTimeout(() => {}, 5000);
+                }
+              } else if (!pressed && prev.buttons[i]) {
+                if (unlockTimerRef.current) {
+                  clearTimeout(unlockTimerRef.current);
+                  unlockTimerRef.current = null;
+                }
+                if (unlockIntervalRef.current) {
+                  clearInterval(unlockIntervalRef.current);
+                  unlockIntervalRef.current = null;
+                }
+                useInputStore.getState().setControllersTabUnlockProgress(0);
+              }
+            }
+          }
+          // Suppress all controller navigation while locked on the Controllers tab
+          continue;
+        }
 
         for (let i = 0; i < gp.buttons.length; i++) {
           const pressed = gp.buttons[i]?.pressed;
@@ -288,9 +339,13 @@ export function useGamepadApi(enabled: boolean) {
       clearInterval(interval);
       Object.values(timersRef.current).forEach(clearTimeout);
       Object.values(longPressTimersRef.current).forEach(clearTimeout);
+      if (unlockTimerRef.current) clearTimeout(unlockTimerRef.current);
+      if (unlockIntervalRef.current) clearInterval(unlockIntervalRef.current);
       timersRef.current = {};
       cooldownRef.current = {};
       longPressTimersRef.current = {};
+      unlockTimerRef.current = null;
+      unlockIntervalRef.current = null;
       // Unregister all synthetic devices on cleanup
       for (const [, deviceId] of registeredDevicesRef.current) {
         useInputStore.getState().removeDevice(deviceId);
