@@ -12,6 +12,7 @@ import {
 import { XboxController } from "./XboxController";
 import { PS4Controller } from "./PS4Controller";
 import { GameCubeController } from "./GameCubeController";
+import { subscribeLearning, setLearningDeviceId } from "../../hooks/useControllerWorker";
 
 const CONTROLLER_ICON_SIZE = 28;
 
@@ -357,18 +358,21 @@ export const ControllersTab: React.FC = () => {
   }, [selectedDevice]);
 
   useEffect(() => {
-    if (!learningCode) return;
-    const unsub = window.htpc.input.onEvent((ev: NormalizedInputEvent) => {
-      if (
-        ev.type === "button_press" &&
-        learningRef.current &&
-        ev.rawCode !== undefined
-      ) {
+    if (!learningCode || !selectedDevice) {
+      setLearningDeviceId(null);
+      return;
+    }
+    setLearningDeviceId(selectedDevice.id);
+    const unsub = subscribeLearning((ev) => {
+      if (learningRef.current && ev.rawCode !== undefined) {
         setLearnedRaw(ev.rawCode);
       }
     });
-    return () => { unsub(); };
-  }, [learningCode]);
+    return () => {
+      unsub();
+      setLearningDeviceId(null);
+    };
+  }, [learningCode, selectedDevice]);
 
   const saveMapping = useCallback(
     (inputCode: string, action: string, rawCode?: number | null): void => {

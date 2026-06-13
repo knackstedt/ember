@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useInputStore } from "../store/input.store";
 import { NormalizedInputEvent } from "../../../shared/types";
+import { subscribeControllerEvents } from "./useControllerWorker";
 
 type NavAction =
   | "up"
@@ -31,7 +32,7 @@ export function useInputNav(
   handler: (action: NavAction, event: NormalizedInputEvent) => void,
 ): void {
   useEffect(() => {
-    const unsub = window.htpc.input.onEvent((ev) => {
+    const unsub = subscribeControllerEvents((ev) => {
       useInputStore.getState().setLastEvent(ev);
 
       if (ev.type !== "button_press" && ev.type !== "key_down") return;

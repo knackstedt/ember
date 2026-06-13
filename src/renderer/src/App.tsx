@@ -19,7 +19,7 @@ import { TVShowsTab } from "./tabs/TVShows";
 import { StoreTab } from "./tabs/Store";
 import { SettingsTab } from "./tabs/Settings";
 import { ControllersTab } from "./tabs/Controllers";
-import { TabId, ScanProgress, AppSettings } from "../../shared/types";
+import { TabId, ScanProgress, AppSettings, NormalizedInputEvent } from "../../shared/types";
 import { useGamesStore } from "./store/games.store";
 import { useMoviesStore, useMusicStore, useTvStore } from "./store/media.store";
 import { ToastContainer } from "./components/Toast/Toast";
@@ -44,6 +44,10 @@ import { CredentialPrompt } from "./components/CredentialPrompt/CredentialPrompt
 import { useCommands } from "./hooks/useCommands";
 import { useCommandsStore } from "./store/commands.store";
 import { useGamepadApi } from "./hooks/useGamepadApi";
+import {
+  useControllerWorker,
+  subscribeControllerEvents,
+} from "./hooks/useControllerWorker";
 import { useBrowserControllerNav } from "./hooks/useBrowserControllerNav";
 import { CursorOverlay } from "./components/CursorOverlay/CursorOverlay";
 import { useFocusZoneStore } from "./store/focusZone.store";
@@ -131,8 +135,7 @@ export default function App(): React.ReactElement {
   const [activeTab, setActiveTab] = useState<TabId>("gaming");
   useBrowserControllerNav({ enabled: !loading, evdevActive: inputDevices.length > 0 });
 
-  const addDevice = useInputStore((s) => s.addDevice);
-  const removeDevice = useInputStore((s) => s.removeDevice);
+
   const hasPlayer = useMusicPlayerStore((s) => s.queue.length > 0);
   const setBladeCollapsed = useMusicPlayerStore((s) => s.setBladeCollapsed);
   const videoOpen = useVideoPlayerStore((s) => !!s.src);
@@ -438,13 +441,12 @@ export default function App(): React.ReactElement {
     };
   }, []);
 
+  // Initialize the controller worker + SAB pipeline
+  useControllerWorker();
+
   useEffect(() => {
-    const unsubConnect = window.htpc.input.onDeviceConnected(addDevice);
-    const unsubDisconnect =
-      window.htpc.input.onDeviceDisconnected(removeDevice);
-    const unsubEvent = window.htpc.input.onEvent((ev) => {
+    const handleInputEvent = (ev: NormalizedInputEvent) => {
       useInputStore.getState().setLastEvent(ev);
-      useInputStore.getState().updateLiveState(ev.deviceId, ev);
       if (activeTabRef.current === "controllers") {
         useInputStore.getState().recordRawInput(ev.deviceId, ev);
       }
@@ -610,11 +612,13 @@ export default function App(): React.ReactElement {
           dispatchNavAction(action);
         }
       }
-    });
+    };
+
+    const unsubEvent = subscribeControllerEvents(handleInputEvent);
+    const unsubKeyboard = window.htpc.input.onEventKeyboard(handleInputEvent);
     return () => {
-      unsubConnect();
-      unsubDisconnect();
       unsubEvent();
+      unsubKeyboard();
       Object.values(axisTimersRef.current).forEach(clearTimeout);
       Object.values(buttonTimersRef.current).forEach(clearTimeout);
       axisTimersRef.current = {};

@@ -1,14 +1,21 @@
 import { useEffect, useRef } from "react";
-import { useInputStore } from "../store/input.store";
-import { ControllerDevice, ControllerType, TabId } from "../../../shared/types";
+import {
+  ControllerDevice,
+  ControllerType,
+  TabId,
+} from "../../../shared/types";
+import {
+  postGamepadState,
+  getControllerWorker,
+} from "./useControllerWorker";
 
 /**
- * Fallback gamepad input using the browser Gamepad API.
- * Polls navigator.getGamepads() and dispatches htpc:nav / htpc:contextmenu
- * events so controllers work even when the evdev path lacks permissions.
+ * Gamepad API fallback — polls navigator.getGamepads() and forwards state
+ * snapshots to the controller worker, which processes them and sends state
+ * updates back to the renderer.
  *
- * Also registers synthetic ControllerDevice entries in the input store so
- * controllers show up in the Controllers tab when evdev is unavailable.
+ * Navigation, lock/unlock, and store updates are all handled by the worker
+ * and the central event dispatch loop (App.tsx / useBrowserControllerNav).
  */
 
 /** Parse vendor/product from Linux-style gamepad IDs like "045e-02d1-..." */
@@ -37,90 +44,40 @@ function detectTypeFromGamepad(id: string, name: string, vendorId: number): Cont
   if (n.includes("dualshock") || n.includes("dual shock")) return "ps4";
   if (n.includes("nintendo") || n.includes("switch") || n.includes("pro controller")) return "gamecube";
   if (n.includes("wiimote") || n.includes("wii remote")) return "wiimote";
-  // Generic gamepads with Xbox-style standard mapping are common; default to xbox
-  // so the Xbox diagram (the most complete one) is shown.
   if (n.includes("gamepad") || n.includes("controller")) return "xbox";
   return "generic";
 }
 
-const BTN_ACTIONS: Record<number, string> = {
-  0: "confirm",   // A / south
-  1: "cancel",    // B / east
-  2: "contextmenu", // X / west
-  3: "menu",      // Y / north
-  8: "commands",  // Select / View
-  9: "tabnext",   // Start / Menu
-  12: "up",       // D-pad up
-  13: "down",      // D-pad down
-  14: "left",      // D-pad left
-  15: "right",     // D-pad right
+const GAMEPAD_BTN_TO_ACTION: Record<number, string> = {
+  0: "south",
+  1: "east",
+  2: "west",
+  3: "north",
+  4: "left_bumper",
+  5: "right_bumper",
+  6: "left_trigger",
+  7: "right_trigger",
+  8: "select",
+  9: "start",
+  10: "left_thumb",
+  11: "right_thumb",
+  12: "dpad_up",
+  13: "dpad_down",
+  14: "dpad_left",
+  15: "dpad_right",
+  16: "home",
 };
 
-const LONG_PRESS_DURATION = 800;
-
-function dispatchNav(action: string) {
-  if (action === "contextmenu") {
-    window.dispatchEvent(
-      new CustomEvent("htpc:contextmenu", { detail: { source: "gamepad" } }),
-    );
-    return;
-  }
-  if (action === "commands") {
-    import("../store/commands.store").then((m) => {
-      m.useCommandsStore.getState().open();
-    });
-    return;
-  }
-  if (action === "tabnext") {
-    window.dispatchEvent(new CustomEvent("htpc:tab-next"));
-    return;
-  }
-  window.dispatchEvent(new CustomEvent("htpc:nav", { detail: { action } }));
-}
-
-export function useGamepadApi(enabled: boolean, activeTab: TabId) {
+export function useGamepadApi(enabled: boolean, _activeTab: TabId) {
   const prevStateRef = useRef<Record<string, {
-    buttons: (boolean | undefined)[];
+    buttons: Record<string, boolean>;
     axes: number[];
   }>>({});
-  const timersRef = useRef<Record<string, number>>({});
-  const cooldownRef = useRef<Record<string, number>>({});
-  const longPressTimersRef = useRef<Record<number, number>>({});
-  const lockedRef = useRef(true);
-  const activeTabRef = useRef<TabId>(activeTab);
-  activeTabRef.current = activeTab;
   /** Map from combined gamepad id (gp.id + gp.index) to deviceId */
   const registeredDevicesRef = useRef<Map<string, string>>(new Map());
-  const unlockTimerRef = useRef<number | null>(null);
-  const unlockIntervalRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    const unsub = useInputStore.subscribe((state) => {
-      lockedRef.current = state.controllersTabLocked;
-    });
-    return () => unsub();
-  }, []);
 
   useEffect(() => {
     if (!enabled) return;
-
-    const AXIS_THRESHOLD = 0.5;
-    const COOLDOWN_MS = 200;
-
-    function getAxisAction(axisIndex: number, value: number): string | null {
-      if (Math.abs(value) < AXIS_THRESHOLD) return null;
-      if (axisIndex === 0) return value > 0 ? "right" : "left";
-      if (axisIndex === 1) return value > 0 ? "down" : "up";
-      return null;
-    }
-
-    function canDispatch(key: string): boolean {
-      const now = Date.now();
-      const last = cooldownRef.current[key] ?? 0;
-      if (now - last < COOLDOWN_MS) return false;
-      cooldownRef.current[key] = now;
-      return true;
-    }
 
     const poll = () => {
       const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
@@ -131,7 +88,7 @@ export function useGamepadApi(enabled: boolean, activeTab: TabId) {
         const id = gp.id + gp.index;
         seen.add(id);
 
-        // Register synthetic ControllerDevice so it appears in the Controllers tab
+        // Register synthetic ControllerDevice via worker
         if (!registeredDevicesRef.current.has(id)) {
           const deviceId = `gamepad-${gp.index}`;
           registeredDevicesRef.current.set(id, deviceId);
@@ -145,215 +102,63 @@ export function useGamepadApi(enabled: boolean, activeTab: TabId) {
             axisCount: gp.axes.length,
             buttonCount: gp.buttons.length,
           };
-          useInputStore.getState().addDevice(device);
-        }
-
-        const prev = prevStateRef.current[id] ?? { buttons: [], axes: [] };
-        const nextButtons: (boolean | undefined)[] = [];
-        const nextAxes: number[] = [...gp.axes];
-
-        // Build live state for the Controllers tab readout
-        const deviceId = registeredDevicesRef.current.get(id)!;
-        const liveButtons: Record<string, boolean> = {};
-        const liveAxes: Record<string, number> = {};
-        const gamepadBtnToAction: Record<number, string> = {
-          0: "south",
-          1: "east",
-          2: "west",
-          3: "north",
-          4: "left_bumper",
-          5: "right_bumper",
-          6: "left_trigger",
-          7: "right_trigger",
-          8: "select",
-          9: "start",
-          10: "left_thumb",
-          11: "right_thumb",
-          12: "dpad_up",
-          13: "dpad_down",
-          14: "dpad_left",
-          15: "dpad_right",
-          16: "home",
-        };
-        let liveChanged = false;
-        const onControllersTab = activeTabRef.current === "controllers";
-        for (let i = 0; i < gp.buttons.length; i++) {
-          const pressed = gp.buttons[i]?.pressed ?? false;
-          nextButtons[i] = pressed;
-          const action = gamepadBtnToAction[i] ?? `btn_${i}`;
-          liveButtons[action] = pressed;
-          if (pressed !== (prev.buttons[i] ?? false)) {
-            liveChanged = true;
-            if (onControllersTab) {
-              useInputStore.getState().recordRawInput(deviceId, {
-                source: "gamepad",
-                deviceId,
-                deviceName: gp.id,
-                type: pressed ? "button_press" : "button_release",
-                rawCode: i,
-                timestamp: Date.now(),
-              });
-            }
+          const worker = getControllerWorker();
+          if (worker) {
+            worker.postMessage({
+              type: "connect",
+              controllerIdx: 8 + gp.index, // offset gamepad API indices to avoid collision with evdev (0-7)
+              deviceId,
+              name: device.name,
+              deviceType: device.type,
+            });
           }
         }
+
+        const deviceId = registeredDevicesRef.current.get(id)!;
+        const prev = prevStateRef.current[id] ?? { buttons: {}, axes: [] };
+        const nextButtons: Record<string, boolean> = {};
+        const nextAxes: number[] = [];
+
+        for (let i = 0; i < gp.buttons.length; i++) {
+          const pressed = gp.buttons[i]?.pressed ?? false;
+          const action = GAMEPAD_BTN_TO_ACTION[i] ?? `btn_${i}`;
+          nextButtons[action] = pressed;
+        }
+
         for (let i = 0; i < gp.axes.length; i++) {
           let val = gp.axes[i] ?? 0;
-          const axisName = i === 0 ? "left_x" : i === 1 ? "left_y" : i === 2 ? "right_x" : i === 3 ? "right_y" : `axis_${i}`;
           // Apply deadzone so stick drift near center is reported as 0
-          if (!axisName.includes("trigger") && Math.abs(val) < 0.08) {
+          if (i < 4 && Math.abs(val) < 0.08) {
             val = 0;
           }
           nextAxes[i] = val;
-          liveAxes[axisName] = val;
-          if (val !== (prev.axes[i] ?? 0)) {
-            liveChanged = true;
-            if (onControllersTab) {
-              useInputStore.getState().recordRawInput(deviceId, {
-                source: "gamepad",
-                deviceId,
-                deviceName: gp.id,
-                type: "axis",
-                axis: axisName,
-                value: val,
-                rawCode: i,
-                timestamp: Date.now(),
-              });
-            }
-          }
-        }
-        if (liveChanged) {
-          const existing = useInputStore.getState().liveStates[deviceId];
-          useInputStore.setState({
-            liveStates: {
-              ...useInputStore.getState().liveStates,
-              [deviceId]: {
-                buttons: { ...(existing?.buttons ?? {}), ...liveButtons },
-                axes: { ...(existing?.axes ?? {}), ...liveAxes },
-                lastUpdated: Date.now(),
-              },
-            },
-          });
         }
 
-        // Controllers tab lock / unlock logic (mirrors App.tsx evdev path)
-        if (onControllersTab && lockedRef.current) {
-          for (let i = 0; i < gp.buttons.length; i++) {
-            const pressed = gp.buttons[i]?.pressed;
-            if (i === 2) {
-              // west / X / Square button
-              if (pressed && !prev.buttons[i]) {
-                if (!unlockTimerRef.current) {
-                  const startTime = Date.now();
-                  unlockIntervalRef.current = window.setInterval(() => {
-                    const elapsed = Date.now() - startTime;
-                    const progress = Math.min(elapsed / 5000, 1);
-                    useInputStore.getState().setControllersTabUnlockProgress(progress);
-                    if (progress >= 1) {
-                      useInputStore.getState().setControllersTabLocked(false);
-                      if (unlockTimerRef.current) {
-                        clearTimeout(unlockTimerRef.current);
-                        unlockTimerRef.current = null;
-                      }
-                      if (unlockIntervalRef.current) {
-                        clearInterval(unlockIntervalRef.current);
-                        unlockIntervalRef.current = null;
-                      }
-                    }
-                  }, 50);
-                  unlockTimerRef.current = window.setTimeout(() => {}, 5000);
-                }
-              } else if (!pressed && prev.buttons[i]) {
-                if (unlockTimerRef.current) {
-                  clearTimeout(unlockTimerRef.current);
-                  unlockTimerRef.current = null;
-                }
-                if (unlockIntervalRef.current) {
-                  clearInterval(unlockIntervalRef.current);
-                  unlockIntervalRef.current = null;
-                }
-                useInputStore.getState().setControllersTabUnlockProgress(0);
-              }
-            }
-          }
-          // Suppress all controller navigation while locked on the Controllers tab
-          continue;
-        }
+        // Only post to worker when state actually changes
+        const buttonsChanged = Object.entries(nextButtons).some(
+          ([k, v]) => prev.buttons[k] !== v,
+        );
+        const axesChanged = nextAxes.some((v, i) => (prev.axes[i] ?? 0) !== v);
 
-        for (let i = 0; i < gp.buttons.length; i++) {
-          const pressed = gp.buttons[i]?.pressed;
-
-          if (pressed && !prev.buttons[i]) {
-            // Button pressed
-            if (i === 4) {
-              window.dispatchEvent(new CustomEvent("htpc:tab-prev"));
-              continue;
-            }
-            if (i === 5) {
-              window.dispatchEvent(new CustomEvent("htpc:tab-next"));
-              continue;
-            }
-            if (i === 0) {
-              // Confirm button: dispatch immediately and start long-press timer
-              dispatchNav("confirm");
-              const timer = window.setTimeout(() => {
-                delete longPressTimersRef.current[i];
-                window.dispatchEvent(
-                  new CustomEvent("htpc:contextmenu", { detail: { source: "gamepad" } }),
-                );
-              }, LONG_PRESS_DURATION);
-              longPressTimersRef.current[i] = timer;
-              continue;
-            }
-            const action = BTN_ACTIONS[i];
-            if (action) {
-              dispatchNav(action);
-            }
-          } else if (!pressed && prev.buttons[i]) {
-            // Button released: cancel any long-press timer
-            const timer = longPressTimersRef.current[i];
-            if (timer) {
-              clearTimeout(timer);
-              delete longPressTimersRef.current[i];
-            }
-          }
-        }
-
-        // Axes (left stick) + D-pad repeat via axes
-        for (let i = 0; i < gp.axes.length; i++) {
-          const val = gp.axes[i];
-          const prevAction = getAxisAction(i, prev.axes[i] ?? 0);
-          const nextAction = getAxisAction(i, val);
-          const cooldownKey = `${id}:axis:${i}`;
-          if (nextAction && nextAction !== prevAction && canDispatch(cooldownKey)) {
-            dispatchNav(nextAction);
-            const repeatKey = `${id}:repeat:${i}`;
-            const repeat = () => {
-              if (canDispatch(cooldownKey)) {
-                dispatchNav(nextAction);
-              }
-              timersRef.current[repeatKey] = window.setTimeout(repeat, 180);
-            };
-            timersRef.current[repeatKey] = window.setTimeout(repeat, 500);
-          }
-          if (!nextAction && prevAction) {
-            const repeatKey = `${id}:repeat:${i}`;
-            const t = timersRef.current[repeatKey];
-            if (t) {
-              clearTimeout(t);
-              delete timersRef.current[repeatKey];
-            }
-          }
+        if (buttonsChanged || axesChanged) {
+          postGamepadState(8 + gp.index, nextAxes, nextButtons);
         }
 
         prevStateRef.current[id] = { buttons: nextButtons, axes: nextAxes };
       }
 
-      // Remove disconnected gamepads from the device list
+      // Remove disconnected gamepads
       for (const [rid, deviceId] of registeredDevicesRef.current) {
         if (!seen.has(rid)) {
           registeredDevicesRef.current.delete(rid);
-          useInputStore.getState().removeDevice(deviceId);
           delete prevStateRef.current[rid];
+          const worker = getControllerWorker();
+          if (worker) {
+            worker.postMessage({
+              type: "disconnect",
+              controllerIdx: 8 + parseInt(deviceId.replace("gamepad-", ""), 10),
+            });
+          }
         }
       }
     };
@@ -361,18 +166,14 @@ export function useGamepadApi(enabled: boolean, activeTab: TabId) {
     const interval = window.setInterval(poll, 16); // ~60fps
     return () => {
       clearInterval(interval);
-      Object.values(timersRef.current).forEach(clearTimeout);
-      Object.values(longPressTimersRef.current).forEach(clearTimeout);
-      if (unlockTimerRef.current) clearTimeout(unlockTimerRef.current);
-      if (unlockIntervalRef.current) clearInterval(unlockIntervalRef.current);
-      timersRef.current = {};
-      cooldownRef.current = {};
-      longPressTimersRef.current = {};
-      unlockTimerRef.current = null;
-      unlockIntervalRef.current = null;
-      // Unregister all synthetic devices on cleanup
       for (const [, deviceId] of registeredDevicesRef.current) {
-        useInputStore.getState().removeDevice(deviceId);
+        const worker = getControllerWorker();
+        if (worker) {
+          worker.postMessage({
+            type: "disconnect",
+            controllerIdx: 8 + parseInt(deviceId.replace("gamepad-", ""), 10),
+          });
+        }
       }
       registeredDevicesRef.current.clear();
       prevStateRef.current = {};

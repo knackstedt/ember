@@ -21,13 +21,30 @@ import {
   ControllerType,
 } from "../../shared/types";
 import { createLogger } from "../util/logger";
+import {
+  CompactEventKind,
+  COMPACT_EVENT_SIZE,
+  writeCompactEvent,
+} from "../../shared/controller-buffer";
 
 const log = createLogger("info");
 
 const INPUT_DIR = "/dev/input";
 
 let watcher: ReturnType<typeof setInterval> | null = null;
-const activeDevices = new Map<string, { device: unknown; close: () => void; info: ControllerDevice }>();
+const activeDevices = new Map<string, { device: unknown; close: () => void; info: ControllerDevice; controllerIdx: number }>();
+
+/** Allocate a free controller index (0..7). Returns -1 if full. */
+function allocControllerIdx(): number {
+  const used = new Set<number>();
+  for (const d of activeDevices.values()) used.add(d.controllerIdx);
+  for (let i = 0; i < 8; i++) if (!used.has(i)) return i;
+  return -1;
+}
+
+function freeControllerIdx(idx: number): void {
+  // No-op; allocation just scans for gaps.
+}
 
 /* ─── Axis layouts ───
  * Different Linux drivers expose axes in different orders.
@@ -260,7 +277,7 @@ async function openDevice(
   eventPath: string,
   window: BrowserWindow,
   info: { name: string; vendorId: number; productId: number },
-): Promise<{ device: unknown; close: () => void; info: ControllerDevice } | null> {
+): Promise<{ device: unknown; close: () => void; info: ControllerDevice; controllerIdx: number } | null> {
 
   const controllerType = detectControllerType(
     info.name,
@@ -268,6 +285,11 @@ async function openDevice(
     info.productId,
   );
   const deviceId = eventPath;
+  const controllerIdx = allocControllerIdx();
+  if (controllerIdx < 0) {
+    log.warn("evdev", `Too many controllers, skipping ${eventPath}`);
+    return null;
+  }
 
   const deviceInfo: ControllerDevice = {
     id: deviceId,
@@ -277,6 +299,7 @@ async function openDevice(
     productId: info.productId,
     axisCount: 6,
     buttonCount: 16,
+    controllerIdx,
   };
 
   if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
@@ -296,6 +319,9 @@ async function openDevice(
     const stream = createReadStream(eventPath);
     let remainder = Buffer.alloc(0);
 
+    // Pre-allocate a reusable compact event buffer to avoid GC churn
+    const compactBuf = Buffer.allocUnsafe(COMPACT_EVENT_SIZE);
+
     stream.on("data", (chunk) => {
       if (window.isDestroyed()) {
         stream.destroy();
@@ -312,38 +338,46 @@ async function openDevice(
 
         if (type === EV_SYN) continue;
 
-        let inputEvent: NormalizedInputEvent | null = null;
-
         if (type === EV_KEY) {
           const isBtn = code >= 0x100;
-          const source: InputSource = isBtn ? "gamepad" : "keyboard";
-          const map = isBtn ? BTN_MAP : KEY_MAP;
-          inputEvent = {
-            source,
-            deviceId,
-            deviceName: info.name,
-            type: value ? "button_press" : "button_release",
-            action: map[code] ?? `btn_${code}`,
-            rawCode: code,
-            timestamp: Date.now(),
-          };
+          if (isBtn) {
+            compactBuf.writeUInt8(
+              value ? CompactEventKind.BUTTON_PRESS : CompactEventKind.BUTTON_RELEASE,
+              0,
+            );
+            compactBuf.writeUInt8(controllerIdx, 1);
+            compactBuf.writeUInt16LE(code, 2);
+            compactBuf.writeFloatLE(value ? 1 : 0, 4);
+            compactBuf.writeUInt32LE(Date.now() >>> 0, 8);
+            if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
+              window.webContents.send("input:event", compactBuf.buffer.slice(compactBuf.byteOffset, compactBuf.byteOffset + COMPACT_EVENT_SIZE));
+            }
+          } else {
+            // Keyboard events — still send as rich objects (infrequent, needed by App.tsx keyboard handler)
+            const map = KEY_MAP;
+            const inputEvent: NormalizedInputEvent = {
+              source: "keyboard",
+              deviceId,
+              deviceName: info.name,
+              type: value ? "button_press" : "button_release",
+              action: map[code] ?? `btn_${code}`,
+              rawCode: code,
+              timestamp: Date.now(),
+            };
+            if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
+              window.webContents.send("input:event-keyboard", inputEvent);
+            }
+          }
         } else if (type === EV_ABS) {
           const mappedAxis = axisMap[code] ?? `abs_${code}`;
-          inputEvent = {
-            source: "gamepad",
-            deviceId,
-            deviceName: info.name,
-            type: "axis",
-            axis: mappedAxis,
-            value: normalizeAxis(value, code, mappedAxis),
-            rawCode: code,
-            timestamp: Date.now(),
-          };
-        }
-
-        if (inputEvent) {
+          const normalized = normalizeAxis(value, code, mappedAxis);
+          compactBuf.writeUInt8(CompactEventKind.AXIS, 0);
+          compactBuf.writeUInt8(controllerIdx, 1);
+          compactBuf.writeUInt16LE(code, 2);
+          compactBuf.writeFloatLE(normalized, 4);
+          compactBuf.writeUInt32LE(Date.now() >>> 0, 8);
           if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
-            window.webContents.send("input:event", inputEvent);
+            window.webContents.send("input:event", compactBuf.buffer.slice(compactBuf.byteOffset, compactBuf.byteOffset + COMPACT_EVENT_SIZE));
           }
         }
       }
@@ -354,7 +388,7 @@ async function openDevice(
       log.warn("evdev", `Error reading ${eventPath} (${info.name}): ${err}`);
       activeDevices.delete(eventPath);
       if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
-        window.webContents.send("input:device-disconnected", deviceId);
+        window.webContents.send("input:device-disconnected", { deviceId, controllerIdx });
       }
     });
 
@@ -365,10 +399,11 @@ async function openDevice(
     return {
       device: stream,
       info: deviceInfo,
+      controllerIdx,
       close: () => {
         stream.destroy();
         if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
-          window.webContents.send("input:device-disconnected", deviceId);
+          window.webContents.send("input:device-disconnected", { deviceId, controllerIdx });
         }
       },
     };

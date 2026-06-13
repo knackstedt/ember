@@ -13,6 +13,7 @@ import {
 } from "../../../../shared/types";
 import { FlashFilterEngine } from "./FlashFilterEngine";
 import { BUILT_IN_FILTERS } from "./builtInFilters";
+import { subscribeControllerEvents } from "../../hooks/useControllerWorker";
 
 const DEFAULT_FLASH_SETTINGS: FlashSettings = {
   aspectRatio: "free",
@@ -434,7 +435,7 @@ export const FlashPlayer: React.FC = () => {
       }
     };
 
-    const unsub = window.htpc.input.onEvent(onEvent);
+    const unsub = subscribeControllerEvents(onEvent);
 
     // Mouse movement loop for analog sticks
     const mouseLoop = (time: number) => {

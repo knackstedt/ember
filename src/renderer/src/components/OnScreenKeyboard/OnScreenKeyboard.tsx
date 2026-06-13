@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { subscribeControllerEvents } from "../../hooks/useControllerWorker";
 
 interface OnScreenKeyboardProps {
   value: string;
@@ -64,7 +65,7 @@ export const OnScreenKeyboard: React.FC<OnScreenKeyboardProps> = ({
   valueRef.current = value;
 
   useEffect(() => {
-    const unsub = window.htpc.input.onEvent((ev) => {
+    const unsub = subscribeControllerEvents((ev) => {
       if (ev.type !== "button_press") return;
       const r = rowsRef.current;
       const [row, col] = focusedKeyRef.current;

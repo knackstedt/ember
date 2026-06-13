@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { useLibretroPlayerStore } from "../../store/libretroPlayer.store";
 import { VERTEX_SHADER, wrapFragmentBody, getShaderPreset } from "./shaders";
 import { GamePlatform } from "../../../../shared/types";
+import { subscribeControllerEvents } from "../../hooks/useControllerWorker";
 
 function platformToButtonMap(_platform: GamePlatform): Record<string, number> {
   const common: Record<string, number> = {
@@ -317,7 +318,7 @@ export const LibretroPlayer: React.FC = () => {
       right_bumper: 11,
     };
 
-    const unsub = window.htpc.input.onEvent((ev) => {
+    const unsub = subscribeControllerEvents((ev) => {
       if (ev.type !== "button_press" && ev.type !== "button_release") return;
       const value = ev.type === "button_press" ? 1 : 0;
       const id = gamepadMap[ev.action ?? ""];

@@ -294,6 +294,7 @@ export interface ControllerDevice {
   productId?: number;
   axisCount: number;
   buttonCount: number;
+  controllerIdx?: number;
 }
 
 export interface ButtonMapping {

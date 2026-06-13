@@ -23,6 +23,7 @@ import {
   PackageOperationProgress,
 } from "../shared/types";
 import { GameMetadata } from "../shared/metadata";
+
 import { libretroApi } from "./libretro";
 import { WebGLVideoRenderer } from "./webgl-renderer";
 import { ffmpegVideoDecoder } from "./ffmpeg-decoder";
@@ -396,13 +397,19 @@ const htpc = {
       ipcRenderer.invoke("input:mappings:set", deviceId, inputCode, action),
     resetMappings: (deviceId: string): Promise<void> =>
       ipcRenderer.invoke("input:mappings:reset", deviceId),
-    onEvent: (cb: (event: NormalizedInputEvent) => void) => {
+    onEvent: (cb: (buffer: ArrayBuffer) => void) => {
+      const handler = (_: Electron.IpcRendererEvent, buffer: ArrayBuffer) =>
+        cb(buffer);
+      ipcRenderer.on("input:event", handler);
+      return () => ipcRenderer.removeListener("input:event", handler);
+    },
+    onEventKeyboard: (cb: (event: NormalizedInputEvent) => void) => {
       const handler = (
         _: Electron.IpcRendererEvent,
         ev: NormalizedInputEvent,
       ) => cb(ev);
-      ipcRenderer.on("input:event", handler);
-      return () => ipcRenderer.removeListener("input:event", handler);
+      ipcRenderer.on("input:event-keyboard", handler);
+      return () => ipcRenderer.removeListener("input:event-keyboard", handler);
     },
     onDeviceConnected: (cb: (device: ControllerDevice) => void) => {
       const handler = (_: Electron.IpcRendererEvent, dev: ControllerDevice) =>
@@ -411,8 +418,8 @@ const htpc = {
       return () =>
         ipcRenderer.removeListener("input:device-connected", handler);
     },
-    onDeviceDisconnected: (cb: (id: string) => void) => {
-      const handler = (_: Electron.IpcRendererEvent, id: string) => cb(id);
+    onDeviceDisconnected: (cb: (payload: { deviceId: string; controllerIdx: number }) => void) => {
+      const handler = (_: Electron.IpcRendererEvent, payload: { deviceId: string; controllerIdx: number }) => cb(payload);
       ipcRenderer.on("input:device-disconnected", handler);
       return () =>
         ipcRenderer.removeListener("input:device-disconnected", handler);
