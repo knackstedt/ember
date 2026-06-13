@@ -176,13 +176,24 @@ export function useGamepadApi(enabled: boolean, activeTab: TabId) {
           16: "home",
         };
         let liveChanged = false;
+        const onControllersTab = activeTabRef.current === "controllers";
         for (let i = 0; i < gp.buttons.length; i++) {
           const pressed = gp.buttons[i]?.pressed ?? false;
           nextButtons[i] = pressed;
-          const action = gamepadBtnToAction[i];
-          if (action) {
-            liveButtons[action] = pressed;
-            if (pressed !== (prev.buttons[i] ?? false)) liveChanged = true;
+          const action = gamepadBtnToAction[i] ?? `btn_${i}`;
+          liveButtons[action] = pressed;
+          if (pressed !== (prev.buttons[i] ?? false)) {
+            liveChanged = true;
+            if (onControllersTab) {
+              useInputStore.getState().recordRawInput(deviceId, {
+                source: "gamepad",
+                deviceId,
+                deviceName: gp.id,
+                type: pressed ? "button_press" : "button_release",
+                rawCode: i,
+                timestamp: Date.now(),
+              });
+            }
           }
         }
         for (let i = 0; i < gp.axes.length; i++) {
@@ -194,7 +205,21 @@ export function useGamepadApi(enabled: boolean, activeTab: TabId) {
           }
           nextAxes[i] = val;
           liveAxes[axisName] = val;
-          if (val !== (prev.axes[i] ?? 0)) liveChanged = true;
+          if (val !== (prev.axes[i] ?? 0)) {
+            liveChanged = true;
+            if (onControllersTab) {
+              useInputStore.getState().recordRawInput(deviceId, {
+                source: "gamepad",
+                deviceId,
+                deviceName: gp.id,
+                type: "axis",
+                axis: axisName,
+                value: val,
+                rawCode: i,
+                timestamp: Date.now(),
+              });
+            }
+          }
         }
         if (liveChanged) {
           const existing = useInputStore.getState().liveStates[deviceId];
@@ -211,7 +236,6 @@ export function useGamepadApi(enabled: boolean, activeTab: TabId) {
         }
 
         // Controllers tab lock / unlock logic (mirrors App.tsx evdev path)
-        const onControllersTab = activeTabRef.current === "controllers";
         if (onControllersTab && lockedRef.current) {
           for (let i = 0; i < gp.buttons.length; i++) {
             const pressed = gp.buttons[i]?.pressed;

@@ -64,6 +64,11 @@ function getAxisMap(name: string): Record<number, string> {
   if (n === "gamepad p5" || /gamepad\s*p\d/.test(n)) {
     return GENERIC_AXIS_MAP;
   }
+  // Generic USB GameCube adapters (e.g. Microntek) expose right stick on
+  // codes 2 and 5 instead of the Xbox-style 3 and 4.
+  if (n.includes("microntek") || n.includes("gamecube")) {
+    return GENERIC_AXIS_MAP;
+  }
   return XBOX_AXIS_MAP;
 }
 
@@ -118,6 +123,16 @@ function normalizeAxis(value: number, code: number, axisName?: string): number {
 }
 
 const BTN_MAP: Record<number, string> = {
+  // Old-style joystick buttons (e.g. Microntek USB GameCube adapters)
+  288: "west", // Y
+  289: "north", // X
+  290: "south", // A
+  291: "east", // B
+  292: "left_trigger_btn", // L
+  293: "right_trigger_btn", // R
+  294: "z", // Z
+  297: "start", // Start
+  // Standard gamepad buttons (xpad, ds4drv, etc)
   304: "south",
   305: "east",
   306: "c",
@@ -171,12 +186,12 @@ function detectControllerType(
     n.includes("nintendo rvu")
   )
     return "wiimote";
-  if (n.includes("gamecube") || vendorId === 0x057e) return "gamecube";
+  if (n.includes("gamecube") || n.includes("microntek") || vendorId === 0x057e || vendorId === 0x0079) return "gamecube";
   if (n.includes("dualshock") || n.includes("dual shock")) return "ps4";
   if (n.includes("dualsense")) return "ps5";
   // Most generic USB gamepads present as Xbox-style (standard mapping).
   // Show the Xbox diagram since it is the most complete and widely applicable.
-  if (n.includes("gamepad") || n.includes("controller") || n.includes("pad")) return "xbox";
+  if (n.includes("gamepad") || n.includes("controller") || n.includes("joystick") || n.includes("pad")) return "xbox";
   return "generic";
 }
 

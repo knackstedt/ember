@@ -445,6 +445,9 @@ export default function App(): React.ReactElement {
     const unsubEvent = window.htpc.input.onEvent((ev) => {
       useInputStore.getState().setLastEvent(ev);
       useInputStore.getState().updateLiveState(ev.deviceId, ev);
+      if (activeTabRef.current === "controllers") {
+        useInputStore.getState().recordRawInput(ev.deviceId, ev);
+      }
       if (ev.source === "gamepad" && !evdevGamepadActiveRef.current) {
         evdevGamepadActiveRef.current = true;
         setEvdevGamepadActive(true);

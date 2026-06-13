@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Gamepad2, Lock, Unlock } from "lucide-react";
+import { Gamepad2, Lock, Unlock, ChevronDown, ChevronRight } from "lucide-react";
 import { useInputStore } from "../../store/input.store";
 import type { LiveControllerState } from "../../store/input.store";
 import {
@@ -11,6 +11,7 @@ import {
 } from "../../../../shared/types";
 import { XboxController } from "./XboxController";
 import { PS4Controller } from "./PS4Controller";
+import { GameCubeController } from "./GameCubeController";
 
 const CONTROLLER_ICON_SIZE = 28;
 
@@ -67,6 +68,25 @@ const BUTTON_LABELS: Record<string, string> = {
 };
 
 const BUTTON_CODES = Object.keys(BUTTON_LABELS);
+
+const STANDARD_AXIS_NAMES = new Set([
+  "left_x",
+  "left_y",
+  "right_x",
+  "right_y",
+  "left_trigger",
+  "right_trigger",
+  "dpad_x",
+  "dpad_y",
+]);
+
+function isKnownButton(name: string): boolean {
+  return BUTTON_CODES.includes(name);
+}
+
+function isKnownAxis(name: string): boolean {
+  return STANDARD_AXIS_NAMES.has(name);
+}
 
 interface MappingRowProps {
   inputCode: string;
@@ -280,7 +300,24 @@ function DiagramForDevice({
         axes={axes}
       />
     );
-  return null;
+  if (type === "gamecube")
+    return (
+      <GameCubeController
+        highlightCode={highlight}
+        learnCode={learn}
+        pressedCodes={pressed}
+        axes={axes}
+      />
+    );
+  /* Fallback — generic / unknown controllers still show a diagram */
+  return (
+    <XboxController
+      highlightCode={highlight}
+      learnCode={learn}
+      pressedCodes={pressed}
+      axes={axes}
+    />
+  );
 }
 
 export const ControllersTab: React.FC = () => {
@@ -288,6 +325,7 @@ export const ControllersTab: React.FC = () => {
     devices,
     lastEvent,
     liveStates,
+    rawDiscoveries,
     controllersTabLocked,
     controllersTabUnlockProgress,
   } = useInputStore();
@@ -299,6 +337,7 @@ export const ControllersTab: React.FC = () => {
   const [learnedRaw, setLearnedRaw] = useState<number | null>(null);
   const [hoveredCode, setHoveredCode] = useState<string | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [rawExpanded, setRawExpanded] = useState(false);
   const learningRef = useRef<string | null>(null);
   learningRef.current = learningCode;
 
@@ -377,7 +416,8 @@ export const ControllersTab: React.FC = () => {
     (selectedDevice.type === "xbox" ||
       selectedDevice.type === "ps4" ||
       selectedDevice.type === "ps5" ||
-      selectedDevice.type === "ps3");
+      selectedDevice.type === "ps3" ||
+      selectedDevice.type === "gamecube");
 
   return (
     <div className="h-full flex gap-4 p-4 overflow-hidden">
@@ -843,6 +883,160 @@ export const ControllersTab: React.FC = () => {
                 );
               })}
             </div>
+
+            {/* Unknown Inputs */}
+            {selectedDevice &&
+              rawDiscoveries[selectedDevice.id] &&
+              (() => {
+                const disc = rawDiscoveries[selectedDevice.id];
+                const unknownButtons = Object.entries(disc.buttons).filter(
+                  ([, name]) => !isKnownButton(name),
+                );
+                const unknownAxes = Object.entries(disc.axes).filter(
+                  ([, info]) => !isKnownAxis(info.name),
+                );
+                if (unknownButtons.length === 0 && unknownAxes.length === 0)
+                  return null;
+                return (
+                  <div className="flex flex-col gap-2">
+                    <h3
+                      className="text-xs font-semibold uppercase tracking-wider"
+                      style={{ color: "var(--color-text-dim)" }}
+                    >
+                      Unknown Inputs
+                    </h3>
+                    <div className="flex flex-col gap-1.5">
+                      {unknownButtons.map(([rawCode, name]) => (
+                        <div
+                          key={`unknown-btn-${rawCode}`}
+                          className="flex items-center justify-between py-2 px-3 rounded gap-2"
+                          style={{
+                            background: "var(--color-surface-raised)",
+                            border: "1px solid var(--color-border)",
+                          }}
+                        >
+                          <span
+                            className="text-sm font-mono w-28 shrink-0"
+                            style={{ color: "var(--color-text)" }}
+                          >
+                            {name}
+                          </span>
+                          <span
+                            className="text-xs ml-auto"
+                            style={{ color: "var(--color-text-dim)" }}
+                          >
+                            raw {rawCode}
+                          </span>
+                        </div>
+                      ))}
+                      {unknownAxes.map(([rawCode, info]) => (
+                        <div
+                          key={`unknown-axis-${rawCode}`}
+                          className="flex items-center justify-between py-2 px-3 rounded gap-2"
+                          style={{
+                            background: "var(--color-surface-raised)",
+                            border: "1px solid var(--color-border)",
+                          }}
+                        >
+                          <span
+                            className="text-sm font-mono w-28 shrink-0"
+                            style={{ color: "var(--color-text)" }}
+                          >
+                            {info.name}
+                          </span>
+                          <span
+                            className="text-xs ml-auto"
+                            style={{ color: "var(--color-text-dim)" }}
+                          >
+                            raw {rawCode} &middot; range{" "}
+                            {info.min.toFixed(2)} .. {info.max.toFixed(2)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+
+            {/* Raw Input (collapsed) */}
+            {selectedDevice && rawDiscoveries[selectedDevice.id] && (
+              <div className="flex flex-col gap-2">
+                <button
+                  className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider"
+                  style={{ color: "var(--color-text-dim)" }}
+                  onClick={() => setRawExpanded((v) => !v)}
+                >
+                  {rawExpanded ? (
+                    <ChevronDown size={14} />
+                  ) : (
+                    <ChevronRight size={14} />
+                  )}
+                  Raw Input
+                </button>
+                <AnimatePresence>
+                  {rawExpanded && (
+                    <motion.div
+                      className="flex flex-col gap-1.5"
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                    >
+                      {Object.entries(
+                        rawDiscoveries[selectedDevice.id].buttons,
+                      ).map(([rawCode, name]) => (
+                        <div
+                          key={`raw-btn-${rawCode}`}
+                          className="flex items-center justify-between py-1.5 px-3 rounded gap-2"
+                          style={{
+                            background: "var(--color-surface-raised)",
+                            border: "1px solid var(--color-border)",
+                          }}
+                        >
+                          <span
+                            className="text-xs font-mono"
+                            style={{ color: "var(--color-text)" }}
+                          >
+                            {name}
+                          </span>
+                          <span
+                            className="text-[10px]"
+                            style={{ color: "var(--color-text-dim)" }}
+                          >
+                            button &middot; raw {rawCode}
+                          </span>
+                        </div>
+                      ))}
+                      {Object.entries(
+                        rawDiscoveries[selectedDevice.id].axes,
+                      ).map(([rawCode, info]) => (
+                        <div
+                          key={`raw-axis-${rawCode}`}
+                          className="flex items-center justify-between py-1.5 px-3 rounded gap-2"
+                          style={{
+                            background: "var(--color-surface-raised)",
+                            border: "1px solid var(--color-border)",
+                          }}
+                        >
+                          <span
+                            className="text-xs font-mono"
+                            style={{ color: "var(--color-text)" }}
+                          >
+                            {info.name}
+                          </span>
+                          <span
+                            className="text-[10px]"
+                            style={{ color: "var(--color-text-dim)" }}
+                          >
+                            axis &middot; raw {rawCode} &middot; range{" "}
+                            {info.min.toFixed(3)} .. {info.max.toFixed(3)}
+                          </span>
+                        </div>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            )}
           </div>
         ) : (
           <div
