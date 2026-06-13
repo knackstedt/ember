@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useInputStore } from "../store/input.store";
+import { useSettingsStore } from "../store/settings.store";
 import { getCursorManager, DeviceCursor } from "./browserControllerManager";
 import { CursorStyle } from "../components/VirtualCursor/VirtualCursor";
 import { findInputElement, useControllerOskStore } from "../store/controllerOsk.store";
@@ -30,14 +31,15 @@ export function useBrowserControllerNav({
 
     const AXIS_THRESHOLD = 0.15;
     const SCROLL_THRESHOLD = 0.15;
-    const MOUSE_SPEED = 4;
-    const SCROLL_SPEED = 10;
+    const BASE_MOUSE_SPEED = 8; // pixels/frame at 60fps when mouseSpeed = 1.0
+    const BASE_SCROLL_SPEED = 10; // pixels/frame at 60fps
     const TRIGGER_THRESHOLD = 0.3; // triggers are normalised 0..1
     const WIGGLE_EXPAND_MS = 2000;
     const WIGGLE_SAMPLE_COUNT = 6;
     const WIGGLE_ANGLE_THRESHOLD = 1.8;
     const CURSOR_FADE_DELAY_MS = 60_000;
     const CURSOR_CHECK_INTERVAL_MS = 150;
+    let lastPollTime = 0;
 
     const applyDeadzone = (x: number, y: number, threshold: number): [number, number] => {
       const mag = Math.sqrt(x * x + y * y);
@@ -374,6 +376,14 @@ export function useBrowserControllerNav({
     };
 
     const poll = () => {
+      const now = performance.now();
+      const dt = lastPollTime ? Math.min((now - lastPollTime) / 1000, 0.05) : 1 / 60;
+      lastPollTime = now;
+
+      const mouseSpeed = useSettingsStore.getState().settings?.controllerBrowser?.mouseSpeed ?? 0.5;
+      const mouseSpeedPx = BASE_MOUSE_SPEED * mouseSpeed * 60 * dt;
+      const scrollSpeedPx = BASE_SCROLL_SPEED * 60 * dt;
+
       const liveStates = getLiveStates();
       const activeIds = Object.keys(liveStates);
 
@@ -434,8 +444,8 @@ export function useBrowserControllerNav({
             }
           }
 
-          dev.posRef.current.x += rightX * MOUSE_SPEED;
-          dev.posRef.current.y += rightY * MOUSE_SPEED;
+          dev.posRef.current.x += rightX * mouseSpeedPx;
+          dev.posRef.current.y += rightY * mouseSpeedPx;
           const clamped = clampToWindow(dev.posRef.current.x, dev.posRef.current.y);
           dev.posRef.current.x = clamped.x;
           dev.posRef.current.y = clamped.y;
@@ -456,7 +466,7 @@ export function useBrowserControllerNav({
           anyInput = true;
           if (webviewUnderCursor) {
             try {
-              webviewUnderCursor.executeJavaScript(`window.scrollBy(${leftX * SCROLL_SPEED}, ${leftY * SCROLL_SPEED})`);
+              webviewUnderCursor.executeJavaScript(`window.scrollBy(${leftX * scrollSpeedPx}, ${leftY * scrollSpeedPx})`);
             } catch {}
           }
         }
@@ -632,7 +642,7 @@ export function useBrowserControllerNav({
       const remaining = manager.cursors.filter((c) => !c.deviceId.startsWith(instancePrefix));
       manager.setCursors(remaining);
     };
-  }, [enabled]);
+  }, [enabled, evdevActive]);
 }
 
 const CURSOR_MAP: Record<string, boolean> = {
