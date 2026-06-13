@@ -55,7 +55,7 @@ export function useNativeVideo(
   const decoderId = stableId(src);
   const canvasId = `native-video-${decoderId}`;
 
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const rafRef = useRef<number | null>(null);
   const playingRef = useRef(false);
   const userPausedRef = useRef(false);
   const startTimeRef = useRef(0);
@@ -63,6 +63,7 @@ export function useNativeVideo(
   const frameRateRef = useRef(30);
   const pumpGenRef = useRef(0);
   const lastStateUpdateRef = useRef(0);
+  const lastFramePresentRef = useRef(0);
   const metadataRef = useRef<{ width: number; height: number; frameRate: number } | null>(null);
 
   const [state, setState] = useState<NativeVideoState>({
@@ -91,6 +92,7 @@ export function useNativeVideo(
     userPausedRef.current = false;
 
     async function init() {
+      if (!src) return;
       try {
         window.htpc.videoDecoder.create(decoderId);
 
@@ -141,6 +143,7 @@ export function useNativeVideo(
         window.htpc.videoDecoder.attachCanvas(decoderId, canvasId);
         // Resize WebGL viewport to the canvas's DISPLAY size so letterboxing
         // math uses the same aspect ratio the user actually sees.
+        if (!canvas) return;
         const rect = canvas.getBoundingClientRect();
         window.htpc.videoDecoder.resizeCanvas(decoderId, rect.width, rect.height);
 
@@ -167,43 +170,53 @@ export function useNativeVideo(
       cancelled = true;
       pumpGenRef.current++;
       playingRef.current = false;
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
-        timerRef.current = null;
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
       }
       window.htpc.videoDecoder.destroy(decoderId);
     };
   }, [src, decoderId, canvasRef, updateState]);
 
-  // Frame pump timed to the video frame-rate instead of RAF.
-  // This prevents bursts when multiple frames have accumulated.
+  // Frame pump via requestAnimationFrame, gated by the video frame interval.
+  // Works for any frame rate (24, 30, 60, 120 fps) because the gate uses
+  // the actual frameRate from ffprobe, not a hardcoded display refresh rate.
   const pump = useCallback(() => {
     if (!playingRef.current) return;
 
     const myGen = pumpGenRef.current;
 
     try {
-      const frame = window.htpc.videoDecoder.renderNextFrame(decoderId);
-      if (!frame) {
-        playingRef.current = false;
-        updateState({ playing: false });
-        return;
+      const now = performance.now();
+      const frameInterval = 1000 / frameRateRef.current;
+      const elapsed = now - lastFramePresentRef.current;
+
+      if (elapsed >= frameInterval) {
+        // Maintain sub-frame precision to prevent drift over time.
+        lastFramePresentRef.current = now - (elapsed % frameInterval);
+
+        const frame = window.htpc.videoDecoder.renderNextFrame(decoderId);
+        if (!frame) {
+          playingRef.current = false;
+          updateState({ playing: false });
+          return;
+        }
       }
 
-      const now = performance.now();
       if (now - lastStateUpdateRef.current > 250) {
         lastStateUpdateRef.current = now;
-        const elapsed = now - startTimeRef.current;
-        const currentTime = (pausedAtRef.current + elapsed) / 1000;
+        const elapsedPlay = now - startTimeRef.current;
+        const currentTime = (pausedAtRef.current + elapsedPlay) / 1000;
         setState((prev) => ({
           ...prev,
           currentTime: Math.min(currentTime, prev.duration),
         }));
+        // Sync decoder state so pause/resume/seek use the correct position.
+        window.htpc.videoDecoder.setCurrentTime(decoderId, Math.floor((pausedAtRef.current + elapsedPlay)));
       }
 
       if (playingRef.current && myGen === pumpGenRef.current) {
-        const interval = 1000 / frameRateRef.current;
-        timerRef.current = setTimeout(pump, interval);
+        rafRef.current = requestAnimationFrame(pump);
       }
     } catch (err: any) {
       console.error("[NativeVideo] decode error:", err);
@@ -217,6 +230,7 @@ export function useNativeVideo(
     playingRef.current = true;
     userPausedRef.current = false;
     startTimeRef.current = performance.now();
+    lastFramePresentRef.current = performance.now();
     pumpGenRef.current++;
     lastStateUpdateRef.current = 0;
     window.htpc.videoDecoder.resume(decoderId);
@@ -229,10 +243,12 @@ export function useNativeVideo(
     playingRef.current = false;
     userPausedRef.current = true;
     pausedAtRef.current += performance.now() - startTimeRef.current;
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-      timerRef.current = null;
+    if (rafRef.current !== null) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
     }
+    // Sync decoder state so resume starts from the correct position.
+    window.htpc.videoDecoder.setCurrentTime(decoderId, Math.floor(pausedAtRef.current));
     window.htpc.videoDecoder.pause(decoderId);
     updateState({ playing: false });
   }, [updateState, decoderId]);
@@ -247,11 +263,18 @@ export function useNativeVideo(
       const ms = Math.max(0, Math.floor(time * 1000));
       pausedAtRef.current = ms;
       startTimeRef.current = performance.now();
+      lastFramePresentRef.current = performance.now();
       pumpGenRef.current++;
+      // Cancel any old RAF so the old pump iteration doesn't compete.
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
       try {
         window.htpc.videoDecoder.seek(decoderId, ms);
-        window.htpc.videoDecoder.renderNextFrame(decoderId);
-        if (!playingRef.current) {
+        if (playingRef.current) {
+          pump();
+        } else {
           window.htpc.videoDecoder.pause(decoderId);
         }
       } catch (err: any) {
@@ -259,7 +282,7 @@ export function useNativeVideo(
         updateState({ error: err.message || String(err) });
       }
     },
-    [decoderId, updateState]
+    [decoderId, updateState, pump]
   );
 
   const setVolume = useCallback(

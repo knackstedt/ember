@@ -20,9 +20,15 @@ interface FfmpegDecoderState {
   currentTimeMs: number;
   paused: boolean;
   playing: boolean;
-  pumpHandle: number | null;
-  lastFrameTime: number;
-  renderedCount: number;
+  /** Incremented on every startFfmpeg; stdout handler ignores stale process data. */
+  procGeneration: number;
+  /** True while startFfmpeg is running; prevents re-entrant spawns. */
+  starting: boolean;
+  // Audio
+  audioChunks: Buffer[];
+  audioBufferTotal: number;
+  audioCtx: AudioContext | null;
+  audioNode: ScriptProcessorNode | null;
 }
 
 const decoders = new Map<string, FfmpegDecoderState>();
@@ -41,9 +47,12 @@ function getState(id: string): FfmpegDecoderState {
       currentTimeMs: 0,
       paused: false,
       playing: false,
-      pumpHandle: null,
-      lastFrameTime: 0,
-      renderedCount: 0,
+      procGeneration: 0,
+      starting: false,
+      audioChunks: [],
+      audioBufferTotal: 0,
+      audioCtx: null,
+      audioNode: null,
     };
     decoders.set(id, state);
   }
@@ -57,13 +66,14 @@ function killFfmpeg(state: FfmpegDecoderState) {
     } catch { /* ignore */ }
     state.process = null;
   }
-  if (state.pumpHandle !== null) {
-    cancelAnimationFrame(state.pumpHandle);
-    state.pumpHandle = null;
-  }
   state.playing = false;
   state.frameChunks = [];
   state.frameBufferTotal = 0;
+  state.audioChunks = [];
+  state.audioBufferTotal = 0;
+  // Do NOT reset procGeneration here — it must stay monotonic
+  // so stale process data handlers from a killed process are ignored.
+  state.starting = false;
 }
 
 function getNvdecDecoder(codecName: string): string | null {
@@ -130,16 +140,77 @@ function computeOutputSize(metaWidth: number, metaHeight: number): { w: number; 
   return { w: MAX_W, h: Math.round(metaHeight * scale) };
 }
 
+/** Create/resume the Web Audio context and ScriptProcessorNode. */
+function ensureAudioPlayback(state: FfmpegDecoderState) {
+  if (!state.audioCtx) {
+    const ctx = new AudioContext({ sampleRate: 48000 });
+    state.audioCtx = ctx;
+    const node = ctx.createScriptProcessor(4096, 0, 2);
+    node.onaudioprocess = (e) => {
+      const outL = e.outputBuffer.getChannelData(0);
+      const outR = e.outputBuffer.getChannelData(1);
+      const samplesNeeded = outL.length;
+      const bytesNeeded = samplesNeeded * 4; // 2 channels x 2 bytes (s16le)
+
+      const pcm: Buffer[] = [];
+      let gathered = 0;
+      const keep: Buffer[] = [];
+      let keepTotal = 0;
+      for (const chunk of state.audioChunks) {
+        if (gathered < bytesNeeded) {
+          const take = Math.min(chunk.length, bytesNeeded - gathered);
+          pcm.push(chunk.subarray(0, take));
+          gathered += take;
+          if (take < chunk.length) {
+            const remainder = chunk.subarray(take);
+            keep.push(remainder);
+            keepTotal += remainder.length;
+          }
+        } else {
+          keep.push(chunk);
+          keepTotal += chunk.length;
+        }
+      }
+      state.audioChunks = keep;
+      state.audioBufferTotal = keepTotal;
+
+      const pcmBuf = Buffer.concat(pcm);
+      const view = new Int16Array(pcmBuf.buffer, pcmBuf.byteOffset, pcmBuf.byteLength / 2);
+      const sampleCount = Math.min(samplesNeeded, view.length / 2);
+      for (let i = 0; i < sampleCount; i++) {
+        outL[i] = view[i * 2] / 32768;
+        outR[i] = view[i * 2 + 1] / 32768;
+      }
+      for (let i = sampleCount; i < samplesNeeded; i++) {
+        outL[i] = 0;
+        outR[i] = 0;
+      }
+    };
+    node.connect(ctx.destination);
+    state.audioNode = node;
+  }
+  if (state.audioCtx.state === "suspended") {
+    state.audioCtx.resume().catch(() => {});
+  }
+}
+
 function startFfmpeg(id: string, path: string, seekMs: number = 0) {
   const state = getState(id);
   const meta = state.metadata;
   if (!meta) return;
 
   killFfmpeg(state);
+  state.starting = true;
+  state.procGeneration++;
+  const myGeneration = state.procGeneration;
 
   const out = computeOutputSize(meta.width, meta.height);
+  const frameSize = out.w * out.h * 4;
+  const MAX_BUFFER_FRAMES = 8;
+  const MAX_BUFFER_BYTES = frameSize * MAX_BUFFER_FRAMES;
+  const MAX_AUDIO_BYTES = 48000 * 2 * 2 * 4; // ~4 seconds of stereo s16le
 
-  const args = [
+  const args: string[] = [
     "-hide_banner",
     "-loglevel", "error",
   ];
@@ -154,8 +225,10 @@ function startFfmpeg(id: string, path: string, seekMs: number = 0) {
   if (seekMs > 0) {
     args.push("-ss", `${seekMs / 1000}`);
   }
+  // Pace input reading at native frame rate so output arrives ~1x real-time.
+  args.push("-re");
 
-  // HDR tone-mapping: PQ BT.2020 → gamma BT.709 so colors look correct on SDR.
+  // HDR tone-mapping: PQ BT.2020 -> gamma BT.709 so colors look correct on SDR.
   const isHdr = meta.codecName === "hevc" && (meta.width >= 1920 || meta.height >= 1080);
   const colorspace = isHdr
     ? `zscale=t=linear,tonemap=hable,zscale=t=bt709:m=bt709,scale=${out.w}:${out.h}:flags=fast_bilinear,format=pix_fmts=rgba`
@@ -163,53 +236,97 @@ function startFfmpeg(id: string, path: string, seekMs: number = 0) {
 
   args.push(
     "-i", path,
+    "-map", "0:v",
     "-vf", colorspace,
     "-f", "rawvideo",
     "-pix_fmt", "rgba",
-    "-an", "-sn", "-dn",
     "-vsync", "cfr",
     "-r", `${meta.frameRate}`,
-    "pipe:1"
+    "pipe:1",
+    "-map", "0:a",
+    "-vn",
+    "-f", "s16le",
+    "-ac", "2",
+    "-ar", "48000",
+    "pipe:3"
   );
 
   const proc = spawn("ffmpeg", args, {
-    stdio: ["ignore", "pipe", "pipe"],
+    stdio: ["ignore", "pipe", "pipe", "pipe"],
   });
 
   state.process = proc;
+  state.starting = false;
   state.playing = true;
   state.paused = false;
+
+  ensureAudioPlayback(state);
 
   proc.stderr.on("data", (d: Buffer) => {
     const msg = d.toString("utf8").trim();
     if (msg) console.error("[ffmpeg-decoder] stderr:", msg);
   });
 
+  // Video pipe (fd 1 -> proc.stdout)
   proc.stdout.on("data", (chunk: Buffer) => {
+    if (state.procGeneration !== myGeneration) return;
     if (state.paused) return;
     state.frameChunks.push(chunk);
     state.frameBufferTotal += chunk.length;
-    // Do NOT pump here — let the timer in useNativeVideo pace playback.
+    if (state.frameBufferTotal > MAX_BUFFER_BYTES) {
+      const excessBytes = state.frameBufferTotal - MAX_BUFFER_BYTES;
+      const framesToDrop = Math.ceil(excessBytes / frameSize);
+      let bytesToDrop = framesToDrop * frameSize;
+      const newChunks: Buffer[] = [];
+      for (const c of state.frameChunks) {
+        if (bytesToDrop > 0) {
+          if (c.length <= bytesToDrop) {
+            bytesToDrop -= c.length;
+          } else {
+            newChunks.push(c.subarray(bytesToDrop));
+            bytesToDrop = 0;
+          }
+        } else {
+          newChunks.push(c);
+        }
+      }
+      state.frameChunks = newChunks;
+      state.frameBufferTotal = newChunks.reduce((sum, c) => sum + c.length, 0);
+    }
+    // Do NOT render here — RAF in useNativeVideo is the sole renderer.
+    // This avoids jitter from irregular OS pipe chunk delivery timing.
   });
 
   proc.stdout.on("end", () => {
-    state.playing = false;
+    if (state.process === proc) state.playing = false;
+  });
+
+  // Audio pipe (fd 3 -> proc.stdio[3])
+  const audioStream = proc.stdio[3] as NodeJS.ReadableStream;
+  audioStream.on("data", (chunk: Buffer) => {
+    if (state.procGeneration !== myGeneration) return;
+    state.audioChunks.push(chunk);
+    state.audioBufferTotal += chunk.length;
+    while (state.audioBufferTotal > MAX_AUDIO_BYTES && state.audioChunks.length > 0) {
+      const dropped = state.audioChunks.shift()!;
+      state.audioBufferTotal -= dropped.length;
+    }
   });
 
   proc.on("error", (err) => {
     console.error("[ffmpeg-decoder] process error:", err);
-    state.playing = false;
+    if (state.process === proc) state.playing = false;
   });
 
   proc.on("close", (code) => {
     if (code !== 0 && code !== null && code !== -9) {
       console.error(`[ffmpeg-decoder] exited with code ${code}`);
     }
-    state.playing = false;
+    if (state.process === proc) state.playing = false;
   });
 }
 
-function pumpFrames(id: string) {
+function pumpOneFrame(id: string) {
   const state = getState(id);
   if (!state.renderer || !state.metadata) return;
 
@@ -217,19 +334,16 @@ function pumpFrames(id: string) {
   const frameSize = out.w * out.h * 4;
   if (frameSize <= 0) return;
 
-  // Render at most ONE frame per pump call so playback is paced by
-  // the caller (setTimeout at frame-rate intervals).
   if (state.frameBufferTotal < frameSize) return;
 
-  const needed = frameSize;
   let gathered = 0;
   const usedChunks: Buffer[] = [];
   const keepChunks: Buffer[] = [];
   let keepTotal = 0;
 
   for (const chunk of state.frameChunks) {
-    if (gathered < needed) {
-      const take = Math.min(chunk.length, needed - gathered);
+    if (gathered < frameSize) {
+      const take = Math.min(chunk.length, frameSize - gathered);
       usedChunks.push(chunk.subarray(0, take));
       gathered += take;
       if (take < chunk.length) {
@@ -251,7 +365,6 @@ function pumpFrames(id: string) {
   );
   state.frameChunks = keepChunks;
   state.frameBufferTotal = keepTotal;
-  state.lastFrameTime = performance.now();
 }
 
 export const ffmpegVideoDecoder = {
@@ -298,17 +411,17 @@ export const ffmpegVideoDecoder = {
   renderNextFrame(id: string): { width: number; height: number } | null {
     const state = getState(id);
     if (!state.metadata || !state.renderer) return null;
-    if (!state.process && state.path && !state.paused) {
+    if (!state.process && !state.starting && state.path && !state.paused) {
       startFfmpeg(id, state.path, state.currentTimeMs);
     }
-    pumpFrames(id);
+    pumpOneFrame(id);
     return state.playing ? { width: state.metadata.width, height: state.metadata.height } : null;
   },
 
-  seek(id: string, _path: string, timestampMs: number) {
+  seek(id: string, timestampMs: number) {
     const state = getState(id);
     state.currentTimeMs = timestampMs;
-    if (state.process && state.path) {
+    if (state.path && !state.starting) {
       startFfmpeg(id, state.path, timestampMs);
     }
   },
@@ -316,23 +429,37 @@ export const ffmpegVideoDecoder = {
   pause(id: string) {
     const state = getState(id);
     state.paused = true;
+    killFfmpeg(state);
+    if (state.audioCtx && state.audioCtx.state === "running") {
+      state.audioCtx.suspend().catch(() => {});
+    }
   },
 
   resume(id: string) {
     const state = getState(id);
     state.paused = false;
-    if (!state.process && state.path && state.metadata) {
+    if (!state.process && !state.starting && state.path && state.metadata) {
       startFfmpeg(id, state.path, state.currentTimeMs);
     }
+    ensureAudioPlayback(state);
   },
 
   getMetadata(id: string): VideoMetadata | null {
     return getState(id).metadata;
   },
 
+  setCurrentTime(id: string, timeMs: number) {
+    getState(id).currentTimeMs = timeMs;
+  },
+
   destroy(id: string) {
     const state = getState(id);
     killFfmpeg(state);
+    if (state.audioCtx) {
+      state.audioCtx.close().catch(() => {});
+      state.audioCtx = null;
+    }
+    state.audioNode = null;
     if (state.renderer) {
       state.renderer.destroy();
       state.renderer = null;

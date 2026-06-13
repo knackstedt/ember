@@ -109,7 +109,7 @@ const videoDecoderApi = {
     return ffmpegVideoDecoder.renderNextFrame(id);
   },
   seek(id: string, timestampMs: number): void {
-    ffmpegVideoDecoder.seek(id, "", timestampMs);
+    ffmpegVideoDecoder.seek(id, timestampMs);
   },
   pause(id: string): void {
     ffmpegVideoDecoder.pause(id);
@@ -126,6 +126,9 @@ const videoDecoderApi = {
     const meta = ffmpegVideoDecoder.getMetadata(id);
     if (!meta) throw new Error("Decoder not opened");
     return meta;
+  },
+  setCurrentTime(id: string, timeMs: number): void {
+    ffmpegVideoDecoder.setCurrentTime(id, timeMs);
   },
   destroy(id: string): void {
     ffmpegVideoDecoder.destroy(id);
