@@ -12,6 +12,12 @@ import {
 import { XboxController } from "./XboxController";
 import { PS4Controller } from "./PS4Controller";
 import { GameCubeController } from "./GameCubeController";
+import {
+  PSXIcon,
+  PSCircleIcon,
+  PSSquareIcon,
+  PSTriangleIcon,
+} from "./PlayStationIcons";
 import { subscribeLearning, setLearningDeviceId } from "../../hooks/useControllerWorker";
 
 const CONTROLLER_ICON_SIZE = 28;
@@ -47,11 +53,11 @@ const DEFAULT_ACTIONS = [
   "fullscreen",
 ];
 
-const BUTTON_LABELS: Record<string, string> = {
-  south: "A / ✕",
-  east: "B / ○",
-  west: "X / □",
-  north: "Y / △",
+const BUTTON_LABELS: Record<string, React.ReactNode> = {
+  south: <>A / <PSXIcon /></>,
+  east: <>B / <PSCircleIcon /></>,
+  west: <>X / <PSSquareIcon /></>,
+  north: <>Y / <PSTriangleIcon /></>,
   left_bumper: "LB / L1",
   right_bumper: "RB / R1",
   left_trigger: "LT / L2",
@@ -621,7 +627,7 @@ export const ControllersTab: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="text-xs" style={{ color: "var(--color-text-dim)" }}>
-                      Hold <strong>X / □</strong> for 5 seconds to unlock
+                      Hold <strong>X / <PSSquareIcon /></strong> for 5 seconds to unlock
                     </span>
                     <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: "var(--color-surface-raised)" }}>
                       <motion.div
