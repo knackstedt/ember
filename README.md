@@ -2,6 +2,8 @@
 
 A Home Theater PC frontend for Linux. Browse and launch games, movies, TV shows, and music from the couch with controller support.
 
+> **Alpha Software**: This application is in an early alpha state. Expect breaking changes, incomplete features, and bugs. Nothing is guaranteed to work — use at your own risk.
+
 For system dependencies (Dolphin emulator, ffmpeg, xdotool, etc.), see [`SETUP.md`](SETUP.md).
 
 ---
