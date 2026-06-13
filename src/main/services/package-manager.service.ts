@@ -109,14 +109,8 @@ const KNOWN_PACKAGES: PackageDefinition[] = [
   { id: "apt-gstreamer-base", name: "gstreamer1.0-plugins-base", displayName: "GStreamer Base Plugins", description: "Essential GStreamer elements including videoconvert and appsink.", manager: "apt", category: "media-codec", aptName: "gstreamer1.0-plugins-base" },
   { id: "apt-gstreamer-good", name: "gstreamer1.0-plugins-good", displayName: "GStreamer Good Plugins", description: "High-quality GStreamer plugins for common codecs.", manager: "apt", category: "media-codec", aptName: "gstreamer1.0-plugins-good" },
   { id: "apt-gstreamer-tools", name: "gstreamer1.0-tools", displayName: "GStreamer Tools", description: "Utility binaries for GStreamer pipeline inspection and debugging.", manager: "apt", category: "media-codec", aptName: "gstreamer1.0-tools" },
-  { id: "apt-libavcodec", name: "libavcodec-dev", displayName: "libavcodec-dev", description: "FFmpeg codec library development files (required for native video decoder build).", manager: "apt", category: "dependency", aptName: "libavcodec-dev" },
-  { id: "apt-libavformat", name: "libavformat-dev", displayName: "libavformat-dev", description: "FFmpeg format library development files (required for native video decoder build).", manager: "apt", category: "dependency", aptName: "libavformat-dev" },
-  { id: "apt-libavutil", name: "libavutil-dev", displayName: "libavutil-dev", description: "FFmpeg utility library development files (required for native video decoder build).", manager: "apt", category: "dependency", aptName: "libavutil-dev" },
-  { id: "apt-libswscale", name: "libswscale-dev", displayName: "libswscale-dev", description: "FFmpeg software scaler library development files (required for native video decoder build).", manager: "apt", category: "dependency", aptName: "libswscale-dev" },
-  { id: "apt-libavfilter", name: "libavfilter-dev", displayName: "libavfilter-dev", description: "FFmpeg audio/video filter library development files (required for native video decoder build).", manager: "apt", category: "dependency", aptName: "libavfilter-dev" },
-  { id: "apt-libavdevice", name: "libavdevice-dev", displayName: "libavdevice-dev", description: "FFmpeg device handling library development files (required for native video decoder build).", manager: "apt", category: "dependency", aptName: "libavdevice-dev" },
-  { id: "apt-libgstreamer-dev", name: "libgstreamer1.0-dev", displayName: "libgstreamer1.0-dev", description: "GStreamer core development files (required for native video decoder build).", manager: "apt", category: "dependency", aptName: "libgstreamer1.0-dev" },
-  { id: "apt-libgstreamer-plugins-base-dev", name: "libgstreamer-plugins-base1.0-dev", displayName: "libgstreamer-plugins-base1.0-dev", description: "GStreamer base plugins development files (required for native video decoder build).", manager: "apt", category: "dependency", aptName: "libgstreamer-plugins-base1.0-dev" },
+  { id: "apt-libmpv-dev", name: "libmpv-dev", displayName: "libmpv-dev", description: "libmpv development files (required for native video decoder build).", manager: "apt", category: "dependency", aptName: "libmpv-dev" },
+  { id: "apt-libegl-mesa", name: "libegl1-mesa-dev", displayName: "libegl1-mesa-dev", description: "EGL development files (required for native video decoder offscreen rendering).", manager: "apt", category: "dependency", aptName: "libegl1-mesa-dev" },
 
   // Windows compatibility layers
   {
@@ -149,7 +143,8 @@ let aptPassword = "";
 const activeOperations = new Map<string, ChildProcess>();
 
 function getAppimageDir(): string {
-  const dir = join(app.getPath("userData"), "appimages");
+  let dir;
+try { dir = join(app.getPath("userData"), "appimages"); } catch { dir = join(process.cwd(), "appimages"); }
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   return dir;
 }
@@ -384,7 +379,8 @@ export async function detectInstalledCores(): Promise<DetectedCore[]> {
   const searchPaths: string[] = [];
   const home = process.env.HOME || "/home/user";
 
-  const buildbotCoresDir = join(app.getPath("userData"), "cores");
+  let buildbotCoresDir;
+try { buildbotCoresDir = join(app.getPath("userData"), "cores"); } catch { buildbotCoresDir = join(process.cwd(), "cores"); }
 
   searchPaths.push(
     join(home, ".config/retroarch/cores"),

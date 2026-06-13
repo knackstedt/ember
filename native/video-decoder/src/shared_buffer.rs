@@ -68,12 +68,20 @@ impl SharedFrameBuffer {
         self.u32_at(OFF_SEQUENCE).store(0, Ordering::Relaxed);
     }
 
+    pub fn required_size(&self) -> usize {
+        let slot_size = self.u32_at(OFF_SLOT_SIZE).load(Ordering::Relaxed) as usize;
+        let slot_count = self.u32_at(OFF_SLOT_COUNT).load(Ordering::Relaxed) as usize;
+        HEADER_SIZE + slot_count * slot_size
+    }
+
     fn slot_offset(&self, slot_idx: usize) -> usize {
         let slot_size = self.u32_at(OFF_SLOT_SIZE).load(Ordering::Relaxed) as usize;
         HEADER_SIZE + slot_idx * slot_size
     }
 
-    fn slot_mut_slice(&self, slot_idx: usize) -> &mut [u8] {
+    /// Returns a mutable slice for the entire slot buffer (max_width * max_height * 4 bytes).
+    /// This is useful when the caller needs the full buffer for external rendering.
+    pub fn slot_mut_slice(&self, slot_idx: usize) -> &mut [u8] {
         let offset = self.slot_offset(slot_idx);
         let slot_size = self.u32_at(OFF_SLOT_SIZE).load(Ordering::Relaxed) as usize;
         // SAFETY: caller ensures slot_idx < slot_count and buffer is large enough.
@@ -119,10 +127,21 @@ impl SharedFrameBuffer {
         Some(&mut slot[..needed])
     }
 
+    /// Returns the index of the next slot that should be written to
+    /// (the one that is NOT currently ready).
+    pub fn next_write_slot(&self) -> usize {
+        let current_ready = self.u32_at(OFF_READY_SLOT).load(Ordering::Acquire);
+        // ready_slot: 0=none, 1=slot0, 2=slot1
+        // Write to the slot that is NOT ready.
+        if current_ready == 1 { 1 } else { 0 }
+    }
+
     /// Atomically publish metadata after writing into a slot via `slot_mut_rgba`.
     pub fn publish_metadata(&self, width: u32, height: u32) {
         let current_ready = self.u32_at(OFF_READY_SLOT).load(Ordering::Acquire);
-        let write_idx = if current_ready == 1 { 0 } else { 1 };
+        // ready_slot: 0=none, 1=slot0, 2=slot1
+        // Write to the slot that is NOT ready.
+        let write_idx = if current_ready == 1 { 1 } else { 0 };
         self.u32_at(OFF_WIDTH).store(width, Ordering::Relaxed);
         self.u32_at(OFF_HEIGHT).store(height, Ordering::Relaxed);
         self.u32_at(OFF_PITCH).store(width * BYTES_PER_PIXEL, Ordering::Relaxed);

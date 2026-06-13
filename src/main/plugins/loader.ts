@@ -14,8 +14,10 @@ import { createLogger } from "../util/logger";
 
 const log = createLogger("info");
 
-const PLUGINS_DIR = join(app.getPath("home"), ".config", "htpc", "plugins");
-const PLUGIN_BUILD_DIR = join(app.getPath("userData"), "plugin-builds");
+let PLUGINS_DIR;
+try { PLUGINS_DIR = join(app.getPath("home"), ".config", "htpc", "plugins"); } catch { PLUGINS_DIR = join(process.cwd(), ".config", "htpc", "plugins"); }
+let PLUGIN_BUILD_DIR;
+try { PLUGIN_BUILD_DIR = join(app.getPath("userData"), "plugin-builds"); } catch { PLUGIN_BUILD_DIR = join(process.cwd(), "plugin-builds"); }
 
 mkdirSync(PLUGINS_DIR, { recursive: true });
 mkdirSync(PLUGIN_BUILD_DIR, { recursive: true });

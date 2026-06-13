@@ -55,7 +55,8 @@ async function connectWithRetry(
 export async function initDb(): Promise<Surreal> {
   if (db) return db;
 
-  const dataDir = join(app.getPath("userData"), "db");
+  let dataDir;
+try { dataDir = join(app.getPath("userData"), "db"); } catch { dataDir = join(process.cwd(), "db"); }
   mkdirSync(dataDir, { recursive: true });
 
   const [{ Surreal }, { createNodeEngines }] = await Promise.all([

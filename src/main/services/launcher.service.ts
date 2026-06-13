@@ -114,7 +114,7 @@ function fullscreenDolphinWindow(): void {
     if (xdotoolCheck.status !== 0) {
       log.warn(
         "launcher",
-        "xdotool not found; cannot auto-fullscreen Dolphin. Install xdotool for best HTPC experience.",
+        "xdotool not found; cannot auto-fullscreen Dolphin. Install xdotool for best experience.",
       );
       return;
     }

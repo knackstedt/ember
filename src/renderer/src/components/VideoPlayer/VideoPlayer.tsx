@@ -261,9 +261,7 @@ export const VideoPlayer: React.FC = () => {
   }, [src, movieId, updateMovieProgress, useNative, native.state.duration, native.state.currentTime]);
 
   const handleClose = useCallback(async () => {
-    if (useNative) {
-      native.controls.destroy();
-    }
+    // Native decoder cleanup is handled by useNativeVideo's useEffect return.
     if (movieId) {
       let current = 0;
       let dur = 0;

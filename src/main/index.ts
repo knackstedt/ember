@@ -1,6 +1,6 @@
 import { app, BrowserWindow, shell, protocol, Menu } from "electron";
 import path, { join } from "path";
-import { readFileSync, createReadStream, statSync, lstatSync, readlinkSync, unlinkSync, writeFileSync, existsSync, mkdirSync } from "fs";
+import { readFileSync, createReadStream, statSync, lstatSync, readlinkSync, unlinkSync, writeFileSync, existsSync, mkdirSync, readdirSync } from "fs";
 import { initDb } from "./db";
 import { registerIpcHandlers } from "./ipc";
 import { initInputSystem, destroyInputSystem } from "./input/evdev";
@@ -8,7 +8,8 @@ import { getSettings } from "./services/settings.service";
 import { getWindowState, saveWindowState } from "./services/window-state.service";
 import { createLogger } from "./util/logger";
 import { getXdgVideosDir } from "./scanners/xdg";
-import { MovieRepo } from "./db/repository";
+import { MovieRepo, RemoteSourceRepo } from "./db/repository";
+import { getServePort } from "./services/rclone-manager";
 
 const log = createLogger("info");
 
@@ -130,6 +131,29 @@ export function getMainWindow(): BrowserWindow | null {
   return mainWindow;
 }
 
+function findFileRecursive(dir: string, targetName: string): string | null {
+  try {
+    const entries = readdirSync(dir);
+    for (const entry of entries) {
+      const full = join(dir, entry);
+      try {
+        const st = statSync(full);
+        if (st.isDirectory()) {
+          const found = findFileRecursive(full, targetName);
+          if (found) return found;
+        } else if (entry === targetName) {
+          return full;
+        }
+      } catch {
+        continue;
+      }
+    }
+  } catch {
+    // ignore unreadable dirs
+  }
+  return null;
+}
+
 async function createWindow(): Promise<void> {
   await initDb();
 
@@ -149,7 +173,15 @@ async function createWindow(): Promise<void> {
           await MovieRepo.upsert({ ...movie, filePath: candidate });
           log.info("migration", `fixed relative filePath for ${movie.title}: ${candidate}`);
         } else {
-          log.warn("migration", `could not resolve relative filePath for ${movie.title}: ${movie.filePath}`);
+          // Try a recursive search in the Videos directory for the basename.
+          const basename = movie.filePath.split("/").pop() || movie.filePath;
+          const found = findFileRecursive(videosDir, basename);
+          if (found) {
+            await MovieRepo.upsert({ ...movie, filePath: found });
+            log.info("migration", `fixed relative filePath (recursive) for ${movie.title}: ${found}`);
+          } else {
+            log.warn("migration", `could not resolve relative filePath for ${movie.title}: ${movie.filePath}`);
+          }
         }
       }
     }
@@ -281,7 +313,7 @@ protocol.registerSchemesAsPrivileged([
 ]);
 
 app.whenReady().then(async () => {
-  app.setAppUserModelId("com.htpc.app");
+  app.setAppUserModelId("com.ember.app");
 
   protocol.handle("ember", async (request) => {
     const url = new URL(request.url);
@@ -295,8 +327,6 @@ app.whenReady().then(async () => {
         return new Response("Bad Request", { status: 400 });
       }
 
-      const { getServePort } = await import("./services/rclone-manager");
-      const { RemoteSourceRepo } = await import("./db/repository");
       const port = await getServePort(sourceId);
       if (!port) {
         log.error("ember:protocol", `no serve available for ${sourceId}`);

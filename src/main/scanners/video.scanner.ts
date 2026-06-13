@@ -28,10 +28,12 @@ const VIDEO_EXTS = new Set([
 
 const TV_PATTERN = /[Ss](\d+)[Ee](\d+)/;
 
-const movieThumbCache = join(app.getPath("userData"), "thumbnails", "movies");
+let movieThumbCache;
+try { movieThumbCache = join(app.getPath("userData"), "thumbnails", "movies"); } catch { movieThumbCache = join(process.cwd(), "thumbnails", "movies"); }
 mkdirSync(movieThumbCache, { recursive: true });
 
-const showThumbCache = join(app.getPath("userData"), "thumbnails", "tv");
+let showThumbCache;
+try { showThumbCache = join(app.getPath("userData"), "thumbnails", "tv"); } catch { showThumbCache = join(process.cwd(), "thumbnails", "tv"); }
 mkdirSync(showThumbCache, { recursive: true });
 
 let ffmpegAvailable: boolean | undefined;

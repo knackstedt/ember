@@ -19,7 +19,8 @@ import { createLogger } from "../util/logger";
 
 const log = createLogger("info");
 
-const coverRoot = join(app.getPath("userData"), "covers", "flash");
+let coverRoot;
+try { coverRoot = join(app.getPath("userData"), "covers", "flash"); } catch { coverRoot = join(process.cwd(), "covers", "flash"); }
 const screenshotDir = join(coverRoot, "screenshots");
 const generatedDir = join(coverRoot, "generated");
 mkdirSync(screenshotDir, { recursive: true });

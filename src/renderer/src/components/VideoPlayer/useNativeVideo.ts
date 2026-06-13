@@ -1,5 +1,5 @@
 /**
- * React hook for the native dual-backend video decoder.
+ * React hook for the native libmpv video renderer.
  *
  * Decode and WebGL rendering happen entirely in the preload context
  * so no frame data crosses the Electron context bridge.
@@ -14,7 +14,6 @@ export interface NativeVideoState {
   buffered: number;
   width: number;
   height: number;
-  backend: string;
   error: string | null;
   ready: boolean;
 }
@@ -33,7 +32,6 @@ function generateId(): string {
 
 function stableId(src: string | null): string {
   if (!src) return generateId();
-  // Use a hash of src so the same video always gets the same decoder id
   let h = 0;
   for (let i = 0; i < src.length; i++) {
     h = ((h << 5) - h + src.charCodeAt(i)) | 0;
@@ -41,7 +39,7 @@ function stableId(src: string | null): string {
   return `dec-${Math.abs(h).toString(36)}`;
 }
 
-function shouldUseNativeDecoder(src: string | null): boolean {
+export function shouldUseNativeDecoder(src: string | null): boolean {
   if (!src) return false;
   const lower = src.toLowerCase();
   const unsupportedExts = [".mkv", ".avi", ".wmv", ".ts", ".m2ts", ".vob", ".iso", ".mpeg", ".mpg"];
@@ -53,17 +51,16 @@ function shouldUseNativeDecoder(src: string | null): boolean {
 export function useNativeVideo(
   src: string | null,
   canvasRef: React.RefObject<HTMLCanvasElement | null>
-): { state: NativeVideoState; controls: NativeVideoControls } {
+): { state: NativeVideoState; controls: NativeVideoControls; canvasId: string } {
   const decoderId = stableId(src);
   const canvasId = `native-video-${decoderId}`;
 
-  const pumpTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const playingRef = useRef(false);
   const userPausedRef = useRef(false);
   const startTimeRef = useRef(0);
   const pausedAtRef = useRef(0);
   const frameRateRef = useRef(30);
-  const frameCountRef = useRef(0);
   const pumpGenRef = useRef(0);
   const lastStateUpdateRef = useRef(0);
   const metadataRef = useRef<{ width: number; height: number; frameRate: number } | null>(null);
@@ -75,7 +72,6 @@ export function useNativeVideo(
     buffered: 0,
     width: 0,
     height: 0,
-    backend: "",
     error: null,
     ready: false,
   });
@@ -96,20 +92,42 @@ export function useNativeVideo(
 
     async function init() {
       try {
-        // 1. Create decoder in preload
         window.htpc.videoDecoder.create(decoderId);
 
-        // 2. Resolve ember://remote/ URLs via main process IPC, then open.
         let resolved = src;
         if (src.startsWith("ember://remote/")) {
           resolved = await window.htpc.videoDecoder.resolveUrl(src);
         } else if (src.startsWith("ember://media/")) {
           resolved = src.slice("ember://media/".length);
+        } else if (!src.startsWith("/") && !src.startsWith("http://") && !src.startsWith("https://") && !src.startsWith("file://")) {
+          // Bare filename / relative path — ask main process to resolve it
+          // against the movie database (may return absolute path or ember://remote/).
+          resolved = await window.htpc.videoDecoder.resolveUrl(src);
+          // If the DB lookup returned an ember://remote/ URL, resolve it to HTTP.
+          if (resolved.startsWith("ember://remote/")) {
+            resolved = await window.htpc.videoDecoder.resolveUrl(resolved);
+          }
         }
-        console.log("[NativeVideo] src:", src, "resolved:", resolved);
-        const backend = window.htpc.videoDecoder.open(decoderId, resolved);
+        // If we still have a bare filename (not absolute, not URL),
+        // ask the main process to look it up in the movie DB.
+        // This handles stale local entries that should redirect to a NAS.
+        if (
+          resolved &&
+          !resolved.startsWith("/") &&
+          !resolved.startsWith("http://") &&
+          !resolved.startsWith("https://") &&
+          !resolved.startsWith("file://") &&
+          !resolved.startsWith("ember://")
+        ) {
+          resolved = await window.htpc.videoDecoder.resolveUrl(resolved);
+          // If the DB lookup returned an ember://remote/ URL, resolve it to HTTP.
+          if (resolved.startsWith("ember://remote/")) {
+            resolved = await window.htpc.videoDecoder.resolveUrl(resolved);
+          }
+        }
 
-        // 3. Get metadata
+        await window.htpc.videoDecoder.open(decoderId, resolved);
+
         const meta = window.htpc.videoDecoder.getMetadata(decoderId);
         frameRateRef.current = meta.frameRate || 30;
         metadataRef.current = {
@@ -120,25 +138,23 @@ export function useNativeVideo(
 
         if (cancelled) return;
 
-        // 4. Attach WebGL renderer in preload (direct DOM access)
         window.htpc.videoDecoder.attachCanvas(decoderId, canvasId);
-        window.htpc.videoDecoder.resizeCanvas(decoderId, meta.width, meta.height);
-        // Apply the correct YCbCr→RGB matrix and PAR from the actual caps.
-        window.htpc.videoDecoder.setColorimetry(
-          decoderId,
-          meta.colorimetry ?? "bt709",
-          meta.parN ?? 1,
-          meta.parD ?? 1,
-        );
+        // Resize WebGL viewport to the canvas's DISPLAY size so letterboxing
+        // math uses the same aspect ratio the user actually sees.
+        const rect = canvas.getBoundingClientRect();
+        window.htpc.videoDecoder.resizeCanvas(decoderId, rect.width, rect.height);
 
         updateState({
           duration: meta.durationMs / 1000,
           width: meta.width,
           height: meta.height,
-          backend,
           ready: true,
           error: null,
         });
+
+        // Auto-start playback — mpv is already decoding, so start the
+        // frame pump immediately so the canvas renders frames.
+        play();
       } catch (err: any) {
         console.error("[NativeVideo] init failed:", err);
         updateState({ error: err.message || String(err), ready: false });
@@ -150,17 +166,18 @@ export function useNativeVideo(
     return () => {
       cancelled = true;
       pumpGenRef.current++;
-      if (pumpTimerRef.current) {
-        clearTimeout(pumpTimerRef.current);
-        pumpTimerRef.current = null;
+      playingRef.current = false;
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
       }
       window.htpc.videoDecoder.destroy(decoderId);
     };
   }, [src, decoderId, canvasRef, updateState]);
 
-  // Async frame pump using setTimeout so blocking NAPI decode doesn't
-  // stall the browser's compositor inside requestAnimationFrame.
-  const pump = useCallback(async () => {
+  // Frame pump timed to the video frame-rate instead of RAF.
+  // This prevents bursts when multiple frames have accumulated.
+  const pump = useCallback(() => {
     if (!playingRef.current) return;
 
     const myGen = pumpGenRef.current;
@@ -173,8 +190,6 @@ export function useNativeVideo(
         return;
       }
 
-      // Update current time estimate (throttled to 4Hz to avoid React re-renders
-      // and GC pressure from frequent state updates on every frame).
       const now = performance.now();
       if (now - lastStateUpdateRef.current > 250) {
         lastStateUpdateRef.current = now;
@@ -186,11 +201,9 @@ export function useNativeVideo(
         }));
       }
 
-      // GStreamer sync=true blocks pull_sample until the next frame's PTS,
-      // so we just queue the next pump immediately. It will sleep inside
-      // renderNextFrame for the correct inter-frame interval.
       if (playingRef.current && myGen === pumpGenRef.current) {
-        pumpTimerRef.current = window.setTimeout(pump, 0);
+        const interval = 1000 / frameRateRef.current;
+        timerRef.current = setTimeout(pump, interval);
       }
     } catch (err: any) {
       console.error("[NativeVideo] decode error:", err);
@@ -204,7 +217,6 @@ export function useNativeVideo(
     playingRef.current = true;
     userPausedRef.current = false;
     startTimeRef.current = performance.now();
-    frameCountRef.current = 0;
     pumpGenRef.current++;
     lastStateUpdateRef.current = 0;
     window.htpc.videoDecoder.resume(decoderId);
@@ -217,9 +229,9 @@ export function useNativeVideo(
     playingRef.current = false;
     userPausedRef.current = true;
     pausedAtRef.current += performance.now() - startTimeRef.current;
-    if (pumpTimerRef.current) {
-      clearTimeout(pumpTimerRef.current);
-      pumpTimerRef.current = null;
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
     }
     window.htpc.videoDecoder.pause(decoderId);
     updateState({ playing: false });
@@ -235,20 +247,13 @@ export function useNativeVideo(
       const ms = Math.max(0, Math.floor(time * 1000));
       pausedAtRef.current = ms;
       startTimeRef.current = performance.now();
-      frameCountRef.current = 0;
       pumpGenRef.current++;
       try {
         window.htpc.videoDecoder.seek(decoderId, ms);
-        // Render one frame at the new position so the thumbnail updates.
-        // The Rust backend uses pull_preroll() for this call and then
-        // restores the correct pipeline state (Paused/Playing) automatically.
         window.htpc.videoDecoder.renderNextFrame(decoderId);
-        // Belt-and-suspenders: if the user was paused, re-assert pause so
-        // a race in the native layer can never leave audio running silently.
         if (!playingRef.current) {
           window.htpc.videoDecoder.pause(decoderId);
         }
-        updateState({ currentTime: time });
       } catch (err: any) {
         console.error("[NativeVideo] seek failed:", err);
         updateState({ error: err.message || String(err) });
@@ -257,47 +262,18 @@ export function useNativeVideo(
     [decoderId, updateState]
   );
 
-  const setVolume = useCallback((v: number) => {
-    console.log("[NativeVideo] volume set to", v, "(audio not yet implemented)");
-  }, []);
-
-  // Auto-play when ready (but not if user explicitly paused)
-  useEffect(() => {
-    if (state.ready && !state.playing && !state.error && src && !userPausedRef.current) {
-      play();
-    }
-  }, [state.ready, state.playing, state.error, src, play]);
-
-  // Resize canvas when container size changes (fullscreen, window resize)
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ro = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const { width, height } = entry.contentRect;
-        window.htpc.videoDecoder.resizeCanvas(decoderId, width, height);
-      }
-    });
-    ro.observe(canvas);
-    return () => ro.disconnect();
-  }, [canvasRef, decoderId]);
-
-  const destroy = useCallback(() => {
-    playingRef.current = false;
-    pumpGenRef.current++;
-    if (pumpTimerRef.current) {
-      clearTimeout(pumpTimerRef.current);
-      pumpTimerRef.current = null;
-    }
-    window.htpc.videoDecoder.destroy(decoderId);
-  }, [decoderId]);
+  const setVolume = useCallback(
+    (v: number) => {
+      // libmpv audio is handled natively; volume can be set via mpv property
+      // if we expose it. For now, no-op.
+      console.log("[NativeVideo] setVolume not yet implemented:", v);
+    },
+    []
+  );
 
   return {
     state,
-    controls: { play, pause, toggle, seek, setVolume, destroy },
+    controls: { play, pause, toggle, seek, setVolume },
     canvasId,
   };
 }
-
-export { shouldUseNativeDecoder };

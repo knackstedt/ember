@@ -10,7 +10,7 @@ interface XboxControllerProps {
 
 /* ── tunable constants ── */
 const STICK_TRAVEL = 28; // max pixel distance sticks move from center
-const TRIGGER_FULL_SCALE = 1027; // raw value that represents 100% pressed
+const TRIGGER_FULL_SCALE = 1027; // raw value that represents 100% pressed (xpad)
 
 
 
@@ -119,18 +119,26 @@ const TRIGGER = {
   right_trigger: { x: 418, y: 30, w: 64, h: 42, label: "RT", labelCx: 450, labelCy: 55, barX: 402, barY: 30, barW: 10, barH: 42 },
 };
 
-/* ── helpers ── */
+/* ── helpers ──
+ * Linux drivers report axes in different raw ranges:
+ *   - xpad (Xbox): sticks signed-16 (-32768..32767), triggers 0..1023
+ *   - hid-generic (Gamepad P5 etc): sticks 0..255 (center 128), triggers 0..255
+ *   - Already-normalised by a previous layer: -1..1
+ */
+
 function normAxis(v: number | undefined): number {
   if (v === undefined) return 0;
-  if (Math.abs(v) <= 1) return v;
-  return v / 32767;
+  if (Math.abs(v) <= 1) return v;               // already normalised -1..1
+  if (v >= 0 && v <= 255) return (v - 128) / 128; // raw 0..255 (center 128)
+  return v / 32767;                              // signed-16
 }
 
 function triggerNorm(v: number | undefined): number {
   if (v === undefined) return 0;
-  if (v >= 0 && v <= 1) return v;
+  if (v >= 0 && v <= 1) return v;                 // already normalised 0..1
+  if (v >= 0 && v <= 255) return v / 255;         // raw 0..255 (generic)
   if (v >= 0 && v <= TRIGGER_FULL_SCALE) return v / TRIGGER_FULL_SCALE;
-  return Math.max(0, Math.min(1, v / 32767));
+  return Math.max(0, Math.min(1, v / 32767));     // signed-16 normalised
 }
 
 export const XboxController: React.FC<XboxControllerProps> = ({

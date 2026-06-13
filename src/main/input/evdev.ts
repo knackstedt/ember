@@ -27,18 +27,45 @@ const log = createLogger("info");
 const INPUT_DIR = "/dev/input";
 
 let watcher: ReturnType<typeof setInterval> | null = null;
-const activeDevices = new Map<string, { device: unknown; close: () => void }>();
+const activeDevices = new Map<string, { device: unknown; close: () => void; info: ControllerDevice }>();
 
-const ABS_AXIS_MAP: Record<number, string> = {
+/* ─── Axis layouts ───
+ * Different Linux drivers expose axes in different orders.
+ * We pick a map per device so the Controllers tab labels match reality.
+ */
+
+const XBOX_AXIS_MAP: Record<number, string> = {
   0: "left_x",
   1: "left_y",
   2: "left_trigger",
   3: "right_x",
   4: "right_y",
   5: "right_trigger",
+  9: "right_trigger",
+  10: "left_trigger",
   16: "dpad_x",
   17: "dpad_y",
 };
+
+const GENERIC_AXIS_MAP: Record<number, string> = {
+  0: "left_x",
+  1: "left_y",
+  2: "right_x",
+  5: "right_y",
+  9: "right_trigger",
+  10: "left_trigger",
+  16: "dpad_x",
+  17: "dpad_y",
+};
+
+function getAxisMap(name: string): Record<number, string> {
+  const n = name.toLowerCase();
+  // "Gamepad P5" and similar generic HID pads use an alternate layout
+  if (n === "gamepad p5" || /gamepad\s*p\d/.test(n)) {
+    return GENERIC_AXIS_MAP;
+  }
+  return XBOX_AXIS_MAP;
+}
 
 const BTN_MAP: Record<number, string> = {
   304: "south",
@@ -72,6 +99,7 @@ const KEY_MAP: Record<number, string> = {
   1: "escape",
   15: "tab",
   14: "backspace",
+  172: "home", // KEY_HOMEPAGE on some generic pads
 };
 
 function detectControllerType(
@@ -80,7 +108,7 @@ function detectControllerType(
   productId: number,
 ): ControllerType {
   const n = name.toLowerCase();
-  if (n.includes("xbox") || vendorId === 0x045e) return "xbox";
+  if (n.includes("xbox") || vendorId === 0x045e || n.includes("xinput")) return "xbox";
   if (vendorId === 0x054c) {
     if (productId === 0x0268) return "ps3";
     if (productId === 0x05c4 || productId === 0x09cc) return "ps4";
@@ -96,6 +124,9 @@ function detectControllerType(
   if (n.includes("gamecube") || vendorId === 0x057e) return "gamecube";
   if (n.includes("dualshock") || n.includes("dual shock")) return "ps4";
   if (n.includes("dualsense")) return "ps5";
+  // Most generic USB gamepads present as Xbox-style (standard mapping).
+  // Show the Xbox diagram since it is the most complete and widely applicable.
+  if (n.includes("gamepad") || n.includes("controller") || n.includes("pad")) return "xbox";
   return "generic";
 }
 
@@ -187,6 +218,9 @@ async function openDevice(
     window.webContents.send("input:device-connected", deviceInfo);
   }
 
+  // Pick the correct axis map for this controller model
+  const axisMap = getAxisMap(info.name);
+
   // Pure Node.js binary reader — struct input_event is 24 bytes on 64-bit Linux
   const EVENT_SIZE = 24; // sec(8) + usec(8) + type(2) + code(2) + value(4)
   const EV_SYN = 0,
@@ -233,7 +267,7 @@ async function openDevice(
             deviceId,
             deviceName: info.name,
             type: "axis",
-            axis: ABS_AXIS_MAP[code] ?? `abs_${code}`,
+            axis: axisMap[code] ?? `abs_${code}`,
             value,
             rawCode: code,
             timestamp: Date.now(),
@@ -263,6 +297,7 @@ async function openDevice(
 
     return {
       device: stream,
+      info: deviceInfo,
       close: () => {
         stream.destroy();
         if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
@@ -359,5 +394,5 @@ export async function destroyInputSystem(): Promise<void> {
 }
 
 export function getConnectedDevices(): ControllerDevice[] {
-  return [];
+  return Array.from(activeDevices.values()).map((h) => h.info);
 }

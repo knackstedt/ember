@@ -1,5 +1,5 @@
 import { join, dirname } from "path";
-import { readFileSync, rmSync, mkdirSync, readdirSync, existsSync } from "fs";
+import { readFileSync, rmSync, mkdirSync, readdirSync, existsSync, statSync } from "fs";
 import { BrowserWindow, ipcMain, app, dialog, shell, session } from "electron";
 import { spawn, ChildProcess } from "child_process";
 import { homedir } from "os";
@@ -40,6 +40,7 @@ import {
   MappingRepo,
   BrokenFlashRepo,
   CollectionRepo,
+  RemoteSourceRepo,
   escapeId,
 } from "../db/repository";
 import { getProtonRating } from "../services/protondb.service";
@@ -135,6 +136,29 @@ import {
   canCompress,
 } from "../services/compression.service";
 const log = createLogger("info");
+
+/** Recursively search a directory for a file by exact name. */
+function findFileRecursive(dir: string, targetName: string): string | null {
+  try {
+    const entries = readdirSync(dir);
+    for (const entry of entries) {
+      const full = join(dir, entry);
+      try {
+        if (existsSync(full) && statSync(full).isDirectory()) {
+          const found = findFileRecursive(full, targetName);
+          if (found) return found;
+        } else if (entry === targetName) {
+          return full;
+        }
+      } catch {
+        continue;
+      }
+    }
+  } catch {
+    // ignore unreadable dirs
+  }
+  return null;
+}
 
 // ---------------------------------------------------------------------------
 // Libretro worker process — isolates dynarec cores from Electron V8
@@ -397,30 +421,130 @@ export function registerIpcHandlers(window: BrowserWindow): void {
   // so SharedArrayBuffer can be used without IPC serialization blocks.
   // ---------------------------------------------------------------------------
   ipcMain.handle("videoDecoder:resolveUrl", async (_e, path: string) => {
-    if (!path.startsWith("ember://remote/")) return path;
+    log.info("videoDecoder:resolveUrl", `resolving: ${path}`);
 
-    const url = new URL(path);
-    const segments = url.pathname.split("/").filter(Boolean).map(decodeURIComponent);
-    const sourceId = segments[0];
-    const remotePath = segments.slice(1).join("/");
-    const { getServePort } = await import("../services/rclone-manager");
-    const { RemoteSourceRepo } = await import("../db/repository");
-    const port = await getServePort(sourceId);
-    if (!port) throw new Error(`Remote source ${sourceId} is not serving`);
-    let proxyPath = remotePath;
-    try {
-      const sources = await RemoteSourceRepo.list();
-      const source = sources.find((s: any) => s.id === sourceId);
-      const basePath = (source?.remotePath || "/").replace(/^\//, "");
-      if (basePath && proxyPath.toLowerCase().startsWith(basePath.toLowerCase() + "/")) {
-        proxyPath = proxyPath.slice(basePath.length + 1);
-      } else if (basePath && proxyPath.toLowerCase() === basePath.toLowerCase()) {
-        proxyPath = "";
+    // 1) ember://remote/ → http://localhost:<port>/...
+    if (path.startsWith("ember://remote/")) {
+      const url = new URL(path);
+      const segments = url.pathname.split("/").filter(Boolean).map(decodeURIComponent);
+      const sourceId = segments[0];
+      const remotePath = segments.slice(1).join("/");
+      const port = await getServePort(sourceId);
+      if (!port) throw new Error(`Remote source ${sourceId} is not serving`);
+      let proxyPath = remotePath;
+      try {
+        const sources = await RemoteSourceRepo.list();
+        const source = sources.find((s: any) => s.id === sourceId);
+        const basePath = (source?.remotePath || "/").replace(/^\//, "");
+        if (basePath && proxyPath.toLowerCase().startsWith(basePath.toLowerCase() + "/")) {
+          proxyPath = proxyPath.slice(basePath.length + 1);
+        } else if (basePath && proxyPath.toLowerCase() === basePath.toLowerCase()) {
+          proxyPath = "";
+        }
+      } catch {
+        // ignore
       }
-    } catch {
-      // ignore
+      const resolved = `http://localhost:${port}/${proxyPath.split("/").map(encodeURIComponent).join("/")}`;
+      log.info("videoDecoder:resolveUrl", `ember://remote/ -> ${resolved}`);
+      return resolved;
     }
-    return `http://localhost:${port}/${proxyPath.split("/").map(encodeURIComponent).join("/")}`;
+
+    // 2) Absolute or already-resolved paths — pass through.
+    if (path.startsWith("/") || path.startsWith("http://") || path.startsWith("https://") || path.startsWith("file://")) {
+      log.info("videoDecoder:resolveUrl", `absolute/url path: ${path}`);
+      return path;
+    }
+
+    // 3) Strip ember://media/ prefix if present (used by resolveMediaUrl for local files).
+    let searchPath = path;
+    if (searchPath.startsWith("ember://media/")) {
+      searchPath = searchPath.slice("ember://media/".length);
+    }
+
+    // 4) If it's now an absolute path, pass through.
+    if (searchPath.startsWith("/")) {
+      log.info("videoDecoder:resolveUrl", `absolute after strip: ${searchPath}`);
+      return searchPath;
+    }
+
+    const basename = searchPath.split("/").pop() || searchPath;
+
+    // 5) Try local Videos directory first.
+    const videosDir = getXdgVideosDir();
+    const candidate = join(videosDir, searchPath);
+    if (existsSync(candidate)) {
+      log.info("videoDecoder:resolveUrl", `found in Videos: ${candidate}`);
+      return candidate;
+    }
+
+    // 6) Search DB for movies with this basename.
+    // Collect ALL matches, then prefer ones with usable paths (absolute or remote).
+    try {
+      const movies = await MovieRepo.list();
+      log.info("videoDecoder:resolveUrl", `DB has ${movies.length} movies, searching for basename: ${basename}`);
+
+      const matches = movies.filter((m: any) => {
+        if (!m.filePath) return false;
+        const movieBasename = m.filePath.split("/").pop() || m.filePath;
+        return movieBasename.toLowerCase() === basename.toLowerCase();
+      });
+
+      log.info("videoDecoder:resolveUrl", `found ${matches.length} DB match(es)`);
+
+      // Prefer remote entries (ember://remote/) first, then absolute paths, then anything else.
+      const remoteMatch = matches.find((m: any) => m.filePath?.startsWith("ember://remote/"));
+      const absMatch = matches.find((m: any) => m.filePath?.startsWith("/"));
+      const anyMatch = matches[0];
+
+      let match = remoteMatch || absMatch || anyMatch;
+
+      if (match?.filePath) {
+        // If the matched path is ember://remote/, resolve it to HTTP now.
+        if (match.filePath.startsWith("ember://remote/")) {
+          const url = new URL(match.filePath);
+          const segments = url.pathname.split("/").filter(Boolean).map(decodeURIComponent);
+          const sourceId = segments[0];
+          const remotePath = segments.slice(1).join("/");
+          const port = await getServePort(sourceId);
+          if (!port) throw new Error(`Remote source ${sourceId} is not serving`);
+          let proxyPath = remotePath;
+          try {
+            const sources = await RemoteSourceRepo.list();
+            const source = sources.find((s: any) => s.id === sourceId);
+            const basePath = (source?.remotePath || "/").replace(/^\//, "");
+            if (basePath && proxyPath.toLowerCase().startsWith(basePath.toLowerCase() + "/")) {
+              proxyPath = proxyPath.slice(basePath.length + 1);
+            } else if (basePath && proxyPath.toLowerCase() === basePath.toLowerCase()) {
+              proxyPath = "";
+            }
+          } catch {
+            // ignore
+          }
+          const resolved = `http://localhost:${port}/${proxyPath.split("/").map(encodeURIComponent).join("/")}`;
+          log.info("videoDecoder:resolveUrl", `DB remote match -> ${resolved}`);
+          return resolved;
+        }
+        // Absolute path — return as-is.
+        if (match.filePath.startsWith("/")) {
+          log.info("videoDecoder:resolveUrl", `DB absolute match -> ${match.filePath}`);
+          return match.filePath;
+        }
+        // Bare filename from DB — try to resolve it locally before returning.
+        log.info("videoDecoder:resolveUrl", `DB bare filename match: ${match.filePath}`);
+      }
+    } catch (err: any) {
+      log.info("videoDecoder:resolveUrl", `DB lookup error: ${err.message || String(err)}`);
+    }
+
+    // 7) Last resort: recursive search in Videos directory.
+    const found = findFileRecursive(videosDir, basename);
+    if (found) {
+      log.info("videoDecoder:resolveUrl", `recursive search found: ${found}`);
+      return found;
+    }
+
+    log.info("videoDecoder:resolveUrl", `could not resolve ${path}, returning as-is`);
+    return path;
   });
 
   // ---------------------------------------------------------------------------

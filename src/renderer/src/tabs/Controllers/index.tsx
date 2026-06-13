@@ -687,10 +687,22 @@ export const ControllersTab: React.FC = () => {
                 {Object.keys(liveState.axes).length > 0 && (
                   <div className="flex flex-col gap-2">
                     {Object.entries(liveState.axes).map(([axis, value]) => {
-                      const normalized =
-                        typeof value === "number"
-                          ? Math.max(-1, Math.min(1, value / 32767))
-                          : value;
+                      /* Normalise raw value to a 0..1 or -1..1 display range.
+                         Drivers report different ranges; detect from magnitude. */
+                      let normalized = 0;
+                      if (typeof value === "number") {
+                        if (Math.abs(value) <= 1) {
+                          normalized = value; // already normalised
+                        } else if (value >= 0 && value <= 255) {
+                          // Raw 0..255: triggers (0..255) or sticks (center 128)
+                          normalized = axis.includes("trigger")
+                            ? value / 255
+                            : (value - 128) / 128;
+                        } else {
+                          // Signed-16
+                          normalized = Math.max(-1, Math.min(1, value / 32767));
+                        }
+                      }
                       const isCenter = Math.abs(normalized) < 0.05;
                       const pct = ((normalized + 1) / 2) * 100;
                       return (

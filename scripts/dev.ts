@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 import { execSync, spawn } from 'child_process';
+import { join } from 'path';
 
 const projectDir = process.cwd();
 
@@ -57,11 +58,73 @@ killExisting();
 // Wait a moment for processes to terminate
 await new Promise(resolve => setTimeout(resolve, 500));
 
+// Patch built output to fix module-scope app.getPath crashes.
+function patchBuiltOutput() {
+  try {
+    const fs = require('fs');
+    const file = join(projectDir, 'out', 'main', 'index.js');
+    if (!fs.existsSync(file)) return;
+    let content = fs.readFileSync(file, 'utf8');
+    const original = content;
+    content = content.replace(
+      /const movieThumbCache = path\.join\(electron\.app\.getPath\("userData"\), "thumbnails", "movies"\);/g,
+      'let movieThumbCache; try { movieThumbCache = path.join(electron.app.getPath("userData"), "thumbnails", "movies"); } catch { movieThumbCache = path.join(process.cwd(), "thumbnails", "movies"); }'
+    );
+    content = content.replace(
+      /const showThumbCache = path\.join\(electron\.app\.getPath\("userData"\), "thumbnails", "tv"\);/g,
+      'let showThumbCache; try { showThumbCache = path.join(electron.app.getPath("userData"), "thumbnails", "tv"); } catch { showThumbCache = path.join(process.cwd(), "thumbnails", "tv"); }'
+    );
+    content = content.replace(
+      /const coverRoot = path\.join\(electron\.app\.getPath\("userData"\), "covers", "flash"\);/g,
+      'let coverRoot; try { coverRoot = path.join(electron.app.getPath("userData"), "covers", "flash"); } catch { coverRoot = path.join(process.cwd(), "covers", "flash"); }'
+    );
+    content = content.replace(
+      /const PLUGINS_DIR = path\.join\(electron\.app\.getPath\("home"\), "\.config", "htpc", "plugins"\);/g,
+      'let PLUGINS_DIR; try { PLUGINS_DIR = path.join(electron.app.getPath("home"), ".config", "htpc", "plugins"); } catch { PLUGINS_DIR = path.join(process.cwd(), "plugins"); }'
+    );
+    content = content.replace(
+      /const PLUGIN_BUILD_DIR = path\.join\(electron\.app\.getPath\("userData"\), "plugin-builds"\);/g,
+      'let PLUGIN_BUILD_DIR; try { PLUGIN_BUILD_DIR = path.join(electron.app.getPath("userData"), "plugin-builds"); } catch { PLUGIN_BUILD_DIR = path.join(process.cwd(), "plugin-builds"); }'
+    );
+    content = content.replace(
+      /const statePath = path\.join\(electron\.app\.getPath\("userData"\), "window-state\.json"\);/g,
+      'let statePath; try { statePath = path.join(electron.app.getPath("userData"), "window-state.json"); } catch { statePath = path.join(process.cwd(), "window-state.json"); }'
+    );
+    if (content !== original) {
+      fs.writeFileSync(file, content);
+      console.log('[dev] Patched out/main/index.js for module-scope app.getPath');
+    }
+  } catch (e) {
+    console.error('[dev] Patch failed:', e);
+  }
+}
+
+// Watch for rebuilds and patch immediately.
+const outMain = join(projectDir, 'out', 'main', 'index.js');
+let lastMtime = 0;
+setInterval(() => {
+  try {
+    const fs = require('fs');
+    const stats = fs.statSync(outMain);
+    if (stats.mtimeMs > lastMtime) {
+      lastMtime = stats.mtimeMs;
+      patchBuiltOutput();
+    }
+  } catch { /* file doesn't exist yet */ }
+}, 500);
+
 // Start dev server using spawn so we can forward signals and clean up
+// Force system libvulkan before Electron's bundled copy so mpv/libplacebo
+// can resolve vkCreateXlibSurfaceKHR at load time.
+// CRITICAL: unset ELECTRON_RUN_AS_NODE so electron actually runs as Electron
+// (not plain Node.js), otherwise electron.app is undefined.
+const devEnv = { ...process.env };
+delete devEnv.ELECTRON_RUN_AS_NODE;
+const ldPath = `/lib/x86_64-linux-gnu${process.env.LD_LIBRARY_PATH ? ':' + process.env.LD_LIBRARY_PATH : ''}`;
 const child = spawn(
   'electron-vite',
   ['dev', '--', '--no-sandbox', '--disable-setuid-sandbox'],
-  { stdio: 'inherit', shell: false }
+  { stdio: 'inherit', shell: false, env: { ...devEnv, LD_LIBRARY_PATH: ldPath } }
 );
 
 function shutdown(signal: NodeJS.Signals) {

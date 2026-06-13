@@ -17,11 +17,19 @@ import { createLogger } from "../util/logger";
 
 const log = createLogger("info");
 
-const coverCache = join(app.getPath("userData"), "covers", "music");
+function getUserDataPath(): string {
+  try {
+    return app.getPath("userData");
+  } catch {
+    return process.cwd();
+  }
+}
+
+const coverCache = join(getUserDataPath(), "covers", "music");
 const generatedCache = join(coverCache, "generated");
-const artistCache = join(app.getPath("userData"), "covers", "artists");
-mkdirSync(generatedCache, { recursive: true });
-mkdirSync(artistCache, { recursive: true });
+const artistCache = join(getUserDataPath(), "covers", "artists");
+try { mkdirSync(generatedCache, { recursive: true }); } catch { /* ignore */ }
+try { mkdirSync(artistCache, { recursive: true }); } catch { /* ignore */ }
 
 const inFlight = new Set<string>();
 

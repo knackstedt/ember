@@ -6,27 +6,18 @@ const ARCHS = [
   { target: "aarch64-unknown-linux-gnu", arch: "arm64" },
 ] as const;
 
-async function buildFeature(
-  target: string,
-  feature: string,
-  cwd: string
-): Promise<number> {
-  console.log(`Building video-decoder (${feature}) for ${target}...`);
+async function build(target: string, cwd: string): Promise<number> {
+  console.log(`Building video-decoder for ${target}...`);
   const env: Record<string, string> = { ...process.env };
   if (target === "aarch64-unknown-linux-gnu") {
     env.PKG_CONFIG_ALLOW_CROSS = "1";
     env.PKG_CONFIG_SYSROOT_DIR = "/usr/aarch64-linux-gnu";
+    // Force the cross-linker; without this Rust defaults to rust-lld
+    // which is the host (x86_64) linker and cannot link aarch64 objects.
+    env.CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER = "aarch64-linux-gnu-gcc";
   }
   const proc = Bun.spawn({
-    cmd: [
-      "cargo",
-      "build",
-      "--release",
-      "--target",
-      target,
-      "--features",
-      feature,
-    ],
+    cmd: ["cargo", "build", "--release", "--target", target],
     cwd,
     stdout: "inherit",
     stderr: "inherit",
@@ -36,15 +27,8 @@ async function buildFeature(
   return proc.exitCode ?? 1;
 }
 
-function findArtifact(
-  rustDir: string,
-  target: string,
-  feature: string
-): string | undefined {
-  const dir =
-    feature === "ffmpeg"
-      ? resolve(rustDir, `target/ffmpeg/${target}/release`)
-      : resolve(rustDir, `target/gstreamer/${target}/release`);
+function findArtifact(rustDir: string, target: string): string | undefined {
+  const dir = resolve(rustDir, `target/${target}/release`);
   const candidate = resolve(dir, "libvideo_decoder.so");
   if (existsSync(candidate)) {
     return candidate;
@@ -57,96 +41,23 @@ async function main() {
   console.log("Setting up video-decoder native addon...\n");
 
   for (const { target, arch } of ARCHS) {
-    // Build FFmpeg backend
-    {
-      const dest = resolve(
-        `resources/video-decoder-ffmpeg.linux-${arch}-gnu.node`
+    const dest = resolve(`resources/video-decoder.linux-${arch}-gnu.node`);
+    const exitCode = await build(target, rustDir);
+
+    if (exitCode === 0) {
+      const src = findArtifact(rustDir, target);
+      if (src) {
+        copyFileSync(src, dest);
+        console.log(`Copied ${src} -> ${dest}`);
+      }
+    } else {
+      console.warn(
+        `Warning: failed to build video-decoder for ${target} (exit ${exitCode}).`
       );
-      const env: Record<string, string> = {
-        ...process.env,
-        CARGO_TARGET_DIR: resolve(rustDir, "target/ffmpeg"),
-      };
-      if (target === "aarch64-unknown-linux-gnu") {
-        env.PKG_CONFIG_ALLOW_CROSS = "1";
-        env.PKG_CONFIG_SYSROOT_DIR = "/usr/aarch64-linux-gnu";
-      }
-
-      const proc = Bun.spawn({
-        cmd: [
-          "cargo",
-          "build",
-          "--release",
-          "--target",
-          target,
-          "--features",
-          "ffmpeg",
-        ],
-        cwd: rustDir,
-        stdout: "inherit",
-        stderr: "inherit",
-        env,
-      });
-      await proc.exited;
-
-      if (proc.exitCode === 0) {
-        const src = findArtifact(rustDir, target, "ffmpeg");
-        if (src) {
-          copyFileSync(src, dest);
-          console.log(`Copied ${src} -> ${dest}`);
-        }
-      } else {
-        console.warn(
-          `Warning: failed to build FFmpeg backend for ${target} (exit ${proc.exitCode}).`
-        );
-      }
-    }
-
-    // Build GStreamer backend
-    {
-      const dest = resolve(
-        `resources/video-decoder-gstreamer.linux-${arch}-gnu.node`
-      );
-      const env: Record<string, string> = {
-        ...process.env,
-        CARGO_TARGET_DIR: resolve(rustDir, "target/gstreamer"),
-      };
-      if (target === "aarch64-unknown-linux-gnu") {
-        env.PKG_CONFIG_ALLOW_CROSS = "1";
-        env.PKG_CONFIG_SYSROOT_DIR = "/usr/aarch64-linux-gnu";
-      }
-
-      const proc = Bun.spawn({
-        cmd: [
-          "cargo",
-          "build",
-          "--release",
-          "--target",
-          target,
-          "--features",
-          "gstreamer",
-        ],
-        cwd: rustDir,
-        stdout: "inherit",
-        stderr: "inherit",
-        env,
-      });
-      await proc.exited;
-
-      if (proc.exitCode === 0) {
-        const src = findArtifact(rustDir, target, "gstreamer");
-        if (src) {
-          copyFileSync(src, dest);
-          console.log(`Copied ${src} -> ${dest}`);
-        }
-      } else {
-        console.warn(
-          `Warning: failed to build GStreamer backend for ${target} (exit ${proc.exitCode}).`
-        );
-      }
     }
   }
 
-  console.log("\nDone. Video decoder native addons are ready.");
+  console.log("\nDone. Video decoder native addon is ready.");
 }
 
 main().catch((err) => {

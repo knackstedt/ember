@@ -127,13 +127,14 @@ export default function App(): React.ReactElement {
   const visibleTabIdsRef = useRef(visibleTabIds);
   visibleTabIdsRef.current = visibleTabIds;
 
+  const inputDevices = useInputStore((s) => s.devices);
+
   /* Controller cursors — always call hook, control via `enabled` */
   const [activeTab, setActiveTab] = useState<TabId>("gaming");
-  useBrowserControllerNav({ enabled: !loading });
+  useBrowserControllerNav({ enabled: !loading, evdevActive: inputDevices.length > 0 });
 
   const addDevice = useInputStore((s) => s.addDevice);
   const removeDevice = useInputStore((s) => s.removeDevice);
-  const inputDevices = useInputStore((s) => s.devices);
   const hasPlayer = useMusicPlayerStore((s) => s.queue.length > 0);
   const setBladeCollapsed = useMusicPlayerStore((s) => s.setBladeCollapsed);
   const videoOpen = useVideoPlayerStore((s) => !!s.src);
@@ -167,7 +168,6 @@ export default function App(): React.ReactElement {
   const axisValuesRef = useRef<Record<string, number>>({});
   const axisTimersRef = useRef<Record<string, number>>({});
   const axisCooldownRef = useRef<Record<string, number>>({});
-  const AXIS_THRESHOLD = 16384;
   const AXIS_COOLDOWN_MS = 200;
 
   /* Button long-press timers for evdev controller input */
@@ -178,19 +178,27 @@ export default function App(): React.ReactElement {
   const unlockTimerRef = useRef<number | null>(null);
   const unlockIntervalRef = useRef<number | null>(null);
 
+  /** Return a stick threshold appropriate for the driver's value range. */
+  function getAxisThreshold(value: number): number {
+    if (Math.abs(value) <= 1) return 0.5;     // already normalised -1..1
+    if (Math.abs(value) <= 255) return 64;    // raw 0..255 (center 128)
+    return 16384;                               // signed-16
+  }
+
   function getAxisNavAction(axis: string, value: number): string | null {
+    const thr = getAxisThreshold(value);
     if (axis === "dpad_x") {
-      if (value < 0) return "left";
-      if (value > 0) return "right";
+      if (value < -thr) return "left";
+      if (value > thr) return "right";
     } else if (axis === "dpad_y") {
-      if (value < 0) return "up";
-      if (value > 0) return "down";
+      if (value < -thr) return "up";
+      if (value > thr) return "down";
     } else if (axis === "left_x") {
-      if (value < -AXIS_THRESHOLD) return "left";
-      if (value > AXIS_THRESHOLD) return "right";
+      if (value < -thr) return "left";
+      if (value > thr) return "right";
     } else if (axis === "left_y") {
-      if (value < -AXIS_THRESHOLD) return "up";
-      if (value > AXIS_THRESHOLD) return "down";
+      if (value < -thr) return "up";
+      if (value > thr) return "down";
     }
     return null;
   }
@@ -602,6 +610,7 @@ export default function App(): React.ReactElement {
           dpad_left: "left",
           dpad_right: "right",
           east: "cancel",
+          north: "menu",
         };
         const action = actionMap[ev.action ?? ""];
         if (action) {

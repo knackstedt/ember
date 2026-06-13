@@ -1,8 +1,7 @@
 /**
- * WebGL renderer for NV12 frames.
+ * WebGL renderer for RGBA frames.
  *
- * Uploads Y and UV planes as two separate textures and performs
- * YUV→RGB conversion in the fragment shader.
+ * Uploads a single RGBA texture and blits it to the canvas.
  */
 
 const VERT = `
@@ -17,15 +16,9 @@ void main() {
 const FRAG = `
 precision mediump float;
 varying vec2 v_uv;
-uniform sampler2D u_y;
-uniform sampler2D u_uv;
+uniform sampler2D u_tex;
 void main() {
-  float y = texture2D(u_y, v_uv).r;
-  vec2 uv = texture2D(u_uv, v_uv).ra - vec2(0.5, 0.5);
-  float r = y + 1.5748 * uv.g;
-  float g = y - 0.1873 * uv.r - 0.4681 * uv.g;
-  float b = y + 1.8556 * uv.r;
-  gl_FragColor = vec4(r, g, b, 1.0);
+  gl_FragColor = texture2D(u_tex, v_uv);
 }
 `;
 
@@ -60,10 +53,8 @@ export class WebGLVideoRenderer {
   private gl: WebGLRenderingContext;
   private program: WebGLProgram;
   private posLoc: number;
-  private yLoc: WebGLUniformLocation | null;
-  private uvLoc: WebGLUniformLocation | null;
-  private texY: WebGLTexture;
-  private texUV: WebGLTexture;
+  private texLoc: WebGLUniformLocation | null;
+  private tex: WebGLTexture;
   private buf: WebGLBuffer;
   private canvas: HTMLCanvasElement;
 
@@ -87,10 +78,8 @@ export class WebGLVideoRenderer {
     const prog = createProgram(gl, VERT, FRAG);
     this.program = prog;
     this.posLoc = gl.getAttribLocation(prog, "a_pos");
-    this.yLoc = gl.getUniformLocation(prog, "u_y");
-    this.uvLoc = gl.getUniformLocation(prog, "u_uv");
+    this.texLoc = gl.getUniformLocation(prog, "u_tex");
 
-    // Fullscreen triangle strip quad
     this.buf = gl.createBuffer()!;
     gl.bindBuffer(gl.ARRAY_BUFFER, this.buf);
     gl.bufferData(
@@ -99,25 +88,15 @@ export class WebGLVideoRenderer {
       gl.STATIC_DRAW
     );
 
-    // Y texture (LUMINANCE = single-channel)
-    this.texY = gl.createTexture()!;
-    gl.bindTexture(gl.TEXTURE_2D, this.texY);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-
-    // UV texture (LUMINANCE_ALPHA = two-channel)
-    this.texUV = gl.createTexture()!;
-    gl.bindTexture(gl.TEXTURE_2D, this.texUV);
+    this.tex = gl.createTexture()!;
+    gl.bindTexture(gl.TEXTURE_2D, this.tex);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 
     gl.useProgram(prog);
-    gl.uniform1i(this.yLoc, 0);
-    gl.uniform1i(this.uvLoc, 1);
+    gl.uniform1i(this.texLoc, 0);
 
     gl.clearColor(0, 0, 0, 1);
   }
@@ -130,41 +109,22 @@ export class WebGLVideoRenderer {
     gl.viewport(0, 0, canvas.width, canvas.height);
   }
 
-  render(y: Uint8Array, uv: Uint8Array, width: number, height: number) {
+  render(rgba: Uint8Array, width: number, height: number) {
     const { gl } = this;
     gl.clear(gl.COLOR_BUFFER_BIT);
 
-    const yW = width;
-    const yH = height;
-    const uvW = width / 2;
-    const uvH = height / 2;
-
     gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, this.texY);
+    gl.bindTexture(gl.TEXTURE_2D, this.tex);
     gl.texImage2D(
       gl.TEXTURE_2D,
       0,
-      gl.LUMINANCE,
-      yW,
-      yH,
+      gl.RGBA,
+      width,
+      height,
       0,
-      gl.LUMINANCE,
+      gl.RGBA,
       gl.UNSIGNED_BYTE,
-      y
-    );
-
-    gl.activeTexture(gl.TEXTURE1);
-    gl.bindTexture(gl.TEXTURE_2D, this.texUV);
-    gl.texImage2D(
-      gl.TEXTURE_2D,
-      0,
-      gl.LUMINANCE_ALPHA,
-      uvW,
-      uvH,
-      0,
-      gl.LUMINANCE_ALPHA,
-      gl.UNSIGNED_BYTE,
-      uv
+      rgba
     );
 
     gl.bindBuffer(gl.ARRAY_BUFFER, this.buf);
@@ -172,15 +132,13 @@ export class WebGLVideoRenderer {
     gl.vertexAttribPointer(this.posLoc, 2, gl.FLOAT, false, 0, 0);
 
     gl.useProgram(this.program);
-    gl.uniform1i(this.yLoc, 0);
-    gl.uniform1i(this.uvLoc, 1);
+    gl.uniform1i(this.texLoc, 0);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   }
 
   destroy() {
     const { gl } = this;
-    gl.deleteTexture(this.texY);
-    gl.deleteTexture(this.texUV);
+    gl.deleteTexture(this.tex);
     gl.deleteBuffer(this.buf);
     gl.deleteProgram(this.program);
   }

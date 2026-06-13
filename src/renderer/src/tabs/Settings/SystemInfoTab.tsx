@@ -23,7 +23,7 @@ interface DiagnosticsData {
   displays: { id: number; resolution: string; scaleFactor: number; rotation: number; internal: boolean; primary: boolean }[];
   gpu: any;
   videoDecoders: { name: string; available: boolean; path?: string }[];
-  ffmpegCodecs: string[];
+  libmpvVersion: string;
   hwaccels: string[];
 }
 
@@ -339,7 +339,7 @@ export const SystemInfoTab: React.FC = () => {
             </div>
           ))}
           <p className="text-xs mt-1" style={{ color: "var(--color-text-dim)" }}>
-            The FFmpeg backend supports NVDEC hardware acceleration for H.264, HEVC, AV1, VP8, VP9, MPEG2, and MPEG4 on NVIDIA GPUs.
+            The libmpv backend supports hardware acceleration (VA-API, NVDEC, etc.) for virtually all video codecs.
           </p>
         </div>
       </SectionCard>
@@ -365,28 +365,20 @@ export const SystemInfoTab: React.FC = () => {
         </SectionCard>
       )}
 
-      {/* FFmpeg Codecs */}
-      {data.ffmpegCodecs.length > 0 && (
-        <SectionCard icon={Film} title="FFmpeg Codecs">
-          <div className="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto">
-            {Array.from(new Set(data.ffmpegCodecs)).slice(0, 200).map((codec) => (
-              <span
-                key={codec}
-                className="text-xs px-2 py-1 rounded font-mono"
-                style={{
-                  background: "var(--color-surface-raised)",
-                  border: "1px solid var(--color-border)",
-                  color: "var(--color-text-dim)",
-                }}
-              >
-                {codec}
-              </span>
-            ))}
-            {data.ffmpegCodecs.length > 200 && (
-              <span className="text-xs px-2 py-1 rounded" style={{ color: "var(--color-text-dim)" }}>
-                +{data.ffmpegCodecs.length - 200} more
-              </span>
-            )}
+      {/* libmpv */}
+      {data.libmpvVersion && (
+        <SectionCard icon={Film} title="libmpv">
+          <div className="flex flex-wrap gap-1.5">
+            <span
+              className="text-xs px-2 py-1 rounded font-mono"
+              style={{
+                background: "var(--color-surface-raised)",
+                border: "1px solid var(--color-border)",
+                color: "var(--color-text-dim)",
+              }}
+            >
+              {data.libmpvVersion}
+            </span>
           </div>
         </SectionCard>
       )}

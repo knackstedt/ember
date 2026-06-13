@@ -6,7 +6,7 @@ import { exec } from "child_process";
 import { RemoteSource } from "../../shared/types";
 import { Movie, MusicTrack, Game } from "../../shared/types";
 import { createLogger } from "../util/logger";
-import { getRemoteFileList, startServe, getServePort, restartServe } from "./rclone-manager";
+import { getRemoteFileList, startServe, getServePort, restartServe, listRemotes } from "./rclone-manager";
 import { MovieRepo, MusicRepo, GameRepo } from "../db/repository";
 import { generateMovieThumbnail } from "../scanners/video.scanner";
 
@@ -579,7 +579,6 @@ export async function scanAllRemoteSources(
   sendProgress?: RemoteProgressSender,
 ): Promise<void> {
   try {
-    const { listRemotes } = await import("./rclone-manager");
     const sources = await listRemotes();
     for (const source of sources) {
       if (!source.enabled) continue;

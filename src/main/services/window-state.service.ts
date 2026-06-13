@@ -14,7 +14,8 @@ interface WindowState {
   maximized?: boolean;
 }
 
-const statePath = join(app.getPath("userData"), "window-state.json");
+let statePath;
+try { statePath = join(app.getPath("userData"), "window-state.json"); } catch { statePath = join(process.cwd(), "window-state.json"); }
 const defaultState: WindowState = { width: 1280, height: 720 };
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 

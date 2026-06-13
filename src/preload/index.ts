@@ -1,12 +1,13 @@
 import { contextBridge, ipcRenderer, shell } from "electron";
 import { join } from "path";
-import { existsSync } from "fs";
+import { existsSync, readdirSync, statSync } from "fs";
 import { homedir } from "os";
 import {
   AppSettings,
   Game,
   GameEmulatorConfig,
   WineRunner,
+  GamePlatform,
   Movie,
   MusicTrack,
   TVShow,
@@ -24,79 +25,48 @@ import {
 import { GameMetadata } from "../shared/metadata";
 import { libretroApi } from "./libretro";
 import { WebGLVideoRenderer } from "./webgl-renderer";
+import { ffmpegVideoDecoder } from "./ffmpeg-decoder";
 
-// ---------------------------------------------------------------------------
-// Native video decoder — loaded in preload (Node.js context) and exposed
-// to renderer via contextBridge.  Uses a pre-allocated ArrayBuffer for
-// zero-copy frame delivery: Rust writes directly into it, JS creates
-// Uint8Array views into the same memory for WebGL texImage2D.
-// No per-frame allocations.
-// ---------------------------------------------------------------------------
-
-const arch = process.arch === "arm64" ? "arm64" : "x64";
-const VIDEO_DECODER_BACKENDS = [
-  `video-decoder-ffmpeg.linux-${arch}-gnu.node`,
-  `video-decoder-gstreamer.linux-${arch}-gnu.node`,
-];
-
-function findAllVideoDecoderAddons(): string[] {
-  const paths = new Set<string>();
-  for (const name of VIDEO_DECODER_BACKENDS) {
-    const p = join((process as any).resourcesPath, name);
-    if (existsSync(p)) paths.add(p);
-    const dev = join(__dirname, "..", "..", "resources", name);
-    if (existsSync(dev)) paths.add(dev);
-  }
-  return [...paths];
-}
-
-const videoDecoderClasses: any[] = [];
-function getVideoDecoderClasses(): any[] {
-  if (videoDecoderClasses.length === 0) {
-    for (const path of findAllVideoDecoderAddons()) {
+function findFileRecursive(dir: string, targetName: string): string | null {
+  try {
+    const entries = readdirSync(dir);
+    for (const entry of entries) {
+      const full = join(dir, entry);
       try {
-        const addon = require(path);
-        if (addon.VideoDecoder) {
-          videoDecoderClasses.push(addon.VideoDecoder);
-          console.log(`[VideoDecoder] Loaded addon: ${path}`);
-        } else {
-          console.warn(`[VideoDecoder] Addon missing VideoDecoder export: ${path}`);
+        const st = statSync(full);
+        if (st.isDirectory()) {
+          const found = findFileRecursive(full, targetName);
+          if (found) return found;
+        } else if (entry === targetName) {
+          return full;
         }
-      } catch (e) {
-        console.warn(`[VideoDecoder] Failed to load ${path}:`, e);
+      } catch {
+        continue;
       }
     }
-    if (videoDecoderClasses.length === 0) {
-      throw new Error("No video decoder backend available. Install FFmpeg or GStreamer runtime libraries.");
-    }
+  } catch {
+    // ignore unreadable dirs
   }
-  return videoDecoderClasses;
+  return null;
 }
 
-function getVideoDecoderClass(): any {
-  return getVideoDecoderClasses()[0];
-}
-
-const videoDecoders = new Map<string, any>();
-const videoBuffers = new Map<string, ArrayBuffer>();
-const videoRenderers = new Map<string, WebGLVideoRenderer>();
+// ---------------------------------------------------------------------------
+// Video decoder — uses ffmpeg child process for robust, crash-free
+// decoding.  ffmpeg outputs raw RGBA frames to stdout; the preload
+// buffers them and pumps to the WebGL renderer.  No native addons,
+// no renderer-process crashes.
+// ---------------------------------------------------------------------------
 
 const videoDecoderApi = {
   create(id: string): boolean {
-    if (videoDecoders.has(id)) {
-      console.warn("[VideoDecoder] create() called for existing id:", id);
-      this.destroy(id); // tear down the old one before creating fresh
-    }
-    const DecoderClass = getVideoDecoderClass();
-    const decoder = new DecoderClass();
-    videoDecoders.set(id, decoder);
+    ffmpegVideoDecoder.create(id);
     return true;
   },
-  open(id: string, path: string): string {
-    let decoder = videoDecoders.get(id);
-    if (!decoder) throw new Error("Decoder not found");
+  async open(id: string, path: string): Promise<void> {
+    if (path.startsWith("ember://remote/")) {
+      throw new Error(`Unresolved remote URL passed to decoder: ${path}.`);
+    }
 
-    // Resolve bare filenames against the XDG Videos directory.
     let resolvedPath = path;
     if (
       path &&
@@ -106,130 +76,59 @@ const videoDecoderApi = {
       !path.startsWith("file://") &&
       !path.startsWith("ember://")
     ) {
-      const videosDir = join(
-        process.env.XDG_VIDEOS_DIR ?? join(homedir(), "Videos"),
-      );
-      const candidate = join(videosDir, path);
-      if (existsSync(candidate)) {
-        resolvedPath = candidate;
-        console.log(`[VideoDecoder] Resolved relative path: ${path} -> ${candidate}`);
-      }
-    }
-
-    const classes = getVideoDecoderClasses();
-    let lastError = "";
-
-    for (let i = 0; i < classes.length; i++) {
-      try {
-        console.log(`[VideoDecoder] Trying backend #${i} for ${resolvedPath}`);
-        const backend = decoder.open(resolvedPath);
-        videoDecoders.set(id, decoder);
-        console.log(`[VideoDecoder] Backend #${i} succeeded: ${backend}`);
-        return backend;
-      } catch (e: any) {
-        lastError = e.message || String(e);
-        console.warn(`[VideoDecoder] Backend #${i} failed:`, lastError);
-        try { decoder.close(); } catch { /* ignore */ }
-        if (i + 1 < classes.length) {
-          decoder = new classes[i + 1]();
+      if (existsSync(path)) {
+        resolvedPath = path;
+      } else {
+        const videosDir = join(
+          process.env.XDG_VIDEOS_DIR ?? join(homedir(), "Videos"),
+        );
+        const candidate = join(videosDir, path);
+        if (existsSync(candidate)) {
+          resolvedPath = candidate;
+        } else {
+          const basename = path.split("/").pop() || path;
+          const found = findFileRecursive(videosDir, basename);
+          if (found) {
+            resolvedPath = found;
+          } else {
+            throw new Error(`Video file not found: ${path}.`);
+          }
         }
       }
     }
 
-    throw new Error(lastError);
+    await ffmpegVideoDecoder.open(id, resolvedPath);
   },
   attachCanvas(id: string, canvasId: string): boolean {
-    const canvas = document.getElementById(canvasId) as HTMLCanvasElement | null;
-    if (!canvas) throw new Error(`Canvas #${canvasId} not found`);
-    const renderer = new WebGLVideoRenderer(canvas);
-    videoRenderers.set(id, renderer);
-    return true;
+    return ffmpegVideoDecoder.attachCanvas(id, canvasId);
   },
   resizeCanvas(id: string, width: number, height: number): void {
-    const renderer = videoRenderers.get(id);
-    if (renderer) renderer.resize(width, height);
+    ffmpegVideoDecoder.resizeCanvas(id, width, height);
   },
   renderNextFrame(id: string): { width: number; height: number } | null {
-    const decoder = videoDecoders.get(id);
-    if (!decoder) throw new Error("Decoder not found");
-    const renderer = videoRenderers.get(id);
-    if (!renderer) throw new Error("Renderer not attached — call attachCanvas first");
-
-    // Lazy zero-copy buffer setup
-    let buf = videoBuffers.get(id);
-    if (!buf) {
-      const meta = decoder.getMetadata();
-      const maxPixels = meta.width * meta.height;
-      const bufSize = Math.max(maxPixels + maxPixels / 2, 16_777_216);
-      buf = new ArrayBuffer(bufSize);
-      videoBuffers.set(id, buf);
-      decoder.attachSharedBuffer(buf);
-    }
-
-    const meta = decoder.decodeNextFrameSab();
-    if (!meta) return null;
-    const ySize = meta.width * meta.height;
-    const uvSize = ySize / 2;
-    renderer.render(
-      new Uint8Array(buf, 0, ySize),
-      new Uint8Array(buf, ySize, uvSize),
-      meta.width,
-      meta.height
-    );
-    return { width: meta.width, height: meta.height };
+    return ffmpegVideoDecoder.renderNextFrame(id);
   },
   seek(id: string, timestampMs: number): void {
-    const decoder = videoDecoders.get(id);
-    if (!decoder) throw new Error("Decoder not found");
-    decoder.seek(timestampMs);
+    ffmpegVideoDecoder.seek(id, "", timestampMs);
   },
   pause(id: string): void {
-    const decoder = videoDecoders.get(id);
-    if (!decoder) throw new Error("Decoder not found");
-    decoder.pause();
+    ffmpegVideoDecoder.pause(id);
   },
   resume(id: string): void {
-    const decoder = videoDecoders.get(id);
-    if (!decoder) throw new Error("Decoder not found");
-    decoder.resume();
+    ffmpegVideoDecoder.resume(id);
   },
   getMetadata(id: string): {
-    backend: string;
     width: number;
     height: number;
     durationMs: number;
     frameRate: number;
-    colorimetry: string;
-    parN: number;
-    parD: number;
   } {
-    const decoder = videoDecoders.get(id);
-    if (!decoder) throw new Error("Decoder not found");
-    return decoder.getMetadata();
-  },
-  /**
-   * Tell the WebGL renderer which YCbCr→RGB matrix to use, derived from the
-   * colorimetry string in the decoder caps (e.g. "bt709", "bt601", "2:4:5:1").
-   * Also forwards the pixel-aspect-ratio so the renderer can letterbox
-   * anamorphic content correctly.
-   */
-  setColorimetry(id: string, colorimetry: string, parN: number, parD: number): void {
-    const renderer = videoRenderers.get(id);
-    if (renderer) renderer.setColorimetry(colorimetry, parN, parD);
+    const meta = ffmpegVideoDecoder.getMetadata(id);
+    if (!meta) throw new Error("Decoder not opened");
+    return meta;
   },
   destroy(id: string): void {
-    const decoder = videoDecoders.get(id);
-    if (decoder) {
-      try { decoder.pause(); } catch { /* ignore */ }
-      try { decoder.close(); } catch { /* ignore */ }
-      videoDecoders.delete(id);
-    }
-    const renderer = videoRenderers.get(id);
-    if (renderer) {
-      try { renderer.destroy(); } catch { /* ignore */ }
-      videoRenderers.delete(id);
-    }
-    videoBuffers.delete(id);
+    ffmpegVideoDecoder.destroy(id);
   },
   resolveUrl(path: string): Promise<string> {
     return ipcRenderer.invoke("videoDecoder:resolveUrl", path);
@@ -550,7 +449,7 @@ const htpc = {
     launch: (opts: {
       romPath: string;
       title: string;
-      platform: string;
+      platform: GamePlatform;
       gameId: string;
       shader?: string;
       corePath?: string;
@@ -558,7 +457,7 @@ const htpc = {
     onOpen: (cb: (opts: {
       romPath: string;
       title: string;
-      platform: string;
+      platform: GamePlatform;
       gameId: string;
       shader?: string;
       corePath?: string;
@@ -566,7 +465,7 @@ const htpc = {
       const handler = (_: Electron.IpcRendererEvent, payload: {
         romPath: string;
         title: string;
-        platform: string;
+        platform: GamePlatform;
         gameId: string;
         shader?: string;
         corePath?: string;

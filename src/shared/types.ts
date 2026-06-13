@@ -19,6 +19,14 @@ export type TabId =
   | "settings"
   | "controllers";
 
+export interface ScanProgress {
+  scanner: string;
+  status: "scanning" | "done" | "error";
+  current: number;
+  total: number;
+  message?: string;
+}
+
 export type GamePlatform =
   | "steam"
   | "gog"
@@ -466,6 +474,12 @@ export interface AppSettings {
   commandControllerMap?: Record<string, string>;
   controllerBrowser?: ControllerBrowserSettings;
   remoteSources?: RemoteSource[];
+  /** Tabs hidden from the main navigation bar */
+  disabledTabs?: TabId[];
+  /** Tab to open on app launch */
+  defaultTab?: TabId;
+  /** Whether the window is in fullscreen mode */
+  fullscreen?: boolean;
 }
 
 export type RemoteSourceProtocol =
@@ -565,4 +579,10 @@ export interface VideoDecoderMetadata {
   frameRate: number;
 }
 
+export interface PluginManifest {
+  id: string;
+  name: string;
+  version: string;
+  entryPoint: string;
+}
 

@@ -1,32 +1,26 @@
 /**
- * WebGL renderer for NV12 frames (preload version).
+ * WebGL renderer for RGBA frames (preload version).
  *
- * Uploads Y and UV planes as two separate textures and performs
- * YUV→RGB conversion in the fragment shader.
+ * Uploads a single RGBA texture and blits it to the canvas
+ * with letterboxing to preserve the video's aspect ratio.
  */
 
 const VERT = `
 attribute vec2 a_pos;
 varying vec2 v_uv;
+uniform vec2 u_scale;
 void main() {
   v_uv = vec2(a_pos.x * 0.5 + 0.5, -a_pos.y * 0.5 + 0.5);
-  gl_Position = vec4(a_pos, 0.0, 1.0);
+  gl_Position = vec4(a_pos * u_scale, 0.0, 1.0);
 }
 `;
 
 const FRAG = `
 precision mediump float;
 varying vec2 v_uv;
-uniform sampler2D u_y;
-uniform sampler2D u_uv;
-uniform mat3 u_yuv_mat;  // column-major YCbCr->RGB matrix
-uniform vec3 u_yuv_off;  // [yOff, cbOff, crOff]
-
+uniform sampler2D u_tex;
 void main() {
-  float y  = texture2D(u_y, v_uv).r;
-  vec2  uv = texture2D(u_uv, v_uv).ra;
-  vec3 rgb = clamp(u_yuv_mat * (vec3(y, uv.x, uv.y) - u_yuv_off), 0.0, 1.0);
-  gl_FragColor = vec4(rgb, 1.0);
+  gl_FragColor = vec4(texture2D(u_tex, v_uv).rgb, 1.0);
 }
 `;
 
@@ -57,115 +51,19 @@ function createProgram(gl: WebGLRenderingContext, vert: string, frag: string): W
   return prog;
 }
 
-// ---------------------------------------------------------------------------
-// YUV→RGB matrix helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Parse the GStreamer colorimetry string and return the column-major mat3
- * (Float32Array[9]) and vec3 offset (Float32Array[3]) ready for
- * gl.uniformMatrix3fv / gl.uniform3fv.
- *
- * GStreamer colorimetry can be a shorthand ("bt709", "bt601") or a
- * detailed four-field string "primaries:transfer:matrix:range" where
- * matrix values are: 1=RGB, 2=FCC, 3=BT709, 4=BT601, 5=SMPTE240M,
- * 6=BT2020 and range values are: 1=full(0-255), 2=limited(16-235).
- */
-function yuvMatrixFromColorimetry(colorimetry: string): {
-  mat: Float32Array;
-  off: Float32Array;
-} {
-  const lower = colorimetry.toLowerCase();
-  const parts = lower.split(":");
-
-  // --- detect color range ---
-  let limited = true; // default: limited (studio-swing, most video content)
-  if (parts.length === 4) {
-    const range = parseInt(parts[3], 10);
-    if (range === 1) limited = false; // GST_VIDEO_COLOR_RANGE_0_255 = full
-    if (range === 2) limited = true;  // GST_VIDEO_COLOR_RANGE_16_235 = limited
-  } else if (lower.includes("full")) {
-    limited = false;
-  }
-
-  // --- detect color matrix ---
-  type Matrix = "bt601" | "bt709" | "bt2020";
-  let matrix: Matrix = "bt709"; // safe HD default
-  if (parts.length === 4) {
-    const m = parseInt(parts[2], 10);
-    if (m === 4) matrix = "bt601";
-    else if (m === 3 || m === 5) matrix = "bt709";
-    else if (m === 6) matrix = "bt2020";
-  } else if (lower.includes("bt601") || lower.includes("sdtv") || lower.includes("smpte170")) {
-    matrix = "bt601";
-  }
-
-  // HDR transfer functions (bt2100-pq = HDR10, bt2100-hlg = HLG).
-  // These use BT.2020 matrix coefficients but need tone mapping for SDR displays.
-  let is_hdr = false;
-  let hdr_mode = 0; // 0 = SDR, 1 = PQ, 2 = HLG
-  if (lower.includes("bt2100-pq") || lower.includes("smpte2084")) {
-    matrix = "bt2020";
-    is_hdr = true;
-    hdr_mode = 1; // PQ
-  } else if (lower.includes("bt2100-hlg") || lower.includes("arib-std-b67")) {
-    matrix = "bt2020";
-    is_hdr = true;
-    hdr_mode = 2; // HLG (backward-compatible with SDR)
-  } else if (lower.includes("bt2020") || lower.includes("2020")) {
-    matrix = "bt2020";
-  }
-
-  const yGain = limited ? 1.164 : 1.0;
-  const yOff  = limited ? 16 / 255 : 0.0;
-  const cOff  = 128 / 255;
-
-  let rCr: number, gCb: number, gCr: number, bCb: number;
-  if (matrix === "bt601") {
-    rCr = 1.596; gCb = -0.392; gCr = -0.813; bCb = 2.017;
-  } else if (matrix === "bt2020") {
-    rCr = 1.678; gCb = -0.188; gCr = -0.652; bCb = 2.142;
-  } else {
-    // BT.709 (default)
-    rCr = 1.793; gCb = -0.213; gCr = -0.533; bCb = 2.112;
-  }
-
-  const mat = new Float32Array([
-    yGain, yGain, yGain,
-    0,     gCb,   bCb,
-    rCr,   gCr,   0,
-  ]);
-  const off = new Float32Array([yOff, cOff, cOff]);
-
-  console.log(
-    `[WebGL] colorimetry="${colorimetry}" → matrix=${matrix}, limited=${limited}, hdr=${is_hdr}, hdr_mode=${hdr_mode}`
-  );
-  console.log(
-    `[WebGL] mat=[${Array.from(mat).map((v) => v.toFixed(4)).join(", ")}]  off=[${Array.from(off).map((v) => v.toFixed(4)).join(", ")}]`
-  );
-
-  return { mat, off, is_hdr, hdr_mode };
-}
-
-// Build identifier — change this string whenever the shader changes so
-// the user can confirm in DevTools that the new bundle is loaded.
-const RENDERER_BUILD_ID = "webgl-2025-01-28-v4";
+const RENDERER_BUILD_ID = "webgl-2025-06-12-letterbox";
 
 export class WebGLVideoRenderer {
   private gl: WebGLRenderingContext;
   private program: WebGLProgram;
   private posLoc: number;
-  private yLoc: WebGLUniformLocation | null;
-  private uvLoc: WebGLUniformLocation | null;
-  private matLoc: WebGLUniformLocation | null;
-  private offLoc: WebGLUniformLocation | null;
-  private texY: WebGLTexture;
-  private texUV: WebGLTexture;
+  private texLoc: WebGLUniformLocation | null;
+  private scaleLoc: WebGLUniformLocation | null;
+  private tex: WebGLTexture;
   private buf: WebGLBuffer;
   private canvas: HTMLCanvasElement;
 
   constructor(canvas: HTMLCanvasElement) {
-    console.log(`[WebGL] renderer init  build=${RENDERER_BUILD_ID}`);
     this.canvas = canvas;
     const gl = canvas.getContext("webgl", {
       alpha: false,
@@ -185,10 +83,8 @@ export class WebGLVideoRenderer {
     const prog = createProgram(gl, VERT, FRAG);
     this.program = prog;
     this.posLoc = gl.getAttribLocation(prog, "a_pos");
-    this.yLoc   = gl.getUniformLocation(prog, "u_y");
-    this.uvLoc  = gl.getUniformLocation(prog, "u_uv");
-    this.matLoc    = gl.getUniformLocation(prog, "u_yuv_mat");
-    this.offLoc    = gl.getUniformLocation(prog, "u_yuv_off");
+    this.texLoc = gl.getUniformLocation(prog, "u_tex");
+    this.scaleLoc = gl.getUniformLocation(prog, "u_scale");
 
     this.buf = gl.createBuffer()!;
     gl.bindBuffer(gl.ARRAY_BUFFER, this.buf);
@@ -198,135 +94,58 @@ export class WebGLVideoRenderer {
       gl.STATIC_DRAW
     );
 
-    this.texY = gl.createTexture()!;
-    gl.bindTexture(gl.TEXTURE_2D, this.texY);
+    this.tex = gl.createTexture()!;
+    gl.bindTexture(gl.TEXTURE_2D, this.tex);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-
-    this.texUV = gl.createTexture()!;
-    gl.bindTexture(gl.TEXTURE_2D, this.texUV);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    // LINEAR: let the GPU do bilinear chroma upsampling.  This is what mpv,
-    // VLC, and every other player does.  The visual difference vs. manual
-    // upsampling with co-siting correction is negligible in practice.
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 
     gl.useProgram(prog);
-    gl.uniform1i(this.yLoc, 0);
-    gl.uniform1i(this.uvLoc, 1);
-
-    // Seed BT.709 limited-range defaults; overwritten by setColorimetry()
-    // once the decoder reports the real caps colorimetry.
-    const defaultCm = yuvMatrixFromColorimetry("bt709");
-    gl.uniformMatrix3fv(this.matLoc, false, defaultCm.mat);
-    gl.uniform3fv(this.offLoc, defaultCm.off);
+    gl.uniform1i(this.texLoc, 0);
 
     gl.clearColor(0, 0, 0, 1);
   }
 
-  // Pixel-aspect-ratio correction: display aspect = (width * parN/parD) / height.
-  // Stored as a ratio (not individual n/d) to keep render() simple.
-  // 0 means "use coded dimensions" (default for square pixels).
-  private _parRatio = 0;
-
-  /**
-   * Call once after opening the file, passing the colorimetry string from
-   * the decoder metadata (e.g. "bt709", "bt601", "2:4:5:1") and the
-   * pixel-aspect-ratio from caps (1/1 for square pixels).
-   * The renderer computes the correct YCbCr→RGB matrix and uploads it,
-   * and caches the PAR for use in render().
-   */
-  setColorimetry(colorimetry: string, parN = 1, parD = 1) {
-    const { gl } = this;
-    gl.useProgram(this.program);
-    const { mat, off } = yuvMatrixFromColorimetry(colorimetry);
-    gl.uniformMatrix3fv(this.matLoc, false, mat);
-    gl.uniform3fv(this.offLoc, off);
-    // Store PAR ratio — only non-trivial when parN !== parD
-    this._parRatio = (parN === parD || parD === 0) ? 0 : parN / parD;
-  }
-
-  /**
-   * Call once after the canvas is mounted and whenever the video dimensions
-   * are known.  The canvas backing-store is set to its CSS layout size (×dpr)
-   * so one CSS pixel == one physical pixel.  If the canvas hasn't been laid
-   * out yet (clientWidth === 0) we fall back to the video dimensions so the
-   * element has a sensible initial size.
-   */
-  resize(videoWidth: number, videoHeight: number) {
+  resize(width: number, height: number) {
     const { canvas, gl } = this;
     const dpr = window.devicePixelRatio || 1;
-    const cssW = canvas.clientWidth  || videoWidth;
-    const cssH = canvas.clientHeight || videoHeight;
-    canvas.width  = Math.floor(cssW * dpr);
-    canvas.height = Math.floor(cssH * dpr);
+    canvas.width = Math.floor(width * dpr);
+    canvas.height = Math.floor(height * dpr);
     gl.viewport(0, 0, canvas.width, canvas.height);
   }
 
-  render(y: Uint8Array, uv: Uint8Array, width: number, height: number) {
+  render(rgba: Uint8Array, width: number, height: number) {
     const { gl, canvas } = this;
 
-    // Keep the canvas backing-store in sync with its CSS display size.
-    // This must happen every frame because the window (or container) may be
-    // resized at any time.  Changing canvas.width/height only when the size
-    // actually differs avoids the expensive framebuffer recreation on every frame.
-    const dpr = window.devicePixelRatio || 1;
-    const backW = Math.max(1, Math.floor((canvas.clientWidth  || width)  * dpr));
-    const backH = Math.max(1, Math.floor((canvas.clientHeight || height) * dpr));
-    if (canvas.width !== backW || canvas.height !== backH) {
-      canvas.width  = backW;
-      canvas.height = backH;
-    }
-
-    // Letterbox / pillarbox: fit the video inside the canvas while preserving
-    // the video's own aspect ratio.  The remainder of the canvas is painted
-    // black.
-    // Apply pixel-aspect-ratio correction for anamorphic sources (PAR ≠ 1:1).
-    const videoAspect = this._parRatio
-      ? (width * this._parRatio) / height
-      : width / height;
-    const canvasAspect = backW / backH;
-    let vx: number, vy: number, vw: number, vh: number;
-    if (videoAspect > canvasAspect) {
-      // Video is wider than the canvas → horizontal bars top and bottom.
-      vw = backW;
-      vh = Math.round(backW / videoAspect);
-      vx = 0;
-      vy = Math.round((backH - vh) / 2);
+    // Letterbox: compute scale so the video quad preserves its
+    // aspect ratio inside the canvas viewport.
+    const canvasAspect = canvas.width / canvas.height;
+    const videoAspect = width / height;
+    let scaleX = 1;
+    let scaleY = 1;
+    if (canvasAspect > videoAspect) {
+      // Canvas is wider than video — black bars on left/right
+      scaleX = videoAspect / canvasAspect;
     } else {
-      // Video is taller than the canvas → vertical bars left and right.
-      vh = backH;
-      vw = Math.round(backH * videoAspect);
-      vx = Math.round((backW - vw) / 2);
-      vy = 0;
+      // Canvas is taller than video — black bars on top/bottom
+      scaleY = canvasAspect / videoAspect;
     }
 
-    // Clear the full canvas to black so the letterbox bars are painted.
-    gl.viewport(0, 0, backW, backH);
-    gl.clearColor(0, 0, 0, 1);
     gl.clear(gl.COLOR_BUFFER_BIT);
 
-    // Constrain subsequent rendering to the video area only.
-    gl.viewport(vx, vy, vw, vh);
-
     gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, this.texY);
+    gl.bindTexture(gl.TEXTURE_2D, this.tex);
     gl.texImage2D(
-      gl.TEXTURE_2D, 0, gl.LUMINANCE,
-      width, height, 0,
-      gl.LUMINANCE, gl.UNSIGNED_BYTE, y
-    );
-
-    gl.activeTexture(gl.TEXTURE1);
-    gl.bindTexture(gl.TEXTURE_2D, this.texUV);
-    gl.texImage2D(
-      gl.TEXTURE_2D, 0, gl.LUMINANCE_ALPHA,
-      width >> 1, height >> 1, 0,
-      gl.LUMINANCE_ALPHA, gl.UNSIGNED_BYTE, uv
+      gl.TEXTURE_2D,
+      0,
+      gl.RGBA,
+      width,
+      height,
+      0,
+      gl.RGBA,
+      gl.UNSIGNED_BYTE,
+      rgba
     );
 
     gl.bindBuffer(gl.ARRAY_BUFFER, this.buf);
@@ -334,15 +153,14 @@ export class WebGLVideoRenderer {
     gl.vertexAttribPointer(this.posLoc, 2, gl.FLOAT, false, 0, 0);
 
     gl.useProgram(this.program);
-    gl.uniform1i(this.yLoc, 0);
-    gl.uniform1i(this.uvLoc, 1);
+    gl.uniform1i(this.texLoc, 0);
+    gl.uniform2f(this.scaleLoc, scaleX, scaleY);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   }
 
   destroy() {
     const { gl } = this;
-    gl.deleteTexture(this.texY);
-    gl.deleteTexture(this.texUV);
+    gl.deleteTexture(this.tex);
     gl.deleteBuffer(this.buf);
     gl.deleteProgram(this.program);
   }

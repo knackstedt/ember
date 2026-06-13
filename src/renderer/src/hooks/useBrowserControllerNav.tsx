@@ -5,10 +5,15 @@ import { CursorStyle } from "../components/VirtualCursor/VirtualCursor";
 
 interface UseBrowserControllerNavOptions {
   enabled?: boolean;
+  /** When true, evdev devices are present and button actions are already
+   *  handled by the evdev path. This hook should only manage cursor movement
+   *  and scrolling to avoid double-firing UI actions. */
+  evdevActive?: boolean;
 }
 
 export function useBrowserControllerNav({
   enabled = true,
+  evdevActive = false,
 }: UseBrowserControllerNavOptions) {
   const getLiveStates = useRef(() => useInputStore.getState().liveStates).current;
   const manager = useRef(getCursorManager()).current;
@@ -39,6 +44,19 @@ export function useBrowserControllerNav({
       const scale = (mag - threshold) / (1 - threshold) / mag;
       return [x * scale, y * scale];
     };
+
+    /** Normalise raw axis values to signed-16 range or -1..1.
+     *  Drivers report different ranges; detect from magnitude. */
+    function normStick(value: number): number {
+      if (Math.abs(value) <= 1) return value;          // already normalised
+      if (value >= 0 && value <= 255) return (value - 128) / 128; // raw 0..255
+      return value / 32767;                             // signed-16
+    }
+    function normTrigger(value: number): number {
+      if (value >= 0 && value <= 1) return value;       // already normalised
+      if (value >= 0 && value <= 255) return value / 255; // raw 0..255
+      return value / 32767;                              // signed-16
+    }
 
     interface DeviceState {
       posRef: { current: { x: number; y: number } };
@@ -76,8 +94,8 @@ export function useBrowserControllerNav({
       const axes = liveStates[deviceId]?.axes;
       const buttons = liveStates[deviceId]?.buttons;
       if (!axes || !buttons) return {};
-      const ltAxis = (axes.left_trigger ?? 0) / 32767;
-      const rtAxis = (axes.right_trigger ?? 0) / 32767;
+      const ltAxis = normTrigger(axes.left_trigger ?? 0);
+      const rtAxis = normTrigger(axes.right_trigger ?? 0);
       const ltBtn = buttons["left_trigger_btn"] ?? false;
       const rtBtn = buttons["right_trigger_btn"] ?? false;
       const ltBtnFallback = buttons["left_trigger"] ?? false;
@@ -279,8 +297,8 @@ export function useBrowserControllerNav({
         // Cache webview under this device's cursor for the entire frame
         const webviewUnderCursor = findWebviewAt(dev.posRef.current.x, dev.posRef.current.y);
 
-        const rawRightX = (axes.right_x ?? 0) / 32767;
-        const rawRightY = (axes.right_y ?? 0) / 32767;
+        const rawRightX = normStick(axes.right_x ?? 0);
+        const rawRightY = normStick(axes.right_y ?? 0);
         const [rightX, rightY] = applyDeadzone(rawRightX, rawRightY, AXIS_THRESHOLD);
 
         if (rightX !== 0 || rightY !== 0) {
@@ -318,8 +336,8 @@ export function useBrowserControllerNav({
           dev.expanded = Date.now() < dev.wiggleEndTime;
         }
 
-        const rawLeftX = (axes.left_x ?? 0) / 32767;
-        const rawLeftY = (axes.left_y ?? 0) / 32767;
+        const rawLeftX = normStick(axes.left_x ?? 0);
+        const rawLeftY = normStick(axes.left_y ?? 0);
         const [leftX, leftY] = applyDeadzone(rawLeftX, rawLeftY, SCROLL_THRESHOLD);
 
         if (leftX !== 0 || leftY !== 0) {
@@ -349,44 +367,49 @@ export function useBrowserControllerNav({
           pendingTimeouts.add(t);
         };
 
-        if (check("south")) {
-          anyInput = true;
-          sendMouseEvent("mouseDown", dev.posRef.current.x, dev.posRef.current.y, "left");
-          scheduleMouseUp(dev.posRef.current.x, dev.posRef.current.y, "left");
-        }
-        if (check("east")) {
-          anyInput = true;
-          if (webviewUnderCursor && webviewUnderCursor.canGoBack && webviewUnderCursor.canGoBack()) {
-            webviewUnderCursor.goBack();
-          }
-        }
-        if (check("west")) {
-          anyInput = true;
-          sendMouseEvent("mouseDown", dev.posRef.current.x, dev.posRef.current.y, "right");
-          scheduleMouseUp(dev.posRef.current.x, dev.posRef.current.y, "right");
-        }
-        if (check("north")) {
-          anyInput = true;
-          if (webviewUnderCursor && webviewUnderCursor.canGoForward && webviewUnderCursor.canGoForward()) {
-            webviewUnderCursor.goForward();
-          }
-        }
-        // Only send Tab keys for bumpers when cursor is inside a webview.
-        // In main mode the app already handles bumper tab switching
-        // directly via evdev / useGamepadApi to avoid double-firing.
-        if (webviewUnderCursor) {
-          if (check("left_bumper")) {
+        // When evdev devices are present, button actions are already handled
+        // by the evdev path in App.tsx. Skip synthetic mouse/keyboard events
+        // to avoid double-firing UI actions.
+        if (!evdevActive) {
+          if (check("south")) {
             anyInput = true;
-            sendKey("Tab", dev.posRef.current.x, dev.posRef.current.y, ["shift"]);
+            sendMouseEvent("mouseDown", dev.posRef.current.x, dev.posRef.current.y, "left");
+            scheduleMouseUp(dev.posRef.current.x, dev.posRef.current.y, "left");
           }
-          if (check("right_bumper")) {
+          if (check("east")) {
             anyInput = true;
-            sendKey("Tab", dev.posRef.current.x, dev.posRef.current.y);
+            if (webviewUnderCursor && webviewUnderCursor.canGoBack && webviewUnderCursor.canGoBack()) {
+              webviewUnderCursor.goBack();
+            }
+          }
+          if (check("west")) {
+            anyInput = true;
+            sendMouseEvent("mouseDown", dev.posRef.current.x, dev.posRef.current.y, "right");
+            scheduleMouseUp(dev.posRef.current.x, dev.posRef.current.y, "right");
+          }
+          if (check("north")) {
+            anyInput = true;
+            if (webviewUnderCursor && webviewUnderCursor.canGoForward && webviewUnderCursor.canGoForward()) {
+              webviewUnderCursor.goForward();
+            }
+          }
+          // Only send Tab keys for bumpers when cursor is inside a webview.
+          // In main mode the app already handles bumper tab switching
+          // directly via evdev / useGamepadApi to avoid double-firing.
+          if (webviewUnderCursor) {
+            if (check("left_bumper")) {
+              anyInput = true;
+              sendKey("Tab", dev.posRef.current.x, dev.posRef.current.y, ["shift"]);
+            }
+            if (check("right_bumper")) {
+              anyInput = true;
+              sendKey("Tab", dev.posRef.current.x, dev.posRef.current.y);
+            }
           }
         }
 
-        const ltAxis = (axes.left_trigger ?? 0) / 32767;
-        const rtAxis = (axes.right_trigger ?? 0) / 32767;
+        const ltAxis = normTrigger(axes.left_trigger ?? 0);
+        const rtAxis = normTrigger(axes.right_trigger ?? 0);
         const ltBtn = buttons["left_trigger_btn"] ?? false;
         const rtBtn = buttons["right_trigger_btn"] ?? false;
         const ltBtnFallback = buttons["left_trigger"] ?? false;

@@ -34,7 +34,8 @@ export const BUILDBOT_CORES: BuildbotCore[] = [
 ];
 
 function getCoresDir(): string {
-  const dir = join(app.getPath("userData"), "cores");
+  let dir;
+try { dir = join(app.getPath("userData"), "cores"); } catch { dir = join(process.cwd(), "cores"); }
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   return dir;
 }

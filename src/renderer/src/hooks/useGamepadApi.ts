@@ -1,20 +1,59 @@
 import { useEffect, useRef } from "react";
 import { useInputStore } from "../store/input.store";
+import { ControllerDevice, ControllerType } from "../../../shared/types";
 
 /**
  * Fallback gamepad input using the browser Gamepad API.
  * Polls navigator.getGamepads() and dispatches htpc:nav / htpc:contextmenu
  * events so controllers work even when the evdev path lacks permissions.
+ *
+ * Also registers synthetic ControllerDevice entries in the input store so
+ * controllers show up in the Controllers tab when evdev is unavailable.
  */
+
+/** Parse vendor/product from Linux-style gamepad IDs like "045e-02d1-..." */
+function parseGamepadId(id: string): { name: string; vendorId: number; productId: number } {
+  const match = id.match(/^([0-9a-fA-F]{4})-([0-9a-fA-F]{4})-(.*)$/);
+  if (match) {
+    return {
+      vendorId: parseInt(match[1], 16),
+      productId: parseInt(match[2], 16),
+      name: match[3].trim(),
+    };
+  }
+  return { name: id, vendorId: 0, productId: 0 };
+}
+
+function detectTypeFromGamepad(id: string, name: string, vendorId: number): ControllerType {
+  const n = name.toLowerCase();
+  if (n.includes("xbox") || vendorId === 0x045e || n.includes("xinput") || /\bx360\b/.test(n)) return "xbox";
+  if (vendorId === 0x054c) {
+    if (n.includes("dualsense") || /ps5|playstation 5/.test(n)) return "ps5";
+    if (n.includes("dualshock 4") || /ps4|playstation 4/.test(n)) return "ps4";
+    if (n.includes("dualshock 3") || /ps3|playstation 3/.test(n)) return "ps3";
+    return "ps4";
+  }
+  if (n.includes("dualsense")) return "ps5";
+  if (n.includes("dualshock") || n.includes("dual shock")) return "ps4";
+  if (n.includes("nintendo") || n.includes("switch") || n.includes("pro controller")) return "gamecube";
+  if (n.includes("wiimote") || n.includes("wii remote")) return "wiimote";
+  // Generic gamepads with Xbox-style standard mapping are common; default to xbox
+  // so the Xbox diagram (the most complete one) is shown.
+  if (n.includes("gamepad") || n.includes("controller")) return "xbox";
+  return "generic";
+}
 
 const BTN_ACTIONS: Record<number, string> = {
   0: "confirm",   // A / south
   1: "cancel",    // B / east
   2: "contextmenu", // X / west
-  12: "up",      // D-pad up
-  13: "down",     // D-pad down
-  14: "left",     // D-pad left
-  15: "right",    // D-pad right
+  3: "menu",      // Y / north
+  8: "commands",  // Select / View
+  9: "tabnext",   // Start / Menu
+  12: "up",       // D-pad up
+  13: "down",      // D-pad down
+  14: "left",      // D-pad left
+  15: "right",     // D-pad right
 };
 
 const LONG_PRESS_DURATION = 800;
@@ -32,6 +71,10 @@ function dispatchNav(action: string) {
     });
     return;
   }
+  if (action === "tabnext") {
+    window.dispatchEvent(new CustomEvent("htpc:tab-next"));
+    return;
+  }
   window.dispatchEvent(new CustomEvent("htpc:nav", { detail: { action } }));
 }
 
@@ -44,6 +87,8 @@ export function useGamepadApi(enabled: boolean) {
   const cooldownRef = useRef<Record<string, number>>({});
   const longPressTimersRef = useRef<Record<number, number>>({});
   const lockedRef = useRef(true);
+  /** Map from combined gamepad id (gp.id + gp.index) to deviceId */
+  const registeredDevicesRef = useRef<Map<string, string>>(new Map());
 
   useEffect(() => {
     const unsub = useInputStore.subscribe((state) => {
@@ -75,9 +120,30 @@ export function useGamepadApi(enabled: boolean) {
 
     const poll = () => {
       const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+      const seen = new Set<string>();
+
       for (const gp of gamepads) {
         if (!gp) continue;
         const id = gp.id + gp.index;
+        seen.add(id);
+
+        // Register synthetic ControllerDevice so it appears in the Controllers tab
+        if (!registeredDevicesRef.current.has(id)) {
+          const deviceId = `gamepad-${gp.index}`;
+          registeredDevicesRef.current.set(id, deviceId);
+          const { name, vendorId, productId } = parseGamepadId(gp.id);
+          const device: ControllerDevice = {
+            id: deviceId,
+            name: name || gp.id,
+            type: detectTypeFromGamepad(gp.id, name, vendorId),
+            vendorId,
+            productId,
+            axisCount: gp.axes.length,
+            buttonCount: gp.buttons.length,
+          };
+          useInputStore.getState().addDevice(device);
+        }
+
         const prev = prevStateRef.current[id] ?? { buttons: [], axes: [] };
         const nextButtons: (boolean | undefined)[] = [];
         const nextAxes: number[] = [...gp.axes];
@@ -206,6 +272,15 @@ export function useGamepadApi(enabled: boolean) {
 
         prevStateRef.current[id] = { buttons: nextButtons, axes: nextAxes };
       }
+
+      // Remove disconnected gamepads from the device list
+      for (const [rid, deviceId] of registeredDevicesRef.current) {
+        if (!seen.has(rid)) {
+          registeredDevicesRef.current.delete(rid);
+          useInputStore.getState().removeDevice(deviceId);
+          delete prevStateRef.current[rid];
+        }
+      }
     };
 
     const interval = window.setInterval(poll, 16); // ~60fps
@@ -216,6 +291,12 @@ export function useGamepadApi(enabled: boolean) {
       timersRef.current = {};
       cooldownRef.current = {};
       longPressTimersRef.current = {};
+      // Unregister all synthetic devices on cleanup
+      for (const [, deviceId] of registeredDevicesRef.current) {
+        useInputStore.getState().removeDevice(deviceId);
+      }
+      registeredDevicesRef.current.clear();
+      prevStateRef.current = {};
     };
   }, [enabled]);
 }

@@ -13,18 +13,5 @@ log = "0.4"
 parking_lot = "0.12"
 libc = "0.2"
 
-# FFmpeg backend (preferred)
-ffmpeg-next = { version = "6", optional = true }
-
-# GStreamer fallback backend
-gstreamer = { version = "0.23", optional = true }
-gstreamer-app = { version = "0.23", optional = true }
-gstreamer-video = { version = "0.23", optional = true }
-
-[features]
-default = []
-ffmpeg = ["dep:ffmpeg-next"]
-gstreamer = ["dep:gstreamer", "dep:gstreamer-app", "dep:gstreamer-video"]
-
 [build-dependencies]
 napi-build = "2"
