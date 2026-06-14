@@ -44,6 +44,10 @@ interface ActiveDeviceEntry {
 }
 const activeDevices = new Map<string, ActiveDeviceEntry>();
 
+/** Devices that recently failed to open (EACCES after sleep, etc.) */
+const recentFailures = new Map<string, number>();
+const FAILURE_COOLDOWN_MS = 30_000;
+
 /** Allocate a free controller index (0..7). Returns -1 if full. */
 function allocControllerIdx(): number {
   const used = new Set<number>();
@@ -542,6 +546,9 @@ async function openDevice(
     });
 
     stream.on("error", (err) => {
+      if ((err as NodeJS.ErrnoException).code === "EACCES") {
+        recentFailures.set(eventPath, Date.now());
+      }
       log.warn("evdev", `Error reading ${eventPath} (${info.name}): ${err}`);
       activeDevices.delete(eventPath);
       if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
@@ -567,6 +574,9 @@ async function openDevice(
       },
     };
   } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "EACCES") {
+      recentFailures.set(eventPath, Date.now());
+    }
     log.warn("evdev", `Could not open ${eventPath}: ${err}`);
     return null;
   }
@@ -608,6 +618,9 @@ export async function initInputSystem(window: BrowserWindow): Promise<void> {
 
     for (const device of eventDevices) {
       if (activeDevices.has(device)) continue;
+      const lastFail = recentFailures.get(device);
+      if (lastFail && Date.now() - lastFail < FAILURE_COOLDOWN_MS) continue;
+
       const info = getDeviceInfo(device);
       if (!info) continue;
       if (!hasControllerCapabilities(device, info.name)) continue;
@@ -617,8 +630,14 @@ export async function initInputSystem(window: BrowserWindow): Promise<void> {
           2000,
           `openDevice(${device})`,
         );
-        if (handle) activeDevices.set(device, handle);
+        if (handle) {
+          activeDevices.set(device, handle);
+          recentFailures.delete(device);
+        }
       } catch (err) {
+        if ((err as NodeJS.ErrnoException).code === "EACCES") {
+          recentFailures.set(device, Date.now());
+        }
         log.warn("evdev", `Skipping ${device} due to timeout/error: ${err}`);
       }
     }
@@ -627,6 +646,7 @@ export async function initInputSystem(window: BrowserWindow): Promise<void> {
       if (!existsSync(path)) {
         activeDevices.get(path)?.close();
         activeDevices.delete(path);
+        recentFailures.delete(path);
       }
     }
   };
@@ -641,6 +661,11 @@ export async function initInputSystem(window: BrowserWindow): Promise<void> {
   } catch (err) {
     log.warn("evdev", `Initial device scan timed out: ${err}`);
   }
+}
+
+/** Clear all recent-failure cooldowns (call on system resume). */
+export function clearFailureCooldowns(): void {
+  recentFailures.clear();
 }
 
 export async function destroyInputSystem(): Promise<void> {

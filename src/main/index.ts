@@ -1,10 +1,10 @@
-import { app, BrowserWindow, shell, protocol, Menu } from "electron";
+import { app, BrowserWindow, shell, protocol, Menu, powerMonitor } from "electron";
 import { EventEmitter } from "events";
 import path, { join } from "path";
 import { readFileSync, createReadStream, statSync, lstatSync, readlinkSync, unlinkSync, writeFileSync, existsSync, mkdirSync, readdirSync } from "fs";
 import { initDb } from "./db";
 import { registerIpcHandlers } from "./ipc";
-import { initInputSystem, destroyInputSystem } from "./input/evdev";
+import { initInputSystem, destroyInputSystem, clearFailureCooldowns } from "./input/evdev";
 import { getSettings, setSetting } from "./services/settings.service";
 import { getWindowState, saveWindowState } from "./services/window-state.service";
 import { createLogger } from "./util/logger";
@@ -584,6 +584,10 @@ app.whenReady().then(async () => {
   await createWindow();
 
   startRemoteAvailabilityWorker();
+
+  powerMonitor.on("resume", () => {
+    clearFailureCooldowns();
+  });
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
