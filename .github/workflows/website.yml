@@ -37,9 +37,6 @@ jobs:
             ${{ runner.os }}-bun-website-
 
       - name: Install Dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Install Website Dependencies
         working-directory: ./website
         run: bun install --frozen-lockfile
 
