@@ -278,6 +278,11 @@ async function createWindow(): Promise<void> {
   });
 
   mainWindow.webContents.on("console-message", (_event, level, message, line, sourceId) => {
+    // Suppress harmless Chromium ResizeObserver warnings that flood the logs
+    // during zoom or rapid layout changes (virtua, framer-motion, etc.).
+    if (message.includes("ResizeObserver loop completed with undelivered notifications")) {
+      return;
+    }
     const labels = ["debug","info", "warn", "error"];
     const moduleStr = sourceId ? `${sourceId}:${line}` : `line:${line}`;
     (log[labels[level] as "info"])(moduleStr, message);

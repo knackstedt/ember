@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer, shell } from "electron";
+import { contextBridge, ipcRenderer, shell, webFrame } from "electron";
 import { join } from "path";
 import { existsSync, readdirSync, statSync } from "fs";
 import { homedir } from "os";
@@ -172,6 +172,17 @@ const htpc = {
       ipcRenderer.invoke("app:xdg-defaults"),
     getPreloadPath: (name: string): Promise<string> =>
       ipcRenderer.invoke("app:getPreloadPath", name),
+    zoomIn: (): void => {
+      const level = webFrame.getZoomLevel();
+      webFrame.setZoomLevel(level + 1);
+    },
+    zoomOut: (): void => {
+      const level = webFrame.getZoomLevel();
+      webFrame.setZoomLevel(level - 1);
+    },
+    resetZoom: (): void => {
+      webFrame.setZoomLevel(0);
+    },
   },
 
   games: {

@@ -814,6 +814,15 @@ export default function App(): React.ReactElement {
         document
           .querySelector<HTMLInputElement>('input[placeholder^="Search"]')
           ?.focus();
+      } else if (e.type === "keydown" && e.key === "=" && e.ctrlKey) {
+        e.preventDefault();
+        window.htpc.app.zoomIn();
+      } else if (e.type === "keydown" && e.key === "-" && e.ctrlKey) {
+        e.preventDefault();
+        window.htpc.app.zoomOut();
+      } else if (e.type === "keydown" && e.key === "0" && e.ctrlKey) {
+        e.preventDefault();
+        window.htpc.app.resetZoom();
       }
     };
     window.addEventListener("keydown", handler);

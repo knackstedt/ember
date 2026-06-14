@@ -71,20 +71,28 @@ function useGridLayout(
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
+    let rafId: number | null = null;
     const ro = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const w = entry.contentRect.width;
-        if (w > 0) {
-          setContainerWidth(w);
-          const cols = minItemWidth
-            ? Math.max(2, Math.floor(w / minItemWidth))
-            : columnCountProp;
-          setEffectiveColCount((prev) => (prev !== cols ? cols : prev));
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        for (const entry of entries) {
+          const w = entry.contentRect.width;
+          if (w > 0) {
+            setContainerWidth(w);
+            const cols = minItemWidth
+              ? Math.max(2, Math.floor(w / minItemWidth))
+              : columnCountProp;
+            setEffectiveColCount((prev) => (prev !== cols ? cols : prev));
+          }
         }
-      }
+      });
     });
     ro.observe(el);
-    return () => ro.disconnect();
+    return () => {
+      ro.disconnect();
+      if (rafId) cancelAnimationFrame(rafId);
+    };
   }, [columnCountProp, minItemWidth]);
 
   useEffect(() => {
