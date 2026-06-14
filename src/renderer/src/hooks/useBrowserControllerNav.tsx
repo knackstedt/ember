@@ -117,7 +117,7 @@ export function useBrowserControllerNav({
       if (!state) {
         const saved = manager.lastPositions.get(deviceId);
         const posRef = { current: saved ? { x: saved.x, y: saved.y } : getDefaultPos() };
-        const lastInputTime = saved?.lastInputTime ?? Date.now();
+        const lastInputTime = saved?.lastInputTime ?? 0;
         state = {
           posRef,
           clickRef: { current: 0 },
