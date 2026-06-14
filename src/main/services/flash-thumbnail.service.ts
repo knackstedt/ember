@@ -336,7 +336,12 @@ startWhenReady();
 class ScreenshotQueue {
   private queue: Array<{ game: Game; resolve: (result: { url?: string; source?: string }) => void }> = [];
   private running = 0;
-  private readonly maxConcurrency = 4;
+  private maxConcurrency = 4;
+
+  setMaxConcurrency(n: number) {
+    this.maxConcurrency = Math.max(1, Math.min(10, n));
+    this.process();
+  }
 
   enqueue(game: Game): Promise<{ url?: string; source?: string }> {
     return new Promise((resolve) => {
@@ -519,6 +524,10 @@ const inFlight = new Set<string>();
 
 export function clearInFlight(id: string): void {
   inFlight.delete(id);
+}
+
+export function setFlashThumbnailConcurrency(n: number): void {
+  screenshotQueue.setMaxConcurrency(n);
 }
 
 function coverExistsOnDisk(id: string): string | undefined {

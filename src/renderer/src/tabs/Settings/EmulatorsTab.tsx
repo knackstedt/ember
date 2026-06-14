@@ -149,6 +149,32 @@ export const EmulatorsTab: React.FC = () => {
               <option value="xbrz">xBRZ (high-quality pixel art)</option>
             </select>
           </div>
+          <div>
+            <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--color-text-dim)" }}>
+              Thumbnail Concurrency
+            </label>
+            <input
+              type="number"
+              min={1}
+              max={10}
+              value={settings.flashThumbnailConcurrency ?? 4}
+              onChange={(e) =>
+                update({
+                  flashThumbnailConcurrency: Math.max(1, Math.min(10, parseInt(e.target.value) || 4)),
+                })
+              }
+              className="w-full text-sm px-2 py-1.5 rounded"
+              style={{
+                background: "var(--color-surface-raised)",
+                border: "1px solid var(--color-border)",
+                color: "var(--color-text)",
+                outline: "none",
+              }}
+            />
+            <p className="text-xs mt-1" style={{ color: "var(--color-text-dim)" }}>
+              Max number of flash games to thumbnail at once (1–10)
+            </p>
+          </div>
         </div>
       </section>
 

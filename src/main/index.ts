@@ -6,6 +6,7 @@ import { initDb } from "./db";
 import { registerIpcHandlers } from "./ipc";
 import { initInputSystem, destroyInputSystem, clearFailureCooldowns } from "./input/evdev";
 import { getSettings, setSetting } from "./services/settings.service";
+import { setFlashThumbnailConcurrency } from "./services/flash-thumbnail.service";
 import { getWindowState, saveWindowState } from "./services/window-state.service";
 import { createLogger } from "./util/logger";
 import { getXdgVideosDir } from "./scanners/xdg";
@@ -196,6 +197,7 @@ async function createWindow(): Promise<void> {
   }
 
   const settings = await getSettings();
+  setFlashThumbnailConcurrency(settings.flashThumbnailConcurrency ?? 4);
 
   // Migration: rename tv-shows tab to streaming in user settings
   try {

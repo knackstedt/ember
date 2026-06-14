@@ -45,7 +45,7 @@ import {
 } from "../db/repository";
 import { getProtonRating } from "../services/protondb.service";
 import { performGameScan } from "../services/game-scan.service";
-import { loadFlashThumbnail, clearInFlight } from "../services/flash-thumbnail.service";
+import { loadFlashThumbnail, clearInFlight, setFlashThumbnailConcurrency } from "../services/flash-thumbnail.service";
 import { searchGame } from "../services/rawg.service";
 import { searchMovie, searchShow } from "../services/tmdb.service";
 import {
@@ -371,6 +371,9 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     await setSettings(partial);
     if ("fullscreen" in partial) {
       window.setFullScreen(partial.fullscreen ?? false);
+    }
+    if ("flashThumbnailConcurrency" in partial) {
+      setFlashThumbnailConcurrency(partial.flashThumbnailConcurrency ?? 4);
     }
   });
 

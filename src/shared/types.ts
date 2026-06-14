@@ -524,6 +524,8 @@ export interface AppSettings {
   fullscreen?: boolean;
   /** Gallery layout view mode */
   galleryView?: GalleryView;
+  /** Max concurrent flash game thumbnail captures (1–10) */
+  flashThumbnailConcurrency?: number;
 }
 
 export type RemoteSourceProtocol =

@@ -22,6 +22,7 @@ const DEFAULTS: AppSettings = {
   streamingExtensions: [],
   streamingExtensionPromptDismissed: [],
   galleryView: "theme-default",
+  flashThumbnailConcurrency: 4,
 };
 
 export async function getSettings(): Promise<AppSettings> {
