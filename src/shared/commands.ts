@@ -70,13 +70,12 @@ export const COMMAND_DEFINITIONS: CommandDefinition[] = [
   { id: "gaming.show-hidden", label: "Show Hidden Games", category: "gaming", requiresContext: "gaming-tab" },
   { id: "gaming.view.all", label: "View: All Games", category: "gaming", requiresContext: "gaming-tab" },
   { id: "gaming.view.ai-groups", label: "View: AI Groups", category: "gaming", requiresContext: "gaming-tab" },
-  { id: "gaming.view.by-platform", label: "View: By Platform", category: "gaming", requiresContext: "gaming-tab" },
   { id: "gaming.filter.favorites", label: "Filter: Favorites", category: "gaming", requiresContext: "gaming-tab" },
   { id: "gaming.filter.steam", label: "Filter: Steam", category: "gaming", requiresContext: "gaming-tab" },
   { id: "gaming.filter.retro", label: "Filter: Retro", category: "gaming", requiresContext: "gaming-tab" },
   { id: "gaming.emulator.stop", label: "Stop Emulator", category: "gaming", requiresContext: "emulator-open" },
   { id: "gaming.shader.clear", label: "Disable Shader", description: "Remove shader override from the selected game", category: "visual", requiresContext: "game-selected" },
-  { id: "gaming.filter.clear", label: "Clear Platform Filter", category: "gaming", requiresContext: "gaming-tab" },
+  { id: "gaming.filter.clear", label: "Clear Console Filter", category: "gaming", requiresContext: "gaming-tab" },
 
   /* ─── Movies ─── */
   { id: "movies.toggle-favorite", label: "Toggle Favorite (Selected Movie)", category: "movies", requiresContext: "movie-selected" },

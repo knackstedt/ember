@@ -187,15 +187,18 @@ export const GamingTab: React.FC = () => {
   const scanning = useGamesStore((s) => s.scanning);
   const remoteScanning = useGamesStore((s) => s.remoteScanning);
   const activeFilter = useGamesStore((s) => s.activeFilter);
+  const consoleFilter = useGamesStore((s) => s.consoleFilter);
   const searchQuery = useGamesStore((s) => s.searchQuery);
   const load = useGamesStore((s) => s.load);
   const scan = useGamesStore((s) => s.scan);
   const setFilter = useGamesStore((s) => s.setFilter);
+  const setConsoleFilter = useGamesStore((s) => s.setConsoleFilter);
   const setSearch = useGamesStore((s) => s.setSearch);
   const filtered = useGamesStore((s) => s.filtered);
   const toggleFavorite = useGamesStore((s) => s.toggleFavorite);
   const setTags = useGamesStore((s) => s.setTags);
   const hide = useGamesStore((s) => s.hide);
+  const deleteGame = useGamesStore((s) => s.delete);
   const regenerateThumbnail = useGamesStore((s) => s.regenerateThumbnail);
   const updateLastPlayed = useGamesStore((s) => s.updateLastPlayed);
   useGamesStore((s) => s.coreVersion); // forces re-render when cores change
@@ -209,7 +212,7 @@ export const GamingTab: React.FC = () => {
   const gridRef = useRef<VirtualGridHandle>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  type ViewMode = "all" | "ai-groups" | "by-platform";
+  type ViewMode = "all" | "ai-groups";
   const [viewMode, setViewMode] = useState<ViewMode>("ai-groups");
   const [aiGroups, setAiGroups] = useState<AiGroup[]>([]);
   const [aiGroupsLoading, setAiGroupsLoading] = useState(false);
@@ -221,6 +224,9 @@ export const GamingTab: React.FC = () => {
     setFacetFilters((prev) => ({ ...prev, [field]: value }));
   };
   const [filtersExpanded, setFiltersExpanded] = useState(false);
+
+  const [topBarFocused, setTopBarFocused] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
 
   const collections = useCollectionsStore((s) => s.collections);
   const loadCollections = useCollectionsStore((s) => s.load);
@@ -275,6 +281,12 @@ export const GamingTab: React.FC = () => {
     return () => window.removeEventListener("htpc:escape", handler);
   }, []);
 
+  useEffect(() => {
+    if (selected) {
+      setTopBarFocused(false);
+    }
+  }, [selected]);
+
   /* Dispatch selection changes for command palette context */
   useEffect(() => {
     window.dispatchEvent(
@@ -286,7 +298,7 @@ export const GamingTab: React.FC = () => {
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail as string;
-      if (["all", "ai-groups", "by-platform"].includes(detail)) {
+      if (["all", "ai-groups"].includes(detail)) {
         setViewMode(detail as ViewMode);
       }
     };
@@ -294,6 +306,23 @@ export const GamingTab: React.FC = () => {
     return () => window.removeEventListener("htpc:gaming-view", handler);
   }, []);
 
+  /* Controller navigation for top bar */
+  useEffect(() => {
+    if (!topBarFocused) return;
+    const handler = (e: Event) => {
+      if (dropdownOpen) return; // dropdown handles its own nav when open
+      const detail = (e as CustomEvent).detail as { action: string };
+      if (detail?.action === "down" || detail?.action === "cancel") {
+        e.stopImmediatePropagation?.();
+        setTopBarFocused(false);
+      } else if (detail?.action === "confirm") {
+        e.stopImmediatePropagation?.();
+        setDropdownOpen(true);
+      }
+    };
+    window.addEventListener("htpc:nav", handler);
+    return () => window.removeEventListener("htpc:nav", handler);
+  }, [topBarFocused, dropdownOpen]);
 
   /* Auto-generate AI groups when viewMode switches to ai-groups and games are loaded */
   useEffect(() => {
@@ -347,7 +376,7 @@ export const GamingTab: React.FC = () => {
     if (!activeCollectionId) return base;
     const result = base.filter((g) => collectionItemIds.has(g.id));
     return sortByCollection<Game>(result, activeCollection);
-  }, [filtered, games, activeFilter, searchQuery, activeCollectionId, collectionItemIds, activeCollection]);
+  }, [filtered, games, activeFilter, consoleFilter, searchQuery, activeCollectionId, collectionItemIds, activeCollection]);
 
   const displayItems = useMemo(() => {
     if (viewMode !== "ai-groups" || !selectedAiGroupId) return items;
@@ -381,12 +410,22 @@ export const GamingTab: React.FC = () => {
     { key: "developer", label: "Developer", accessor: (g) => (g as Record<string, unknown>).developer as string | undefined, maxValues: 6 },
   ], []);
 
+  const handleGridEdge = useCallback(
+    (direction: "up" | "down" | "left" | "right") => {
+      if (direction === "up") {
+        setTopBarFocused(true);
+      }
+    },
+    [],
+  );
+
   const { focusedIndex, setFocusedIndex } = useGridFocus({
     items: gridItems,
     columnCount,
     gridRef,
     onConfirm: (game) => setSelected(game),
-    enabled: !selected,
+    enabled: !selected && !topBarFocused,
+    onEdge: handleGridEdge,
   });
 
   const focusedRow = Math.floor(focusedIndex / Math.max(1, columnCount));
@@ -437,6 +476,14 @@ export const GamingTab: React.FC = () => {
       }
       if (devToolsOpen) {
         opts.push({ id: "debug", label: "Debug", icon: <Bug size={16} /> });
+      }
+      if (game.missing) {
+        opts.push({
+          id: "delete",
+          label: "Delete missing entry",
+          icon: <Trash2 size={16} />,
+          destructive: true,
+        });
       }
       opts.push({ id: "remove", label: "Remove from library", icon: <Trash2 size={16} />, destructive: true });
       if (gameCollections.length > 0) {
@@ -498,6 +545,10 @@ export const GamingTab: React.FC = () => {
         }
         case "debug": {
           console.log("[Debug] Game entry:", game);
+          break;
+        }
+        case "delete": {
+          deleteGame(game.id);
           break;
         }
         case "remove": {
@@ -731,7 +782,7 @@ export const GamingTab: React.FC = () => {
               color: "var(--color-bg)",
             }}
           >
-            {viewMode === "all" ? "All" : viewMode === "ai-groups" ? <><Sparkles size={12} /> Groups</> : "By Platform"}
+            {viewMode === "all" ? "All" : <><Sparkles size={12} /> Groups</>}
           </span>
           {viewMode === "ai-groups" && selectedAiGroupId && (() => {
             const group = aiGroups.find((g) => g.id === selectedAiGroupId);
@@ -750,18 +801,18 @@ export const GamingTab: React.FC = () => {
               </motion.button>
             ) : null;
           })()}
-          {viewMode === "by-platform" && activeFilter && (
+          {consoleFilter !== "all" && (
             <motion.button
               className="px-2.5 py-0.5 rounded-full text-xs font-medium"
               style={{
                 backgroundColor: "var(--color-accent)",
                 color: "var(--color-bg)",
               }}
-              onClick={() => setFilter("all")}
+              onClick={() => setConsoleFilter("all")}
               whileTap={{ scale: 0.95 }}
               title="Clear platform filter"
             >
-              Platform: {PLATFORM_FILTERS.find((f) => f.id === activeFilter)?.label ?? activeFilter} <X size={12} />
+              {PLATFORM_FILTERS.find((f) => f.id === consoleFilter)?.label ?? consoleFilter} <X size={12} />
             </motion.button>
           )}
           {Object.entries(facetFilters).map(([key, value]) =>
@@ -793,6 +844,30 @@ export const GamingTab: React.FC = () => {
           >
             {filtersExpanded ? "▲ Filters" : "▼ Filters"}
           </motion.button>
+
+          {/* Platform selector — top right */}
+          <div className="ml-auto">
+            <Dropdown
+              value={consoleFilter}
+              options={[
+                { value: "all", label: "All Platforms" },
+                ...PLATFORM_FILTERS
+                  .filter((f): f is ChipFilter<GamePlatform> =>
+                    f.id !== "all" && f.id !== "favorites" && f.id !== "couch-coop"
+                  )
+                  .map((f) => ({ value: f.id, label: String(f.label) })),
+              ]}
+              onChange={(value) => {
+                setConsoleFilter(value as GamePlatform | "all");
+                setActiveCollectionId(null);
+              }}
+              placeholder="Platform"
+              className="w-40"
+              open={dropdownOpen}
+              onOpenChange={setDropdownOpen}
+              focused={topBarFocused}
+            />
+          </div>
         </div>
 
         {/* Expanded filters — render below sticky bar so they stay visible */}
@@ -800,7 +875,7 @@ export const GamingTab: React.FC = () => {
           <div className="flex flex-col gap-3 pb-3">
             {/* View-mode sub-tabs */}
             <div className="flex gap-2 flex-shrink-0 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
-              {(["all", "ai-groups", "by-platform"] as ViewMode[]).map((m) => (
+              {(["all", "ai-groups"] as ViewMode[]).map((m) => (
                 <motion.button
                   key={m}
                   onClick={() => {
@@ -819,7 +894,7 @@ export const GamingTab: React.FC = () => {
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                 >
-                  {m === "all" ? "All" : m === "ai-groups" ? "✨ Groups" : "By Platform"}
+                  {m === "all" ? "All" : "✨ Groups"}
                 </motion.button>
               ))}
             </div>
@@ -868,19 +943,6 @@ export const GamingTab: React.FC = () => {
                 <div className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "var(--color-accent)", borderTopColor: "transparent" }} />
                 <span className="text-xs">Generating smart groups…</span>
               </div>
-            )}
-
-            {/* Traditional platform filters when not in AI-groups mode */}
-            {viewMode === "by-platform" && (
-              <ChipFilters
-                filters={PLATFORM_FILTERS}
-                active={activeFilter}
-                onSelect={(f) => {
-                  setActiveCollectionId(null);
-                  setFilter(f);
-                }}
-                className="flex-shrink-0"
-              />
             )}
 
             {/* Dynamic metadata facets based on currently visible items */}

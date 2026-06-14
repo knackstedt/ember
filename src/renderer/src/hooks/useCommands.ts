@@ -232,20 +232,17 @@ export function useCommands(
         case "gaming.view.ai-groups":
           window.dispatchEvent(new CustomEvent("htpc:gaming-view", { detail: "ai-groups" }));
           break;
-        case "gaming.view.by-platform":
-          window.dispatchEvent(new CustomEvent("htpc:gaming-view", { detail: "by-platform" }));
-          break;
         case "gaming.filter.favorites":
           setGameFilter("favorites");
           break;
         case "gaming.filter.steam":
-          setGameFilter("steam");
+          useGamesStore.getState().setConsoleFilter("steam");
           break;
         case "gaming.filter.retro":
-          setGameFilter("nes");
+          useGamesStore.getState().setConsoleFilter("nes");
           break;
         case "gaming.filter.clear":
-          setGameFilter("all");
+          useGamesStore.getState().setConsoleFilter("all");
           break;
         case "gaming.emulator.stop":
           closeFlash();

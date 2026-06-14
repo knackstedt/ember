@@ -13,6 +13,9 @@ interface DropdownProps {
   onChange: (value: string) => void;
   placeholder?: string;
   className?: string;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  focused?: boolean;
 }
 
 export const Dropdown: React.FC<DropdownProps> = ({
@@ -21,31 +24,44 @@ export const Dropdown: React.FC<DropdownProps> = ({
   onChange,
   placeholder = "Select...",
   className = "",
+  open: controlledOpen,
+  onOpenChange,
+  focused,
 }) => {
-  const [isOpen, setIsOpen] = useState(false);
+  const isControlled = controlledOpen !== undefined;
+  const [internalOpen, setInternalOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
+  const isOpen = isControlled ? controlledOpen : internalOpen;
   const containerRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
+  const setOpen = useCallback((next: boolean) => {
+    if (isControlled) {
+      onOpenChange?.(next);
+    } else {
+      setInternalOpen(next);
+    }
+  }, [isControlled, onOpenChange]);
 
   const selectedLabel = options.find((o) => o.value === value)?.label ?? placeholder;
 
   const handleToggle = useCallback(() => {
-    setIsOpen((prev) => !prev);
-  }, []);
+    setOpen(!isOpen);
+  }, [isOpen, setOpen]);
 
   const handleSelect = useCallback(
     (v: string) => {
       onChange(v);
-      setIsOpen(false);
+      setOpen(false);
       setActiveIndex(-1);
     },
-    [onChange]
+    [onChange, setOpen]
   );
 
   const handleClose = useCallback(() => {
-    setIsOpen(false);
+    setOpen(false);
     setActiveIndex(-1);
-  }, []);
+  }, [setOpen]);
 
   // Close on click outside
   useEffect(() => {
@@ -59,7 +75,7 @@ export const Dropdown: React.FC<DropdownProps> = ({
     return () => window.removeEventListener("mousedown", handler);
   }, [isOpen, handleClose]);
 
-  // Keyboard navigation
+  // Keyboard navigation (native)
   useEffect(() => {
     if (!isOpen) return;
     const handler = (e: KeyboardEvent) => {
@@ -94,6 +110,44 @@ export const Dropdown: React.FC<DropdownProps> = ({
     return () => window.removeEventListener("keydown", handler);
   }, [isOpen, options, activeIndex, handleClose, handleSelect]);
 
+  // Gamepad / controller navigation via htpc:nav
+  useEffect(() => {
+    if (!isOpen) return;
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { action: string } | undefined;
+      if (!detail?.action) return;
+
+      if (detail.action === "cancel") {
+        e.stopImmediatePropagation?.();
+        handleClose();
+        return;
+      }
+      if (detail.action === "down") {
+        e.stopImmediatePropagation?.();
+        setActiveIndex((prev) => {
+          const next = prev + 1;
+          return next >= options.length ? 0 : next;
+        });
+        return;
+      }
+      if (detail.action === "up") {
+        e.stopImmediatePropagation?.();
+        setActiveIndex((prev) => {
+          const next = prev - 1;
+          return next < 0 ? options.length - 1 : next;
+        });
+        return;
+      }
+      if (detail.action === "confirm" && activeIndex >= 0) {
+        e.stopImmediatePropagation?.();
+        handleSelect(options[activeIndex].value);
+        return;
+      }
+    };
+    window.addEventListener("htpc:nav", handler);
+    return () => window.removeEventListener("htpc:nav", handler);
+  }, [isOpen, options, activeIndex, handleClose, handleSelect]);
+
   // Scroll active option into view
   useEffect(() => {
     if (activeIndex >= 0 && itemRefs.current[activeIndex]) {
@@ -109,9 +163,12 @@ export const Dropdown: React.FC<DropdownProps> = ({
         className="w-full text-sm px-2 py-1.5 rounded flex items-center justify-between gap-2 text-left transition-colors"
         style={{
           background: "var(--color-surface-raised)",
-          border: "1px solid var(--color-border)",
+          border: focused
+            ? "2px solid var(--color-accent)"
+            : "1px solid var(--color-border)",
           color: "var(--color-text)",
           outline: "none",
+          boxShadow: focused ? "var(--shadow-glow)" : "none",
         }}
         onMouseDown={(e) => e.preventDefault()}
       >

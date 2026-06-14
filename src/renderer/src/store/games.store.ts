@@ -7,6 +7,7 @@ interface GamesState {
   scanning: boolean;
   remoteScanning: boolean;
   activeFilter: GamePlatform | "all" | "couch-coop" | "favorites";
+  consoleFilter: GamePlatform | "all";
   searchQuery: string;
   regeneratingIds: Set<string>;
   pendingThumbnailIds: Set<string>;
@@ -15,10 +16,12 @@ interface GamesState {
   scan: () => Promise<void>;
   refreshCores: () => void;
   setFilter: (filter: GamesState["activeFilter"]) => void;
+  setConsoleFilter: (filter: GamesState["consoleFilter"]) => void;
   setSearch: (q: string) => void;
   toggleFavorite: (id: string) => Promise<void>;
   setTags: (id: string, tags: string[]) => Promise<void>;
   hide: (id: string) => Promise<void>;
+  delete: (id: string) => Promise<void>;
   loadThumbnail: (id: string) => Promise<void>;
   regenerateThumbnail: (id: string) => Promise<void>;
   getEmulatorConfig: (id: string) => Promise<GameEmulatorConfig>;
@@ -43,6 +46,7 @@ export const useGamesStore = create<GamesState>((set, get) => ({
   scanning: false,
   remoteScanning: false,
   activeFilter: "all",
+  consoleFilter: "all",
   searchQuery: "",
   regeneratingIds: new Set(),
   pendingThumbnailIds: new Set(),
@@ -74,6 +78,7 @@ export const useGamesStore = create<GamesState>((set, get) => ({
   refreshCores: () => set((s) => ({ coreVersion: s.coreVersion + 1 })),
 
   setFilter: (filter) => set({ activeFilter: filter }),
+  setConsoleFilter: (filter) => set({ consoleFilter: filter }),
   setSearch: (searchQuery) => set({ searchQuery }),
 
   toggleFavorite: async (id) => {
@@ -95,6 +100,13 @@ export const useGamesStore = create<GamesState>((set, get) => ({
 
   hide: async (id) => {
     await window.htpc.games.hide(id, true);
+    set((s) => ({
+      games: s.games.filter((g) => g.id !== id),
+    }));
+  },
+
+  delete: async (id) => {
+    await window.htpc.games.delete(id);
     set((s) => ({
       games: s.games.filter((g) => g.id !== id),
     }));
@@ -212,7 +224,7 @@ export const useGamesStore = create<GamesState>((set, get) => ({
   },
 
   filtered: () => {
-    const { games, activeFilter, searchQuery } = get();
+    const { games, activeFilter, consoleFilter, searchQuery } = get();
     let result = games.filter((g) => !g.hidden);
 
     switch (activeFilter) {
@@ -226,6 +238,10 @@ export const useGamesStore = create<GamesState>((set, get) => ({
         break;
       default:
         result = result.filter((g) => g.platform === activeFilter);
+    }
+
+    if (consoleFilter !== "all") {
+      result = result.filter((g) => g.platform === consoleFilter);
     }
 
     if (searchQuery.trim()) {
