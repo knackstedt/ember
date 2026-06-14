@@ -10,6 +10,7 @@ export interface UseGridFocusOptions<T> {
   onConfirm: (item: T, index: number) => void;
   enabled: boolean;
   onEdge?: (direction: "up" | "down" | "left" | "right") => void;
+  getNextIndex?: (currentIndex: number, action: NavAction, columnCount: number, itemCount: number) => number | null;
 }
 
 export function useGridFocus<T>({
@@ -19,6 +20,7 @@ export function useGridFocus<T>({
   onConfirm,
   enabled,
   onEdge,
+  getNextIndex,
 }: UseGridFocusOptions<T>): {
   focusedIndex: number;
   setFocusedIndex: (i: number) => void;
@@ -46,6 +48,9 @@ export function useGridFocus<T>({
   const onEdgeRef = useRef(onEdge);
   onEdgeRef.current = onEdge;
 
+  const getNextIndexRef = useRef(getNextIndex);
+  getNextIndexRef.current = getNextIndex;
+
   const handleNav = useCallback(
     (action: NavAction) => {
       if (!enabledRef.current || itemsRef.current.length === 0) return;
@@ -58,6 +63,21 @@ export function useGridFocus<T>({
 
       setFocusedIndex((prev) => {
         const itemCount = itemsRef.current.length;
+
+        if (getNextIndexRef.current) {
+          const next = getNextIndexRef.current(prev, action, columnCount, itemCount);
+          if (next !== null) {
+            if (action === "up" || action === "down") {
+              gridRef.current?.scrollToItem(next);
+            }
+            return next;
+          }
+          if (onEdgeRef.current) {
+            onEdgeRef.current(action as "up" | "down" | "left" | "right");
+          }
+          return prev;
+        }
+
         const row = Math.floor(prev / columnCount);
         const col = prev % columnCount;
         const maxRow = Math.ceil(itemCount / columnCount) - 1;

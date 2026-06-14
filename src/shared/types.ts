@@ -19,6 +19,14 @@ export type TabId =
   | "settings"
   | "controllers";
 
+export type GalleryView =
+  | "theme-default"
+  | "grid"
+  | "list"
+  | "hex-grid"
+  | "bookshelf"
+  | "spread-deck";
+
 export interface ScanProgress {
   scanner: string;
   status: "scanning" | "done" | "error";
@@ -514,6 +522,8 @@ export interface AppSettings {
   defaultTab?: TabId;
   /** Whether the window is in fullscreen mode */
   fullscreen?: boolean;
+  /** Gallery layout view mode */
+  galleryView?: GalleryView;
 }
 
 export type RemoteSourceProtocol =

@@ -6,6 +6,16 @@ import {
   VirtualGrid,
   VirtualGridHandle,
 } from "../../components/VirtualGrid/VirtualGrid";
+import {
+  ListView,
+  HexGridView,
+  BookshelfView,
+  SpreadDeckView,
+  NeonGridView,
+  GalleryImage,
+  useGalleryView,
+  useIsNeonGrid,
+} from "../../components/GalleryView";
 import { MediaCard } from "../../components/MediaCard/MediaCard";
 import { DetailPanel } from "../../components/DetailPanel/DetailPanel";
 import { OskInput } from "../../components/OnScreenKeyboard/OnScreenKeyboard";
@@ -79,6 +89,52 @@ const LazyMusicCard: React.FC<{
   );
 });
 
+const LazyMusicListItem: React.FC<{
+  track: MusicTrack;
+  index: number;
+  focusedIndex: number;
+  bindItem: (track: MusicTrack, index: number) => Record<string, unknown>;
+  onSelect: () => void;
+}> = React.memo(({ track, index, focusedIndex, bindItem, onSelect }) => {
+  const loadThumbnail = useMusicStore((s) => s.loadThumbnail);
+  const cachedUrl = useCoverCacheStore((s) => s.urls[track.id]);
+  const coverUrl = track.albumArtUrl ?? cachedUrl;
+
+  useEffect(() => {
+    if (!coverUrl) {
+      loadThumbnail(track.id);
+    }
+  }, [track.id, coverUrl, loadThumbnail]);
+
+  return (
+    <div className="flex items-center gap-3 w-full h-full px-3" {...bindItem(track, index)} onClick={onSelect}>
+      <div
+        className="w-12 h-12 flex-shrink-0 rounded overflow-hidden bg-cover bg-center"
+        style={{
+          backgroundImage: coverUrl ? `url(${coverUrl})` : undefined,
+          backgroundColor: !coverUrl ? "#1a1a2e" : undefined,
+          filter: track.missing ? "grayscale(80%)" : undefined,
+          opacity: track.missing ? 0.6 : undefined,
+        }}
+      />
+      <div className="flex-1 min-w-0 flex flex-col justify-center">
+        <div
+          className="font-medium truncate text-sm"
+          style={{ color: index === focusedIndex ? "var(--color-accent)" : "var(--color-text)" }}
+        >
+          {track.title}
+        </div>
+        <div className="text-xs truncate" style={{ color: "var(--color-text-dim)" }}>
+          {track.artist}
+          {track.artist && track.album ? ` · ${track.album}` : ""}
+          {track.year ? ` · ${track.year}` : ""}
+        </div>
+      </div>
+      {track.isFavorite && <Star size={14} style={{ color: "var(--color-accent)" }} />}
+    </div>
+  );
+});
+
 type SubTab = "local" | "streaming" | "ai-groups";
 type BrowseMode = "artists" | "genres" | "tracks";
 
@@ -127,6 +183,7 @@ export const MusicTab: React.FC = () => {
   >("artist");
   const [trackColumnCount, setTrackColumnCount] = useState(6);
   const [groupColumnCount, setGroupColumnCount] = useState(6);
+  const [viewColumnCount, setViewColumnCount] = useState(6);
   const [activeCollectionId, setActiveCollectionId] = useState<string | null>(null);
   const [showCollectionManager, setShowCollectionManager] = useState(false);
   const [collectionItemIds, setCollectionItemIds] = useState<Set<string>>(new Set());
@@ -134,6 +191,8 @@ export const MusicTab: React.FC = () => {
   const trackGridRef = useRef<VirtualGridHandle>(null);
   const groupGridRef = useRef<VirtualGridHandle>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const galleryView = useGalleryView();
+  const isNeonGrid = useIsNeonGrid();
 
   const [aiGroups, setAiGroups] = useState<AiGroup[]>([]);
   const [aiGroupsLoading, setAiGroupsLoading] = useState(false);
@@ -423,7 +482,7 @@ export const MusicTab: React.FC = () => {
 
   const { focusedIndex: groupFocusedIndex, setFocusedIndex: setGroupFocusedIndex } = useGridFocus<MusicGroup>({
     items: groupItems,
-    columnCount: groupColumnCount,
+    columnCount: viewColumnCount,
     gridRef: groupGridRef,
     onConfirm: (group) => setSelectedGroup(group.name),
     enabled: subTab === "local" && !selected && !selectedGroup && browseMode !== "tracks",
@@ -432,7 +491,7 @@ export const MusicTab: React.FC = () => {
 
   const { focusedIndex: trackFocusedIndex, setFocusedIndex: setTrackFocusedIndex } = useGridFocus<MusicTrack>({
     items: gridTrackItems,
-    columnCount: trackColumnCount,
+    columnCount: viewColumnCount,
     gridRef: trackGridRef,
     onConfirm: (track, index) => {
       play(gridTrackItems, index);
@@ -584,6 +643,475 @@ export const MusicTab: React.FC = () => {
       </div>
     ),
     [bindTrackItem, trackFocusedIndex, setTrackFocusedIndex, play, trackItems, toggleFavorite],
+  );
+
+  const renderTrackListItem = useCallback(
+    (track: MusicTrack, index: number) => (
+      <LazyMusicListItem
+        track={track}
+        index={index}
+        focusedIndex={trackFocusedIndex}
+        bindItem={bindTrackItem}
+        onSelect={() => { setTrackFocusedIndex(index); play(trackItems, index); setSelected(track); }}
+      />
+    ),
+    [bindTrackItem, trackFocusedIndex, setTrackFocusedIndex, play, trackItems],
+  );
+
+  const renderTrackSpine = useCallback(
+    (track: MusicTrack, _index: number, { isHovered, isFocused }: { isHovered: boolean; isFocused: boolean }) => {
+      const color = track.albumArtUrl ? "#1a1a2e" : "#16213e";
+      return (
+        <div
+          className="w-full h-full relative"
+          style={{ background: `linear-gradient(180deg, ${color}, #0f0f1e)` }}
+        >
+          {!isHovered && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span
+                className="text-[10px] font-bold text-white/80 tracking-wide"
+                style={{
+                  writingMode: "vertical-rl",
+                  textOrientation: "mixed",
+                  transform: "rotate(180deg)",
+                  maxHeight: "85%",
+                  overflow: "hidden",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {track.title}
+              </span>
+            </div>
+          )}
+          {isHovered && (
+            <>
+              <GalleryImage
+                src={track.albumArtUrl ?? useCoverCacheStore.getState().urls[track.id]}
+                alt={track.title}
+                style={{ width: "100%", height: "100%" }}
+              />
+              <div
+                className="absolute bottom-0 left-0 right-0 p-2"
+                style={{ background: "linear-gradient(to top, rgba(0,0,0,0.92), transparent)" }}
+              >
+                <div className="text-[10px] font-bold text-white truncate">{track.title}</div>
+                <div className="text-[9px] text-white/50 truncate">{track.artist}</div>
+              </div>
+            </>
+          )}
+          {isFocused && (
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                boxShadow: "inset 0 0 0 2px var(--color-accent)",
+                zIndex: 10,
+              }}
+            />
+          )}
+        </div>
+      );
+    },
+    [],
+  );
+
+  const renderTrackDeckCard = useCallback(
+    (track: MusicTrack, _index: number, { isHovered, isFocused }: { isHovered: boolean; isFocused: boolean }) => {
+      return (
+        <div className="w-full h-full relative">
+          <GalleryImage
+            src={track.albumArtUrl ?? useCoverCacheStore.getState().urls[track.id]}
+            alt={track.title}
+            style={{ width: "100%", height: "100%" }}
+          />
+          {!isHovered && <div className="absolute inset-0 bg-black/30 pointer-events-none" />}
+          {isHovered && (
+            <div className="absolute bottom-0 left-0 right-0 p-2" style={{ background: "linear-gradient(to top, rgba(0,0,0,0.9), transparent)" }}>
+              <div className="text-xs font-bold text-white truncate">{track.title}</div>
+            </div>
+          )}
+          {isFocused && (
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                boxShadow: "inset 0 0 0 2px var(--color-accent)",
+                zIndex: 10,
+              }}
+            />
+          )}
+        </div>
+      );
+    },
+    [],
+  );
+
+  const renderTrackNeonCard = useCallback(
+    (track: MusicTrack, index: number) => {
+      const cover = track.albumArtUrl ?? useCoverCacheStore.getState().urls[track.id];
+      return (
+        <div className="p-1 w-full h-full flex flex-col min-w-0" {...bindTrackItem(track, index)}>
+          <div
+            className="flex-1 relative overflow-hidden"
+            style={{
+              background: `linear-gradient(135deg, rgba(14,20,40,0.8), rgba(6,10,24,0.95))`,
+              borderBottom: "1px solid rgba(24,30,46,0.8)",
+            }}
+          >
+            {cover ? (
+              <img src={cover} alt={track.title} className="w-full h-full object-cover opacity-80" loading="lazy" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <span className="text-white/20 text-2xl font-bold">{track.title.slice(0, 2).toUpperCase()}</span>
+              </div>
+            )}
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                backgroundImage: "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.02) 2px, rgba(255,255,255,0.02) 4px)",
+              }}
+            />
+          </div>
+          <div className="px-1.5 py-1">
+            <div
+              className="text-[11px] font-bold truncate"
+              style={{ color: index === trackFocusedIndex ? "var(--color-accent)" : "var(--color-text)" }}
+            >
+              {track.title}
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-[9px] truncate" style={{ color: "var(--color-accent)", maxWidth: "70%" }}>
+                {track.artist}
+              </span>
+              <span className="text-[8px]" style={{ color: "var(--color-text-dim)" }}>
+                {track.year}
+              </span>
+            </div>
+          </div>
+        </div>
+      );
+    },
+    [bindTrackItem, trackFocusedIndex],
+  );
+
+  const renderGroupListItem = useCallback(
+    (group: MusicGroup, index: number) => (
+      <div className="flex items-center gap-3 w-full h-full px-3" {...bindGroupItem(group, index)}>
+        <div
+          className="w-12 h-12 flex-shrink-0 rounded overflow-hidden bg-cover bg-center"
+          style={{
+            backgroundImage: (artistThumbnails[group.name] ?? group.coverUrl)
+              ? `url(${artistThumbnails[group.name] ?? group.coverUrl})`
+              : undefined,
+            backgroundColor: !(artistThumbnails[group.name] ?? group.coverUrl) ? "#1a1a2e" : undefined,
+          }}
+        />
+        <div className="flex-1 min-w-0 flex flex-col justify-center">
+          <div
+            className="font-medium truncate text-sm"
+            style={{ color: index === groupFocusedIndex ? "var(--color-accent)" : "var(--color-text)" }}
+          >
+            {group.name}
+          </div>
+          <div className="text-xs" style={{ color: "var(--color-text-dim)" }}>
+            {group.trackCount} track{group.trackCount !== 1 ? "s" : ""}
+          </div>
+        </div>
+      </div>
+    ),
+    [bindGroupItem, groupFocusedIndex, artistThumbnails],
+  );
+
+  const renderGroupSpine = useCallback(
+    (group: MusicGroup, _index: number, { isHovered, isFocused }: { isHovered: boolean; isFocused: boolean }) => {
+      const color = "#1a1a2e";
+      return (
+        <div
+          className="w-full h-full relative"
+          style={{ background: `linear-gradient(180deg, ${color}, #0f0f1e)` }}
+        >
+          {!isHovered && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span
+                className="text-[10px] font-bold text-white/80 tracking-wide"
+                style={{
+                  writingMode: "vertical-rl",
+                  textOrientation: "mixed",
+                  transform: "rotate(180deg)",
+                  maxHeight: "85%",
+                  overflow: "hidden",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {group.name}
+              </span>
+            </div>
+          )}
+          {isHovered && (
+            <>
+              <GalleryImage
+                src={artistThumbnails[group.name] ?? group.coverUrl}
+                alt={group.name}
+                style={{ width: "100%", height: "100%" }}
+              />
+              <div
+                className="absolute bottom-0 left-0 right-0 p-2"
+                style={{ background: "linear-gradient(to top, rgba(0,0,0,0.92), transparent)" }}
+              >
+                <div className="text-[10px] font-bold text-white truncate">{group.name}</div>
+                <div className="text-[9px] text-white/50 truncate">{group.trackCount} tracks</div>
+              </div>
+            </>
+          )}
+          {isFocused && (
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                boxShadow: "inset 0 0 0 2px var(--color-accent)",
+                zIndex: 10,
+              }}
+            />
+          )}
+        </div>
+      );
+    },
+    [artistThumbnails],
+  );
+
+  const renderGroupDeckCard = useCallback(
+    (group: MusicGroup, _index: number, { isHovered, isFocused }: { isHovered: boolean; isFocused: boolean }) => {
+      return (
+        <div className="w-full h-full relative">
+          <GalleryImage
+            src={artistThumbnails[group.name] ?? group.coverUrl}
+            alt={group.name}
+            style={{ width: "100%", height: "100%" }}
+          />
+          {!isHovered && <div className="absolute inset-0 bg-black/30 pointer-events-none" />}
+          {isHovered && (
+            <div className="absolute bottom-0 left-0 right-0 p-2" style={{ background: "linear-gradient(to top, rgba(0,0,0,0.9), transparent)" }}>
+              <div className="text-xs font-bold text-white truncate">{group.name}</div>
+            </div>
+          )}
+          {isFocused && (
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                boxShadow: "inset 0 0 0 2px var(--color-accent)",
+                zIndex: 10,
+              }}
+            />
+          )}
+        </div>
+      );
+    },
+    [artistThumbnails],
+  );
+
+  const renderGroupNeonCard = useCallback(
+    (group: MusicGroup, index: number) => {
+      const cover = artistThumbnails[group.name] ?? group.coverUrl;
+      return (
+        <div className="p-1 w-full h-full flex flex-col min-w-0" {...bindGroupItem(group, index)}>
+          <div
+            className="flex-1 relative overflow-hidden"
+            style={{
+              background: `linear-gradient(135deg, rgba(14,20,40,0.8), rgba(6,10,24,0.95))`,
+              borderBottom: "1px solid rgba(24,30,46,0.8)",
+            }}
+          >
+            {cover ? (
+              <img src={cover} alt={group.name} className="w-full h-full object-cover opacity-80" loading="lazy" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <span className="text-white/20 text-2xl font-bold">{group.name.slice(0, 2).toUpperCase()}</span>
+              </div>
+            )}
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                backgroundImage: "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.02) 2px, rgba(255,255,255,0.02) 4px)",
+              }}
+            />
+          </div>
+          <div className="px-1.5 py-1">
+            <div
+              className="text-[11px] font-bold truncate"
+              style={{ color: index === groupFocusedIndex ? "var(--color-accent)" : "var(--color-text)" }}
+            >
+              {group.name}
+            </div>
+            <div className="text-[9px]" style={{ color: "var(--color-text-dim)" }}>
+              {group.trackCount} track{group.trackCount !== 1 ? "s" : ""}
+            </div>
+          </div>
+        </div>
+      );
+    },
+    [bindGroupItem, groupFocusedIndex, artistThumbnails],
+  );
+
+  useEffect(() => {
+    switch (galleryView) {
+      case "list": setTrackColumnCount(1); setGroupColumnCount(1); setViewColumnCount(1); break;
+      case "bookshelf": setTrackColumnCount(12); setGroupColumnCount(12); setViewColumnCount(12); break;
+      case "spread-deck": setTrackColumnCount(16); setGroupColumnCount(16); setViewColumnCount(16); break;
+      default: setTrackColumnCount(6); setGroupColumnCount(6); setViewColumnCount(6); break;
+    }
+  }, [galleryView]);
+
+  const renderTrackGallery = useCallback(
+    (itemsToRender: MusicTrack[]) => {
+      switch (galleryView) {
+        case "list":
+          return (
+            <ListView
+              ref={trackGridRef}
+              items={itemsToRender}
+              renderItem={renderTrackListItem}
+              rowHeight={80}
+              scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
+            />
+          );
+        case "hex-grid":
+          return (
+            <HexGridView
+              ref={trackGridRef}
+              items={itemsToRender}
+              minItemWidth={180}
+              onColumnCountChange={setTrackColumnCount}
+              rowHeight={240}
+              renderItem={renderTrackItem}
+              focusedIndex={trackFocusedIndex}
+              scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
+            />
+          );
+        case "bookshelf":
+          return (
+            <BookshelfView
+              ref={trackGridRef}
+              items={itemsToRender}
+              renderSpine={renderTrackSpine}
+              focusedIndex={trackFocusedIndex}
+              onItemsPerRowChange={(count) => setViewColumnCount(count)}
+              scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
+            />
+          );
+        case "spread-deck":
+          return (
+            <SpreadDeckView
+              ref={trackGridRef}
+              items={itemsToRender}
+              renderCard={renderTrackDeckCard}
+              focusedIndex={trackFocusedIndex}
+              onItemsPerRowChange={(count) => setViewColumnCount(count)}
+              scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
+            />
+          );
+        default:
+          if (isNeonGrid) {
+            return (
+              <NeonGridView
+                ref={trackGridRef}
+                items={itemsToRender}
+                minItemWidth={180}
+                onColumnCountChange={setTrackColumnCount}
+                rowHeight={240}
+                renderItem={renderTrackNeonCard}
+                scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
+              />
+            );
+          }
+          return (
+            <VirtualGrid
+              ref={trackGridRef}
+              items={itemsToRender}
+              minItemWidth={180}
+              onColumnCountChange={setTrackColumnCount}
+              rowHeight={240}
+              renderItem={renderTrackItem}
+              scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
+            />
+          );
+      }
+    },
+    [galleryView, isNeonGrid, trackFocusedIndex, trackGridRef, renderTrackListItem, renderTrackItem, renderTrackSpine, renderTrackDeckCard, renderTrackNeonCard, scrollContainerRef],
+  );
+
+  const renderGroupGallery = useCallback(
+    (itemsToRender: MusicGroup[]) => {
+      switch (galleryView) {
+        case "list":
+          return (
+            <ListView
+              ref={groupGridRef}
+              items={itemsToRender}
+              renderItem={renderGroupListItem}
+              rowHeight={80}
+              scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
+            />
+          );
+        case "hex-grid":
+          return (
+            <HexGridView
+              ref={groupGridRef}
+              items={itemsToRender}
+              minItemWidth={180}
+              onColumnCountChange={setGroupColumnCount}
+              rowHeight={240}
+              renderItem={renderGroupItem}
+              focusedIndex={groupFocusedIndex}
+              scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
+            />
+          );
+        case "bookshelf":
+          return (
+            <BookshelfView
+              ref={groupGridRef}
+              items={itemsToRender}
+              renderSpine={renderGroupSpine}
+              focusedIndex={groupFocusedIndex}
+              onItemsPerRowChange={(count) => setViewColumnCount(count)}
+              scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
+            />
+          );
+        case "spread-deck":
+          return (
+            <SpreadDeckView
+              ref={groupGridRef}
+              items={itemsToRender}
+              renderCard={renderGroupDeckCard}
+              focusedIndex={groupFocusedIndex}
+              onItemsPerRowChange={(count) => setViewColumnCount(count)}
+              scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
+            />
+          );
+        default:
+          if (isNeonGrid) {
+            return (
+              <NeonGridView
+                ref={groupGridRef}
+                items={itemsToRender}
+                minItemWidth={180}
+                onColumnCountChange={setGroupColumnCount}
+                rowHeight={240}
+                renderItem={renderGroupNeonCard}
+                scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
+              />
+            );
+          }
+          return (
+            <VirtualGrid
+              ref={groupGridRef}
+              items={itemsToRender}
+              minItemWidth={180}
+              onColumnCountChange={setGroupColumnCount}
+              rowHeight={240}
+              renderItem={renderGroupItem}
+              scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
+            />
+          );
+      }
+    },
+    [galleryView, isNeonGrid, groupFocusedIndex, groupGridRef, renderGroupListItem, renderGroupItem, renderGroupSpine, renderGroupDeckCard, renderGroupNeonCard, scrollContainerRef],
   );
 
   const artists = [
@@ -1053,27 +1581,9 @@ export const MusicTab: React.FC = () => {
                 </motion.button>
               </div>
             ) : browseMode !== "tracks" && !selectedGroup ? (
-              <VirtualGrid
-                key="groups"
-                ref={groupGridRef}
-                items={groupItems}
-                minItemWidth={180}
-                onColumnCountChange={setGroupColumnCount}
-                rowHeight={240}
-                renderItem={renderGroupItem}
-                scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
-              />
+              renderGroupGallery(groupItems)
             ) : (
-              <VirtualGrid
-                key="tracks"
-                ref={trackGridRef}
-                items={gridTrackItems}
-                minItemWidth={180}
-                onColumnCountChange={setTrackColumnCount}
-                rowHeight={240}
-                renderItem={renderTrackItem}
-                scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
-              />
+              renderTrackGallery(gridTrackItems)
             )}
           </>
         )}
@@ -1085,15 +1595,7 @@ export const MusicTab: React.FC = () => {
                 <p>No tracks found.</p>
               </div>
             ) : (
-              <VirtualGrid
-                ref={trackGridRef}
-                items={gridTrackItems}
-                minItemWidth={160}
-                onColumnCountChange={setTrackColumnCount}
-                rowHeight={240}
-                renderItem={renderTrackItem}
-                scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
-              />
+              renderTrackGallery(gridTrackItems)
             )}
           </>
         )}

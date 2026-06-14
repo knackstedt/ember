@@ -21,6 +21,7 @@ const DEFAULTS: AppSettings = {
   commandControllerMap: {},
   streamingExtensions: [],
   streamingExtensionPromptDismissed: [],
+  galleryView: "theme-default",
 };
 
 export async function getSettings(): Promise<AppSettings> {

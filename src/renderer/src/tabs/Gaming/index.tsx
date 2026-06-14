@@ -9,6 +9,16 @@ import {
   VirtualGrid,
   VirtualGridHandle,
 } from "../../components/VirtualGrid/VirtualGrid";
+import {
+  ListView,
+  HexGridView,
+  BookshelfView,
+  SpreadDeckView,
+  NeonGridView,
+  GalleryImage,
+  useGalleryView,
+  useIsNeonGrid,
+} from "../../components/GalleryView";
 import { GameCard } from "../../components/GameCard/GameCard";
 import { DetailPanel } from "../../components/DetailPanel/DetailPanel";
 import { OskInput } from "../../components/OnScreenKeyboard/OnScreenKeyboard";
@@ -16,7 +26,7 @@ import { RecentlyPlayedRow } from "../../components/RecentlyPlayedRow/RecentlyPl
 import { CoreSelector } from "../../components/CoreSelector/CoreSelector";
 import { Dropdown } from "../../components/Dropdown/Dropdown";
 import { Game, GamePlatform, GameEmulatorConfig, WineRunner } from "../../../../shared/types";
-import { useGridFocus } from "../../hooks/useGridFocus";
+import { useGridFocus, NavAction } from "../../hooks/useGridFocus";
 import { useDetailController } from "../../hooks/useDetailController";
 import { useContextMenu } from "../../hooks/useContextMenu";
 import { ContextMenuOption } from "../../components/ContextMenu/ContextMenu";
@@ -202,9 +212,12 @@ export const GamingTab: React.FC = () => {
   const deleteGame = useGamesStore((s) => s.delete);
   const regenerateThumbnail = useGamesStore((s) => s.regenerateThumbnail);
   const updateLastPlayed = useGamesStore((s) => s.updateLastPlayed);
+  const pendingThumbnailIds = useGamesStore((s) => s.pendingThumbnailIds);
+  const regeneratingIds = useGamesStore((s) => s.regeneratingIds);
   useGamesStore((s) => s.coreVersion); // forces re-render when cores change
   const [selected, setSelected] = useState<Game | null>(null);
   const [columnCount, setColumnCount] = useState(6);
+  const [viewColumnCount, setViewColumnCount] = useState(6);
   const [selectedEmulatorConfig, setSelectedEmulatorConfig] = useState<GameEmulatorConfig>({});
   const [activeCollectionId, setActiveCollectionId] = useState<string | null>(null);
   const [showCollectionManager, setShowCollectionManager] = useState(false);
@@ -212,6 +225,8 @@ export const GamingTab: React.FC = () => {
   const [collectionItemIds, setCollectionItemIds] = useState<Set<string>>(new Set());
   const gridRef = useRef<VirtualGridHandle>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const galleryView = useGalleryView();
+  const isNeonGrid = useIsNeonGrid();
 
   type ViewMode = "all" | "ai-groups";
   const [viewMode, setViewMode] = useState<ViewMode>("ai-groups");
@@ -420,13 +435,20 @@ export const GamingTab: React.FC = () => {
     [],
   );
 
+  const isHexGrid = galleryView === "hex-grid";
   const { focusedIndex, setFocusedIndex } = useGridFocus({
     items: gridItems,
-    columnCount,
+    columnCount: isHexGrid ? columnCount : viewColumnCount,
     gridRef,
     onConfirm: (game) => setSelected(game),
     enabled: !selected && !topBarFocused,
     onEdge: handleGridEdge,
+    getNextIndex: isHexGrid
+      ? (current, action) => {
+          const handle = gridRef.current as unknown as { getNextIndex?(i: number, a: NavAction): number | null } | null;
+          return handle?.getNextIndex?.(current, action) ?? null;
+        }
+      : undefined,
   });
 
   const focusedRow = Math.floor(focusedIndex / Math.max(1, columnCount));
@@ -618,6 +640,215 @@ export const GamingTab: React.FC = () => {
     ),
     [bindItem, focusedIndex, setFocusedIndex, toggleFavorite],
   );
+
+  const renderHex = useCallback(
+    (game: Game, index: number) => {
+      const b = gameBadge(game);
+      return {
+        coverUrl: game.coverUrl,
+        title: game.title,
+        subtitle: game.developer,
+        badge: b?.label,
+        badgeColor: b?.color,
+        isFavorite: game.isFavorite,
+        isLoading: pendingThumbnailIds.has(game.id) || regeneratingIds.has(game.id),
+        missing: game.missing,
+        onClick: () => { setFocusedIndex(index); setSelected(game); },
+        onFavorite: () => toggleFavorite(game.id),
+      };
+    },
+    [pendingThumbnailIds, regeneratingIds, toggleFavorite],
+  );
+
+  const renderListItem = useCallback(
+    (game: Game, index: number) => (
+      <div className="flex items-center gap-3 w-full h-full px-3" {...bindItem(game, index)}>
+        <div
+          className="w-12 h-[72px] flex-shrink-0 rounded overflow-hidden bg-cover bg-center"
+          style={{
+            backgroundImage: game.coverUrl ? `url(${game.coverUrl})` : undefined,
+            backgroundColor: !game.coverUrl ? "#1a1a2e" : undefined,
+            filter: game.missing ? "grayscale(80%)" : undefined,
+            opacity: game.missing ? 0.6 : undefined,
+          }}
+        />
+        <div className="flex-1 min-w-0 flex flex-col justify-center">
+          <div
+            className="font-medium truncate text-sm"
+            style={{ color: index === focusedIndex ? "var(--color-accent)" : "var(--color-text)" }}
+          >
+            {game.title}
+          </div>
+          <div className="text-xs truncate" style={{ color: "var(--color-text-dim)" }}>
+            {game.platform}
+            {game.releaseYear ? ` · ${game.releaseYear}` : ""}
+            {game.playTime ? ` · ${Math.round(game.playTime / 3600)}h` : ""}
+          </div>
+        </div>
+        {game.isFavorite && <Star size={14} style={{ color: "var(--color-accent)" }} />}
+      </div>
+    ),
+    [bindItem, focusedIndex],
+  );
+
+  const renderSpine = useCallback(
+    (game: Game, _index: number, { isHovered, isFocused }: { isHovered: boolean; isFocused: boolean }) => {
+      const color = game.coverUrl ? "#1a1a2e" : "#16213e";
+      return (
+        <div
+          className="w-full h-full relative"
+          style={{
+            background: `linear-gradient(180deg, ${color}, #0f0f1e)`,
+          }}
+        >
+          {!isHovered && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span
+                className="text-[10px] font-bold text-white/80 tracking-wide"
+                style={{
+                  writingMode: "vertical-rl",
+                  textOrientation: "mixed",
+                  transform: "rotate(180deg)",
+                  maxHeight: "85%",
+                  overflow: "hidden",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {game.title}
+              </span>
+            </div>
+          )}
+          {isHovered && (
+            <>
+              <GalleryImage
+                src={game.coverUrl}
+                alt={game.title}
+                style={{ width: "100%", height: "100%" }}
+              />
+              <div
+                className="absolute bottom-0 left-0 right-0 p-2"
+                style={{
+                  background: "linear-gradient(to top, rgba(0,0,0,0.92), transparent)",
+                }}
+              >
+                <div className="text-[10px] font-bold text-white truncate">{game.title}</div>
+                <div className="text-[9px] text-white/50 truncate">{game.platform}</div>
+              </div>
+            </>
+          )}
+          {isFocused && (
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                boxShadow: "inset 0 0 0 2px var(--color-accent)",
+                zIndex: 10,
+              }}
+            />
+          )}
+        </div>
+      );
+    },
+    [],
+  );
+
+  const renderDeckCard = useCallback(
+    (game: Game, _index: number, { isHovered, isFocused }: { isHovered: boolean; isFocused: boolean }) => {
+      return (
+        <div className="w-full h-full relative">
+          <GalleryImage
+            src={game.coverUrl}
+            alt={game.title}
+            style={{ width: "100%", height: "100%" }}
+          />
+          {!isHovered && <div className="absolute inset-0 bg-black/30 pointer-events-none" />}
+          {isHovered && (
+            <div
+              className="absolute bottom-0 left-0 right-0 p-2"
+              style={{ background: "linear-gradient(to top, rgba(0,0,0,0.9), transparent)" }}
+            >
+              <div className="text-xs font-bold text-white truncate">{game.title}</div>
+            </div>
+          )}
+          {isFocused && (
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                boxShadow: "inset 0 0 0 2px var(--color-accent)",
+                zIndex: 10,
+              }}
+            />
+          )}
+        </div>
+      );
+    },
+    [],
+  );
+
+  const renderNeonCard = useCallback(
+    (game: Game, index: number) => {
+      const b = gameBadge(game);
+      return (
+        <div className="p-1 w-full h-full flex flex-col min-w-0" {...bindItem(game, index)}>
+          <div
+            className="flex-1 relative overflow-hidden"
+            style={{
+              background: `linear-gradient(135deg, rgba(14,20,40,0.8), rgba(6,10,24,0.95))`,
+              borderBottom: "1px solid rgba(24,30,46,0.8)",
+            }}
+          >
+            {game.coverUrl ? (
+              <img
+                src={game.coverUrl}
+                alt={game.title}
+                className="w-full h-full object-cover opacity-80"
+                loading="lazy"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <span className="text-white/20 text-2xl font-bold">
+                  {game.title.slice(0, 2).toUpperCase()}
+                </span>
+              </div>
+            )}
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                backgroundImage: "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.02) 2px, rgba(255,255,255,0.02) 4px)",
+              }}
+            />
+          </div>
+          <div className="px-1.5 py-1">
+            <div
+              className="text-[11px] font-bold truncate"
+              style={{ color: index === focusedIndex ? "var(--color-accent)" : "var(--color-text)" }}
+            >
+              {game.title}
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-[9px]" style={{ color: "var(--color-accent)" }}>
+                {game.platform}
+              </span>
+              {b && (
+                <span className="text-[8px] px-1 rounded" style={{ background: b.color, color: "#fff" }}>
+                  {b.label}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    },
+    [bindItem, focusedIndex],
+  );
+
+  useEffect(() => {
+    switch (galleryView) {
+      case "list": setColumnCount(1); setViewColumnCount(1); break;
+      case "bookshelf": setColumnCount(12); setViewColumnCount(12); break;
+      case "spread-deck": setColumnCount(16); setViewColumnCount(16); break;
+      default: setColumnCount(6); setViewColumnCount(6); break;
+    }
+  }, [galleryView]);
 
   const badge = selected ? gameBadge(selected) : undefined;
 
@@ -1000,14 +1231,74 @@ export const GamingTab: React.FC = () => {
             </motion.button>
           </div>
         ) : (
-          <VirtualGrid
-            ref={gridRef}
-            items={gridItems}
-            minItemWidth={200}
-            onColumnCountChange={setColumnCount}
-            rowHeight={260}
-            renderItem={renderItem}
-          />
+          (() => {
+            switch (galleryView) {
+              case "list":
+                return (
+                  <ListView
+                    ref={gridRef}
+                    items={gridItems}
+                    renderItem={renderListItem}
+                    rowHeight={80}
+                  />
+                );
+              case "hex-grid":
+                return (
+                  <HexGridView
+                    ref={gridRef}
+                    items={gridItems}
+                    minItemWidth={200}
+                    onColumnCountChange={setColumnCount}
+                    renderHex={renderHex}
+                    focusedIndex={focusedIndex}
+                    bindItem={bindItem}
+                  />
+                );
+              case "bookshelf":
+                return (
+                  <BookshelfView
+                    ref={gridRef}
+                    items={gridItems}
+                    renderSpine={renderSpine}
+                    focusedIndex={focusedIndex}
+                    onItemsPerRowChange={(count) => setViewColumnCount(count)}
+                  />
+                );
+              case "spread-deck":
+                return (
+                  <SpreadDeckView
+                    ref={gridRef}
+                    items={gridItems}
+                    renderCard={renderDeckCard}
+                    focusedIndex={focusedIndex}
+                    onItemsPerRowChange={(count) => setViewColumnCount(count)}
+                  />
+                );
+              default:
+                if (isNeonGrid) {
+                  return (
+                    <NeonGridView
+                      ref={gridRef}
+                      items={gridItems}
+                      minItemWidth={200}
+                      onColumnCountChange={setColumnCount}
+                      rowHeight={260}
+                      renderItem={renderNeonCard}
+                    />
+                  );
+                }
+                return (
+                  <VirtualGrid
+                    ref={gridRef}
+                    items={gridItems}
+                    minItemWidth={200}
+                    onColumnCountChange={setColumnCount}
+                    rowHeight={260}
+                    renderItem={renderItem}
+                  />
+                );
+            }
+          })()
         )}
       </div>
 

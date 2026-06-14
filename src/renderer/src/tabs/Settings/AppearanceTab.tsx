@@ -8,6 +8,7 @@ import {
   ImageFitMode,
   MatrixPreset,
   DailyBackgroundSource,
+  GalleryView,
 } from "../../../../shared/types";
 import { THEMES, Toggle, Field } from "./shared";
 
@@ -37,6 +38,15 @@ const IMAGE_FIT_LABELS: Record<ImageFitMode, string> = {
   stretch: "Stretch",
   center: "Center",
   tile: "Tile",
+};
+
+const GALLERY_VIEW_LABELS: Record<GalleryView, string> = {
+  "theme-default": "Theme Default",
+  grid: "Grid",
+  list: "List",
+  "hex-grid": "Hex Grid",
+  bookshelf: "Bookshelf",
+  "spread-deck": "Spread Deck",
 };
 
 export const AppearanceTab: React.FC = () => {
@@ -345,6 +355,44 @@ export const AppearanceTab: React.FC = () => {
             />
           </div>
         )}
+      </section>
+
+      <section className="flex flex-col gap-4">
+        <h2 className="text-lg font-semibold" style={{ color: "var(--color-text)" }}>
+          Gallery View
+        </h2>
+        <p className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+          Choose how media libraries are displayed.
+        </p>
+        <div className="grid grid-cols-3 gap-3">
+          {(Object.keys(GALLERY_VIEW_LABELS) as GalleryView[]).map((v) => (
+            <motion.button
+              key={v}
+              className="flex flex-col items-center gap-1 p-2 rounded-[var(--radius-card)]"
+              style={{
+                border: `2px solid ${settings.galleryView === v ? "var(--color-accent)" : "var(--color-border)"}`,
+                background: "var(--color-surface-raised)",
+                boxShadow:
+                  settings.galleryView === v ? "var(--shadow-glow)" : "none",
+              }}
+              onClick={() => update({ galleryView: v })}
+              whileHover={{ scale: 1.04 }}
+              whileTap={{ scale: 0.97 }}
+            >
+              <span
+                className="text-xs text-center font-medium"
+                style={{ color: "var(--color-text)" }}
+              >
+                {GALLERY_VIEW_LABELS[v]}
+              </span>
+              {v === "theme-default" && (
+                <span className="text-[10px] text-center" style={{ color: "var(--color-text-dim)" }}>
+                  Follows theme
+                </span>
+              )}
+            </motion.button>
+          ))}
+        </div>
       </section>
 
       <section className="flex flex-col gap-4">

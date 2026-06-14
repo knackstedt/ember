@@ -6,6 +6,16 @@ import {
   VirtualGrid,
   VirtualGridHandle,
 } from "../../components/VirtualGrid/VirtualGrid";
+import {
+  ListView,
+  HexGridView,
+  BookshelfView,
+  SpreadDeckView,
+  NeonGridView,
+  GalleryImage,
+  useGalleryView,
+  useIsNeonGrid,
+} from "../../components/GalleryView";
 import { MediaCard } from "../../components/MediaCard/MediaCard";
 import { DetailPanel } from "../../components/DetailPanel/DetailPanel";
 import { OskInput } from "../../components/OnScreenKeyboard/OnScreenKeyboard";
@@ -15,7 +25,7 @@ import { resolveMediaUrl } from "../../../../shared/path-utils";
 import { useVideoPlayerStore } from "../../store/videoPlayer.store";
 import { StreamingTile } from "../../components/StreamingTile/StreamingTile";
 import { StreamingService } from "../../../../shared/types";
-import { useGridFocus } from "../../hooks/useGridFocus";
+import { useGridFocus, NavAction } from "../../hooks/useGridFocus";
 import { useDetailController } from "../../hooks/useDetailController";
 import { useContextMenu } from "../../hooks/useContextMenu";
 import { ContextMenuOption } from "../../components/ContextMenu/ContextMenu";
@@ -66,12 +76,15 @@ export const MoviesTab: React.FC = () => {
   const [selected, setSelected] = useState<Movie | null>(null);
   const [subTab, setSubTab] = useState<SubTab>("ai-groups");
   const [columnCount, setColumnCount] = useState(5);
+  const [viewColumnCount, setViewColumnCount] = useState(5);
   const [activeCollectionId, setActiveCollectionId] = useState<string | null>(null);
   const [showCollectionManager, setShowCollectionManager] = useState(false);
   const [collectionItemIds, setCollectionItemIds] = useState<Set<string>>(new Set());
   const [streamingServices, setStreamingServices] = useState<StreamingService[]>([]);
   const gridRef = useRef<VirtualGridHandle>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const galleryView = useGalleryView();
+  const isNeonGrid = useIsNeonGrid();
 
   const [aiGroups, setAiGroups] = useState<AiGroup[]>([]);
   const [aiGroupsLoading, setAiGroupsLoading] = useState(false);
@@ -230,12 +243,19 @@ export const MoviesTab: React.FC = () => {
     { key: "rating", label: "Rating", accessor: (m) => String((m as Record<string, unknown>).rating ?? ""), maxValues: 5 },
   ], []);
 
+  const isHexGrid = galleryView === "hex-grid";
   const { focusedIndex, setFocusedIndex } = useGridFocus({
     items: gridItems,
-    columnCount,
+    columnCount: isHexGrid ? columnCount : viewColumnCount,
     gridRef,
     onConfirm: (movie) => setSelected(movie),
     enabled: subTab !== "streaming" && !selected,
+    getNextIndex: isHexGrid
+      ? (current, action) => {
+          const handle = gridRef.current as unknown as { getNextIndex?(i: number, a: NavAction): number | null } | null;
+          return handle?.getNextIndex?.(current, action) ?? null;
+        }
+      : undefined,
   });
 
   /* Reset grid focus when the view context changes so we don’t point at a stale item */
@@ -353,6 +373,310 @@ export const MoviesTab: React.FC = () => {
       );
     },
     [bindItem, focusedIndex, setFocusedIndex, regeneratingIds, toggleFavorite],
+  );
+
+  const renderHex = useCallback(
+    (movie: Movie, index: number) => {
+      const source = getSourceBadge(movie.sourceLocation);
+      return {
+        coverUrl: movie.coverUrl,
+        title: movie.title,
+        subtitle: movie.releaseYear ? String(movie.releaseYear) : undefined,
+        badge: source.badge,
+        badgeColor: source.badgeColor,
+        isFavorite: movie.isFavorite,
+        isLoading: regeneratingIds.has(movie.id),
+        progress: movie.watchProgress,
+        missing: movie.missing,
+        onClick: () => { setFocusedIndex(index); setSelected(movie); },
+        onFavorite: () => toggleFavorite(movie.id),
+      };
+    },
+    [regeneratingIds, toggleFavorite],
+  );
+
+  const renderListItem = useCallback(
+    (movie: Movie, index: number) => {
+      const source = getSourceBadge(movie.sourceLocation);
+      return (
+        <div className="flex items-center gap-3 w-full h-full px-3" {...bindItem(movie, index)}>
+          <div
+            className="w-12 h-[72px] flex-shrink-0 rounded overflow-hidden bg-cover bg-center"
+            style={{
+              backgroundImage: movie.coverUrl ? `url(${movie.coverUrl})` : undefined,
+              backgroundColor: !movie.coverUrl ? "#1a1a2e" : undefined,
+              filter: movie.missing ? "grayscale(80%)" : undefined,
+              opacity: movie.missing ? 0.6 : undefined,
+            }}
+          />
+          <div className="flex-1 min-w-0 flex flex-col justify-center">
+            <div
+              className={`font-medium truncate text-sm ${index === focusedIndex ? "text-accent" : ""}`}
+              style={{ color: index === focusedIndex ? "var(--color-accent)" : "var(--color-text)" }}
+            >
+              {movie.title}
+            </div>
+            <div className="text-xs truncate" style={{ color: "var(--color-text-dim)" }}>
+              {movie.releaseYear ? `${movie.releaseYear}` : ""}
+              {movie.releaseYear && movie.director ? " · " : ""}
+              {movie.director ? movie.director : ""}
+              {movie.runtime ? ` · ${Math.round(movie.runtime / 60)}min` : ""}
+            </div>
+            {source.badge && (
+              <span
+                className="text-[10px] mt-0.5 w-fit px-1.5 py-0.5 rounded"
+                style={{ background: source.badgeColor ?? "var(--color-surface-raised)", color: "#fff" }}
+              >
+                {source.badge}
+              </span>
+            )}
+          </div>
+          {movie.isFavorite && <Star size={14} style={{ color: "var(--color-accent)" }} />}
+        </div>
+      );
+    },
+    [bindItem, focusedIndex],
+  );
+
+  const renderSpine = useCallback(
+    (movie: Movie, _index: number, { isHovered, isFocused }: { isHovered: boolean; isFocused: boolean }) => {
+      const color = movie.coverUrl ? "#1a1a2e" : "#16213e";
+      return (
+        <div
+          className="w-full h-full relative"
+          style={{
+            background: `linear-gradient(180deg, ${color}, #0f0f1e)`,
+          }}
+        >
+          {!isHovered && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span
+                className="text-[10px] font-bold text-white/80 tracking-wide"
+                style={{
+                  writingMode: "vertical-rl",
+                  textOrientation: "mixed",
+                  transform: "rotate(180deg)",
+                  maxHeight: "85%",
+                  overflow: "hidden",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {movie.title}
+              </span>
+            </div>
+          )}
+          {isHovered && (
+            <>
+              <GalleryImage
+                src={movie.coverUrl}
+                alt={movie.title}
+                style={{ width: "100%", height: "100%" }}
+              />
+              <div
+                className="absolute bottom-0 left-0 right-0 p-2"
+                style={{
+                  background: "linear-gradient(to top, rgba(0,0,0,0.92), transparent)",
+                }}
+              >
+                <div className="text-[10px] font-bold text-white truncate">{movie.title}</div>
+                <div className="text-[9px] text-white/50 truncate">
+                  {movie.releaseYear} · {movie.genres?.[0]}
+                </div>
+              </div>
+            </>
+          )}
+          {isFocused && (
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                boxShadow: "inset 0 0 0 2px var(--color-accent)",
+                zIndex: 10,
+              }}
+            />
+          )}
+        </div>
+      );
+    },
+    [],
+  );
+
+  const renderDeckCard = useCallback(
+    (movie: Movie, _index: number, { isHovered, isFocused }: { isHovered: boolean; isFocused: boolean }) => {
+      return (
+        <div className="w-full h-full relative">
+          <GalleryImage
+            src={movie.coverUrl}
+            alt={movie.title}
+            style={{ width: "100%", height: "100%" }}
+          />
+          {!isHovered && (
+            <div className="absolute inset-0 bg-black/30 pointer-events-none" />
+          )}
+          {isHovered && (
+            <div
+              className="absolute bottom-0 left-0 right-0 p-2"
+              style={{ background: "linear-gradient(to top, rgba(0,0,0,0.9), transparent)" }}
+            >
+              <div className="text-xs font-bold text-white truncate">{movie.title}</div>
+            </div>
+          )}
+          {isFocused && (
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                boxShadow: "inset 0 0 0 2px var(--color-accent)",
+                zIndex: 10,
+              }}
+            />
+          )}
+        </div>
+      );
+    },
+    [],
+  );
+
+  const renderNeonCard = useCallback(
+    (movie: Movie, index: number) => {
+      const source = getSourceBadge(movie.sourceLocation);
+      return (
+        <div className="p-1 w-full h-full flex flex-col min-w-0" {...bindItem(movie, index)}>
+          <div
+            className="flex-1 relative overflow-hidden"
+            style={{
+              background: `linear-gradient(135deg, rgba(14,20,40,0.8), rgba(6,10,24,0.95))`,
+              borderBottom: "1px solid rgba(24,30,46,0.8)",
+            }}
+          >
+            {movie.coverUrl ? (
+              <img
+                src={movie.coverUrl}
+                alt={movie.title}
+                className="w-full h-full object-cover opacity-80"
+                loading="lazy"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <span className="text-white/20 text-2xl font-bold">
+                  {movie.title.slice(0, 2).toUpperCase()}
+                </span>
+              </div>
+            )}
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                backgroundImage: "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.02) 2px, rgba(255,255,255,0.02) 4px)",
+              }}
+            />
+          </div>
+          <div className="px-1.5 py-1">
+            <div
+              className="text-[11px] font-bold truncate"
+              style={{ color: index === focusedIndex ? "var(--color-accent)" : "var(--color-text)" }}
+            >
+              {movie.title}
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-[9px]" style={{ color: "var(--color-accent)" }}>
+                {movie.releaseYear}
+              </span>
+              {source.badge && (
+                <span className="text-[8px] px-1 rounded" style={{ background: source.badgeColor, color: "#fff" }}>
+                  {source.badge}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    },
+    [bindItem, focusedIndex],
+  );
+
+  useEffect(() => {
+    switch (galleryView) {
+      case "list": setColumnCount(1); setViewColumnCount(1); break;
+      case "bookshelf": setColumnCount(12); setViewColumnCount(12); break;
+      case "spread-deck": setColumnCount(16); setViewColumnCount(16); break;
+      default: setColumnCount(5); setViewColumnCount(5); break;
+    }
+  }, [galleryView]);
+
+  const renderGallery = useCallback(
+    (itemsToRender: Movie[]) => {
+      switch (galleryView) {
+        case "list":
+          return (
+            <ListView
+              ref={gridRef}
+              items={itemsToRender}
+              renderItem={renderListItem}
+              rowHeight={80}
+              scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
+            />
+          );
+        case "hex-grid":
+          return (
+            <HexGridView
+              ref={gridRef}
+              items={itemsToRender}
+              minItemWidth={200}
+              onColumnCountChange={setColumnCount}
+              renderHex={renderHex}
+              focusedIndex={focusedIndex}
+              bindItem={bindItem}
+              scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
+            />
+          );
+        case "bookshelf":
+          return (
+            <BookshelfView
+              ref={gridRef}
+              items={itemsToRender}
+              renderSpine={renderSpine}
+              focusedIndex={focusedIndex}
+              onItemsPerRowChange={(count) => setViewColumnCount(count)}
+              scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
+            />
+          );
+        case "spread-deck":
+          return (
+            <SpreadDeckView
+              ref={gridRef}
+              items={itemsToRender}
+              renderCard={renderDeckCard}
+              focusedIndex={focusedIndex}
+              onItemsPerRowChange={(count) => setViewColumnCount(count)}
+              scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
+            />
+          );
+        default:
+          if (isNeonGrid) {
+            return (
+              <NeonGridView
+                ref={gridRef}
+                items={itemsToRender}
+                minItemWidth={200}
+                onColumnCountChange={setColumnCount}
+                rowHeight={300}
+                renderItem={renderNeonCard}
+                scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
+              />
+            );
+          }
+          return (
+            <VirtualGrid
+              ref={gridRef}
+              items={itemsToRender}
+              minItemWidth={200}
+              onColumnCountChange={setColumnCount}
+              rowHeight={300}
+              renderItem={renderItem}
+              scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
+            />
+          );
+      }
+    },
+    [galleryView, isNeonGrid, focusedIndex, gridRef, renderListItem, renderItem, renderSpine, renderDeckCard, renderNeonCard, scrollContainerRef],
   );
 
   const recentlyPlayed = [...movies]
@@ -683,15 +1007,7 @@ export const MoviesTab: React.FC = () => {
                 </motion.button>
               </div>
             ) : (
-              <VirtualGrid
-                ref={gridRef}
-                items={gridItems}
-                minItemWidth={200}
-                onColumnCountChange={setColumnCount}
-                rowHeight={300}
-                renderItem={renderItem}
-                scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
-              />
+              renderGallery(gridItems)
             )}
           </>
         )}
@@ -703,15 +1019,7 @@ export const MoviesTab: React.FC = () => {
                 <p>No movies found.</p>
               </div>
             ) : (
-              <VirtualGrid
-                ref={gridRef}
-                items={gridItems}
-                minItemWidth={200}
-                onColumnCountChange={setColumnCount}
-                rowHeight={300}
-                renderItem={renderItem}
-                scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
-              />
+              renderGallery(gridItems)
             )}
           </>
         )}

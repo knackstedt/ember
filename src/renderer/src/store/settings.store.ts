@@ -65,6 +65,7 @@ const defaults: AppSettings = {
     swapRightStickAxes: false,
     buttonRemapping: {},
   },
+  galleryView: "theme-default",
 };
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({
