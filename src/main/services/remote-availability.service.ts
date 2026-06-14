@@ -22,7 +22,7 @@ function parseEmberPath(emberPath: string): { sourceId: string; remotePath: stri
   return { sourceId, remotePath };
 }
 
-async function checkBatch<T extends { id: string; filePath?: string; romPath?: string }>(
+async function checkBatch<T extends { id: string; filePath?: string; romPath?: string; missing?: boolean }>(
   items: T[],
   sources: RemoteSource[],
   setMissing: (id: string, value: boolean) => Promise<void>,
@@ -38,9 +38,11 @@ async function checkBatch<T extends { id: string; filePath?: string; romPath?: s
 
         const source = sources.find((s) => s.id === parsed.sourceId);
         if (!source) {
-          // Source was removed; mark missing
-          log.warn("remote:availability", `source ${parsed.sourceId} not found for ${item.id}`);
-          await setMissing(item.id, true);
+          // Source was removed; mark missing only if not already marked
+          if (!item.missing) {
+            log.warn("remote:availability", `source ${parsed.sourceId} not found for ${item.id}`);
+            await setMissing(item.id, true);
+          }
           return;
         }
 
@@ -51,9 +53,16 @@ async function checkBatch<T extends { id: string; filePath?: string; romPath?: s
 
         try {
           const exists = await remoteFileExists(source, parsed.remotePath);
-          await setMissing(item.id, !exists);
-          if (!exists) {
+          const nextMissing = !exists;
+          if (nextMissing === item.missing) {
+            // No state change; skip DB write and logging
+            return;
+          }
+          await setMissing(item.id, nextMissing);
+          if (nextMissing) {
             log.info("remote:availability", `marked missing: ${path}`);
+          } else {
+            log.info("remote:availability", `restored: ${path}`);
           }
         } catch (err) {
           log.warn("remote:availability", `check failed for ${path}: ${err}`);
