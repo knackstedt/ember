@@ -164,7 +164,6 @@ export const VirtualGrid = React.forwardRef(function VirtualGridInner<T>(
     return (
       <div ref={containerRef} className="w-full relative">
         <Virtualizer
-          key={`${effectiveColCount}-${items.length}`}
           ref={virtualizerRef}
           scrollRef={scrollRef}
           count={rowCount}
