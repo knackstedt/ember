@@ -123,4 +123,18 @@ bun run dist --linux AppImage
 - ARM64 cross-compilation of the Rust native addon requires `rustup target add aarch64-unknown-linux-gnu` and a cross-compilation sysroot for `alsa-sys`. The build script will skip the ARM64 native addon if cross-compilation is not set up; the Electron app itself will still build for ARM64.
 - Flatpak builds require both `x86_64` and `aarch64` runtimes to be installed (see **Additional setup for cross-compilation** above).
 
+---
+
+## Contributing
+
+We welcome contributions! Please read [`CONTRIBUTING.md`](CONTRIBUTING.md) for details on how to submit bug reports, feature requests, and pull requests.
+
+**Important**: By contributing any code, documentation, or other materials to this project, you agree that your contributions are licensed under the PolyForm Noncommercial License 1.0.0, exactly as specified in [`LICENSE.md`](LICENSE.md), **with no exceptions**.
+
+## License
+
+This project is licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE.md).
+
+> **Commercial Use**: The PolyForm Noncommercial License does not permit commercial use. If you need to use Ember commercially, contact the licensor to purchase a commercial license.
+
 
