@@ -653,6 +653,7 @@ export const GamingTab: React.FC = () => {
         isFavorite: game.isFavorite,
         isLoading: pendingThumbnailIds.has(game.id) || regeneratingIds.has(game.id),
         missing: game.missing,
+        platform: game.platform,
         onClick: () => { setFocusedIndex(index); setSelected(game); },
         onFavorite: () => toggleFavorite(game.id),
       };

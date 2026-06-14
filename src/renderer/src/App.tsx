@@ -170,10 +170,13 @@ export default function App(): React.ReactElement {
   const axisValuesRef = useRef<Record<string, number>>({});
   const axisTimersRef = useRef<Record<string, number>>({});
   const axisCooldownRef = useRef<Record<string, number>>({});
-  const AXIS_COOLDOWN_MS = 200;
+  const AXIS_COOLDOWN_MS = 120;
 
   /* Button long-press timers for evdev controller input */
   const buttonTimersRef = useRef<Record<string, number>>({});
+
+  /* Navigation button repeat timers (dpad directions held) */
+  const navButtonTimersRef = useRef<Record<string, number>>({});
 
   /* Controllers tab lock state */
   const controllersTabLockedRef = useRef(true);
@@ -532,14 +535,19 @@ export default function App(): React.ReactElement {
         const prev = axisValuesRef.current[axis] ?? 0;
         axisValuesRef.current[axis] = ev.value ?? 0;
 
-        const existingTimer = axisTimersRef.current[axis];
-        if (existingTimer) {
-          clearTimeout(existingTimer);
-          delete axisTimersRef.current[axis];
-        }
-
         const action = getAxisNavAction(axis, ev.value ?? 0);
         const prevAction = getAxisNavAction(axis, prev);
+
+        // Only clear the repeat timer when the direction actually changes.
+        // Analog stick jitter generates constant axis events; if we blindly
+        // clear the timer the repeat never fires while the stick is held.
+        if (action !== prevAction) {
+          const existingTimer = axisTimersRef.current[axis];
+          if (existingTimer) {
+            clearTimeout(existingTimer);
+            delete axisTimersRef.current[axis];
+          }
+        }
 
         if (action && action !== prevAction && canDispatchAxisNav(axis)) {
           dispatchNavAction(action);
@@ -549,7 +557,7 @@ export default function App(): React.ReactElement {
             }
             axisTimersRef.current[axis] = window.setTimeout(repeat, 180);
           };
-          axisTimersRef.current[axis] = window.setTimeout(repeat, 500);
+          axisTimersRef.current[axis] = window.setTimeout(repeat, 400);
         }
         return;
       }
@@ -560,6 +568,11 @@ export default function App(): React.ReactElement {
           if (timer) {
             clearTimeout(timer);
             delete buttonTimersRef.current[ev.action];
+          }
+          const navTimer = navButtonTimersRef.current[ev.action];
+          if (navTimer) {
+            clearTimeout(navTimer);
+            delete navButtonTimersRef.current[ev.action];
           }
         }
         return;
@@ -622,6 +635,16 @@ export default function App(): React.ReactElement {
         const action = actionMap[ev.action ?? ""];
         if (action) {
           dispatchNavAction(action);
+
+          // Start a repeat timer for directional buttons so holding
+          // the d-pad or mapped stick buttons scrolls like keyboard hold.
+          if (ev.action?.startsWith("dpad_")) {
+            const repeat = () => {
+              dispatchNavAction(action);
+              navButtonTimersRef.current[ev.action!] = window.setTimeout(repeat, 180);
+            };
+            navButtonTimersRef.current[ev.action] = window.setTimeout(repeat, 400);
+          }
         }
       }
     };
@@ -633,9 +656,11 @@ export default function App(): React.ReactElement {
       unsubKeyboard();
       Object.values(axisTimersRef.current).forEach(clearTimeout);
       Object.values(buttonTimersRef.current).forEach(clearTimeout);
+      Object.values(navButtonTimersRef.current).forEach(clearTimeout);
       axisTimersRef.current = {};
       axisCooldownRef.current = {};
       buttonTimersRef.current = {};
+      navButtonTimersRef.current = {};
       if (unlockTimerRef.current) {
         clearTimeout(unlockTimerRef.current);
         unlockTimerRef.current = null;
