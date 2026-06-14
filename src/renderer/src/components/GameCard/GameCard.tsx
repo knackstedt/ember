@@ -23,6 +23,7 @@ export interface GameCardProps {
   progress?: number;
   playTime?: number;
   lastPlayed?: number;
+  missing?: boolean;
 }
 
 function formatLastPlayed(ts: number): string {
@@ -134,6 +135,7 @@ export const GameCard: React.FC<GameCardProps> = React.memo(({
   progress,
   playTime,
   lastPlayed,
+  missing,
 }) => {
   const [imgError, setImgError] = useState(false);
   useEffect(() => {
@@ -181,7 +183,13 @@ export const GameCard: React.FC<GameCardProps> = React.memo(({
             )}
 
             {/* Cover image area */}
-            <div className="gc-cover-content">
+            <div
+              className="gc-cover-content"
+              style={{
+                filter: missing ? "grayscale(80%)" : undefined,
+                opacity: missing ? 0.6 : undefined,
+              }}
+            >
               {showPlaceholder ? (
                 <div
                   className="gc-placeholder"
@@ -207,7 +215,18 @@ export const GameCard: React.FC<GameCardProps> = React.memo(({
               {/* Gradient overlay for readability */}
               {/* <div className="gc-cover-overlay" /> */}
 
-              {badge && (
+              {missing && (
+                <span
+                  className="gc-badge"
+                  style={{
+                    backgroundColor: "#ff4444",
+                    color: "#ffffff",
+                  }}
+                >
+                  Missing
+                </span>
+              )}
+              {!missing && badge && (
                 <span
                   className="gc-badge"
                   style={{

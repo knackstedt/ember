@@ -345,6 +345,7 @@ export const MoviesTab: React.FC = () => {
             isFocused={index === focusedIndex}
             isLoading={regeneratingIds.has(movie.id)}
             progress={movie.watchProgress}
+            missing={movie.missing}
             onSelect={() => { setFocusedIndex(index); setSelected(movie); }}
             onFavorite={() => toggleFavorite(movie.id)}
           />

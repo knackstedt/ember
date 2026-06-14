@@ -15,6 +15,7 @@ export interface MediaCardProps {
   aspectRatio?: "2/3" | "16/9" | "1/1";
   progress?: number;
   isLoading?: boolean;
+  missing?: boolean;
 }
 
 const PLACEHOLDER_COLORS = [
@@ -55,6 +56,7 @@ export const MediaCard: React.FC<MediaCardProps> = React.memo(({
   aspectRatio = "2/3",
   progress,
   isLoading,
+  missing,
 }) => {
   const [imgError, setImgError] = useState(false);
   useEffect(() => {
@@ -83,32 +85,51 @@ export const MediaCard: React.FC<MediaCardProps> = React.memo(({
       onClick={onSelect}
     >
       <div className="relative w-full flex-1 min-h-0 overflow-hidden">
-        {showPlaceholder ? (
-          <div
-            className="w-full h-full flex items-center justify-center"
-            style={{ backgroundColor: placeholderColor(title) }}
-          >
-            <span className="text-2xl font-bold text-white/40">
-              {initials(title)}
-            </span>
-          </div>
-        ) : (
-          <img
-            src={coverUrl}
-            alt={title}
-            className="w-full h-full object-cover"
-            loading="lazy"
-            decoding="async"
-            onError={() => setImgError(true)}
-          />
-        )}
+        <div
+          className="w-full h-full"
+          style={{
+            filter: missing ? "grayscale(80%)" : undefined,
+            opacity: missing ? 0.6 : undefined,
+          }}
+        >
+          {showPlaceholder ? (
+            <div
+              className="w-full h-full flex items-center justify-center"
+              style={{ backgroundColor: placeholderColor(title) }}
+            >
+              <span className="text-2xl font-bold text-white/40">
+                {initials(title)}
+              </span>
+            </div>
+          ) : (
+            <img
+              src={coverUrl}
+              alt={title}
+              className="w-full h-full object-cover"
+              loading="lazy"
+              decoding="async"
+              onError={() => setImgError(true)}
+            />
+          )}
+        </div>
         {isLoading && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-10">
             <div className="w-7 h-7 rounded-full border-[3px] border-white/30 border-t-white animate-spin" />
           </div>
         )}
 
-        {badge && (
+        {missing && (
+          <span
+            className="absolute top-2 left-2 px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wide"
+            style={{
+              backgroundColor: "#ff4444",
+              color: "#ffffff",
+            }}
+          >
+            Missing
+          </span>
+        )}
+        {!missing && badge && (
           <span
             className="absolute top-2 left-2 px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wide"
             style={{

@@ -72,6 +72,7 @@ const LazyMusicCard: React.FC<{
       aspectRatio="1/1"
       isFavorite={track.isFavorite}
       isFocused={index === focusedIndex}
+      missing={track.missing}
       onSelect={onSelect}
       onFavorite={onFavorite}
     />

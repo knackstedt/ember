@@ -165,6 +165,7 @@ const LazyGameCard: React.FC<{
       missingCoreTooltip={missingCoreTooltip}
       playTime={game.playTime}
       lastPlayed={game.lastPlayed}
+      missing={game.missing}
       onSelect={onSelect}
       onFavorite={onFavorite}
     />
