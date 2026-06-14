@@ -32,6 +32,7 @@ import {
   Sparkles,
   X,
   Globe,
+  Trash2,
 } from "lucide-react";
 import { useCollectionsStore, evaluateSmartFilter, sortByCollection } from "../../store/collections.store";
 import { CollectionsBar } from "../../components/CollectionsBar/CollectionsBar";
@@ -108,6 +109,7 @@ export const MusicTab: React.FC = () => {
   const searchCoverArt = useMusicStore((s) => s.searchCoverArt);
   const pickCoverImage = useMusicStore((s) => s.pickCoverImage);
   const hide = useMusicStore((s) => s.hide);
+  const deleteTrack = useMusicStore((s) => s.delete);
   const artistThumbnails = useMusicStore((s) => s.artistThumbnails);
   const artistThumbnailsLoading = useMusicStore((s) => s.artistThumbnailsLoading);
   const loadArtistThumbnail = useMusicStore((s) => s.loadArtistThumbnail);
@@ -469,6 +471,14 @@ export const MusicTab: React.FC = () => {
           disabled: !track.filePath,
         },
       ];
+      if (track.missing) {
+        opts.push({
+          id: "delete",
+          label: "Delete missing entry",
+          icon: <Trash2 size={16} />,
+          destructive: true,
+        });
+      }
       if (musicCollections.length > 0) {
         opts.push({ id: "__sep__", label: "Collections", disabled: true });
         for (const c of musicCollections) {
@@ -497,6 +507,9 @@ export const MusicTab: React.FC = () => {
           break;
         case "hide":
           hide(track.id);
+          break;
+        case "delete":
+          deleteTrack(track.id);
           break;
         case "tags":
           setSelected(track);

@@ -159,6 +159,22 @@ export const GameRepo = {
       );
     }
   },
+
+  async setMissing(id: string, value: boolean): Promise<void> {
+    const db = getDb();
+    await db.query(`UPDATE game:⟨${escapeId(id)}⟩ SET missing = $value`, { value });
+  },
+
+  async delete(id: string): Promise<void> {
+    const db = getDb();
+    await db.query(`DELETE game:⟨${escapeId(id)}⟩`);
+  },
+
+  async deleteMissing(): Promise<number> {
+    const db = getDb();
+    const rows = await db.query<[any[]]>(`DELETE FROM game WHERE missing = true`);
+    return (rows[0] ?? []).length;
+  },
 };
 
 /* ------------------------------------------------------------------ */
@@ -219,6 +235,22 @@ export const MovieRepo = {
     const db = getDb();
     await db.query(`UPDATE movie:⟨${escapeId(id)}⟩ SET lastPlayed = $ts`, { ts: timestamp });
   },
+
+  async setMissing(id: string, value: boolean): Promise<void> {
+    const db = getDb();
+    await db.query(`UPDATE movie:⟨${escapeId(id)}⟩ SET missing = $value`, { value });
+  },
+
+  async delete(id: string): Promise<void> {
+    const db = getDb();
+    await db.query(`DELETE movie:⟨${escapeId(id)}⟩`);
+  },
+
+  async deleteMissing(): Promise<number> {
+    const db = getDb();
+    const rows = await db.query<[any[]]>(`DELETE FROM movie WHERE missing = true`);
+    return (rows[0] ?? []).length;
+  },
 };
 
 /* ------------------------------------------------------------------ */
@@ -260,6 +292,22 @@ export const MusicRepo = {
   async setLastPlayed(id: string, timestamp: number): Promise<void> {
     const db = getDb();
     await db.query(`UPDATE music_track:⟨${escapeId(id)}⟩ SET lastPlayed = $ts`, { ts: timestamp });
+  },
+
+  async setMissing(id: string, value: boolean): Promise<void> {
+    const db = getDb();
+    await db.query(`UPDATE music_track:⟨${escapeId(id)}⟩ SET missing = $value`, { value });
+  },
+
+  async delete(id: string): Promise<void> {
+    const db = getDb();
+    await db.query(`DELETE music_track:⟨${escapeId(id)}⟩`);
+  },
+
+  async deleteMissing(): Promise<number> {
+    const db = getDb();
+    const rows = await db.query<[any[]]>(`DELETE FROM music_track WHERE missing = true`);
+    return (rows[0] ?? []).length;
   },
 };
 

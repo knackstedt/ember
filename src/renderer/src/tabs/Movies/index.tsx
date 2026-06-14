@@ -32,6 +32,7 @@ import {
   Play,
   X,
   Globe,
+  Trash2,
 } from "lucide-react";
 import { useCollectionsStore, evaluateSmartFilter, sortByCollection } from "../../store/collections.store";
 import { CollectionsBar } from "../../components/CollectionsBar/CollectionsBar";
@@ -58,6 +59,7 @@ export const MoviesTab: React.FC = () => {
   const setTags = useMoviesStore((s) => s.setTags);
   const filtered = useMoviesStore((s) => s.filtered);
   const hide = useMoviesStore((s) => s.hide);
+  const deleteMovie = useMoviesStore((s) => s.delete);
   const regenerateThumbnail = useMoviesStore((s) => s.regenerateThumbnail);
   const regeneratingIds = useMoviesStore((s) => s.regeneratingIds);
   const openVideo = useVideoPlayerStore((s) => s.open);
@@ -271,6 +273,14 @@ export const MoviesTab: React.FC = () => {
           disabled: !movie.filePath,
         },
       ];
+      if (movie.missing) {
+        opts.push({
+          id: "delete",
+          label: "Delete missing entry",
+          icon: <Trash2 size={16} />,
+          destructive: true,
+        });
+      }
       if (movieCollections.length > 0) {
         opts.push({ id: "__sep__", label: "Collections", disabled: true });
         for (const c of movieCollections) {
@@ -299,6 +309,9 @@ export const MoviesTab: React.FC = () => {
           break;
         case "hide":
           hide(movie.id);
+          break;
+        case "delete":
+          deleteMovie(movie.id);
           break;
         case "tags":
           setSelected(movie);

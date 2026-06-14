@@ -260,6 +260,8 @@ const htpc = {
       ipcRenderer.invoke("games:metadata:proton", steamAppId),
     hide: (id: string, value: boolean): Promise<void> =>
       ipcRenderer.invoke("games:hide", id, value),
+    delete: (id: string): Promise<void> =>
+      ipcRenderer.invoke("games:delete", id),
     emulatorConfig: {
       get: (id: string): Promise<GameEmulatorConfig> =>
         ipcRenderer.invoke("games:emulatorConfig:get", id),
@@ -332,6 +334,8 @@ const htpc = {
       ipcRenderer.invoke("movies:metadata", title),
     hide: (id: string, value: boolean): Promise<void> =>
       ipcRenderer.invoke("movies:hide", id, value),
+    delete: (id: string): Promise<void> =>
+      ipcRenderer.invoke("movies:delete", id),
     regenerateThumbnail: (movie: Movie): Promise<string | null> =>
       ipcRenderer.invoke("movies:regenerateThumbnail", movie),
   },
@@ -356,6 +360,8 @@ const htpc = {
       ipcRenderer.invoke("music:artistThumbnail", artist),
     hide: (id: string, value: boolean): Promise<void> =>
       ipcRenderer.invoke("music:hide", id, value),
+    delete: (id: string): Promise<void> =>
+      ipcRenderer.invoke("music:delete", id),
     enrich: (track: MusicTrack): Promise<{
       updates: Partial<MusicTrack>;
       coverArtUrl?: string;
@@ -698,6 +704,13 @@ const htpc = {
       ipcRenderer.invoke("rclone:testCredentials", source),
     testPath: (source: import("../shared/types").RemoteSource): Promise<import("../main/services/rclone-manager").RemoteTestResult> =>
       ipcRenderer.invoke("rclone:testPath", source),
+  },
+
+  remote: {
+    checkAvailability: (): Promise<void> =>
+      ipcRenderer.invoke("remote:checkAvailability"),
+    deleteMissing: (type: "movie" | "music" | "game"): Promise<number> =>
+      ipcRenderer.invoke("remote:deleteMissing", type),
   },
 
   network: {

@@ -154,6 +154,8 @@ export interface Game {
   sessionHooks?: SessionHook[];
   /** Whether the game source is local or remote */
   sourceLocation?: SourceLocation;
+  /** Whether the remote file is missing */
+  missing?: boolean;
 }
 
 export interface GameEmulatorConfig {
@@ -182,6 +184,8 @@ export interface Movie {
   hidden?: boolean;
   /** Whether the movie source is local or remote */
   sourceLocation?: SourceLocation;
+  /** Whether the remote file is missing */
+  missing?: boolean;
 }
 
 export interface MusicTrack {
@@ -214,6 +218,8 @@ export interface MusicTrack {
   hidden?: boolean;
   /** Whether the music source is local or remote */
   sourceLocation?: SourceLocation;
+  /** Whether the remote file is missing */
+  missing?: boolean;
 }
 
 export interface TVShow {

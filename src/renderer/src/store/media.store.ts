@@ -23,6 +23,7 @@ interface MoviesState {
   toggleFavoritesFilter: () => void;
   updateProgress: (id: string, progress: number | null) => void;
   hide: (id: string) => Promise<void>;
+  delete: (id: string) => Promise<void>;
   regenerateThumbnail: (id: string) => Promise<void>;
   filtered: () => Movie[];
 }
@@ -84,6 +85,13 @@ export const useMoviesStore = create<MoviesState>((set, get) => ({
 
   hide: async (id) => {
     await window.htpc.movies.hide(id, true);
+    set((s) => ({
+      movies: s.movies.filter((m) => m.id !== id),
+    }));
+  },
+
+  delete: async (id) => {
+    await window.htpc.movies.delete(id);
     set((s) => ({
       movies: s.movies.filter((m) => m.id !== id),
     }));
@@ -176,6 +184,7 @@ interface MusicState {
   loadThumbnail: (id: string) => Promise<void>;
   loadArtistThumbnail: (artist: string) => Promise<void>;
   hide: (id: string) => Promise<void>;
+  delete: (id: string) => Promise<void>;
   filtered: () => MusicTrack[];
 }
 
@@ -288,6 +297,13 @@ export const useMusicStore = create<MusicState>((set, get) => ({
 
   hide: async (id) => {
     await window.htpc.music.hide(id, true);
+    set((s) => ({
+      tracks: s.tracks.filter((t) => t.id !== id),
+    }));
+  },
+
+  delete: async (id) => {
+    await window.htpc.music.delete(id);
     set((s) => ({
       tracks: s.tracks.filter((t) => t.id !== id),
     }));

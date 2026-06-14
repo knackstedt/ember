@@ -112,6 +112,9 @@ import {
   queueRemoteSourceScan,
   scanAllRemoteSources,
 } from "../services/remote-scan.service";
+import {
+  checkRemoteAvailability,
+} from "../services/remote-availability.service";
 import { discoverNetworkDevices } from "../services/network-discovery";
 import { startOAuthFlow } from "../services/oauth-webview";
 import {
@@ -702,6 +705,10 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     await GameRepo.setHidden(id, value);
   });
 
+  ipcMain.handle("games:delete", async (_e, id: string) => {
+    await GameRepo.delete(id);
+  });
+
   ipcMain.handle("games:emulatorConfig:get", async (_e, id: string) => {
     return GameRepo.getEmulatorConfig(id);
   });
@@ -1208,6 +1215,10 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     await MovieRepo.setHidden(id, value);
   });
 
+  ipcMain.handle("movies:delete", async (_e, id: string) => {
+    await MovieRepo.delete(id);
+  });
+
   ipcMain.handle(
     "movies:progress:set",
     async (_e, id: string, progress: number | null) => {
@@ -1328,6 +1339,10 @@ export function registerIpcHandlers(window: BrowserWindow): void {
 
   ipcMain.handle("music:hide", async (_e, id: string, value: boolean) => {
     await MusicRepo.setHidden(id, value);
+  });
+
+  ipcMain.handle("music:delete", async (_e, id: string) => {
+    await MusicRepo.delete(id);
   });
 
   ipcMain.handle("music:searchCoverArt", async (_e, track: MusicTrack) => {
@@ -2117,6 +2132,24 @@ export function registerIpcHandlers(window: BrowserWindow): void {
 
   ipcMain.handle("rclone:testPath", async (_e, source: import("../../shared/types").RemoteSource) => {
     return testRemotePath(source);
+  });
+
+  ipcMain.handle("remote:checkAvailability", async () => {
+    await checkRemoteAvailability();
+    return true;
+  });
+
+  ipcMain.handle("remote:deleteMissing", async (_e, type: "movie" | "music" | "game") => {
+    switch (type) {
+      case "movie":
+        return MovieRepo.deleteMissing();
+      case "music":
+        return MusicRepo.deleteMissing();
+      case "game":
+        return GameRepo.deleteMissing();
+      default:
+        return 0;
+    }
   });
 
   /* ------------------------------------------------------------------ */

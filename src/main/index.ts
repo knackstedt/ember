@@ -11,6 +11,7 @@ import { createLogger } from "./util/logger";
 import { getXdgVideosDir } from "./scanners/xdg";
 import { MovieRepo, RemoteSourceRepo } from "./db/repository";
 import { getServePort } from "./services/rclone-manager";
+import { startRemoteAvailabilityWorker, stopRemoteAvailabilityWorker } from "./services/remote-availability.service";
 import { bootPlugins, shutdownPlugins } from "./plugins/loader";
 
 // Suppress MaxListenersExceededWarning from Electron internals (webviews, extensions)
@@ -577,12 +578,15 @@ app.whenReady().then(async () => {
 
   await createWindow();
 
+  startRemoteAvailabilityWorker();
+
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
 });
 
 app.on("before-quit", async (e) => {
+  stopRemoteAvailabilityWorker();
   // Give renderers a brief moment to fire any pending beforeunload / IPC saves
   const windows = BrowserWindow.getAllWindows();
   if (windows.length > 0) {
@@ -604,6 +608,7 @@ app.on("before-quit", async (e) => {
 });
 
 app.on("window-all-closed", async () => {
+  stopRemoteAvailabilityWorker();
   await destroyInputSystem();
   try {
     await shutdownPlugins();

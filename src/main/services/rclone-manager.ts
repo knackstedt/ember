@@ -413,3 +413,69 @@ export async function testRemotePath(source: RemoteSource): Promise<RemoteTestRe
     return { success: false, message: `Path test failed: ${err}` };
   }
 }
+
+export async function remoteFileExists(
+  source: RemoteSource,
+  remotePath: string,
+): Promise<boolean> {
+  const binary = resolveRcloneBinary();
+  if (!binary) return false;
+
+  const creds = await retrieveCredentials(source);
+  if (!creds) return false;
+
+  const { remoteName, configPath } = await buildRcloneConfig(source, creds);
+
+  try {
+    const { stdout, stderr } = await new Promise<{
+      stdout: string;
+      stderr: string;
+    }>((resolve, reject) => {
+      const child = spawn(binary, [
+        "--config", configPath,
+        "lsjson",
+        `${remoteName}:${remotePath || "/"}`,
+        "--max-depth", "0",
+      ], {
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+
+      let out = "";
+      let err = "";
+      child.stdout?.on("data", (data: Buffer) => { out += data.toString(); });
+      child.stderr?.on("data", (data: Buffer) => { err += data.toString(); });
+
+      const timeout = setTimeout(() => {
+        child.kill("SIGTERM");
+        reject(new Error("timeout"));
+      }, 30000);
+
+      child.on("error", (e) => {
+        clearTimeout(timeout);
+        reject(e);
+      });
+
+      child.on("close", (code) => {
+        clearTimeout(timeout);
+        if (code === 0) {
+          resolve({ stdout: out, stderr: err });
+        } else {
+          reject(new Error(err || `exit ${code}`));
+        }
+      });
+    });
+
+    if (!stdout?.trim()) return false;
+
+    try {
+      const entries = JSON.parse(stdout) as LsJsonEntry[];
+      return entries.length > 0 && !entries[0].IsDir;
+    } catch {
+      return false;
+    }
+  } catch {
+    return false;
+  } finally {
+    cleanupRcloneConfig(configPath);
+  }
+}

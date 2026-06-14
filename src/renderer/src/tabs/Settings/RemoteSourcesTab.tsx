@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Globe, Trash2, Play, Square, RefreshCw, Shield, KeyRound, Timer, Wifi, Lock, FolderCheck } from "lucide-react";
+import { Globe, Trash2, Play, Square, RefreshCw, Shield, KeyRound, Timer, Wifi, Lock, FolderCheck, AlertTriangle, Film, Music, Gamepad2 } from "lucide-react";
 import { RemoteSource, CredentialMode } from "../../../shared/types";
 
 const MODE_ICONS: Record<CredentialMode, typeof Shield> = {
@@ -32,6 +32,8 @@ export const RemoteSourcesTab: React.FC = () => {
   const [discovering, setDiscovering] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [servingIds, setServingIds] = useState<Set<string>>(new Set());
+  const [checkingMissing, setCheckingMissing] = useState(false);
+  const [deletingMissing, setDeletingMissing] = useState<Record<string, boolean>>({});
 
   const load = async () => {
     setLoading(true);
@@ -95,6 +97,32 @@ export const RemoteSourcesTab: React.FC = () => {
       alert("Network discovery failed.");
     } finally {
       setDiscovering(false);
+    }
+  };
+
+  const handleCheckAvailability = async () => {
+    setCheckingMissing(true);
+    try {
+      await window.htpc.remote.checkAvailability();
+      alert("Availability check complete. Missing items have been marked.");
+    } catch (err) {
+      console.error("Availability check failed:", err);
+      alert("Availability check failed.");
+    } finally {
+      setCheckingMissing(false);
+    }
+  };
+
+  const handleDeleteMissing = async (type: "movie" | "music" | "game") => {
+    setDeletingMissing((prev) => ({ ...prev, [type]: true }));
+    try {
+      const count = await window.htpc.remote.deleteMissing(type);
+      alert(`Deleted ${count} missing ${type} entries.`);
+    } catch (err) {
+      console.error(`Failed to delete missing ${type}:`, err);
+      alert(`Failed to delete missing ${type} entries.`);
+    } finally {
+      setDeletingMissing((prev) => ({ ...prev, [type]: false }));
     }
   };
 
@@ -245,6 +273,59 @@ export const RemoteSourcesTab: React.FC = () => {
             })}
           </div>
         )}
+      </section>
+
+      <section className="flex flex-col gap-4">
+        <h2 className="text-lg font-semibold" style={{ color: "var(--color-text)" }}>
+          Remote File Availability
+        </h2>
+        <p className="text-xs" style={{ color: "var(--color-text-dim)" }}>
+          An automatic worker checks every 5 minutes whether remote files still exist and marks missing ones.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <motion.button
+            className="px-3 py-1.5 rounded-[var(--radius-card)] text-xs font-medium flex items-center gap-1.5"
+            style={{
+              background: "var(--color-surface-raised)",
+              color: "var(--color-text)",
+              border: "1px solid var(--color-border)",
+            }}
+            onClick={handleCheckAvailability}
+            whileTap={{ scale: 0.96 }}
+            disabled={checkingMissing}
+          >
+            {checkingMissing ? <RefreshCw size={14} className="animate-spin" /> : <Wifi size={14} />}
+            {checkingMissing ? "Checking…" : "Check Now"}
+          </motion.button>
+        </div>
+        <div className="flex flex-col gap-2 mt-2">
+          <p className="text-xs font-medium" style={{ color: "var(--color-text-dim)" }}>
+            Delete entries marked as missing:
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <DeleteMissingButton
+              label="Movies"
+              type="movie"
+              icon={<Film size={14} />}
+              deleting={deletingMissing["movie"]}
+              onClick={() => handleDeleteMissing("movie")}
+            />
+            <DeleteMissingButton
+              label="Music"
+              type="music"
+              icon={<Music size={14} />}
+              deleting={deletingMissing["music"]}
+              onClick={() => handleDeleteMissing("music")}
+            />
+            <DeleteMissingButton
+              label="Games"
+              type="game"
+              icon={<Gamepad2 size={14} />}
+              deleting={deletingMissing["game"]}
+              onClick={() => handleDeleteMissing("game")}
+            />
+          </div>
+        </div>
       </section>
 
       {showAddModal && (
@@ -674,6 +755,37 @@ const AddRemoteSourceModal: React.FC<AddRemoteSourceModalProps> = ({ onClose, on
         </div>
       </motion.div>
     </div>
+  );
+};
+
+/* ------------------------------------------------------------------ */
+/*  Delete Missing Button Component                                     */
+/* ------------------------------------------------------------------ */
+
+interface DeleteMissingButtonProps {
+  label: string;
+  type: string;
+  icon: React.ReactNode;
+  deleting: boolean;
+  onClick: () => void;
+}
+
+const DeleteMissingButton: React.FC<DeleteMissingButtonProps> = ({ label, icon, deleting, onClick }) => {
+  return (
+    <motion.button
+      className="flex items-center gap-2 px-3 py-2 rounded-[var(--radius-card)] text-xs font-medium"
+      style={{
+        background: "var(--color-surface)",
+        color: "var(--color-text)",
+        border: "1px solid var(--color-border)",
+      }}
+      onClick={onClick}
+      whileTap={{ scale: 0.96 }}
+      disabled={deleting}
+    >
+      {deleting ? <RefreshCw size={14} className="animate-spin" /> : <AlertTriangle size={14} />}
+      {deleting ? "Deleting…" : `Delete Missing ${label}`}
+    </motion.button>
   );
 };
 
