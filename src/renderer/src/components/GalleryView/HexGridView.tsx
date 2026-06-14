@@ -223,6 +223,7 @@ export const HexGridView = React.forwardRef(function HexGridViewInner<T>(
             height: rowHeight,
             paddingLeft,
             paddingRight,
+            overflow: "visible",
           }}
         >
           {isEvenRow && rowItems.length < cols
@@ -247,6 +248,9 @@ export const HexGridView = React.forwardRef(function HexGridViewInner<T>(
                   zIndex: isFocused ? 10 : 1,
                   transform: isFocused ? "scale(1.04)" : "scale(1)",
                   transition: "transform 0.2s ease",
+                  filter: isFocused
+                    ? "drop-shadow(0 0 10px var(--color-accent)) drop-shadow(0 0 4px var(--color-accent))"
+                    : undefined,
                 }}
                 {...itemProps}
                 onClick={() => hex.onClick?.()}
@@ -261,9 +265,6 @@ export const HexGridView = React.forwardRef(function HexGridViewInner<T>(
                     background: "transparent",
                     transition: "filter 0.2s",
                     cursor: "pointer",
-                    filter: isFocused
-                      ? "drop-shadow(0 0 10px var(--color-accent)) drop-shadow(0 0 4px var(--color-accent))"
-                      : undefined,
                   }}
                 >
                   {/* Inner hex: thumbnail / placeholder + title */}
@@ -470,8 +471,10 @@ export const HexGridView = React.forwardRef(function HexGridViewInner<T>(
   );
 
   const wrapperStyle: CSSProperties = {
-    paddingTop: overlap,
-    paddingBottom: overlap,
+    paddingTop: overlap + 8,
+    paddingBottom: overlap + 8,
+    paddingLeft: 12,
+    paddingRight: 12,
   };
 
   if (scrollRef) {
