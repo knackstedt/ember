@@ -1,5 +1,5 @@
 import React from "react";
-import gamecubeSvgUrl from "./gamecube.svg";
+import { GameCubeControllerBg } from "./GameCubeControllerBg";
 
 interface GameCubeControllerProps {
   highlightCode?: string | null;
@@ -166,14 +166,7 @@ export const GameCubeController: React.FC<GameCubeControllerProps> = ({
       aria-label="GameCube controller diagram"
     >
       {/* ── Background controller image ── */}
-      <image
-        href={gamecubeSvgUrl}
-        x="0"
-        y="0"
-        width="585.781"
-        height="585.782"
-        preserveAspectRatio="xMidYMid meet"
-      />
+      <GameCubeControllerBg />
 
       {/* ── Triggers (L / R) ── */}
       {Object.entries(TRIGGER).map(([code, t]) => {

@@ -1,4 +1,5 @@
 import React from "react";
+import { PSXIcon, PSCircleIcon, PSSquareIcon, PSTriangleIcon } from "./PlayStationIcons";
 
 interface PS4ControllerProps {
   highlightCode?: string | null;
@@ -44,10 +45,10 @@ const BODY = {
 
 /* Upper-right diamond */
 const FACE = {
-  north: { cx: 294, cy: 82,  r: 11, label: "Δ", color: "#5bbfaa" },
-  south: { cx: 294, cy: 114, r: 11, label: "X", color: "#6fa8e0" },
-  west:  { cx: 278, cy: 98, r: 11, label: "[]", color: "#d499e8" },
-  east:  { cx: 310, cy: 98, r: 11, label: "O", color: "#e05252" },
+  north: { cx: 294, cy: 82,  r: 11, Icon: PSTriangleIcon },
+  south: { cx: 294, cy: 114, r: 11, Icon: PSXIcon },
+  west:  { cx: 278, cy: 98, r: 11, Icon: PSSquareIcon },
+  east:  { cx: 310, cy: 98, r: 11, Icon: PSCircleIcon },
 };
 
 /* Top shoulder buttons */
@@ -299,14 +300,16 @@ export const PS4Controller: React.FC<PS4ControllerProps> = ({
       {Object.entries(FACE).map(([code, b]) => {
         const active = accentCode === code;
         const isPressed = pressedSet.has(code);
-        const baseColor = active ? (b.color ?? "var(--color-accent)") : isPressed ? (b.color ?? "var(--color-accent)") : "var(--color-surface)";
-        const borderColor = active ? (b.color ?? "var(--color-accent)") : isPressed ? (b.color ?? "var(--color-accent)") : "var(--color-border)";
+        const baseColor = active ? "var(--color-accent)" : isPressed ? "var(--color-accent)" : "var(--color-surface)";
+        const borderColor = active ? "var(--color-accent)" : isPressed ? "var(--color-accent)" : "var(--color-border)";
+        const iconColor = active || isPressed ? "#fff" : "var(--color-text-dim)";
+        const { Icon } = b as unknown as { Icon: React.FC<{ size?: number; color?: string }> };
         return (
           <g key={code}>
             <circle cx={b.cx} cy={b.cy} r={b.r} fill={baseColor} stroke={borderColor} strokeWidth="1.5" opacity={active ? 1 : isPressed ? 0.9 : 0.8} />
-            <text x={b.cx} y={b.cy + 4} textAnchor="middle" fontSize={b.r < 9 ? 7 : 8} fontWeight="700" fill={active || isPressed ? "#fff" : "var(--color-text-dim)"}>
-              {b.label}
-            </text>
+            <g transform={`translate(${b.cx - 5}, ${b.cy - 5})`}>
+              <Icon size={10} color={iconColor} />
+            </g>
           </g>
         );
       })}

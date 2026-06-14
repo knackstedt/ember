@@ -1,5 +1,5 @@
 import React from "react";
-import xboxSvgUrl from "./xbox.svg";
+import { XboxControllerBg } from "./XboxControllerBg";
 
 interface XboxControllerProps {
   highlightCode?: string | null;
@@ -184,14 +184,7 @@ export const XboxController: React.FC<XboxControllerProps> = ({
       aria-label="Xbox controller diagram"
     >
       {/* ── Background controller image ── */}
-      <image
-        href={xboxSvgUrl}
-        x="0"
-        y="0"
-        width="580.032"
-        height="580.032"
-        preserveAspectRatio="xMidYMid meet"
-      />
+      <XboxControllerBg />
 
       {/* ── Triggers ── */}
       {Object.entries(TRIGGER).map(([code, t]) => {
