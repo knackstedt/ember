@@ -133,6 +133,7 @@ async function runMigrations(db: Surreal): Promise<void> {
     DEFINE FIELD IF NOT EXISTS compressedRomPath ON game TYPE option<string>;
     DEFINE FIELD IF NOT EXISTS compressionFormat ON game TYPE option<string>;
     DEFINE FIELD IF NOT EXISTS sourceLocation ON game TYPE option<string>;
+    DEFINE FIELD IF NOT EXISTS missing ON game TYPE option<bool>;
 
     DEFINE TABLE IF NOT EXISTS movie SCHEMAFULL;
     DEFINE FIELD IF NOT EXISTS id ON movie TYPE string;
@@ -155,6 +156,7 @@ async function runMigrations(db: Surreal): Promise<void> {
     DEFINE FIELD IF NOT EXISTS lastPlayed ON movie TYPE option<int>;
     DEFINE FIELD IF NOT EXISTS hidden ON movie TYPE bool DEFAULT false;
     DEFINE FIELD IF NOT EXISTS sourceLocation ON movie TYPE option<string>;
+    DEFINE FIELD IF NOT EXISTS missing ON movie TYPE option<bool>;
 
     DEFINE TABLE IF NOT EXISTS music_track SCHEMAFULL;
     DEFINE FIELD IF NOT EXISTS id ON music_track TYPE string;
@@ -185,6 +187,7 @@ async function runMigrations(db: Surreal): Promise<void> {
     DEFINE FIELD IF NOT EXISTS tags ON music_track TYPE array<string> DEFAULT [];
     DEFINE FIELD IF NOT EXISTS hidden ON music_track TYPE bool DEFAULT false;
     DEFINE FIELD IF NOT EXISTS sourceLocation ON music_track TYPE option<string>;
+    DEFINE FIELD IF NOT EXISTS missing ON music_track TYPE option<bool>;
 
     DEFINE TABLE IF NOT EXISTS tv_show SCHEMAFULL;
     DEFINE FIELD IF NOT EXISTS id ON tv_show TYPE string;

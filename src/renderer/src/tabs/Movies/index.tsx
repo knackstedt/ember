@@ -803,7 +803,7 @@ export const MoviesTab: React.FC = () => {
           )
         }
       />
-      {subTab === "local" && menu}
+      {menu}
       <CollectionManager
         open={showCollectionManager}
         onClose={() => setShowCollectionManager(false)}
