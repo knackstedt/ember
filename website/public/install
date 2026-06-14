@@ -1,0 +1,134 @@
+#!/bin/bash
+set -e
+
+REPO="knackstedt/ember"
+API_URL="https://api.github.com/repos/$REPO/releases/latest"
+
+# Only use colors if output is a terminal
+if [ -t 1 ]; then
+    RED='\033[0;31m'
+    GREEN='\033[0;32m'
+    YELLOW='\033[1;33m'
+    BLUE='\033[0;34m'
+    NC='\033[0m'
+else
+    RED=''; GREEN=''; YELLOW=''; BLUE=''; NC=''
+fi
+
+info()  { printf "${BLUE}==>${NC} %s\n" "$1"; }
+warn()  { printf "${YELLOW}==>${NC} %s\n" "$1"; }
+error() { printf "${RED}==>${NC} %s\n" "$1"; }
+ok()    { printf "${GREEN}==>${NC} %s\n" "$1"; }
+
+# Verify Linux
+if [ "$(uname -s)" != "Linux" ]; then
+    error "Ember is only supported on Linux."
+    exit 1
+fi
+
+ARCH=$(uname -m)
+case "$ARCH" in
+    x86_64|amd64)
+        ELECTRON_ARCH="x64"
+        DEB_ARCH="amd64"
+        RPM_ARCH="x86_64"
+        ;;
+    aarch64|arm64)
+        ELECTRON_ARCH="arm64"
+        DEB_ARCH="arm64"
+        RPM_ARCH="aarch64"
+        ;;
+    *)
+        error "Unsupported architecture: $ARCH"
+        exit 1
+        ;;
+esac
+
+# Detect package manager
+if command -v apt-get >/dev/null 2>&1 || command -v apt >/dev/null 2>&1; then
+    PKG_FORMAT="deb"
+elif command -v dnf >/dev/null 2>&1 || command -v yum >/dev/null 2>&1; then
+    PKG_FORMAT="rpm"
+elif command -v pacman >/dev/null 2>&1; then
+    # Arch has no native package — use AppImage
+    PKG_FORMAT="appimage"
+else
+    PKG_FORMAT="appimage"
+fi
+
+info "Detected: Linux $ARCH ($PKG_FORMAT)"
+
+info "Fetching latest release..."
+RELEASE_JSON=$(curl -fsSL "$API_URL")
+TAG_NAME=$(echo "$RELEASE_JSON" | grep -o '"tag_name": "[^"]*"' | head -1 | cut -d'"' -f4)
+
+if [ -z "$TAG_NAME" ]; then
+    error "Failed to fetch latest release from GitHub."
+    exit 1
+fi
+
+VERSION="${TAG_NAME#v}"
+info "Latest version: $TAG_NAME"
+
+# Pick asset
+case "$PKG_FORMAT" in
+    deb)
+        ASSET_NAME="ember_${VERSION}_${DEB_ARCH}.deb"
+        INSTALL_CMD="sudo apt install -y ./\"$ASSET_NAME\""
+        ;;
+    rpm)
+        ASSET_NAME="ember-${VERSION}.${RPM_ARCH}.rpm"
+        INSTALL_CMD="sudo rpm -i ./\"$ASSET_NAME\""
+        ;;
+    appimage)
+        if [ "$ELECTRON_ARCH" = "arm64" ]; then
+            ASSET_NAME="Ember-${VERSION}-arm64.AppImage"
+        else
+            ASSET_NAME="Ember-${VERSION}.AppImage"
+        fi
+        INSTALL_CMD="chmod +x ./\"$ASSET_NAME\""
+        ;;
+esac
+
+# Find download URL
+DOWNLOAD_URL=$(echo "$RELEASE_JSON" | grep -o '"browser_download_url": "[^"]*"' | grep "$ASSET_NAME" | head -1 | cut -d'"' -f4)
+
+# Fallback to tar.gz
+if [ -z "$DOWNLOAD_URL" ]; then
+    warn "$ASSET_NAME not found, trying tar.gz..."
+    if [ "$ELECTRON_ARCH" = "arm64" ]; then
+        ASSET_NAME="ember-${VERSION}-arm64.tar.gz"
+    else
+        ASSET_NAME="ember-${VERSION}.tar.gz"
+    fi
+    DOWNLOAD_URL=$(echo "$RELEASE_JSON" | grep -o '"browser_download_url": "[^"]*"' | grep "$ASSET_NAME" | head -1 | cut -d'"' -f4)
+
+    if [ -z "$DOWNLOAD_URL" ]; then
+        error "No download found for your platform ($ARCH / $PKG_FORMAT)."
+        exit 1
+    fi
+
+    INSTALL_CMD="tar -xzf ./\"$ASSET_NAME\""
+fi
+
+# Download
+info "Downloading $ASSET_NAME..."
+curl -fSL -o "$ASSET_NAME" "$DOWNLOAD_URL"
+
+# Install
+info "Installing..."
+eval "$INSTALL_CMD"
+
+ok "Ember $TAG_NAME installed successfully."
+
+case "$PKG_FORMAT" in
+    appimage)
+        ok "Run it with: ./$ASSET_NAME"
+        ;;
+    tar.gz)
+        ok "Extracted. Run the binary inside the unpacked directory."
+        ;;
+    *)
+        ok "Ember is now installed. Launch it from your application menu."
+        ;;
+esac
