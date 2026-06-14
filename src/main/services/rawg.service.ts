@@ -17,6 +17,12 @@ export interface RawgGame {
   platforms?: { platform: { name: string } }[];
 }
 
+function fetchWithTimeout(url: string, timeoutMs = 5000): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(url, { signal: controller.signal }).finally(() => clearTimeout(timer));
+}
+
 export async function searchGame(
   title: string,
   apiKey?: string,
@@ -27,7 +33,7 @@ export async function searchGame(
       page_size: "1",
       ...(apiKey ? { key: apiKey } : {}),
     });
-    const res = await fetch(`${RAWG_BASE}/games?${params}`);
+    const res = await fetchWithTimeout(`${RAWG_BASE}/games?${params}`);
     if (!res.ok) return null;
     const data = await res.json();
     return data.results?.[0] ?? null;
@@ -42,7 +48,7 @@ export async function getGameDetail(
 ): Promise<RawgGame | null> {
   try {
     const params = apiKey ? `?key=${apiKey}` : "";
-    const res = await fetch(`${RAWG_BASE}/games/${slug}${params}`);
+    const res = await fetchWithTimeout(`${RAWG_BASE}/games/${slug}${params}`);
     if (!res.ok) return null;
     return await res.json();
   } catch {

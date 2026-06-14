@@ -456,6 +456,10 @@ export interface AppSettings {
   keybinds?: Record<string, string>;
   /** Path overrides for emulator binaries */
   emulatorPaths?: Record<string, string>;
+  /** Per-platform shader presets for emulators */
+  emulatorShaders?: Record<string, string>;
+  /** Default emulator shader when no platform-specific preset is set */
+  defaultEmulatorShader?: string;
   /** Extra directories to scan for ROMs */
   romPaths?: string[];
   /** Extra directories to scan for movies */
@@ -620,7 +624,7 @@ export interface Collection {
   icon?: string;
   color?: string;
   description?: string;
-  itemType: "game" | "movie" | "music" | "tv";
+  itemType: "game" | "movie" | "music" | "tv" | "mixed";
   type: "manual" | "smart";
   filter?: SmartFilterGroup;
   sortOrder?: string;
@@ -631,9 +635,16 @@ export interface CollectionItem {
   id: string;
   collectionId: string;
   itemId: string;
-  itemType: "game" | "movie" | "music" | "tv";
+  itemType: "game" | "movie" | "music" | "tv" | "mixed";
   addedAt: number;
   order?: number;
+}
+
+export interface AiGroup {
+  id: string;
+  label: string;
+  itemIds: string[];
+  centerItemId?: string;
 }
 
 export type SmartFilterOperator =

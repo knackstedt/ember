@@ -344,6 +344,14 @@ export const GamingTab: React.FC = () => {
   useEffect(() => {
     if (viewMode !== "ai-groups" || games.length === 0) return;
     if (aiGroups.length > 0) return; // already computed
+
+    // Guard: AI grouping is synchronous and CPU-intensive on the main thread.
+    // With >150 items the renderer freezes (or appears to crash). Fall back to All view.
+    if (games.length > 150) {
+      setViewMode("all");
+      return;
+    }
+
     setAiGroupsLoading(true);
     if (aiGroupTimeoutRef.current) clearTimeout(aiGroupTimeoutRef.current);
 
@@ -435,15 +443,15 @@ export const GamingTab: React.FC = () => {
     [],
   );
 
-  const isHexGrid = galleryView === "hex-grid";
+  const isRowBasedView = galleryView === "bookshelf" || galleryView === "spread-deck";
   const { focusedIndex, setFocusedIndex } = useGridFocus({
     items: gridItems,
-    columnCount: isHexGrid ? columnCount : viewColumnCount,
+    columnCount: isRowBasedView ? viewColumnCount : columnCount,
     gridRef,
     onConfirm: (game) => setSelected(game),
     enabled: !selected && !topBarFocused,
     onEdge: handleGridEdge,
-    getNextIndex: isHexGrid
+    getNextIndex: galleryView === "hex-grid"
       ? (current, action) => {
           const handle = gridRef.current as unknown as { getNextIndex?(i: number, a: NavAction): number | null } | null;
           return handle?.getNextIndex?.(current, action) ?? null;

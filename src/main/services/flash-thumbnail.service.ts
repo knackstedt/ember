@@ -530,6 +530,41 @@ export function setFlashThumbnailConcurrency(n: number): void {
   screenshotQueue.setMaxConcurrency(n);
 }
 
+/* ------------------------------------------------------------------ */
+/*  Overall thumbnail concurrency semaphore                            */
+/*  Prevents flooding the main process with concurrent online searches */
+/*  and offscreen BrowserWindow creation.                              */
+/* ------------------------------------------------------------------ */
+
+class Semaphore {
+  private running = 0;
+  private max: number;
+  private queue: Array<() => void> = [];
+
+  constructor(max: number) {
+    this.max = max;
+  }
+
+  async acquire(): Promise<void> {
+    if (this.running < this.max) {
+      this.running++;
+      return;
+    }
+    return new Promise((resolve) => this.queue.push(resolve));
+  }
+
+  release(): void {
+    this.running--;
+    const next = this.queue.shift();
+    if (next) {
+      this.running++;
+      next();
+    }
+  }
+}
+
+const flashThumbnailSemaphore = new Semaphore(8);
+
 function coverExistsOnDisk(id: string): string | undefined {
   for (const ext of [".png", ".jpg", ".webp"]) {
     const p = join(screenshotDir, `${id}${ext}`);
@@ -760,6 +795,7 @@ export async function loadFlashThumbnail(
   }
   inFlight.add(id);
 
+  await flashThumbnailSemaphore.acquire();
   try {
     // Check if already on disk from a previous run
     const cached = coverExistsOnDisk(id);
@@ -772,7 +808,7 @@ export async function loadFlashThumbnail(
     // 1. Sidecar image
     const sidecar = findSidecarImage(romPath);
     if (sidecar) {
-    log.debug("flash:loadFlashThumbnail", `using sidecar ${sidecar}`);
+      log.debug("flash:loadFlashThumbnail", `using sidecar ${sidecar}`);
       const ext = extname(sidecar).toLowerCase();
       const destExt = ext === ".webp" ? ".webp" : ".jpg";
       const dest = join(screenshotDir, `${id}${destExt}`);
@@ -790,7 +826,10 @@ export async function loadFlashThumbnail(
     if (onlineUrl) {
       log.info("flash:loadFlashThumbnail", `downloading online cover ${onlineUrl}`);
       try {
-        const res = await fetch(onlineUrl);
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 8000);
+        const res = await fetch(onlineUrl, { signal: controller.signal });
+        clearTimeout(timer);
         if (res.ok) {
           const buf = Buffer.from(await res.arrayBuffer());
           const dest = join(screenshotDir, `${id}.jpg`);
@@ -818,6 +857,7 @@ export async function loadFlashThumbnail(
     return procUrl;
   } finally {
     inFlight.delete(id);
+    flashThumbnailSemaphore.release();
   }
 }
 

@@ -480,9 +480,11 @@ export const MusicTab: React.FC = () => {
     [hasPlayer, setZone],
   );
 
+  const isRowBasedView = galleryView === "bookshelf" || galleryView === "spread-deck";
+
   const { focusedIndex: groupFocusedIndex, setFocusedIndex: setGroupFocusedIndex } = useGridFocus<MusicGroup>({
     items: groupItems,
-    columnCount: viewColumnCount,
+    columnCount: isRowBasedView ? viewColumnCount : groupColumnCount,
     gridRef: groupGridRef,
     onConfirm: (group) => setSelectedGroup(group.name),
     enabled: subTab === "local" && !selected && !selectedGroup && browseMode !== "tracks",
@@ -491,7 +493,7 @@ export const MusicTab: React.FC = () => {
 
   const { focusedIndex: trackFocusedIndex, setFocusedIndex: setTrackFocusedIndex } = useGridFocus<MusicTrack>({
     items: gridTrackItems,
-    columnCount: viewColumnCount,
+    columnCount: isRowBasedView ? viewColumnCount : trackColumnCount,
     gridRef: trackGridRef,
     onConfirm: (track, index) => {
       play(gridTrackItems, index);

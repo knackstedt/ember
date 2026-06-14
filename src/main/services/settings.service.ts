@@ -8,13 +8,9 @@ const DEFAULTS: AppSettings = {
   moviePaths: [],
   musicPaths: [],
   romPaths: [],
-  gamePaths: [],
-  enableAnalytics: false,
-  startOnBoot: false,
-  hardwareAcceleration: true,
   disabledTabs: [],
   dailyBackground: { enabled: false, source: "bing" },
-  background: { type: "theme" },
+  background: "theme",
   defaultEmulatorShader: "",
   emulatorShaders: {},
   commandKeybinds: {},
@@ -25,13 +21,27 @@ const DEFAULTS: AppSettings = {
   flashThumbnailConcurrency: 4,
 };
 
+let cachedSettings: AppSettings | null = null;
+let cacheTime = 0;
+const CACHE_TTL_MS = 5000;
+
 export async function getSettings(): Promise<AppSettings> {
+  if (cachedSettings && Date.now() - cacheTime < CACHE_TTL_MS) {
+    return cachedSettings;
+  }
   try {
     const result = await SettingsRepo.getAll();
-    return { ...DEFAULTS, ...result } as AppSettings;
+    cachedSettings = { ...DEFAULTS, ...result } as AppSettings;
+    cacheTime = Date.now();
+    return cachedSettings;
   } catch {
     return { ...DEFAULTS };
   }
+}
+
+export function invalidateSettingsCache(): void {
+  cachedSettings = null;
+  cacheTime = 0;
 }
 
 export async function setSetting<K extends keyof AppSettings>(
@@ -39,10 +49,12 @@ export async function setSetting<K extends keyof AppSettings>(
   value: AppSettings[K],
 ): Promise<void> {
   await SettingsRepo.set(key, value);
+  invalidateSettingsCache();
 }
 
 export async function setSettings(
   partial: Partial<AppSettings>,
 ): Promise<void> {
   await SettingsRepo.setBatch(partial);
+  invalidateSettingsCache();
 }

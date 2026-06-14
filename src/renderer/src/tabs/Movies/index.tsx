@@ -243,14 +243,14 @@ export const MoviesTab: React.FC = () => {
     { key: "rating", label: "Rating", accessor: (m) => String((m as Record<string, unknown>).rating ?? ""), maxValues: 5 },
   ], []);
 
-  const isHexGrid = galleryView === "hex-grid";
+  const isRowBasedView = galleryView === "bookshelf" || galleryView === "spread-deck";
   const { focusedIndex, setFocusedIndex } = useGridFocus({
     items: gridItems,
-    columnCount: isHexGrid ? columnCount : viewColumnCount,
+    columnCount: isRowBasedView ? viewColumnCount : columnCount,
     gridRef,
     onConfirm: (movie) => setSelected(movie),
     enabled: subTab !== "streaming" && !selected,
-    getNextIndex: isHexGrid
+    getNextIndex: galleryView === "hex-grid"
       ? (current, action) => {
           const handle = gridRef.current as unknown as { getNextIndex?(i: number, a: NavAction): number | null } | null;
           return handle?.getNextIndex?.(current, action) ?? null;
