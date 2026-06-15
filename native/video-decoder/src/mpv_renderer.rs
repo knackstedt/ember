@@ -20,22 +20,37 @@ fn mpv_err(code: c_int) -> Result<(), String> {
 /// symbols are resolved against the system libavutil (so.58) rather
 /// than Electron/Chromium's bundled libavutil (so.59), avoiding ABI
 /// mismatch crashes in the renderer process.
+#[derive(Clone, Debug)]
+pub struct SubtitleTrack {
+    pub id: i64,
+    pub title: Option<String>,
+    pub lang: Option<String>,
+    pub selected: bool,
+    pub default: bool,
+}
+
 pub struct MpvRenderer {
     mpv: *mut api::mpv_handle,
     render_ctx: *mut api::mpv_render_context,
     video_width: u32,
     video_height: u32,
+    render_width: u32,
+    render_height: u32,
     duration_ms: i64,
     frame_rate: f64,
     eof_reached: Arc<AtomicBool>,
     event_thread: Option<JoinHandle<()>>,
+    subtitle_tracks: Vec<SubtitleTrack>,
 }
 
 impl MpvRenderer {
     pub fn new() -> Result<Self, String> {
+        eprintln!("[mpv_renderer] MpvRenderer::new() starting");
         let mpv_api = api::get_api()?;
+        eprintln!("[mpv_renderer] api loaded");
 
         let mpv = unsafe { (mpv_api.mpv_create)() };
+        eprintln!("[mpv_renderer] mpv_create returned");
         if mpv.is_null() {
             return Err("mpv_create failed".to_string());
         }
@@ -44,16 +59,44 @@ impl MpvRenderer {
         // hwdec=auto lets mpv use NVDEC/VAAPI/DXVA — whatever the GPU
         // supports — then the SW render API reads the composited frame
         // back to CPU memory for WebGL upload.
+        // config=no prevents mpv from reading the user's ~/.config/mpv/mpv.conf,
+        // which could set an unexpectedly low volume, unwanted filters, etc.
+        eprintln!("[mpv_renderer] setting options...");
         unsafe {
             (mpv_api.mpv_set_option_string)(mpv, c"vo".as_ptr(), c"libmpv".as_ptr());
             (mpv_api.mpv_set_option_string)(mpv, c"hwdec".as_ptr(), c"auto".as_ptr());
             (mpv_api.mpv_set_option_string)(mpv, c"loop-file".as_ptr(), c"no".as_ptr());
             (mpv_api.mpv_set_option_string)(mpv, c"terminal".as_ptr(), c"no".as_ptr());
             (mpv_api.mpv_set_option_string)(mpv, c"msg-level".as_ptr(), c"all=warn".as_ptr());
+            (mpv_api.mpv_set_option_string)(mpv, c"config".as_ptr(), c"no".as_ptr());
+            // Software volume + explicit PulseAudio for consistent loudness.
+            (mpv_api.mpv_set_option_string)(mpv, c"softvol".as_ptr(), c"yes".as_ptr());
+            (mpv_api.mpv_set_option_string)(mpv, c"ao".as_ptr(), c"pulse".as_ptr());
+            (mpv_api.mpv_set_option_string)(mpv, c"replaygain".as_ptr(), c"no".as_ptr());
+            // Raise ceiling so we have headroom for quiet files.
+            (mpv_api.mpv_set_option_string)(mpv, c"volume-max".as_ptr(), c"200".as_ptr());
         }
+        eprintln!("[mpv_renderer] options set, calling mpv_initialize...");
 
         mpv_err(unsafe { (mpv_api.mpv_initialize)(mpv) })
             .map_err(|e| format!("mpv_initialize failed: {}", e))?;
+        eprintln!("[mpv_renderer] mpv_initialize OK");
+
+        // Explicitly set volume property after init — set_option_string before
+        // initialize is unreliable for some properties.
+        let vol_name = CString::new("volume").unwrap();
+        let vol_value: f64 = 100.0;
+        let ret = unsafe {
+            (mpv_api.mpv_set_property)(
+                mpv,
+                vol_name.as_ptr(),
+                api::MPV_FORMAT_DOUBLE,
+                &vol_value as *const _ as *mut c_void,
+            )
+        };
+        if ret < 0 {
+            eprintln!("[mpv_renderer] Warning: mpv_set_property(volume) failed: {}", ret);
+        }
 
         let api_type = CString::new("sw").unwrap();
         let mut params = [
@@ -68,11 +111,13 @@ impl MpvRenderer {
         ];
 
         let mut render_ctx: *mut api::mpv_render_context = ptr::null_mut();
+        eprintln!("[mpv_renderer] calling mpv_render_context_create...");
         let ret = unsafe { (mpv_api.mpv_render_context_create)(&mut render_ctx, mpv, params.as_mut_ptr()) };
         if ret < 0 {
             unsafe { (mpv_api.mpv_terminate_destroy)(mpv) };
             return Err(format!("mpv_render_context_create failed: {}", ret));
         }
+        eprintln!("[mpv_renderer] mpv_render_context_create OK");
 
         let eof_reached = Arc::new(AtomicBool::new(false));
         let eof_clone = Arc::clone(&eof_reached);
@@ -109,16 +154,21 @@ impl MpvRenderer {
                 }
             }
         });
+        eprintln!("[mpv_renderer] event thread spawned");
 
+        eprintln!("[mpv_renderer] MpvRenderer::new() complete");
         Ok(Self {
             mpv,
             render_ctx,
             video_width: 0,
             video_height: 0,
+            render_width: 0,
+            render_height: 0,
             duration_ms: 0,
             frame_rate: 30.0,
             eof_reached,
             event_thread: Some(event_thread),
+            subtitle_tracks: Vec::new(),
         })
     }
 
@@ -147,6 +197,7 @@ impl MpvRenderer {
                     self.duration_ms =
                         (self.get_property_double("duration")?.unwrap_or(0.0) * 1000.0) as i64;
                     self.frame_rate = self.get_property_double("estimated-vf-fps")?.unwrap_or(30.0);
+                    self.refresh_subtitle_tracks();
                     return Ok(());
                 }
             }
@@ -157,6 +208,11 @@ impl MpvRenderer {
         }
 
         Err("Timeout waiting for video metadata".to_string())
+    }
+
+    pub fn set_render_size(&mut self, width: u32, height: u32) {
+        self.render_width = width;
+        self.render_height = height;
     }
 
     pub fn render_frame(
@@ -175,18 +231,27 @@ impl MpvRenderer {
             return Ok(None);
         }
 
-        if let Some((sab, w, h)) = sab {
+        // Extract requested render dimensions from the sab tuple (caller passes
+        // source resolution), then override with explicit render size if set.
+        let (sab_ref, req_w, req_h) = match sab {
+            Some((s, w, h)) => (Some(s), w, h),
+            None => (None, width, height),
+        };
+        let render_w = if self.render_width > 0 { self.render_width } else { req_w };
+        let render_h = if self.render_height > 0 { self.render_height } else { req_h };
+
+        if let Some(sab) = sab_ref {
             let slot_idx = sab.next_write_slot();
             let slot = sab.slot_mut_slice(slot_idx);
             slot.fill(0);
 
-            let stride = (w * 4) as usize;
-            let needed = stride * h as usize;
+            let stride = (render_w * 4) as usize;
+            let needed = stride * render_h as usize;
             if slot.len() < needed {
                 return Err(format!("SAB slot too small: {} < {}", slot.len(), needed));
             }
 
-            let size = [w as i32, h as i32];
+            let size = [render_w as i32, render_h as i32];
             let format = c"rgb0";
 
             let mut params = [
@@ -217,10 +282,10 @@ impl MpvRenderer {
                 return Err(format!("mpv_render_context_render failed: {}", ret));
             }
 
-            sab.publish_metadata(w, h);
+            sab.publish_metadata(render_w, render_h);
         }
 
-        Ok(Some((width, height)))
+        Ok(Some((render_w, render_h)))
     }
 
     pub fn seek(&mut self, timestamp_ms: i64) -> Result<(), String> {
@@ -258,6 +323,13 @@ impl MpvRenderer {
             height: self.video_height,
             duration_ms: self.duration_ms,
             frame_rate: self.frame_rate,
+        }
+    }
+
+    pub fn get_time_pos_ms(&self) -> i64 {
+        match self.get_property_double("time-pos") {
+            Ok(Some(t)) => (t * 1000.0) as i64,
+            _ => 0,
         }
     }
 
@@ -305,6 +377,297 @@ impl MpvRenderer {
             Ok(None)
         }
     }
+
+    fn get_property_string(&self, name: &str) -> Result<Option<String>, String> {
+        let mpv_api = api::get_api()?;
+        let name_c = CString::new(name).map_err(|e| format!("Invalid property name: {}", e))?;
+        let ptr = unsafe { (mpv_api.mpv_get_property_string)(self.mpv, name_c.as_ptr()) };
+        if ptr.is_null() {
+            return Ok(None);
+        }
+        let value = unsafe { CStr::from_ptr(ptr).to_string_lossy().into_owned() };
+        // NOTE: mpv docs say to free with mpv_free, but doing so causes
+        // "free(): invalid pointer" crashes with the system libmpv.so.2.
+        // The leak is tiny (a few KB per property query) and acceptable.
+        Ok(Some(value))
+    }
+
+    /// Query and cache subtitle tracks from mpv's track-list property.
+    pub fn refresh_subtitle_tracks(&mut self) {
+        self.subtitle_tracks.clear();
+        let json_str = match self.get_property_string("track-list") {
+            Ok(Some(s)) => s,
+            _ => return,
+        };
+
+        #[derive(serde::Deserialize)]
+        struct MpvTrack {
+            #[serde(rename = "type")]
+            track_type: String,
+            id: i64,
+            title: Option<String>,
+            lang: Option<String>,
+            selected: Option<bool>,
+            default: Option<bool>,
+        }
+
+        let tracks: Vec<MpvTrack> = match serde_json::from_str(&json_str) {
+            Ok(t) => t,
+            Err(e) => {
+                eprintln!("[mpv] Failed to parse track-list: {}", e);
+                return;
+            }
+        };
+
+        self.subtitle_tracks = tracks
+            .into_iter()
+            .filter(|t| t.track_type == "sub")
+            .map(|t| SubtitleTrack {
+                id: t.id,
+                title: t.title,
+                lang: t.lang,
+                selected: t.selected.unwrap_or(false),
+                default: t.default.unwrap_or(false),
+            })
+            .collect();
+    }
+
+    pub fn list_subtitle_tracks(&self) -> Vec<SubtitleTrack> {
+        self.subtitle_tracks.clone()
+    }
+
+    pub fn select_subtitle_track(&mut self, id: i64) -> Result<(), String> {
+        let mpv_api = api::get_api()?;
+        let sid = format!("{}", id);
+        let name_c = CString::new("sid").unwrap();
+        let value_c = CString::new(sid).unwrap();
+        let mut args = [
+            c"set".as_ptr(),
+            name_c.as_ptr(),
+            value_c.as_ptr(),
+            ptr::null(),
+        ];
+        mpv_err(unsafe { (mpv_api.mpv_command)(self.mpv, args.as_mut_ptr()) })
+            .map_err(|e| format!("mpv select subtitle failed: {}", e))?;
+        // Refresh track list so selected state is up to date.
+        self.refresh_subtitle_tracks();
+        Ok(())
+    }
+
+    pub fn load_external_subtitle(&mut self, path: &str) -> Result<(), String> {
+        let mpv_api = api::get_api()?;
+        let path_c = CString::new(path).map_err(|e| format!("Invalid subtitle path: {}", e))?;
+        let mut args = [
+            c"sub-add".as_ptr(),
+            path_c.as_ptr(),
+            c"select".as_ptr(),
+            ptr::null(),
+        ];
+        mpv_err(unsafe { (mpv_api.mpv_command)(self.mpv, args.as_mut_ptr()) })
+            .map_err(|e| format!("mpv sub-add failed: {}", e))?;
+        self.refresh_subtitle_tracks();
+        Ok(())
+    }
+
+    // ------------------------------------------------------------------
+    // Audio tracks
+    // ------------------------------------------------------------------
+
+    pub fn list_audio_tracks(&self) -> Vec<SubtitleTrack> {
+        let json_str = match self.get_property_string("track-list") {
+            Ok(Some(s)) => s,
+            _ => return Vec::new(),
+        };
+
+        #[derive(serde::Deserialize)]
+        struct MpvTrack {
+            #[serde(rename = "type")]
+            track_type: String,
+            id: i64,
+            title: Option<String>,
+            lang: Option<String>,
+            selected: Option<bool>,
+            default: Option<bool>,
+        }
+
+        let tracks: Vec<MpvTrack> = match serde_json::from_str(&json_str) {
+            Ok(t) => t,
+            _ => return Vec::new(),
+        };
+
+        tracks
+            .into_iter()
+            .filter(|t| t.track_type == "audio")
+            .map(|t| SubtitleTrack {
+                id: t.id,
+                title: t.title,
+                lang: t.lang,
+                selected: t.selected.unwrap_or(false),
+                default: t.default.unwrap_or(false),
+            })
+            .collect()
+    }
+
+    pub fn select_audio_track(&mut self, id: i64) -> Result<(), String> {
+        let mpv_api = api::get_api()?;
+        let aid = format!("{}", id);
+        let name_c = CString::new("aid").unwrap();
+        let value_c = CString::new(aid).unwrap();
+        let mut args = [
+            c"set".as_ptr(),
+            name_c.as_ptr(),
+            value_c.as_ptr(),
+            ptr::null(),
+        ];
+        mpv_err(unsafe { (mpv_api.mpv_command)(self.mpv, args.as_mut_ptr()) })
+            .map_err(|e| format!("mpv select audio failed: {}", e))
+    }
+
+    // ------------------------------------------------------------------
+    // Volume / mute / speed
+    // ------------------------------------------------------------------
+
+    pub fn get_volume(&self) -> f64 {
+        match self.get_property_double("volume") {
+            Ok(Some(v)) => v,
+            _ => 100.0,
+        }
+    }
+
+    pub fn set_volume(&mut self, vol: f64) -> Result<(), String> {
+        let mpv_api = api::get_api()?;
+        let name_c = CString::new("volume").unwrap();
+        let ret = unsafe {
+            (mpv_api.mpv_set_property)(
+                self.mpv,
+                name_c.as_ptr(),
+                api::MPV_FORMAT_DOUBLE,
+                &vol as *const _ as *mut c_void,
+            )
+        };
+        if ret < 0 {
+            return Err(format!("mpv set volume failed: {}", ret));
+        }
+        // Verify the change took effect.
+        let mut check: f64 = 0.0;
+        let ret2 = unsafe {
+            (mpv_api.mpv_get_property)(
+                self.mpv,
+                name_c.as_ptr(),
+                api::MPV_FORMAT_DOUBLE,
+                &mut check as *mut _ as *mut c_void,
+            )
+        };
+        if ret2 == 0 {
+            eprintln!("[mpv_renderer] volume set -> requested {} actual {}", vol, check);
+        }
+        Ok(())
+    }
+
+    pub fn get_mute(&self) -> bool {
+        match self.get_property_string("mute") {
+            Ok(Some(s)) => s == "yes",
+            _ => false,
+        }
+    }
+
+    pub fn set_mute(&mut self, mute: bool) -> Result<(), String> {
+        let mpv_api = api::get_api()?;
+        let val = if mute { "yes" } else { "no" };
+        let name_c = CString::new("mute").unwrap();
+        let value_c = CString::new(val).unwrap();
+        let mut args = [
+            c"set".as_ptr(),
+            name_c.as_ptr(),
+            value_c.as_ptr(),
+            ptr::null(),
+        ];
+        mpv_err(unsafe { (mpv_api.mpv_command)(self.mpv, args.as_mut_ptr()) })
+            .map_err(|e| format!("mpv set mute failed: {}", e))
+    }
+
+    pub fn get_speed(&self) -> f64 {
+        match self.get_property_double("speed") {
+            Ok(Some(v)) => v,
+            _ => 1.0,
+        }
+    }
+
+    pub fn set_speed(&mut self, speed: f64) -> Result<(), String> {
+        let mpv_api = api::get_api()?;
+        let speed_s = format!("{}", speed);
+        let name_c = CString::new("speed").unwrap();
+        let value_c = CString::new(speed_s).unwrap();
+        let mut args = [
+            c"set".as_ptr(),
+            name_c.as_ptr(),
+            value_c.as_ptr(),
+            ptr::null(),
+        ];
+        mpv_err(unsafe { (mpv_api.mpv_command)(self.mpv, args.as_mut_ptr()) })
+            .map_err(|e| format!("mpv set speed failed: {}", e))
+    }
+
+    // ------------------------------------------------------------------
+    // Chapters
+    // ------------------------------------------------------------------
+
+    pub fn list_chapters(&self) -> Vec<ChapterInfo> {
+        let json_str = match self.get_property_string("chapter-list") {
+            Ok(Some(s)) => s,
+            _ => return Vec::new(),
+        };
+
+        #[derive(serde::Deserialize)]
+        struct MpvChapter {
+            title: String,
+            time: f64,
+        }
+
+        let chapters: Vec<MpvChapter> = match serde_json::from_str(&json_str) {
+            Ok(c) => c,
+            _ => return Vec::new(),
+        };
+
+        chapters
+            .into_iter()
+            .enumerate()
+            .map(|(idx, c)| ChapterInfo {
+                index: idx as i64,
+                title: c.title,
+                time_ms: (c.time * 1000.0) as i64,
+            })
+            .collect()
+    }
+
+    pub fn get_chapter(&self) -> i64 {
+        match self.get_property_int("chapter") {
+            Ok(Some(c)) => c,
+            _ => -1,
+        }
+    }
+
+    pub fn set_chapter(&mut self, idx: i64) -> Result<(), String> {
+        let mpv_api = api::get_api()?;
+        let idx_s = format!("{}", idx);
+        let name_c = CString::new("chapter").unwrap();
+        let value_c = CString::new(idx_s).unwrap();
+        let mut args = [
+            c"set".as_ptr(),
+            name_c.as_ptr(),
+            value_c.as_ptr(),
+            ptr::null(),
+        ];
+        mpv_err(unsafe { (mpv_api.mpv_command)(self.mpv, args.as_mut_ptr()) })
+            .map_err(|e| format!("mpv set chapter failed: {}", e))
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ChapterInfo {
+    pub index: i64,
+    pub title: String,
+    pub time_ms: i64,
 }
 
 #[derive(Clone, Copy)]

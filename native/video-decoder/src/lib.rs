@@ -16,6 +16,31 @@ pub struct FrameMetadata {
     pub frame_rate: f64,
 }
 
+#[napi(object)]
+pub struct SubtitleTrackInfo {
+    pub id: i64,
+    pub title: Option<String>,
+    pub lang: Option<String>,
+    pub selected: bool,
+    pub default: bool,
+}
+
+#[napi(object)]
+pub struct AudioTrackInfo {
+    pub id: i64,
+    pub title: Option<String>,
+    pub lang: Option<String>,
+    pub selected: bool,
+    pub default: bool,
+}
+
+#[napi(object)]
+pub struct ChapterInfo {
+    pub index: i64,
+    pub title: String,
+    pub time_ms: i64,
+}
+
 #[napi]
 pub struct VideoDecoder {
     decoder: Option<MpvRenderer>,
@@ -44,6 +69,19 @@ impl VideoDecoder {
         decoder
             .open(&path)
             .map_err(|e| Error::new(Status::GenericFailure, e))
+    }
+
+    /// Set the target render resolution.  Passing (0, 0) resets to the
+    /// source video resolution.  Decoding at a smaller size (e.g. the
+    /// window pixel size) dramatically reduces CPU load and IPC traffic.
+    #[napi]
+    pub fn set_render_size(&mut self, width: u32, height: u32) -> Result<()> {
+        let decoder = self.decoder.as_mut().ok_or(Error::new(
+            Status::GenericFailure,
+            "Decoder already closed",
+        ))?;
+        decoder.set_render_size(width, height);
+        Ok(())
     }
 
     /// Render the current frame into the attached SharedArrayBuffer.
@@ -159,6 +197,16 @@ impl VideoDecoder {
         })
     }
 
+    /// Get current playback position in milliseconds.
+    #[napi]
+    pub fn get_time_pos_ms(&self) -> Result<i64> {
+        let decoder = self.decoder.as_ref().ok_or(Error::new(
+            Status::GenericFailure,
+            "Decoder not opened",
+        ))?;
+        Ok(decoder.get_time_pos_ms())
+    }
+
     /// Close the decoder and release resources.
     #[napi]
     pub fn close(&mut self) -> Result<()> {
@@ -167,5 +215,187 @@ impl VideoDecoder {
         }
         self.sab = None;
         Ok(())
+    }
+
+    /// List available subtitle tracks.
+    #[napi]
+    pub fn list_subtitle_tracks(&self) -> Result<Vec<SubtitleTrackInfo>> {
+        let decoder = self.decoder.as_ref().ok_or(Error::new(
+            Status::GenericFailure,
+            "Decoder not opened",
+        ))?;
+        let tracks = decoder.list_subtitle_tracks();
+        Ok(tracks
+            .into_iter()
+            .map(|t| SubtitleTrackInfo {
+                id: t.id,
+                title: t.title,
+                lang: t.lang,
+                selected: t.selected,
+                default: t.default,
+            })
+            .collect())
+    }
+
+    /// Select a subtitle track by id (use -1 to disable).
+    #[napi]
+    pub fn select_subtitle_track(&mut self, track_id: i64) -> Result<()> {
+        let decoder = self.decoder.as_mut().ok_or(Error::new(
+            Status::GenericFailure,
+            "Decoder not opened",
+        ))?;
+        decoder
+            .select_subtitle_track(track_id)
+            .map_err(|e| Error::new(Status::GenericFailure, e))
+    }
+
+    /// Load an external subtitle file.
+    #[napi]
+    pub fn load_external_subtitle(&mut self, path: String) -> Result<()> {
+        let decoder = self.decoder.as_mut().ok_or(Error::new(
+            Status::GenericFailure,
+            "Decoder not opened",
+        ))?;
+        decoder
+            .load_external_subtitle(&path)
+            .map_err(|e| Error::new(Status::GenericFailure, e))
+    }
+
+    /// List available audio tracks.
+    #[napi]
+    pub fn list_audio_tracks(&self) -> Result<Vec<AudioTrackInfo>> {
+        let decoder = self.decoder.as_ref().ok_or(Error::new(
+            Status::GenericFailure,
+            "Decoder not opened",
+        ))?;
+        let tracks = decoder.list_audio_tracks();
+        Ok(tracks
+            .into_iter()
+            .map(|t| AudioTrackInfo {
+                id: t.id,
+                title: t.title,
+                lang: t.lang,
+                selected: t.selected,
+                default: t.default,
+            })
+            .collect())
+    }
+
+    /// Select an audio track by id (use -1 to disable).
+    #[napi]
+    pub fn select_audio_track(&mut self, track_id: i64) -> Result<()> {
+        let decoder = self.decoder.as_mut().ok_or(Error::new(
+            Status::GenericFailure,
+            "Decoder not opened",
+        ))?;
+        decoder
+            .select_audio_track(track_id)
+            .map_err(|e| Error::new(Status::GenericFailure, e))
+    }
+
+    /// Get current volume (0-100+).
+    #[napi]
+    pub fn get_volume(&self) -> Result<f64> {
+        let decoder = self.decoder.as_ref().ok_or(Error::new(
+            Status::GenericFailure,
+            "Decoder not opened",
+        ))?;
+        Ok(decoder.get_volume())
+    }
+
+    /// Set volume (0-100+).
+    #[napi]
+    pub fn set_volume(&mut self, volume: f64) -> Result<()> {
+        let decoder = self.decoder.as_mut().ok_or(Error::new(
+            Status::GenericFailure,
+            "Decoder not opened",
+        ))?;
+        decoder
+            .set_volume(volume)
+            .map_err(|e| Error::new(Status::GenericFailure, e))
+    }
+
+    /// Get mute state.
+    #[napi]
+    pub fn get_mute(&self) -> Result<bool> {
+        let decoder = self.decoder.as_ref().ok_or(Error::new(
+            Status::GenericFailure,
+            "Decoder not opened",
+        ))?;
+        Ok(decoder.get_mute())
+    }
+
+    /// Set mute state.
+    #[napi]
+    pub fn set_mute(&mut self, mute: bool) -> Result<()> {
+        let decoder = self.decoder.as_mut().ok_or(Error::new(
+            Status::GenericFailure,
+            "Decoder not opened",
+        ))?;
+        decoder
+            .set_mute(mute)
+            .map_err(|e| Error::new(Status::GenericFailure, e))
+    }
+
+    /// Get playback speed (1.0 = normal).
+    #[napi]
+    pub fn get_speed(&self) -> Result<f64> {
+        let decoder = self.decoder.as_ref().ok_or(Error::new(
+            Status::GenericFailure,
+            "Decoder not opened",
+        ))?;
+        Ok(decoder.get_speed())
+    }
+
+    /// Set playback speed.
+    #[napi]
+    pub fn set_speed(&mut self, speed: f64) -> Result<()> {
+        let decoder = self.decoder.as_mut().ok_or(Error::new(
+            Status::GenericFailure,
+            "Decoder not opened",
+        ))?;
+        decoder
+            .set_speed(speed)
+            .map_err(|e| Error::new(Status::GenericFailure, e))
+    }
+
+    /// List chapters.
+    #[napi]
+    pub fn list_chapters(&self) -> Result<Vec<ChapterInfo>> {
+        let decoder = self.decoder.as_ref().ok_or(Error::new(
+            Status::GenericFailure,
+            "Decoder not opened",
+        ))?;
+        let chapters = decoder.list_chapters();
+        Ok(chapters
+            .into_iter()
+            .map(|c| ChapterInfo {
+                index: c.index,
+                title: c.title,
+                time_ms: c.time_ms,
+            })
+            .collect())
+    }
+
+    /// Get current chapter index.
+    #[napi]
+    pub fn get_chapter(&self) -> Result<i64> {
+        let decoder = self.decoder.as_ref().ok_or(Error::new(
+            Status::GenericFailure,
+            "Decoder not opened",
+        ))?;
+        Ok(decoder.get_chapter())
+    }
+
+    /// Seek to chapter by index.
+    #[napi]
+    pub fn set_chapter(&mut self, index: i64) -> Result<()> {
+        let decoder = self.decoder.as_mut().ok_or(Error::new(
+            Status::GenericFailure,
+            "Decoder not opened",
+        ))?;
+        decoder
+            .set_chapter(index)
+            .map_err(|e| Error::new(Status::GenericFailure, e))
     }
 }

@@ -452,6 +452,10 @@ export const ffmpegVideoDecoder = {
     getState(id).currentTimeMs = timeMs;
   },
 
+  getCurrentTime(id: string): number {
+    return getState(id).currentTimeMs;
+  },
+
   destroy(id: string) {
     const state = getState(id);
     killFfmpeg(state);

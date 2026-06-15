@@ -19,6 +19,7 @@ const DEFAULTS: AppSettings = {
   streamingExtensionPromptDismissed: [],
   galleryView: "theme-default",
   flashThumbnailConcurrency: 4,
+  volume: 1,
 };
 
 let cachedSettings: AppSettings | null = null;

@@ -9,6 +9,7 @@
   "scripts": {
     "postinstall": "node node_modules/electron/install.js && bun scripts/setup-libretro.ts && bun scripts/setup-video-decoder.ts && bun scripts/setup-rclone.ts && cd native/libretro-frontend && cargo fetch",
     "dev": "bun scripts/dev.ts",
+    "prebuild": "bun scripts/setup-video-decoder.ts",
     "build": "electron-vite build",
     "predist": "bun scripts/setup-libretro.ts && bun scripts/setup-video-decoder.ts && bun scripts/package-plugins.ts",
     "dist": "electron-builder",

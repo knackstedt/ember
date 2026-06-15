@@ -1,11 +1,34 @@
 /**
- * React hook for the native libmpv video renderer.
+ * React hook for the native video renderer.
  *
- * Decode and WebGL rendering happen entirely in the preload context
- * so no frame data crosses the Electron context bridge.
+ * Supports both mpv worker (child process) and ffmpeg child-process fallback.
+ * Frames are rendered proactively in the preload context; this hook just
+ * pumps the RAF loop and manages playback state.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+
+export interface SubtitleTrack {
+  id: number;
+  title?: string;
+  lang?: string;
+  selected?: boolean;
+  default?: boolean;
+}
+
+export interface AudioTrack {
+  id: number;
+  title?: string;
+  lang?: string;
+  selected?: boolean;
+  default?: boolean;
+}
+
+export interface Chapter {
+  index: number;
+  title: string;
+  timeMs: number;
+}
 
 export interface NativeVideoState {
   playing: boolean;
@@ -16,6 +39,16 @@ export interface NativeVideoState {
   height: number;
   error: string | null;
   ready: boolean;
+  backend?: string;
+  subtitleTracks: SubtitleTrack[];
+  activeSubtitleId: number | null;
+  audioTracks: AudioTrack[];
+  activeAudioId: number | null;
+  chapters: Chapter[];
+  currentChapter: number;
+  volume: number;
+  muted: boolean;
+  speed: number;
 }
 
 export interface NativeVideoControls {
@@ -24,6 +57,12 @@ export interface NativeVideoControls {
   toggle(): void;
   seek(time: number): void;
   setVolume(v: number): void;
+  setMuted(m: boolean): void;
+  setSpeed(s: number): void;
+  selectSubtitleTrack(trackId: number | null): void;
+  selectAudioTrack(trackId: number | null): void;
+  selectChapter(idx: number): void;
+  loadExternalSubtitle(path: string): Promise<void>;
 }
 
 function generateId(): string {
@@ -50,7 +89,8 @@ export function shouldUseNativeDecoder(src: string | null): boolean {
 
 export function useNativeVideo(
   src: string | null,
-  canvasRef: React.RefObject<HTMLCanvasElement | null>
+  canvasRef: React.RefObject<HTMLCanvasElement | null>,
+  resumeProgress?: number
 ): { state: NativeVideoState; controls: NativeVideoControls; canvasId: string } {
   const decoderId = stableId(src);
   const canvasId = `native-video-${decoderId}`;
@@ -65,6 +105,7 @@ export function useNativeVideo(
   const lastStateUpdateRef = useRef(0);
   const lastFramePresentRef = useRef(0);
   const metadataRef = useRef<{ width: number; height: number; frameRate: number } | null>(null);
+  const openedRef = useRef(false);
 
   const [state, setState] = useState<NativeVideoState>({
     playing: false,
@@ -75,6 +116,15 @@ export function useNativeVideo(
     height: 0,
     error: null,
     ready: false,
+    subtitleTracks: [],
+    activeSubtitleId: null,
+    audioTracks: [],
+    activeAudioId: null,
+    chapters: [],
+    currentChapter: -1,
+    volume: 1,
+    muted: false,
+    speed: 1,
   });
 
   const updateState = useCallback((patch: Partial<NativeVideoState>) => {
@@ -94,7 +144,8 @@ export function useNativeVideo(
     async function init() {
       if (!src) return;
       try {
-        window.htpc.videoDecoder.create(decoderId);
+        await window.htpc.videoDecoder.create(decoderId);
+        if (cancelled) return;
 
         let resolved = src;
         if (src.startsWith("ember://remote/")) {
@@ -102,17 +153,11 @@ export function useNativeVideo(
         } else if (src.startsWith("ember://media/")) {
           resolved = src.slice("ember://media/".length);
         } else if (!src.startsWith("/") && !src.startsWith("http://") && !src.startsWith("https://") && !src.startsWith("file://")) {
-          // Bare filename / relative path — ask main process to resolve it
-          // against the movie database (may return absolute path or ember://remote/).
           resolved = await window.htpc.videoDecoder.resolveUrl(src);
-          // If the DB lookup returned an ember://remote/ URL, resolve it to HTTP.
           if (resolved.startsWith("ember://remote/")) {
             resolved = await window.htpc.videoDecoder.resolveUrl(resolved);
           }
         }
-        // If we still have a bare filename (not absolute, not URL),
-        // ask the main process to look it up in the movie DB.
-        // This handles stale local entries that should redirect to a NAS.
         if (
           resolved &&
           !resolved.startsWith("/") &&
@@ -122,15 +167,17 @@ export function useNativeVideo(
           !resolved.startsWith("ember://")
         ) {
           resolved = await window.htpc.videoDecoder.resolveUrl(resolved);
-          // If the DB lookup returned an ember://remote/ URL, resolve it to HTTP.
           if (resolved.startsWith("ember://remote/")) {
             resolved = await window.htpc.videoDecoder.resolveUrl(resolved);
           }
         }
 
-        await window.htpc.videoDecoder.open(decoderId, resolved);
+        if (cancelled) return;
 
-        const meta = window.htpc.videoDecoder.getMetadata(decoderId);
+        await window.htpc.videoDecoder.open(decoderId, resolved);
+        openedRef.current = true;
+
+        const meta = await window.htpc.videoDecoder.getMetadata(decoderId);
         frameRateRef.current = meta.frameRate || 30;
         metadataRef.current = {
           width: meta.width,
@@ -141,11 +188,51 @@ export function useNativeVideo(
         if (cancelled) return;
 
         window.htpc.videoDecoder.attachCanvas(decoderId, canvasId);
-        // Resize WebGL viewport to the canvas's DISPLAY size so letterboxing
-        // math uses the same aspect ratio the user actually sees.
         if (!canvas) return;
         const rect = canvas.getBoundingClientRect();
         window.htpc.videoDecoder.resizeCanvas(decoderId, rect.width, rect.height);
+
+        // Fetch tracks and chapters (mpv only).
+        let subtitleTracks: SubtitleTrack[] = [];
+        let activeSubtitleId: number | null = null;
+        let audioTracks: AudioTrack[] = [];
+        let activeAudioId: number | null = null;
+        let chapters: Chapter[] = [];
+        let currentChapter = -1;
+        let volume = 100;
+        let muted = false;
+        let speed = 1;
+
+        try {
+          subtitleTracks = await window.htpc.videoDecoder.listSubtitleTracks(decoderId);
+          activeSubtitleId = subtitleTracks.find((t) => t.selected)?.id ?? null;
+        } catch { /* ignore */ }
+
+        try {
+          audioTracks = await window.htpc.videoDecoder.listAudioTracks(decoderId);
+          activeAudioId = audioTracks.find((t) => t.selected)?.id ?? null;
+        } catch { /* ignore */ }
+
+        try {
+          chapters = await window.htpc.videoDecoder.listChapters(decoderId);
+          currentChapter = await window.htpc.videoDecoder.getChapter(decoderId);
+        } catch { /* ignore */ }
+
+        try {
+          volume = await window.htpc.videoDecoder.getVolume(decoderId);
+          muted = await window.htpc.videoDecoder.getMute(decoderId);
+          speed = await window.htpc.videoDecoder.getSpeed(decoderId);
+        } catch { /* ignore */ }
+
+        // Discover and load external sidecar subtitles.
+        try {
+          const subPaths = await window.htpc.videoDecoder.resolveSubtitlePaths(resolved);
+          for (const subPath of subPaths) {
+            await window.htpc.videoDecoder.loadExternalSubtitle(decoderId, subPath);
+          }
+          subtitleTracks = await window.htpc.videoDecoder.listSubtitleTracks(decoderId);
+          activeSubtitleId = subtitleTracks.find((t) => t.selected)?.id ?? null;
+        } catch { /* ignore */ }
 
         updateState({
           duration: meta.durationMs / 1000,
@@ -153,10 +240,33 @@ export function useNativeVideo(
           height: meta.height,
           ready: true,
           error: null,
+          subtitleTracks,
+          activeSubtitleId,
+          audioTracks,
+          activeAudioId,
+          chapters,
+          currentChapter,
+          volume: volume / 100,
+          muted,
+          speed,
         });
 
-        // Auto-start playback — mpv is already decoding, so start the
-        // frame pump immediately so the canvas renders frames.
+        // Resume from saved progress if provided and within reasonable bounds.
+        if (
+          typeof resumeProgress === "number" &&
+          resumeProgress > 0.01 &&
+          resumeProgress < 0.95 &&
+          meta.durationMs > 0
+        ) {
+          const resumeMs = Math.floor(resumeProgress * meta.durationMs);
+          if (resumeMs > 0) {
+            try {
+              await window.htpc.videoDecoder.seek(decoderId, resumeMs);
+              pausedAtRef.current = resumeMs;
+            } catch { /* ignore resume errors */ }
+          }
+        }
+
         play();
       } catch (err: any) {
         console.error("[NativeVideo] init failed:", err);
@@ -166,6 +276,19 @@ export function useNativeVideo(
 
     init();
 
+    // Watch for canvas resizes and propagate the new pixel size to mpv.
+    let resizeObserver: ResizeObserver | null = null;
+    if (canvas) {
+      resizeObserver = new ResizeObserver((entries) => {
+        if (!openedRef.current) return;
+        const entry = entries[0];
+        if (!entry) return;
+        const rect = entry.contentRect;
+        window.htpc.videoDecoder.resizeCanvas(decoderId, rect.width, rect.height);
+      });
+      resizeObserver.observe(canvas);
+    }
+
     return () => {
       cancelled = true;
       pumpGenRef.current++;
@@ -174,13 +297,18 @@ export function useNativeVideo(
         cancelAnimationFrame(rafRef.current);
         rafRef.current = null;
       }
-      window.htpc.videoDecoder.destroy(decoderId);
+      resizeObserver?.disconnect();
+      // Only destroy the decoder if we successfully opened it.
+      // If cleanup fires between create and open (e.g. due to a re-render
+      // race), destroying would prevent init() from completing.
+      if (openedRef.current) {
+        window.htpc.videoDecoder.destroy(decoderId);
+        openedRef.current = false;
+      }
     };
   }, [src, decoderId, canvasRef, updateState]);
 
-  // Frame pump via requestAnimationFrame, gated by the video frame interval.
-  // Works for any frame rate (24, 30, 60, 120 fps) because the gate uses
-  // the actual frameRate from ffprobe, not a hardcoded display refresh rate.
+  // Frame pump via requestAnimationFrame.
   const pump = useCallback(() => {
     if (!playingRef.current) return;
 
@@ -192,7 +320,6 @@ export function useNativeVideo(
       const elapsed = now - lastFramePresentRef.current;
 
       if (elapsed >= frameInterval) {
-        // Maintain sub-frame precision to prevent drift over time.
         lastFramePresentRef.current = now - (elapsed % frameInterval);
 
         const frame = window.htpc.videoDecoder.renderNextFrame(decoderId);
@@ -203,16 +330,31 @@ export function useNativeVideo(
         }
       }
 
+      // Check for mpv EOF events.
+      const mpvEvent = window.htpc.videoDecoder.getMpvEvent?.(decoderId);
+      if (mpvEvent === "end-file") {
+        playingRef.current = false;
+        updateState({ playing: false });
+        return;
+      }
+
       if (now - lastStateUpdateRef.current > 250) {
         lastStateUpdateRef.current = now;
-        const elapsedPlay = now - startTimeRef.current;
-        const currentTime = (pausedAtRef.current + elapsedPlay) / 1000;
-        setState((prev) => ({
-          ...prev,
-          currentTime: Math.min(currentTime, prev.duration),
-        }));
-        // Sync decoder state so pause/resume/seek use the correct position.
-        window.htpc.videoDecoder.setCurrentTime(decoderId, Math.floor((pausedAtRef.current + elapsedPlay)));
+        const decoderTime = window.htpc.videoDecoder.getCurrentTime(decoderId);
+        if (typeof decoderTime === "number" && decoderTime > 0) {
+          setState((prev) => ({
+            ...prev,
+            currentTime: Math.min(decoderTime / 1000, prev.duration),
+          }));
+        } else {
+          const elapsedPlay = now - startTimeRef.current;
+          const currentTime = (pausedAtRef.current + elapsedPlay) / 1000;
+          setState((prev) => ({
+            ...prev,
+            currentTime: Math.min(currentTime, prev.duration),
+          }));
+          window.htpc.videoDecoder.setCurrentTime(decoderId, Math.floor(pausedAtRef.current + elapsedPlay));
+        }
       }
 
       if (playingRef.current && myGen === pumpGenRef.current) {
@@ -247,7 +389,6 @@ export function useNativeVideo(
       cancelAnimationFrame(rafRef.current);
       rafRef.current = null;
     }
-    // Sync decoder state so resume starts from the correct position.
     window.htpc.videoDecoder.setCurrentTime(decoderId, Math.floor(pausedAtRef.current));
     window.htpc.videoDecoder.pause(decoderId);
     updateState({ playing: false });
@@ -265,17 +406,16 @@ export function useNativeVideo(
       startTimeRef.current = performance.now();
       lastFramePresentRef.current = performance.now();
       pumpGenRef.current++;
-      // Cancel any old RAF so the old pump iteration doesn't compete.
       if (rafRef.current !== null) {
         cancelAnimationFrame(rafRef.current);
         rafRef.current = null;
       }
       try {
-        window.htpc.videoDecoder.seek(decoderId, ms);
+        await window.htpc.videoDecoder.seek(decoderId, ms);
         if (playingRef.current) {
           pump();
         } else {
-          window.htpc.videoDecoder.pause(decoderId);
+          await window.htpc.videoDecoder.pause(decoderId);
         }
       } catch (err: any) {
         console.error("[NativeVideo] seek failed:", err);
@@ -286,17 +426,111 @@ export function useNativeVideo(
   );
 
   const setVolume = useCallback(
-    (v: number) => {
-      // libmpv audio is handled natively; volume can be set via mpv property
-      // if we expose it. For now, no-op.
-      console.log("[NativeVideo] setVolume not yet implemented:", v);
+    async (v: number) => {
+      try {
+        await window.htpc.videoDecoder.setVolume(decoderId, v * 100);
+        updateState({ volume: v });
+      } catch (err: any) {
+        console.error("[NativeVideo] setVolume failed:", err);
+      }
     },
-    []
+    [decoderId, updateState]
+  );
+
+  const setMuted = useCallback(
+    async (m: boolean) => {
+      try {
+        await window.htpc.videoDecoder.setMute(decoderId, m);
+        updateState({ muted: m });
+      } catch (err: any) {
+        console.error("[NativeVideo] setMute failed:", err);
+      }
+    },
+    [decoderId, updateState]
+  );
+
+  const setSpeed = useCallback(
+    async (s: number) => {
+      try {
+        await window.htpc.videoDecoder.setSpeed(decoderId, s);
+        updateState({ speed: s });
+        if (metadataRef.current) {
+          frameRateRef.current = metadataRef.current.frameRate * s;
+        }
+      } catch (err: any) {
+        console.error("[NativeVideo] setSpeed failed:", err);
+      }
+    },
+    [decoderId, updateState]
+  );
+
+  const selectSubtitleTrack = useCallback(
+    async (trackId: number | null) => {
+      try {
+        const id = trackId ?? -1;
+        await window.htpc.videoDecoder.selectSubtitleTrack(decoderId, id);
+        updateState({ activeSubtitleId: trackId });
+      } catch (err: any) {
+        console.error("[NativeVideo] selectSubtitleTrack failed:", err);
+      }
+    },
+    [decoderId, updateState]
+  );
+
+  const selectAudioTrack = useCallback(
+    async (trackId: number | null) => {
+      try {
+        const id = trackId ?? -1;
+        await window.htpc.videoDecoder.selectAudioTrack(decoderId, id);
+        updateState({ activeAudioId: trackId });
+      } catch (err: any) {
+        console.error("[NativeVideo] selectAudioTrack failed:", err);
+      }
+    },
+    [decoderId, updateState]
+  );
+
+  const selectChapter = useCallback(
+    async (idx: number) => {
+      try {
+        await window.htpc.videoDecoder.setChapter(decoderId, idx);
+        updateState({ currentChapter: idx });
+      } catch (err: any) {
+        console.error("[NativeVideo] selectChapter failed:", err);
+      }
+    },
+    [decoderId, updateState]
+  );
+
+  const loadExternalSubtitle = useCallback(
+    async (path: string) => {
+      try {
+        await window.htpc.videoDecoder.loadExternalSubtitle(decoderId, path);
+        const tracks = await window.htpc.videoDecoder.listSubtitleTracks(decoderId);
+        const active = tracks.find((t) => t.selected);
+        updateState({ subtitleTracks: tracks, activeSubtitleId: active ? active.id : null });
+      } catch (err: any) {
+        console.error("[NativeVideo] loadExternalSubtitle failed:", err);
+      }
+    },
+    [decoderId, updateState]
   );
 
   return {
     state,
-    controls: { play, pause, toggle, seek, setVolume },
+    controls: {
+      play,
+      pause,
+      toggle,
+      seek,
+      setVolume,
+      setMuted,
+      setSpeed,
+      selectSubtitleTrack,
+      selectAudioTrack,
+      selectChapter,
+      loadExternalSubtitle,
+    },
     canvasId,
   };
 }

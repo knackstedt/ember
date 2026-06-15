@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useVideoPlayerStore } from "../../store/videoPlayer.store";
 import { useInputStore } from "../../store/input.store";
+import { useSettingsStore } from "../../store/settings.store";
 import { shouldClearProgress } from "../../../../shared/progress";
 import { useMoviesStore } from "../../store/media.store";
 import { useNativeVideo, shouldUseNativeDecoder } from "./useNativeVideo";
@@ -51,7 +52,7 @@ export const VideoPlayer: React.FC = () => {
   const lastProgressRef = useRef<{ movieId: string; pct: number } | null>(null);
 
   const useNative = !!src && shouldUseNativeDecoder(src);
-  const native = useNativeVideo(src, nativeCanvasRef);
+  const native = useNativeVideo(src, nativeCanvasRef, watchProgress ?? undefined);
 
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -139,6 +140,23 @@ export const VideoPlayer: React.FC = () => {
     return () => document.removeEventListener("fullscreenchange", onFs);
   }, []);
 
+  // Load persisted volume from settings when a video opens.
+  useEffect(() => {
+    if (!src) return;
+    const saved = useSettingsStore.getState().settings?.volume ?? 1;
+    setVolumeState(saved);
+    setMuted(saved === 0);
+    if (!useNative) {
+      const v = videoRef.current;
+      if (v) {
+        v.volume = saved;
+        v.muted = saved === 0;
+      }
+    }
+    // For native, the volume will be applied once the decoder init completes
+    // (see the native state sync effect below).
+  }, [src, useNative]);
+
   // Standard video src setup
   useEffect(() => {
     if (!src || useNative) return;
@@ -224,6 +242,26 @@ export const VideoPlayer: React.FC = () => {
     v.removeAttribute("src");
     v.load();
   }, [useNative]);
+
+  // Sync native decoder volume/mute to local UI state so the controls
+  // reflect reality (especially on first open / config change).
+  useEffect(() => {
+    if (!useNative) return;
+    setVolumeState(native.state.volume);
+    setMuted(native.state.muted);
+  }, [useNative, native.state.volume, native.state.muted]);
+
+  // Apply persisted volume to native decoder once it finishes init.
+  useEffect(() => {
+    if (!useNative || !native.state.ready) return;
+    const saved = useSettingsStore.getState().settings?.volume ?? 1;
+    if (Math.abs(saved - native.state.volume) > 0.01) {
+      native.controls.setVolume(saved);
+    }
+    if (saved === 0 && !native.state.muted) {
+      native.controls.setMuted(true);
+    }
+  }, [useNative, native.state.ready]);
 
   // Native video progress save (best-effort)
   useEffect(() => {
@@ -388,15 +426,23 @@ export const VideoPlayer: React.FC = () => {
     }
   };
 
+  const persistVolume = useCallback((vol: number, isMuted: boolean) => {
+    const effective = isMuted ? 0 : vol;
+    void useSettingsStore.getState().update({ volume: effective });
+  }, []);
+
   const toggleMute = (): void => {
     if (useNative) {
-      // TODO: native audio mute
-      setMuted((m) => !m);
+      const next = !native.state.muted;
+      native.controls.setMuted(next);
+      setMuted(next);
+      persistVolume(native.state.volume, next);
     } else {
       const v = videoRef.current;
       if (!v) return;
       v.muted = !v.muted;
       setMuted(v.muted);
+      persistVolume(v.volume, v.muted);
     }
   };
 
@@ -405,7 +451,11 @@ export const VideoPlayer: React.FC = () => {
     if (useNative) {
       native.controls.setVolume(val);
       setVolumeState(val);
-      if (val > 0 && muted) setMuted(false);
+      if (val > 0 && native.state.muted) {
+        native.controls.setMuted(false);
+        setMuted(false);
+      }
+      persistVolume(val, val === 0);
     } else {
       const v = videoRef.current;
       if (!v) return;
@@ -415,6 +465,7 @@ export const VideoPlayer: React.FC = () => {
         v.muted = false;
         setMuted(false);
       }
+      persistVolume(val, val === 0);
     }
   };
 
@@ -431,13 +482,39 @@ export const VideoPlayer: React.FC = () => {
   };
 
   const handleSubtitleChange = (idx: number): void => {
-    if (useNative) return; // TODO: native subtitles
+    if (useNative) {
+      const track = native.state.subtitleTracks[idx];
+      if (track) {
+        native.controls.selectSubtitleTrack(track.id);
+      } else {
+        native.controls.selectSubtitleTrack(null);
+      }
+      return;
+    }
     const v = videoRef.current;
     if (!v) return;
     Array.from(v.textTracks).forEach((t, i) => {
       t.mode = i === idx ? "showing" : "hidden";
     });
     setActiveSubtitle(idx);
+  };
+
+  const handleAudioChange = (id: number): void => {
+    if (useNative) {
+      native.controls.selectAudioTrack(id >= 0 ? id : null);
+    }
+  };
+
+  const handleChapterChange = (idx: number): void => {
+    if (useNative) {
+      native.controls.selectChapter(idx);
+    }
+  };
+
+  const handleSpeedChange = (speed: number): void => {
+    if (useNative) {
+      native.controls.setSpeed(speed);
+    }
   };
 
   const toggleFullscreen = (): void => {
@@ -667,34 +744,166 @@ export const VideoPlayer: React.FC = () => {
               <div className="flex-1" />
 
               {/* Subtitle selector */}
-              {!useNative && subtitleTracks.length > 0 && (
+              {useNative ? (
+                native.state.subtitleTracks.length > 0 && (
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <span
+                      className="text-xs"
+                      style={{ color: "rgba(255,255,255,0.6)" }}
+                    >
+                      CC
+                    </span>
+                    <select
+                      value={native.state.activeSubtitleId ?? -1}
+                      onChange={(e) => {
+                        const id = parseInt(e.target.value);
+                        native.controls.selectSubtitleTrack(id >= 0 ? id : null);
+                      }}
+                      className="text-xs rounded px-1 py-0.5"
+                      style={{
+                        background: "rgba(0,0,0,0.7)",
+                        color: "#fff",
+                        border: "1px solid rgba(255,255,255,0.3)",
+                        maxWidth: 100,
+                      }}
+                      aria-label="Subtitle track"
+                    >
+                      <option value={-1}>Off</option>
+                      {native.state.subtitleTracks.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.title || t.lang || `Track ${t.id}`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )
+              ) : (
+                subtitleTracks.length > 0 && (
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <span
+                      className="text-xs"
+                      style={{ color: "rgba(255,255,255,0.6)" }}
+                    >
+                      CC
+                    </span>
+                    <select
+                      value={activeSubtitle}
+                      onChange={(e) =>
+                        handleSubtitleChange(parseInt(e.target.value))
+                      }
+                      className="text-xs rounded px-1 py-0.5"
+                      style={{
+                        background: "rgba(0,0,0,0.7)",
+                        color: "#fff",
+                        border: "1px solid rgba(255,255,255,0.3)",
+                        maxWidth: 100,
+                      }}
+                      aria-label="Subtitle track"
+                    >
+                      <option value={-1}>Off</option>
+                      {subtitleTracks.map((t, i) => (
+                        <option key={i} value={i}>
+                          {t.label || t.language || `Track ${i + 1}`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )
+              )}
+
+              {/* Audio track selector */}
+              {useNative && native.state.audioTracks.length > 0 && (
                 <div className="flex items-center gap-1 flex-shrink-0">
                   <span
                     className="text-xs"
                     style={{ color: "rgba(255,255,255,0.6)" }}
                   >
-                    CC
+                    Audio
                   </span>
                   <select
-                    value={activeSubtitle}
+                    value={native.state.activeAudioId ?? -1}
                     onChange={(e) =>
-                      handleSubtitleChange(parseInt(e.target.value))
+                      handleAudioChange(parseInt(e.target.value))
                     }
                     className="text-xs rounded px-1 py-0.5"
                     style={{
                       background: "rgba(0,0,0,0.7)",
                       color: "#fff",
                       border: "1px solid rgba(255,255,255,0.3)",
-                      maxWidth: 100,
+                      maxWidth: 120,
                     }}
-                    aria-label="Subtitle track"
+                    aria-label="Audio track"
                   >
-                    <option value={-1}>Off</option>
-                    {subtitleTracks.map((t, i) => (
-                      <option key={i} value={i}>
-                        {t.label || t.language || `Track ${i + 1}`}
+                    {native.state.audioTracks.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.title || t.lang || `Track ${t.id}`}
                       </option>
                     ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Chapter selector */}
+              {useNative && native.state.chapters.length > 0 && (
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <span
+                    className="text-xs"
+                    style={{ color: "rgba(255,255,255,0.6)" }}
+                  >
+                    Chapter
+                  </span>
+                  <select
+                    value={native.state.currentChapter}
+                    onChange={(e) =>
+                      handleChapterChange(parseInt(e.target.value))
+                    }
+                    className="text-xs rounded px-1 py-0.5"
+                    style={{
+                      background: "rgba(0,0,0,0.7)",
+                      color: "#fff",
+                      border: "1px solid rgba(255,255,255,0.3)",
+                      maxWidth: 120,
+                    }}
+                    aria-label="Chapter"
+                  >
+                    {native.state.chapters.map((c) => (
+                      <option key={c.index} value={c.index}>
+                        {c.title || `Chapter ${c.index + 1}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Speed control */}
+              {useNative && (
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <span
+                    className="text-xs"
+                    style={{ color: "rgba(255,255,255,0.6)" }}
+                  >
+                    Speed
+                  </span>
+                  <select
+                    value={native.state.speed}
+                    onChange={(e) =>
+                      handleSpeedChange(parseFloat(e.target.value))
+                    }
+                    className="text-xs rounded px-1 py-0.5"
+                    style={{
+                      background: "rgba(0,0,0,0.7)",
+                      color: "#fff",
+                      border: "1px solid rgba(255,255,255,0.3)",
+                      maxWidth: 80,
+                    }}
+                    aria-label="Playback speed"
+                  >
+                    <option value={0.5}>0.5x</option>
+                    <option value={0.75}>0.75x</option>
+                    <option value={1}>1x</option>
+                    <option value={1.25}>1.25x</option>
+                    <option value={1.5}>1.5x</option>
+                    <option value={2}>2x</option>
                   </select>
                 </div>
               )}

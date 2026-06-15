@@ -142,18 +142,31 @@ export const MediaCard: React.FC<MediaCardProps> = React.memo(({
         )}
 
         {progress !== undefined && progress > 0 && (
-          <div
-            className="absolute bottom-0 left-0 right-0 h-1"
-            style={{ background: "rgba(0,0,0,0.4)" }}
-          >
+          <>
             <div
-              className="h-full"
-              style={{
-                width: `${progress * 100}%`,
-                background: "var(--color-accent)",
-              }}
-            />
-          </div>
+              className="absolute bottom-0 left-0 right-0 h-1"
+              style={{ background: "rgba(0,0,0,0.4)" }}
+            >
+              <div
+                className="h-full"
+                style={{
+                  width: `${progress * 100}%`,
+                  background: "var(--color-accent)",
+                }}
+              />
+            </div>
+            {progress < 0.95 && (
+              <span
+                className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide"
+                style={{
+                  backgroundColor: "var(--color-accent)",
+                  color: "var(--color-bg)",
+                }}
+              >
+                Resume
+              </span>
+            )}
+          </>
         )}
 
         {onFavorite && (

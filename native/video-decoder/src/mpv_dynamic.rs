@@ -2,7 +2,7 @@ use std::ffi::{c_char, c_double, c_int, c_void, CStr, CString};
 use std::ptr;
 use std::sync::Once;
 
-use libc::{dlerror, dlsym, dlopen, RTLD_NOW, RTLD_DEEPBIND};
+use libc::{dlerror, dlsym, dlopen, RTLD_NOW, RTLD_GLOBAL, RTLD_DEEPBIND};
 
 // ---------------------------------------------------------------------------
 // Minimal FFI types for libmpv (matches mpv/render.h & mpv/client.h)
@@ -60,9 +60,12 @@ type Fnv_mpv_create = unsafe extern "C" fn() -> *mut mpv_handle;
 type Fnv_mpv_initialize = unsafe extern "C" fn(*mut mpv_handle) -> c_int;
 type Fnv_mpv_terminate_destroy = unsafe extern "C" fn(*mut mpv_handle) -> c_int;
 type Fnv_mpv_set_option_string = unsafe extern "C" fn(*mut mpv_handle, *const c_char, *const c_char) -> c_int;
+type Fnv_mpv_set_property = unsafe extern "C" fn(*mut mpv_handle, *const c_char, mpv_format, *mut c_void) -> c_int;
 type Fnv_mpv_command = unsafe extern "C" fn(*mut mpv_handle, *mut *const c_char) -> c_int;
 type Fnv_mpv_wait_event = unsafe extern "C" fn(*mut mpv_handle, c_double) -> *mut mpv_event;
 type Fnv_mpv_get_property = unsafe extern "C" fn(*mut mpv_handle, *const c_char, mpv_format, *mut c_void) -> c_int;
+type Fnv_mpv_get_property_string = unsafe extern "C" fn(*mut mpv_handle, *const c_char) -> *mut c_char;
+type Fnv_mpv_free = unsafe extern "C" fn(*mut c_void);
 type Fnv_mpv_render_context_create = unsafe extern "C" fn(*mut *mut mpv_render_context, *mut mpv_handle, *mut mpv_render_param) -> c_int;
 type Fnv_mpv_render_context_render = unsafe extern "C" fn(*mut mpv_render_context, *mut mpv_render_param) -> c_int;
 type Fnv_mpv_render_context_free = unsafe extern "C" fn(*mut mpv_render_context);
@@ -72,9 +75,12 @@ pub struct MpvApi {
     pub mpv_initialize: Fnv_mpv_initialize,
     pub mpv_terminate_destroy: Fnv_mpv_terminate_destroy,
     pub mpv_set_option_string: Fnv_mpv_set_option_string,
+    pub mpv_set_property: Fnv_mpv_set_property,
     pub mpv_command: Fnv_mpv_command,
     pub mpv_wait_event: Fnv_mpv_wait_event,
     pub mpv_get_property: Fnv_mpv_get_property,
+    pub mpv_get_property_string: Fnv_mpv_get_property_string,
+    pub mpv_free: Fnv_mpv_free,
     pub mpv_render_context_create: Fnv_mpv_render_context_create,
     pub mpv_render_context_render: Fnv_mpv_render_context_render,
     pub mpv_render_context_free: Fnv_mpv_render_context_free,
@@ -95,17 +101,43 @@ pub fn get_api() -> Result<&'static MpvApi, String> {
 fn load_api() -> Result<MpvApi, String> {
     let mut handle: *mut c_void = ptr::null_mut();
 
-    // Pre-load libvulkan.so.1 globally so libmpv can resolve its
-    // undefined Vulkan symbols, then load libmpv with RTLD_DEEPBIND
-    // so its FFmpeg symbols bind to the system libavutil (so.58)
-    // rather than Electron's bundled libavutil (so.59).
+    // Pre-load system FFmpeg libraries with RTLD_GLOBAL so their symbols
+    // take precedence over Electron's bundled libffmpeg.so (which exports
+    // libavutil 59 symbols).  libmpv was compiled against system libavutil 58,
+    // so mixing allocators causes heap corruption (free(): invalid pointer).
+    // By preloading the system libraries globally, libmpv and its dependencies
+    // will resolve av_malloc/av_free/etc. to the system versions.
+    // Preload system FFmpeg libraries with RTLD_GLOBAL so they override
+    // Electron's bundled libffmpeg.so in the global symbol namespace.
+    let ffmpeg_libs = [
+        "libavutil.so.58",
+        "libavcodec.so.60",
+        "libavformat.so.60",
+        "libavfilter.so.9",
+        "libswresample.so.4",
+        "libswscale.so.7",
+        "libavdevice.so.60",
+    ];
+    for lib in &ffmpeg_libs {
+        let c_path = CString::new(*lib).unwrap();
+        let h = unsafe { dlopen(c_path.as_ptr(), RTLD_NOW | RTLD_GLOBAL) };
+        if !h.is_null() {
+            eprintln!("[mpv_dynamic] preloaded {}", lib);
+        }
+    }
+    // Preload libvulkan without RTLD_GLOBAL so it remains available for
+    // libmpv's dependency chain but doesn't interfere with Electron's Vulkan.
     let vulkan_path = CString::new("libvulkan.so.1").unwrap();
     unsafe { dlopen(vulkan_path.as_ptr(), RTLD_NOW); }
 
     for path in &["libmpv.so.2", "libmpv.so.1", "libmpv.so"] {
         let c_path = CString::new(*path).unwrap();
+        // RTLD_DEEPBIND ensures libmpv's internal symbols (especially
+        // libavutil functions) resolve to the system libraries we just
+        // preloaded, NOT to Electron's bundled libffmpeg.so.
         handle = unsafe { dlopen(c_path.as_ptr(), RTLD_NOW | RTLD_DEEPBIND) };
         if !handle.is_null() {
+            eprintln!("[mpv_dynamic] loaded libmpv from {}", path);
             break;
         }
     }
@@ -140,9 +172,12 @@ fn load_api() -> Result<MpvApi, String> {
         mpv_initialize: sym!(mpv_initialize),
         mpv_terminate_destroy: sym!(mpv_terminate_destroy),
         mpv_set_option_string: sym!(mpv_set_option_string),
+        mpv_set_property: sym!(mpv_set_property),
         mpv_command: sym!(mpv_command),
         mpv_wait_event: sym!(mpv_wait_event),
         mpv_get_property: sym!(mpv_get_property),
+        mpv_get_property_string: sym!(mpv_get_property_string),
+        mpv_free: sym!(mpv_free),
         mpv_render_context_create: sym!(mpv_render_context_create),
         mpv_render_context_render: sym!(mpv_render_context_render),
         mpv_render_context_free: sym!(mpv_render_context_free),

@@ -125,6 +125,10 @@ import {
   needsSessionReauth,
 } from "../services/credential-store.service";
 import {
+  registerMpvIpcHandlers,
+  mpvWorkerAvailable,
+} from "../services/mpv-worker.service";
+import {
   Game,
   Movie,
   MusicTrack,
@@ -363,6 +367,16 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     sendToWindow(window, "devtools:changed", false);
   });
 
+  // Register MPV worker IPC handlers (if native addon is available).
+  if (mpvWorkerAvailable()) {
+    registerMpvIpcHandlers();
+  }
+
+  // Synchronous check used by preload to decide backend.
+  ipcMain.on("mpv:available", (event) => {
+    event.returnValue = mpvWorkerAvailable();
+  });
+
   ipcMain.handle("settings:get", async () => {
     return await getSettings();
   });
@@ -573,6 +587,56 @@ export function registerIpcHandlers(window: BrowserWindow): void {
 
     log.info("videoDecoder:resolveUrl", `could not resolve ${path}, returning as-is`);
     return path;
+  });
+
+  ipcMain.handle("videoDecoder:resolveSubtitlePaths", async (_e, videoPath: string) => {
+    const { dirname, basename, extname, join } = await import("path");
+    const { existsSync } = await import("fs");
+
+    // Resolve ember://media/ URLs to local paths.
+    let resolvedPath = videoPath;
+    if (resolvedPath.startsWith("ember://media/")) {
+      resolvedPath = resolvedPath.slice("ember://media/".length);
+    }
+    if (resolvedPath.startsWith("file://")) {
+      resolvedPath = resolvedPath.slice("file://".length);
+    }
+
+    // Skip remote URLs — can't probe sidecar files.
+    if (resolvedPath.startsWith("http://") || resolvedPath.startsWith("https://") || resolvedPath.startsWith("ember://remote/")) {
+      return [];
+    }
+
+    // If not absolute, try to resolve via the same logic as resolveUrl.
+    if (!resolvedPath.startsWith("/")) {
+      const videosDir = getXdgVideosDir();
+      const candidate = join(videosDir, resolvedPath);
+      if (existsSync(candidate)) {
+        resolvedPath = candidate;
+      } else {
+        const base = basename(resolvedPath);
+        const found = findFileRecursive(videosDir, base);
+        if (found) {
+          resolvedPath = found;
+        } else {
+          return [];
+        }
+      }
+    }
+
+    const dir = dirname(resolvedPath);
+    const base = basename(resolvedPath, extname(resolvedPath));
+    const extensions = [".srt", ".ass", ".vtt", ".sub", ".ssa"];
+    const results: string[] = [];
+
+    for (const ext of extensions) {
+      const subPath = join(dir, base + ext);
+      if (existsSync(subPath)) {
+        results.push(subPath);
+      }
+    }
+
+    return results;
   });
 
   // ---------------------------------------------------------------------------

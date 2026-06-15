@@ -124,6 +124,37 @@ function libretroStaticPlugin(): Plugin {
   };
 }
 
+function videoDecoderStaticPlugin(): Plugin {
+  const arches = ["x64", "arm64"];
+
+  return {
+    name: "video-decoder-static",
+    writeBundle(options) {
+      const outDir = options.dir;
+      if (!outDir) return;
+      for (const arch of arches) {
+        const addonPath = resolve(`resources/video-decoder.linux-${arch}-gnu.node`);
+        if (!existsSync(addonPath)) continue;
+        const outDest = resolve(outDir, `video-decoder.linux-${arch}-gnu.node`);
+        if (existsSync(outDest)) {
+          try {
+            const link = readlinkSync(outDest);
+            if (link === addonPath) continue;
+          } catch {
+            // Not a symlink; remove and recreate.
+          }
+          try { unlinkSync(outDest); } catch { /* ignore */ }
+        }
+        try {
+          symlinkSync(addonPath, outDest);
+        } catch {
+          copyFileSync(addonPath, outDest);
+        }
+      }
+    },
+  };
+}
+
 function pluginStaticPlugin(): Plugin {
   const pluginsDir = resolve(process.env.HOME || process.env.USERPROFILE || "", ".config/htpc/plugins");
 
@@ -169,7 +200,7 @@ function pluginStaticPlugin(): Plugin {
 
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin()],
+    plugins: [externalizeDepsPlugin(), videoDecoderStaticPlugin()],
     build: {
       // @ts-expect-error electron-vite build.rollupOptions typing mismatch
       rollupOptions: {
@@ -179,6 +210,7 @@ export default defineConfig({
             "src/main/workers/game-scan.worker.ts",
           ),
           "libretro-worker": resolve("src/main/libretro-worker.ts"),
+          "mpv-worker": resolve("src/main/mpv-worker.ts"),
         },
         output: {
           entryFileNames: "[name].js",
@@ -220,6 +252,6 @@ export default defineConfig({
         "@shared": resolve("src/shared"),
       },
     },
-    plugins: [react(), ruffleStaticPlugin(), libretroStaticPlugin(), pluginStaticPlugin()],
+    plugins: [react(), ruffleStaticPlugin(), libretroStaticPlugin(), videoDecoderStaticPlugin(), pluginStaticPlugin()],
   },
 });

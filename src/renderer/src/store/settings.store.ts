@@ -67,6 +67,7 @@ const defaults: AppSettings = {
   },
   galleryView: "theme-default",
   flashThumbnailConcurrency: 4,
+  volume: 1,
 };
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({

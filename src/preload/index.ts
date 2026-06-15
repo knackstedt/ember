@@ -54,90 +54,272 @@ function findFileRecursive(dir: string, targetName: string): string | null {
 }
 
 // ---------------------------------------------------------------------------
-// Video decoder — uses ffmpeg child process for robust, crash-free
-// decoding.  ffmpeg outputs raw RGBA frames to stdout; the preload
-// buffers them and pumps to the WebGL renderer.  No native addons,
-// no renderer-process crashes.
+// Video decoder — mpv worker (child process) when available, otherwise
+// ffmpeg child-process fallback.
 // ---------------------------------------------------------------------------
 
+let mpvAvailable: boolean | null = null;
+function isMpvAvailable(): boolean {
+  if (mpvAvailable !== null) return mpvAvailable;
+  try {
+    mpvAvailable = ipcRenderer.sendSync("mpv:available");
+  } catch {
+    mpvAvailable = false;
+  }
+  return mpvAvailable ?? false;
+}
+
+// Frame cache for mpv worker path — rendered immediately on arrival.
+const mpvRenderers = new Map<string, WebGLVideoRenderer>();
+const mpvLatestFrame = new Map<string, { width: number; height: number; timestampMs: number }>();
+const mpvPendingEvents = new Map<string, string>();
+
+ipcRenderer.on("mpv:event", (_e, payload: { id: string; event: string }) => {
+  mpvPendingEvents.set(payload.id, payload.event);
+});
+
+ipcRenderer.on("mpv:frame", (_e, payload: { id: string; width: number; height: number; data: any; timestampMs: number }) => {
+  const renderer = mpvRenderers.get(payload.id);
+  if (renderer) {
+    const data = payload.data instanceof Uint8Array ? payload.data : new Uint8Array(payload.data);
+    const expected = payload.width * payload.height * 4;
+    if (data.length === expected) {
+      renderer.render(data, payload.width, payload.height);
+    }
+    mpvLatestFrame.set(payload.id, {
+      width: payload.width,
+      height: payload.height,
+      timestampMs: payload.timestampMs,
+    });
+  }
+});
+
+async function resolveVideoPath(path: string): Promise<string> {
+  if (path.startsWith("ember://remote/")) {
+    throw new Error(`Unresolved remote URL passed to decoder: ${path}.`);
+  }
+  if (
+    path &&
+    !path.startsWith("/") &&
+    !path.startsWith("http://") &&
+    !path.startsWith("https://") &&
+    !path.startsWith("file://") &&
+    !path.startsWith("ember://")
+  ) {
+    if (existsSync(path)) return path;
+    const videosDir = join(
+      process.env.XDG_VIDEOS_DIR ?? join(homedir(), "Videos"),
+    );
+    const candidate = join(videosDir, path);
+    if (existsSync(candidate)) return candidate;
+    const basename = path.split("/").pop() || path;
+    const found = findFileRecursive(videosDir, basename);
+    if (found) return found;
+    throw new Error(`Video file not found: ${path}.`);
+  }
+  return path;
+}
+
 const videoDecoderApi = {
-  create(id: string): boolean {
-    ffmpegVideoDecoder.create(id);
+  async create(id: string): Promise<boolean> {
+    if (isMpvAvailable()) {
+      await ipcRenderer.invoke("mpv:create", id);
+    } else {
+      ffmpegVideoDecoder.create(id);
+    }
     return true;
   },
   async open(id: string, path: string): Promise<void> {
-    if (path.startsWith("ember://remote/")) {
-      throw new Error(`Unresolved remote URL passed to decoder: ${path}.`);
+    const resolved = await resolveVideoPath(path);
+    if (isMpvAvailable()) {
+      await ipcRenderer.invoke("mpv:open", id, resolved);
+    } else {
+      await ffmpegVideoDecoder.open(id, resolved);
     }
-
-    let resolvedPath = path;
-    if (
-      path &&
-      !path.startsWith("/") &&
-      !path.startsWith("http://") &&
-      !path.startsWith("https://") &&
-      !path.startsWith("file://") &&
-      !path.startsWith("ember://")
-    ) {
-      if (existsSync(path)) {
-        resolvedPath = path;
-      } else {
-        const videosDir = join(
-          process.env.XDG_VIDEOS_DIR ?? join(homedir(), "Videos"),
-        );
-        const candidate = join(videosDir, path);
-        if (existsSync(candidate)) {
-          resolvedPath = candidate;
-        } else {
-          const basename = path.split("/").pop() || path;
-          const found = findFileRecursive(videosDir, basename);
-          if (found) {
-            resolvedPath = found;
-          } else {
-            throw new Error(`Video file not found: ${path}.`);
-          }
-        }
-      }
-    }
-
-    await ffmpegVideoDecoder.open(id, resolvedPath);
   },
   attachCanvas(id: string, canvasId: string): boolean {
+    if (isMpvAvailable()) {
+      let canvas = document.getElementById(canvasId) as HTMLCanvasElement | null;
+      if (!canvas) {
+        for (let i = 0; i < 20; i++) {
+          canvas = document.getElementById(canvasId) as HTMLCanvasElement | null;
+          if (canvas) break;
+          const start = Date.now();
+          while (Date.now() - start < 5) { /* spin */ }
+        }
+      }
+      if (!canvas) throw new Error(`Canvas #${canvasId} not found`);
+      mpvRenderers.set(id, new WebGLVideoRenderer(canvas));
+      return true;
+    }
     return ffmpegVideoDecoder.attachCanvas(id, canvasId);
   },
   resizeCanvas(id: string, width: number, height: number): void {
-    ffmpegVideoDecoder.resizeCanvas(id, width, height);
+    if (isMpvAvailable()) {
+      const renderer = mpvRenderers.get(id);
+      if (renderer) renderer.resize(width, height);
+      const dpr = window.devicePixelRatio || 1;
+      ipcRenderer.invoke("mpv:setRenderSize", id, Math.floor(width * dpr), Math.floor(height * dpr));
+    } else {
+      ffmpegVideoDecoder.resizeCanvas(id, width, height);
+    }
   },
   renderNextFrame(id: string): { width: number; height: number } | null {
+    if (isMpvAvailable()) {
+      const frame = mpvLatestFrame.get(id);
+      // Return cached metadata if available; otherwise return a dummy so the
+      // rAF pump doesn't kill itself before the first IPC frame arrives.
+      return frame ? { width: frame.width, height: frame.height } : { width: 1, height: 1 };
+    }
     return ffmpegVideoDecoder.renderNextFrame(id);
   },
-  seek(id: string, timestampMs: number): void {
-    ffmpegVideoDecoder.seek(id, timestampMs);
+  getMpvEvent(id: string): string | null {
+    if (!isMpvAvailable()) return null;
+    const ev = mpvPendingEvents.get(id) ?? null;
+    mpvPendingEvents.delete(id);
+    return ev;
   },
-  pause(id: string): void {
-    ffmpegVideoDecoder.pause(id);
+  async seek(id: string, timestampMs: number): Promise<void> {
+    if (isMpvAvailable()) {
+      await ipcRenderer.invoke("mpv:seek", id, timestampMs);
+    } else {
+      ffmpegVideoDecoder.seek(id, timestampMs);
+    }
   },
-  resume(id: string): void {
-    ffmpegVideoDecoder.resume(id);
+  async pause(id: string): Promise<void> {
+    if (isMpvAvailable()) {
+      await ipcRenderer.invoke("mpv:pause", id);
+    } else {
+      ffmpegVideoDecoder.pause(id);
+    }
   },
-  getMetadata(id: string): {
+  async resume(id: string): Promise<void> {
+    if (isMpvAvailable()) {
+      await ipcRenderer.invoke("mpv:play", id);
+    } else {
+      ffmpegVideoDecoder.resume(id);
+    }
+  },
+  async getMetadata(id: string): Promise<{
     width: number;
     height: number;
     durationMs: number;
     frameRate: number;
-  } {
+  }> {
+    if (isMpvAvailable()) {
+      const meta = await ipcRenderer.invoke("mpv:getMetadata", id);
+      if (!meta) throw new Error("Decoder not opened");
+      return meta;
+    }
     const meta = ffmpegVideoDecoder.getMetadata(id);
     if (!meta) throw new Error("Decoder not opened");
     return meta;
   },
-  setCurrentTime(id: string, timeMs: number): void {
-    ffmpegVideoDecoder.setCurrentTime(id, timeMs);
+  async setCurrentTime(id: string, timeMs: number): Promise<void> {
+    if (isMpvAvailable()) {
+      await ipcRenderer.invoke("mpv:setCurrentTime", id, timeMs);
+    } else {
+      ffmpegVideoDecoder.setCurrentTime(id, timeMs);
+    }
   },
-  destroy(id: string): void {
-    ffmpegVideoDecoder.destroy(id);
+  async getCurrentTime(id: string): Promise<number> {
+    if (isMpvAvailable()) {
+      return await ipcRenderer.invoke("mpv:getTimePosMs", id);
+    }
+    return ffmpegVideoDecoder.getCurrentTime(id);
+  },
+  async destroy(id: string): Promise<void> {
+    if (isMpvAvailable()) {
+      await ipcRenderer.invoke("mpv:destroy", id);
+      mpvRenderers.delete(id);
+      mpvLatestFrame.delete(id);
+    } else {
+      ffmpegVideoDecoder.destroy(id);
+    }
   },
   resolveUrl(path: string): Promise<string> {
     return ipcRenderer.invoke("videoDecoder:resolveUrl", path);
+  },
+  resolveSubtitlePaths(videoPath: string): Promise<string[]> {
+    return ipcRenderer.invoke("videoDecoder:resolveSubtitlePaths", videoPath);
+  },
+  // Subtitle / Audio / Chapter APIs (mpv only; no-op on ffmpeg fallback)
+  async listSubtitleTracks(id: string): Promise<Array<{ id: number; title?: string; lang?: string; selected?: boolean; default?: boolean }>> {
+    if (isMpvAvailable()) {
+      return await ipcRenderer.invoke("mpv:listSubtitleTracks", id);
+    }
+    return [];
+  },
+  async selectSubtitleTrack(id: string, trackId: number): Promise<void> {
+    if (isMpvAvailable()) {
+      await ipcRenderer.invoke("mpv:selectSubtitleTrack", id, trackId);
+    }
+  },
+  async loadExternalSubtitle(id: string, path: string): Promise<void> {
+    if (isMpvAvailable()) {
+      await ipcRenderer.invoke("mpv:loadExternalSubtitle", id, path);
+    }
+  },
+  async listAudioTracks(id: string): Promise<Array<{ id: number; title?: string; lang?: string; selected?: boolean; default?: boolean }>> {
+    if (isMpvAvailable()) {
+      return await ipcRenderer.invoke("mpv:listAudioTracks", id);
+    }
+    return [];
+  },
+  async selectAudioTrack(id: string, trackId: number): Promise<void> {
+    if (isMpvAvailable()) {
+      await ipcRenderer.invoke("mpv:selectAudioTrack", id, trackId);
+    }
+  },
+  async getVolume(id: string): Promise<number> {
+    if (isMpvAvailable()) {
+      return await ipcRenderer.invoke("mpv:getVolume", id);
+    }
+    return 100;
+  },
+  async setVolume(id: string, vol: number): Promise<void> {
+    if (isMpvAvailable()) {
+      await ipcRenderer.invoke("mpv:setVolume", id, vol);
+    }
+  },
+  async getMute(id: string): Promise<boolean> {
+    if (isMpvAvailable()) {
+      return await ipcRenderer.invoke("mpv:getMute", id);
+    }
+    return false;
+  },
+  async setMute(id: string, mute: boolean): Promise<void> {
+    if (isMpvAvailable()) {
+      await ipcRenderer.invoke("mpv:setMute", id, mute);
+    }
+  },
+  async getSpeed(id: string): Promise<number> {
+    if (isMpvAvailable()) {
+      return await ipcRenderer.invoke("mpv:getSpeed", id);
+    }
+    return 1;
+  },
+  async setSpeed(id: string, speed: number): Promise<void> {
+    if (isMpvAvailable()) {
+      await ipcRenderer.invoke("mpv:setSpeed", id, speed);
+    }
+  },
+  async listChapters(id: string): Promise<Array<{ index: number; title: string; timeMs: number }>> {
+    if (isMpvAvailable()) {
+      return await ipcRenderer.invoke("mpv:listChapters", id);
+    }
+    return [];
+  },
+  async getChapter(id: string): Promise<number> {
+    if (isMpvAvailable()) {
+      return await ipcRenderer.invoke("mpv:getChapter", id);
+    }
+    return -1;
+  },
+  async setChapter(id: string, idx: number): Promise<void> {
+    if (isMpvAvailable()) {
+      await ipcRenderer.invoke("mpv:setChapter", id, idx);
+    }
   },
 };
 
