@@ -628,6 +628,7 @@ export const StreamingServiceRepo = {
     if (normalized.enabled === undefined) normalized.enabled = true;
     if (normalized.isBuiltin === undefined) normalized.isBuiltin = false;
     if (normalized.sortOrder === undefined) normalized.sortOrder = 0;
+    if (normalized.frontpageEnabled === undefined) normalized.frontpageEnabled = true;
     await db.query(
       `UPSERT streaming_service:⟨${escapeId(service.id)}⟩ CONTENT $service`,
       { service: normalized },
