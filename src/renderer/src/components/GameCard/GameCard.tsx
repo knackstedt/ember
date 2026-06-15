@@ -24,6 +24,7 @@ export interface GameCardProps {
   playTime?: number;
   lastPlayed?: number;
   missing?: boolean;
+  skeleton?: boolean;
 }
 
 function formatLastPlayed(ts: number): string {
@@ -136,6 +137,7 @@ export const GameCard: React.FC<GameCardProps> = React.memo(({
   playTime,
   lastPlayed,
   missing,
+  skeleton,
 }) => {
   const [imgError, setImgError] = useState(false);
   useEffect(() => {
@@ -162,6 +164,24 @@ export const GameCard: React.FC<GameCardProps> = React.memo(({
     "--behind-glow-color": badgeColor ? badgeColor : "rgba(125, 190, 255, 0.67)",
     "--behind-glow-size": "50%",
   } as React.CSSProperties;
+
+  if (skeleton) {
+    return (
+      <div className="gc-card-wrapper" style={{ pointerEvents: "none" }}>
+        <div className="gc-card-shell">
+          <section className="gc-card">
+            <div className="gc-inside">
+              <div className="gc-cover-content skeleton-shimmer" style={{ backgroundColor: "var(--color-surface-raised)" }} />
+              <div className="gc-details">
+                <div className="skeleton-shimmer" style={{ width: "85%", height: 13, borderRadius: 4, backgroundColor: "var(--color-surface)", marginBottom: 6 }} />
+                <div className="skeleton-shimmer" style={{ width: "55%", height: 11, borderRadius: 4, backgroundColor: "var(--color-surface)" }} />
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <motion.div

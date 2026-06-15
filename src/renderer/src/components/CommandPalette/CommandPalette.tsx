@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useCallback, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion";
 import { useCommandsStore } from "../../store/commands.store";
 import { useSettingsStore } from "../../store/settings.store";
+import { useFocusTrap } from "../../hooks/useFocusTrap";
 import { CommandDefinition, CommandCategory } from "../../../../shared/commands";
 
 const CATEGORY_ORDER: CommandCategory[] = [
@@ -163,7 +164,10 @@ export const CommandPalette: React.FC<{
 
   /* ── imperative scroll (no useEffect) ── */
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const lastSelectedRef = useRef<number>(-1);
+
+  useFocusTrap(containerRef, isOpen, close);
 
   const setItemRef = useCallback((el: HTMLButtonElement | null, flatIndex: number) => {
     if (flatIndex === selectedIndex && el && scrollContainerRef.current) {
@@ -270,6 +274,7 @@ export const CommandPalette: React.FC<{
           }}
         >
           <motion.div
+            ref={containerRef}
             initial={{ opacity: 0, y: -12, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -12, scale: 0.97 }}

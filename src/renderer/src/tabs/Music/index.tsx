@@ -47,6 +47,8 @@ import {
 import { useCollectionsStore, evaluateSmartFilter, sortByCollection } from "../../store/collections.store";
 import { CollectionsBar } from "../../components/CollectionsBar/CollectionsBar";
 import { CollectionManager } from "../../components/CollectionManager/CollectionManager";
+import { HexCellData } from "../../components/GalleryView/HexGridView";
+import { ErrorDisplay } from "../../components/ErrorDisplay/ErrorDisplay";
 import { useToastStore } from "../../store/toast.store";
 import { AiGroup } from "../../../../shared/types";
 import { DynamicFacetFilters, FacetField } from "../../components/DynamicFacetFilters/DynamicFacetFilters";
@@ -188,6 +190,7 @@ export const MusicTab: React.FC = () => {
   const [showCollectionManager, setShowCollectionManager] = useState(false);
   const [collectionItemIds, setCollectionItemIds] = useState<Set<string>>(new Set());
   const [streamingServices, setStreamingServices] = useState<StreamingService[]>([]);
+  const [streamingError, setStreamingError] = useState<string | null>(null);
   const trackGridRef = useRef<VirtualGridHandle>(null);
   const groupGridRef = useRef<VirtualGridHandle>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -196,6 +199,7 @@ export const MusicTab: React.FC = () => {
 
   const [aiGroups, setAiGroups] = useState<AiGroup[]>([]);
   const [aiGroupsLoading, setAiGroupsLoading] = useState(false);
+  const [aiGroupsError, setAiGroupsError] = useState<string | null>(null);
   const [selectedAiGroupId, setSelectedAiGroupId] = useState<string | null>(null);
   const aiGroupTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -258,7 +262,13 @@ export const MusicTab: React.FC = () => {
 
   useEffect(() => {
     if (subTab === "streaming") {
-      window.htpc.streaming.list("music").then(setStreamingServices).catch(() => {});
+      setStreamingError(null);
+      window.htpc.streaming.list("music")
+        .then((list) => setStreamingServices(list))
+        .catch(() => {
+          setStreamingServices([]);
+          setStreamingError("Failed to load streaming services.");
+        });
     }
   }, [subTab]);
 
@@ -285,6 +295,7 @@ export const MusicTab: React.FC = () => {
     if (subTab !== "ai-groups" || tracks.length === 0) return;
     if (aiGroups.length > 0) return;
     setAiGroupsLoading(true);
+    setAiGroupsError(null);
     if (aiGroupTimeoutRef.current) clearTimeout(aiGroupTimeoutRef.current);
 
     window.htpc.localAi
@@ -305,13 +316,13 @@ export const MusicTab: React.FC = () => {
       })
       .catch(() => {
         setAiGroupsLoading(false);
-        setSubTab("local");
+        setAiGroupsError("Failed to generate AI groups.");
       });
 
     aiGroupTimeoutRef.current = setTimeout(() => {
       if (aiGroupsLoading) {
         setAiGroupsLoading(false);
-        setSubTab("local");
+        setAiGroupsError("AI grouping timed out.");
       }
     }, 15000);
 
@@ -1116,6 +1127,206 @@ export const MusicTab: React.FC = () => {
     [galleryView, isNeonGrid, groupFocusedIndex, groupGridRef, renderGroupListItem, renderGroupItem, renderGroupSpine, renderGroupDeckCard, renderGroupNeonCard, scrollContainerRef],
   );
 
+  const renderSkeletonItem = useCallback(
+    (_: unknown, index: number) => (
+      <div key={`sk-${index}`} className="p-1.5 w-full h-full flex flex-col min-w-0">
+        <MediaCard id={`sk-${index}`} title="" aspectRatio="1/1" skeleton />
+      </div>
+    ),
+    [],
+  );
+
+  const renderSkeletonHex = useCallback(
+    (_: unknown, _index: number) => ({ title: "", skeleton: true } as HexCellData),
+    [],
+  );
+
+  const renderSkeletonListItem = useCallback(
+    (_: unknown, _index: number) => (
+      <div className="flex items-center gap-3 w-full h-full px-3">
+        <div className="w-12 h-12 flex-shrink-0 rounded overflow-hidden skeleton-shimmer" style={{ backgroundColor: "var(--color-surface-raised)" }} />
+        <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
+          <div className="skeleton-shimmer rounded" style={{ width: "60%", height: 14, backgroundColor: "var(--color-surface-raised)" }} />
+          <div className="skeleton-shimmer rounded" style={{ width: "35%", height: 12, backgroundColor: "var(--color-surface-raised)" }} />
+        </div>
+      </div>
+    ),
+    [],
+  );
+
+  const renderSkeletonSpine = useCallback(
+    (_: unknown, _index: number) => (
+      <div className="w-full h-full relative skeleton-shimmer" style={{ backgroundColor: "var(--color-surface-raised)" }} />
+    ),
+    [],
+  );
+
+  const renderSkeletonDeckCard = useCallback(
+    (_: unknown, _index: number) => (
+      <div className="w-full h-full relative skeleton-shimmer" style={{ backgroundColor: "var(--color-surface-raised)", borderRadius: 7 }} />
+    ),
+    [],
+  );
+
+  const renderSkeletonNeonCard = useCallback(
+    (_: unknown, index: number) => (
+      <div key={`sk-${index}`} className="p-1 w-full h-full flex flex-col min-w-0">
+        <MediaCard id={`sk-${index}`} title="" aspectRatio="1/1" skeleton />
+      </div>
+    ),
+    [],
+  );
+
+  const renderSkeletonTrackGallery = useCallback(() => {
+    switch (galleryView) {
+      case "list":
+        return (
+          <ListView
+            ref={trackGridRef}
+            items={Array.from({ length: 6 })}
+            renderItem={renderSkeletonListItem}
+            rowHeight={80}
+            scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
+          />
+        );
+      case "hex-grid":
+        return (
+          <HexGridView
+            ref={trackGridRef}
+            items={Array.from({ length: trackColumnCount * 2 - 1 })}
+            minItemWidth={180}
+            onColumnCountChange={setTrackColumnCount}
+            renderHex={renderSkeletonHex}
+            focusedIndex={trackFocusedIndex}
+            bindItem={bindTrackItem}
+            scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
+          />
+        );
+      case "bookshelf":
+        return (
+          <BookshelfView
+            ref={trackGridRef}
+            items={Array.from({ length: viewColumnCount * 2 })}
+            renderSpine={renderSkeletonSpine}
+            focusedIndex={trackFocusedIndex}
+            onItemsPerRowChange={(count) => setViewColumnCount(count)}
+            scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
+          />
+        );
+      case "spread-deck":
+        return (
+          <SpreadDeckView
+            ref={trackGridRef}
+            items={Array.from({ length: viewColumnCount * 2 })}
+            renderCard={renderSkeletonDeckCard}
+            focusedIndex={trackFocusedIndex}
+            onItemsPerRowChange={(count) => setViewColumnCount(count)}
+            scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
+          />
+        );
+      default:
+        if (isNeonGrid) {
+          return (
+            <NeonGridView
+              ref={trackGridRef}
+              items={Array.from({ length: trackColumnCount * 2 })}
+              minItemWidth={180}
+              onColumnCountChange={setTrackColumnCount}
+              rowHeight={240}
+              renderItem={renderSkeletonNeonCard}
+              scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
+            />
+          );
+        }
+        return (
+          <VirtualGrid
+            ref={trackGridRef}
+            items={Array.from({ length: trackColumnCount * 2 })}
+            minItemWidth={180}
+            onColumnCountChange={setTrackColumnCount}
+            rowHeight={240}
+            renderItem={renderSkeletonItem}
+            scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
+          />
+        );
+    }
+  }, [galleryView, isNeonGrid, trackFocusedIndex, trackGridRef, trackColumnCount, viewColumnCount, bindTrackItem, renderSkeletonListItem, renderSkeletonHex, renderSkeletonSpine, renderSkeletonDeckCard, renderSkeletonNeonCard, renderSkeletonItem, scrollContainerRef]);
+
+  const renderSkeletonGroupGallery = useCallback(() => {
+    switch (galleryView) {
+      case "list":
+        return (
+          <ListView
+            ref={groupGridRef}
+            items={Array.from({ length: 6 })}
+            renderItem={renderSkeletonListItem}
+            rowHeight={80}
+            scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
+          />
+        );
+      case "hex-grid":
+        return (
+          <HexGridView
+            ref={groupGridRef}
+            items={Array.from({ length: groupColumnCount * 2 - 1 })}
+            minItemWidth={180}
+            onColumnCountChange={setGroupColumnCount}
+            renderHex={renderSkeletonHex}
+            focusedIndex={groupFocusedIndex}
+            bindItem={bindGroupItem}
+            scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
+          />
+        );
+      case "bookshelf":
+        return (
+          <BookshelfView
+            ref={groupGridRef}
+            items={Array.from({ length: viewColumnCount * 2 })}
+            renderSpine={renderSkeletonSpine}
+            focusedIndex={groupFocusedIndex}
+            onItemsPerRowChange={(count) => setViewColumnCount(count)}
+            scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
+          />
+        );
+      case "spread-deck":
+        return (
+          <SpreadDeckView
+            ref={groupGridRef}
+            items={Array.from({ length: viewColumnCount * 2 })}
+            renderCard={renderSkeletonDeckCard}
+            focusedIndex={groupFocusedIndex}
+            onItemsPerRowChange={(count) => setViewColumnCount(count)}
+            scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
+          />
+        );
+      default:
+        if (isNeonGrid) {
+          return (
+            <NeonGridView
+              ref={groupGridRef}
+              items={Array.from({ length: groupColumnCount * 2 })}
+              minItemWidth={180}
+              onColumnCountChange={setGroupColumnCount}
+              rowHeight={240}
+              renderItem={renderSkeletonNeonCard}
+              scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
+            />
+          );
+        }
+        return (
+          <VirtualGrid
+            ref={groupGridRef}
+            items={Array.from({ length: groupColumnCount * 2 })}
+            minItemWidth={180}
+            onColumnCountChange={setGroupColumnCount}
+            rowHeight={240}
+            renderItem={renderSkeletonItem}
+            scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
+          />
+        );
+    }
+  }, [galleryView, isNeonGrid, groupFocusedIndex, groupGridRef, groupColumnCount, viewColumnCount, bindGroupItem, renderSkeletonListItem, renderSkeletonHex, renderSkeletonSpine, renderSkeletonDeckCard, renderSkeletonNeonCard, renderSkeletonItem, scrollContainerRef]);
+
   const artists = [
     ...tracks
       .reduce((map, t) => {
@@ -1484,6 +1695,9 @@ export const MusicTab: React.FC = () => {
                     <span className="text-xs">Generating smart groups…</span>
                   </div>
                 )}
+                {aiGroupsError && (
+                  <ErrorDisplay message={aiGroupsError} onRetry={() => { setAiGroups([]); setAiGroupsError(null); }} />
+                )}
                 {aiGroups.length > 0 && (
                   <div className="flex gap-2 flex-shrink-0 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
                     <motion.button
@@ -1543,27 +1757,10 @@ export const MusicTab: React.FC = () => {
         {/* Grid content */}
         {subTab === "local" && (
           <>
-            {loading ? (
-              <div
-                className="flex items-center justify-center"
-                style={{ color: "var(--color-text-dim)", minHeight: 200 }}
-              >
-                Loading music…
-              </div>
-            ) : (scanning || remoteScanning) && trackItems.length === 0 && groupItems.length === 0 ? (
-              <div
-                className="flex flex-col items-center justify-center gap-3"
-                style={{ color: "var(--color-text-dim)", minHeight: 200 }}
-              >
-                <div
-                  className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin"
-                  style={{
-                    borderColor: "var(--color-accent)",
-                    borderTopColor: "transparent",
-                  }}
-                />
-                <span className="text-sm">Scanning for music…</span>
-              </div>
+            {loading || (scanning || remoteScanning) && trackItems.length === 0 && groupItems.length === 0 ? (
+              browseMode !== "tracks" && !selectedGroup
+                ? renderSkeletonGroupGallery()
+                : renderSkeletonTrackGallery()
             ) : trackItems.length === 0 && groupItems.length === 0 ? (
               <div
                 className="flex flex-col items-center justify-center gap-4"
@@ -1592,7 +1789,9 @@ export const MusicTab: React.FC = () => {
 
         {subTab === "ai-groups" && (
           <>
-            {gridTrackItems.length === 0 ? (
+            {aiGroupsLoading ? (
+              renderSkeletonTrackGallery()
+            ) : gridTrackItems.length === 0 ? (
               <div className="flex items-center justify-center" style={{ color: "var(--color-text-dim)", minHeight: 200 }}>
                 <p>No tracks found.</p>
               </div>
@@ -1604,7 +1803,22 @@ export const MusicTab: React.FC = () => {
 
         {subTab === "streaming" && (
           <div className="pt-2">
-            <StreamingTile services={streamingServices} />
+            {streamingError ? (
+              <ErrorDisplay
+                message={streamingError}
+                onRetry={() => {
+                  setStreamingError(null);
+                  window.htpc.streaming.list("music")
+                    .then((list) => setStreamingServices(list))
+                    .catch(() => {
+                      setStreamingServices([]);
+                      setStreamingError("Failed to load streaming services.");
+                    });
+                }}
+              />
+            ) : (
+              <StreamingTile services={streamingServices} />
+            )}
           </div>
         )}
       </div>

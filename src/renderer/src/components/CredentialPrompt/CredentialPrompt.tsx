@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { KeyRound, X, AlertTriangle } from "lucide-react";
 import { RemoteSource } from "../../../shared/types";
+import { useFocusTrap } from "../../hooks/useFocusTrap";
 
 export const CredentialPrompt: React.FC = () => {
   const [show, setShow] = useState(false);
@@ -13,6 +14,9 @@ export const CredentialPrompt: React.FC = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useFocusTrap(containerRef, show, () => setShow(false));
 
   useEffect(() => {
     let cancelled = false;
@@ -108,6 +112,7 @@ export const CredentialPrompt: React.FC = () => {
         exit={{ opacity: 0 }}
       >
         <motion.div
+          ref={containerRef}
           className="w-full max-w-md rounded-[var(--radius-card)] flex flex-col gap-4 p-6"
           style={{
             background: "var(--color-surface-raised)",

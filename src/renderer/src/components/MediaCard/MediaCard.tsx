@@ -16,6 +16,7 @@ export interface MediaCardProps {
   progress?: number;
   isLoading?: boolean;
   missing?: boolean;
+  skeleton?: boolean;
 }
 
 const PLACEHOLDER_COLORS = [
@@ -57,12 +58,28 @@ export const MediaCard: React.FC<MediaCardProps> = React.memo(({
   progress,
   isLoading,
   missing,
+  skeleton,
 }) => {
   const [imgError, setImgError] = useState(false);
   useEffect(() => {
     setImgError(false);
   }, [coverUrl]);
   const showPlaceholder = !coverUrl || imgError;
+
+  if (skeleton) {
+    return (
+      <div
+        className="relative flex flex-col select-none rounded-card overflow-hidden flex-1 ring-1 ring-border"
+        style={{ backgroundColor: "var(--color-surface)", pointerEvents: "none" }}
+      >
+        <div className="relative w-full flex-1 min-h-0 overflow-hidden skeleton-shimmer" style={{ backgroundColor: "var(--color-surface-raised)" }} />
+        <div className="p-2 flex flex-col gap-1.5 flex-shrink-0 min-w-0">
+          <div className="skeleton-shimmer rounded" style={{ width: "85%", height: 14, backgroundColor: "var(--color-surface-raised)" }} />
+          <div className="skeleton-shimmer rounded" style={{ width: "55%", height: 12, backgroundColor: "var(--color-surface-raised)" }} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <motion.div

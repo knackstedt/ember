@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   StreamingService,
@@ -7,6 +7,7 @@ import {
 } from "../../../../shared/types";
 import { useSettingsStore } from "../../store/settings.store";
 import { useToastStore } from "../../store/toast.store";
+import { useFocusTrap } from "../../hooks/useFocusTrap";
 import { X, Download, Trash2, Plus, Globe, Check, Loader } from "lucide-react";
 
 interface Props {
@@ -43,6 +44,9 @@ export const ExtensionManager: React.FC<Props> = ({ service, partition, onClose 
   const [customId, setCustomId] = useState("");
   const [installingIds, setInstallingIds] = useState<Set<string>>(new Set());
   const [showCustomForm, setShowCustomForm] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useFocusTrap(containerRef, true, onClose);
 
   const allExtensions = settings?.streamingExtensions ?? [];
 
@@ -181,6 +185,7 @@ export const ExtensionManager: React.FC<Props> = ({ service, partition, onClose 
         onClick={onClose}
       />
       <motion.div
+        ref={containerRef}
         className="relative flex flex-col w-[min(560px,90vw)] max-h-[85vh] rounded-[var(--radius-card)] overflow-hidden"
         style={{
           background: "var(--color-surface-overlay)",

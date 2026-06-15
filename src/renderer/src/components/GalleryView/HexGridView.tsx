@@ -16,6 +16,7 @@ export interface HexCellData {
   platform?: string;
   onClick?: () => void;
   onFavorite?: () => void;
+  skeleton?: boolean;
 }
 
 export interface HexGridViewProps<T> {
@@ -62,6 +63,42 @@ interface HexCellProps {
 const HexCell: React.FC<HexCellProps> = ({ hex, isFocused, cellWidth, hexHeight, itemProps }) => {
   const [imgError, setImgError] = React.useState(false);
   const hasCover = hex.coverUrl && !imgError;
+
+  if (hex.skeleton) {
+    return (
+      <div
+        style={{
+          width: cellWidth,
+          flexShrink: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          position: "relative",
+        }}
+      >
+        {/* Outer hex — mirrors real cell structure */}
+        <div
+          style={{
+            width: cellWidth,
+            height: hexHeight,
+            position: "relative",
+            clipPath: HEX_CLIP,
+            background: "transparent",
+          }}
+        >
+          <div
+            className="skeleton-shimmer"
+            style={{
+              position: "absolute",
+              inset: 2,
+              clipPath: HEX_CLIP,
+              backgroundColor: "var(--color-surface-raised)",
+            }}
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

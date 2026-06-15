@@ -905,15 +905,27 @@ export default function App(): React.ReactElement {
           </ErrorBoundary>
         )}
       </AnimatePresence>
-      <ErrorBoundary variant="section">
-        <FlashPlayer />
-      </ErrorBoundary>
-      <ErrorBoundary variant="section">
-        <JsnesPlayer />
-      </ErrorBoundary>
-      <ErrorBoundary variant="section">
-        <PluginPlayer />
-      </ErrorBoundary>
+      <AnimatePresence>
+        {flashOpen && (
+          <ErrorBoundary variant="section">
+            <FlashPlayer />
+          </ErrorBoundary>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {jsnesOpen && (
+          <ErrorBoundary variant="section">
+            <JsnesPlayer />
+          </ErrorBoundary>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {pluginOpen && (
+          <ErrorBoundary variant="section">
+            <PluginPlayer />
+          </ErrorBoundary>
+        )}
+      </AnimatePresence>
 
       <div className="relative z-10 flex flex-col h-full">
         {/* Tab bar */}
@@ -1013,9 +1025,13 @@ export default function App(): React.ReactElement {
       </div>
 
       {/* Libretro native core player */}
-      <ErrorBoundary variant="section">
-        <LibretroPlayer />
-      </ErrorBoundary>
+      <AnimatePresence>
+        {libretroOpen && (
+          <ErrorBoundary variant="section">
+            <LibretroPlayer />
+          </ErrorBoundary>
+        )}
+      </AnimatePresence>
 
       {/* Command Palette */}
       <ErrorBoundary variant="section">

@@ -324,3 +324,47 @@ section {
   width: 100% !important;
   height: 100% !important;
 }
+
+/* ─── Skeleton shimmer ─────────────────────────────────────── */
+.skeleton-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.skeleton-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--color-text) 6%, transparent) 50%,
+    transparent 100%
+  );
+  transform: translateX(-100%);
+  will-change: transform;
+  animation: skeleton-sweep 1.6s ease-in-out infinite;
+}
+
+@keyframes skeleton-sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Stagger skeleton rows to avoid synchronized reflow spikes */
+.skeleton-shimmer:nth-child(1)::after { animation-delay: 0s; }
+.skeleton-shimmer:nth-child(2)::after { animation-delay: 0.12s; }
+.skeleton-shimmer:nth-child(3)::after { animation-delay: 0.24s; }
+.skeleton-shimmer:nth-child(4)::after { animation-delay: 0.36s; }
+.skeleton-shimmer:nth-child(5)::after { animation-delay: 0.48s; }
+.skeleton-shimmer:nth-child(6)::after { animation-delay: 0.60s; }
+.skeleton-shimmer:nth-child(7)::after { animation-delay: 0.72s; }
+.skeleton-shimmer:nth-child(8)::after { animation-delay: 0.84s; }
+.skeleton-shimmer:nth-child(9)::after { animation-delay: 0.96s; }
+.skeleton-shimmer:nth-child(10)::after { animation-delay: 1.08s; }
+.skeleton-shimmer:nth-child(11)::after { animation-delay: 1.20s; }
+.skeleton-shimmer:nth-child(12)::after { animation-delay: 1.32s; }

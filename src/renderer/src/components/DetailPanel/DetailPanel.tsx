@@ -1,6 +1,7 @@
 import React, { useState, useRef, KeyboardEvent } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
+import { useFocusTrap } from "../../hooks/useFocusTrap";
 
 interface DetailPanelProps {
   open: boolean;
@@ -33,6 +34,9 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
 }) => {
   const [tagInput, setTagInput] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useFocusTrap(containerRef, open, onClose);
 
   const handleAddTag = () => {
     const trimmed = tagInput.trim();
@@ -56,6 +60,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
     <AnimatePresence>
       {open && (
         <motion.div
+          ref={containerRef}
           className="absolute top-0 bottom-0 flex flex-col overflow-hidden"
           style={{
             width: "min(480px, 90%)",

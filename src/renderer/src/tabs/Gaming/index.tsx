@@ -40,6 +40,7 @@ import { useSettingsStore } from "../../store/settings.store";
 import { useCollectionsStore, evaluateSmartFilter, sortByCollection } from "../../store/collections.store";
 import { CollectionsBar } from "../../components/CollectionsBar/CollectionsBar";
 import { CollectionManager } from "../../components/CollectionManager/CollectionManager";
+import { HexCellData } from "../../components/GalleryView/HexGridView";
 import { Tooltip } from "../../components/Tooltip/Tooltip";
 import {
   Star,
@@ -649,6 +650,56 @@ export const GamingTab: React.FC = () => {
     [bindItem, focusedIndex, setFocusedIndex, toggleFavorite],
   );
 
+  const renderSkeletonItem = useCallback(
+    (_: unknown, index: number) => (
+      <div key={`sk-${index}`} className="p-1.5 w-full h-full flex flex-col min-w-0">
+        <GameCard id={`sk-${index}`} title="" platform="unknown" skeleton />
+      </div>
+    ),
+    [],
+  );
+
+  const renderSkeletonHex = useCallback(
+    (_: unknown, _index: number) => ({ title: "", skeleton: true } as HexCellData),
+    [],
+  );
+
+  const renderSkeletonListItem = useCallback(
+    (_: unknown, _index: number) => (
+      <div className="flex items-center gap-3 w-full h-full px-3">
+        <div className="w-12 h-[72px] flex-shrink-0 rounded overflow-hidden skeleton-shimmer" style={{ backgroundColor: "var(--color-surface-raised)" }} />
+        <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
+          <div className="skeleton-shimmer rounded" style={{ width: "60%", height: 14, backgroundColor: "var(--color-surface-raised)" }} />
+          <div className="skeleton-shimmer rounded" style={{ width: "35%", height: 12, backgroundColor: "var(--color-surface-raised)" }} />
+        </div>
+      </div>
+    ),
+    [],
+  );
+
+  const renderSkeletonSpine = useCallback(
+    (_: unknown, _index: number, { isHovered }: { isHovered: boolean; isFocused: boolean }) => (
+      <div className="w-full h-full relative skeleton-shimmer" style={{ backgroundColor: "var(--color-surface-raised)" }} />
+    ),
+    [],
+  );
+
+  const renderSkeletonDeckCard = useCallback(
+    (_: unknown, _index: number) => (
+      <div className="w-full h-full relative skeleton-shimmer" style={{ backgroundColor: "var(--color-surface-raised)", borderRadius: 7 }} />
+    ),
+    [],
+  );
+
+  const renderSkeletonNeonCard = useCallback(
+    (_: unknown, index: number) => (
+      <div key={`sk-${index}`} className="p-1 w-full h-full flex flex-col min-w-0">
+        <GameCard id={`sk-${index}`} title="" platform="unknown" skeleton />
+      </div>
+    ),
+    [],
+  );
+
   const renderHex = useCallback(
     (game: Game, index: number) => {
       const b = gameBadge(game);
@@ -976,7 +1027,6 @@ export const GamingTab: React.FC = () => {
         {/* Compact bar — search + active filter summary */}
         <div
           className="flex items-center gap-2 pb-3 flex-wrap"
-          style={{ background: "var(--color-bg)" }}
         >
           <OskInput
             value={searchQuery}
@@ -1206,21 +1256,69 @@ export const GamingTab: React.FC = () => {
       >
         {/* Grid content */}
         {loading || scanning || remoteScanning ? (
-          <div
-            className="flex flex-col items-center justify-center gap-3"
-            style={{ color: "var(--color-text-dim)", minHeight: 200 }}
-          >
-            <div
-              className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin"
-              style={{
-                borderColor: "var(--color-accent)",
-                borderTopColor: "transparent",
-              }}
-            />
-            <span className="text-sm">
-              {loading ? "Loading games…" : scanning || remoteScanning ? "Scanning for games…" : ""}
-            </span>
-          </div>
+          (() => {
+            switch (galleryView) {
+              case "list":
+                return (
+                  <ListView
+                    items={Array.from({ length: 6 })}
+                    renderItem={renderSkeletonListItem}
+                    rowHeight={80}
+                  />
+                );
+              case "hex-grid":
+                return (
+                  <HexGridView
+                    ref={gridRef}
+                    items={Array.from({ length: columnCount * 2 - 1 })}
+                    minItemWidth={200}
+                    onColumnCountChange={setColumnCount}
+                    renderHex={renderSkeletonHex}
+                  />
+                );
+              case "bookshelf":
+                return (
+                  <BookshelfView
+                    ref={gridRef}
+                    items={Array.from({ length: viewColumnCount * 2 })}
+                    renderSpine={renderSkeletonSpine}
+                    onItemsPerRowChange={(count) => setViewColumnCount(count)}
+                  />
+                );
+              case "spread-deck":
+                return (
+                  <SpreadDeckView
+                    ref={gridRef}
+                    items={Array.from({ length: viewColumnCount * 2 })}
+                    renderCard={renderSkeletonDeckCard}
+                    onItemsPerRowChange={(count) => setViewColumnCount(count)}
+                  />
+                );
+              default:
+                if (isNeonGrid) {
+                  return (
+                    <NeonGridView
+                      ref={gridRef}
+                      items={Array.from({ length: columnCount * 2 })}
+                      minItemWidth={200}
+                      onColumnCountChange={setColumnCount}
+                      rowHeight={260}
+                      renderItem={renderSkeletonNeonCard}
+                    />
+                  );
+                }
+                return (
+                  <VirtualGrid
+                    ref={gridRef}
+                    items={Array.from({ length: columnCount * 2 })}
+                    minItemWidth={200}
+                    onColumnCountChange={setColumnCount}
+                    rowHeight={260}
+                    renderItem={renderSkeletonItem}
+                  />
+                );
+            }
+          })()
         ) : items.length === 0 ? (
           <div
             className="flex flex-col items-center justify-center gap-4"

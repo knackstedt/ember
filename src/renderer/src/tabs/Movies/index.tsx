@@ -47,6 +47,8 @@ import {
 import { useCollectionsStore, evaluateSmartFilter, sortByCollection } from "../../store/collections.store";
 import { CollectionsBar } from "../../components/CollectionsBar/CollectionsBar";
 import { CollectionManager } from "../../components/CollectionManager/CollectionManager";
+import { HexCellData } from "../../components/GalleryView/HexGridView";
+import { ErrorDisplay } from "../../components/ErrorDisplay/ErrorDisplay";
 import { useToastStore } from "../../store/toast.store";
 import { AiGroup } from "../../../../shared/types";
 import { DynamicFacetFilters, FacetField } from "../../components/DynamicFacetFilters/DynamicFacetFilters";
@@ -81,6 +83,7 @@ export const MoviesTab: React.FC = () => {
   const [showCollectionManager, setShowCollectionManager] = useState(false);
   const [collectionItemIds, setCollectionItemIds] = useState<Set<string>>(new Set());
   const [streamingServices, setStreamingServices] = useState<StreamingService[]>([]);
+  const [streamingError, setStreamingError] = useState<string | null>(null);
   const gridRef = useRef<VirtualGridHandle>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const galleryView = useGalleryView();
@@ -88,6 +91,7 @@ export const MoviesTab: React.FC = () => {
 
   const [aiGroups, setAiGroups] = useState<AiGroup[]>([]);
   const [aiGroupsLoading, setAiGroupsLoading] = useState(false);
+  const [aiGroupsError, setAiGroupsError] = useState<string | null>(null);
   const [selectedAiGroupId, setSelectedAiGroupId] = useState<string | null>(null);
   const aiGroupTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -109,7 +113,15 @@ export const MoviesTab: React.FC = () => {
 
   useEffect(() => {
     if (subTab === "streaming") {
-      window.htpc.streaming.list("video").then(setStreamingServices).catch(() => {});
+      setStreamingError(null);
+      window.htpc.streaming.list("video")
+        .then((list) => {
+          setStreamingServices(list);
+        })
+        .catch(() => {
+          setStreamingServices([]);
+          setStreamingError("Failed to load streaming services.");
+        });
     }
   }, [subTab]);
 
@@ -161,6 +173,7 @@ export const MoviesTab: React.FC = () => {
     if (subTab !== "ai-groups" || movies.length === 0) return;
     if (aiGroups.length > 0) return;
     setAiGroupsLoading(true);
+    setAiGroupsError(null);
     if (aiGroupTimeoutRef.current) clearTimeout(aiGroupTimeoutRef.current);
 
     window.htpc.localAi
@@ -180,13 +193,13 @@ export const MoviesTab: React.FC = () => {
       })
       .catch(() => {
         setAiGroupsLoading(false);
-        setSubTab("local");
+        setAiGroupsError("Failed to generate AI groups.");
       });
 
     aiGroupTimeoutRef.current = setTimeout(() => {
       if (aiGroupsLoading) {
         setAiGroupsLoading(false);
-        setSubTab("local");
+        setAiGroupsError("AI grouping timed out.");
       }
     }, 15000);
 
@@ -592,6 +605,56 @@ export const MoviesTab: React.FC = () => {
     [bindItem, focusedIndex],
   );
 
+  const renderSkeletonItem = useCallback(
+    (_: unknown, index: number) => (
+      <div key={`sk-${index}`} className="p-1.5 w-full h-full flex flex-col min-w-0">
+        <MediaCard id={`sk-${index}`} title="" skeleton />
+      </div>
+    ),
+    [],
+  );
+
+  const renderSkeletonHex = useCallback(
+    (_: unknown, _index: number) => ({ title: "", skeleton: true } as HexCellData),
+    [],
+  );
+
+  const renderSkeletonListItem = useCallback(
+    (_: unknown, _index: number) => (
+      <div className="flex items-center gap-3 w-full h-full px-3">
+        <div className="w-12 h-[72px] flex-shrink-0 rounded overflow-hidden skeleton-shimmer" style={{ backgroundColor: "var(--color-surface-raised)" }} />
+        <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
+          <div className="skeleton-shimmer rounded" style={{ width: "60%", height: 14, backgroundColor: "var(--color-surface-raised)" }} />
+          <div className="skeleton-shimmer rounded" style={{ width: "35%", height: 12, backgroundColor: "var(--color-surface-raised)" }} />
+        </div>
+      </div>
+    ),
+    [],
+  );
+
+  const renderSkeletonSpine = useCallback(
+    (_: unknown, _index: number) => (
+      <div className="w-full h-full relative skeleton-shimmer" style={{ backgroundColor: "var(--color-surface-raised)" }} />
+    ),
+    [],
+  );
+
+  const renderSkeletonDeckCard = useCallback(
+    (_: unknown, _index: number) => (
+      <div className="w-full h-full relative skeleton-shimmer" style={{ backgroundColor: "var(--color-surface-raised)", borderRadius: 7 }} />
+    ),
+    [],
+  );
+
+  const renderSkeletonNeonCard = useCallback(
+    (_: unknown, index: number) => (
+      <div key={`sk-${index}`} className="p-1 w-full h-full flex flex-col min-w-0">
+        <MediaCard id={`sk-${index}`} title="" skeleton />
+      </div>
+    ),
+    [],
+  );
+
   useEffect(() => {
     switch (galleryView) {
       case "list": setColumnCount(1); setViewColumnCount(1); break;
@@ -908,6 +971,9 @@ export const MoviesTab: React.FC = () => {
                     <span className="text-xs">Generating smart groups…</span>
                   </div>
                 )}
+                {aiGroupsError && (
+                  <ErrorDisplay message={aiGroupsError} onRetry={() => { setAiGroups([]); setAiGroupsError(null); }} />
+                )}
                 {aiGroups.length > 0 && (
                   <div className="flex gap-2 flex-shrink-0 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
                     <motion.button
@@ -967,27 +1033,81 @@ export const MoviesTab: React.FC = () => {
         {/* Grid content */}
         {subTab === "local" && (
           <>
-            {loading ? (
-              <div
-                className="flex items-center justify-center"
-                style={{ color: "var(--color-text-dim)", minHeight: 200 }}
-              >
-                Loading movies…
-              </div>
-            ) : (scanning || remoteScanning) && items.length === 0 ? (
-              <div
-                className="flex flex-col items-center justify-center gap-3"
-                style={{ color: "var(--color-text-dim)", minHeight: 200 }}
-              >
-                <div
-                  className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin"
-                  style={{
-                    borderColor: "var(--color-accent)",
-                    borderTopColor: "transparent",
-                  }}
-                />
-                <span className="text-sm">Scanning for movies…</span>
-              </div>
+            {loading || (scanning || remoteScanning) && items.length === 0 ? (
+              (() => {
+                switch (galleryView) {
+                  case "list":
+                    return (
+                      <ListView
+                        ref={gridRef}
+                        items={Array.from({ length: 6 })}
+                        renderItem={renderSkeletonListItem}
+                        rowHeight={80}
+                        scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
+                      />
+                    );
+                  case "hex-grid":
+                    return (
+                      <HexGridView
+                        ref={gridRef}
+                        items={Array.from({ length: columnCount * 2 - 1 })}
+                        minItemWidth={200}
+                        onColumnCountChange={setColumnCount}
+                        renderHex={renderSkeletonHex}
+                        focusedIndex={focusedIndex}
+                        bindItem={bindItem}
+                        scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
+                      />
+                    );
+                  case "bookshelf":
+                    return (
+                      <BookshelfView
+                        ref={gridRef}
+                        items={Array.from({ length: viewColumnCount * 2 })}
+                        renderSpine={renderSkeletonSpine}
+                        focusedIndex={focusedIndex}
+                        onItemsPerRowChange={(count) => setViewColumnCount(count)}
+                        scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
+                      />
+                    );
+                  case "spread-deck":
+                    return (
+                      <SpreadDeckView
+                        ref={gridRef}
+                        items={Array.from({ length: viewColumnCount * 2 })}
+                        renderCard={renderSkeletonDeckCard}
+                        focusedIndex={focusedIndex}
+                        onItemsPerRowChange={(count) => setViewColumnCount(count)}
+                        scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
+                      />
+                    );
+                  default:
+                    if (isNeonGrid) {
+                      return (
+                        <NeonGridView
+                          ref={gridRef}
+                          items={Array.from({ length: columnCount * 2 })}
+                          minItemWidth={200}
+                          onColumnCountChange={setColumnCount}
+                          rowHeight={260}
+                          renderItem={renderSkeletonNeonCard}
+                          scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
+                        />
+                      );
+                    }
+                    return (
+                      <VirtualGrid
+                        ref={gridRef}
+                        items={Array.from({ length: columnCount * 2 })}
+                        minItemWidth={200}
+                        onColumnCountChange={setColumnCount}
+                        rowHeight={300}
+                        renderItem={renderSkeletonItem}
+                        scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
+                      />
+                    );
+                }
+              })()
             ) : items.length === 0 ? (
               <div
                 className="flex flex-col items-center justify-center gap-4"
@@ -1014,7 +1134,82 @@ export const MoviesTab: React.FC = () => {
 
         {subTab === "ai-groups" && (
           <>
-            {gridItems.length === 0 ? (
+            {aiGroupsLoading ? (
+              (() => {
+                switch (galleryView) {
+                  case "list":
+                    return (
+                      <ListView
+                        ref={gridRef}
+                        items={Array.from({ length: 6 })}
+                        renderItem={renderSkeletonListItem}
+                        rowHeight={80}
+                        scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
+                      />
+                    );
+                  case "hex-grid":
+                    return (
+                      <HexGridView
+                        ref={gridRef}
+                        items={Array.from({ length: columnCount * 2 - 1 })}
+                        minItemWidth={200}
+                        onColumnCountChange={setColumnCount}
+                        renderHex={renderSkeletonHex}
+                        focusedIndex={focusedIndex}
+                        bindItem={bindItem}
+                        scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
+                      />
+                    );
+                  case "bookshelf":
+                    return (
+                      <BookshelfView
+                        ref={gridRef}
+                        items={Array.from({ length: viewColumnCount * 2 })}
+                        renderSpine={renderSkeletonSpine}
+                        focusedIndex={focusedIndex}
+                        onItemsPerRowChange={(count) => setViewColumnCount(count)}
+                        scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
+                      />
+                    );
+                  case "spread-deck":
+                    return (
+                      <SpreadDeckView
+                        ref={gridRef}
+                        items={Array.from({ length: viewColumnCount * 2 })}
+                        renderCard={renderSkeletonDeckCard}
+                        focusedIndex={focusedIndex}
+                        onItemsPerRowChange={(count) => setViewColumnCount(count)}
+                        scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
+                      />
+                    );
+                  default:
+                    if (isNeonGrid) {
+                      return (
+                        <NeonGridView
+                          ref={gridRef}
+                          items={Array.from({ length: columnCount * 2 })}
+                          minItemWidth={200}
+                          onColumnCountChange={setColumnCount}
+                          rowHeight={260}
+                          renderItem={renderSkeletonNeonCard}
+                          scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
+                        />
+                      );
+                    }
+                    return (
+                      <VirtualGrid
+                        ref={gridRef}
+                        items={Array.from({ length: columnCount * 2 })}
+                        minItemWidth={200}
+                        onColumnCountChange={setColumnCount}
+                        rowHeight={300}
+                        renderItem={renderSkeletonItem}
+                        scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
+                      />
+                    );
+                }
+              })()
+            ) : gridItems.length === 0 ? (
               <div className="flex items-center justify-center" style={{ color: "var(--color-text-dim)", minHeight: 200 }}>
                 <p>No movies found.</p>
               </div>
@@ -1026,7 +1221,22 @@ export const MoviesTab: React.FC = () => {
 
         {subTab === "streaming" && (
           <div className="pt-2">
-            <StreamingTile services={streamingServices} />
+            {streamingError ? (
+              <ErrorDisplay
+                message={streamingError}
+                onRetry={() => {
+                  setStreamingError(null);
+                  window.htpc.streaming.list("video")
+                    .then((list) => setStreamingServices(list))
+                    .catch(() => {
+                      setStreamingServices([]);
+                      setStreamingError("Failed to load streaming services.");
+                    });
+                }}
+              />
+            ) : (
+              <StreamingTile services={streamingServices} />
+            )}
           </div>
         )}
       </div>

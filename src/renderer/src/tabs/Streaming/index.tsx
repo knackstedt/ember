@@ -6,6 +6,8 @@ import { ExtensionManager } from "../../components/ExtensionManager/ExtensionMan
 import { ExtensionFirstRunPrompt } from "../../components/ExtensionFirstRunPrompt/ExtensionFirstRunPrompt";
 import { useSettingsStore } from "../../store/settings.store";
 import { useToastStore } from "../../store/toast.store";
+import { SkeletonGrid } from "../../components/SkeletonCard/SkeletonCard";
+import { ErrorDisplay } from "../../components/ErrorDisplay/ErrorDisplay";
 import { Globe, ArrowLeft, X, Play } from "lucide-react";
 
 type ViewMode = "services" | "webview";
@@ -19,6 +21,7 @@ export const StreamingTab: React.FC = () => {
   const [services, setServices] = useState<StreamingService[]>([]);
   const [frontpageMap, setFrontpageMap] = useState<Record<string, StreamingFrontpageItem[]>>({});
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [activeService, setActiveService] = useState<StreamingService | null>(null);
   const [activeItemUrl, setActiveItemUrl] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("services");
@@ -53,6 +56,7 @@ export const StreamingTab: React.FC = () => {
   async function loadServices() {
     try {
       setLoading(true);
+      setError(null);
       const list = await window.htpc.streaming.list("video");
       setServices(list);
       // Load frontpage items for all services
@@ -71,6 +75,7 @@ export const StreamingTab: React.FC = () => {
       setFrontpageMap(map);
     } catch {
       setServices([]);
+      setError("Failed to load streaming services.");
     } finally {
       setLoading(false);
     }
@@ -291,15 +296,9 @@ export const StreamingTab: React.FC = () => {
             </div>
 
             {loading ? (
-              <div className="flex-1 flex items-center justify-center">
-                <div
-                  className="w-8 h-8 rounded-full border-2 border-transparent animate-spin"
-                  style={{
-                    borderTopColor: "var(--color-accent)",
-                    borderRightColor: "var(--color-accent)",
-                  }}
-                />
-              </div>
+              <SkeletonGrid columns={8} rows={2} rowHeight={112} cellWidth={200} />
+            ) : error ? (
+              <ErrorDisplay message={error} onRetry={loadServices} />
             ) : servicesWithItems.length > 0 ? (
               <div className="flex flex-col gap-6">
                 {servicesWithItems.map(({ service, items }, rowIndex) => {
