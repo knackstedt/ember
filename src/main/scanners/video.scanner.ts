@@ -321,7 +321,7 @@ export async function scanMovieFiles(
 
       movies.push({
         id,
-        title: probe?.title ?? name,
+        title: probe?.title || name,
         filePath,
         coverUrl,
         runtime: probe?.duration ? Math.round(probe.duration) : undefined,

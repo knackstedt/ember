@@ -221,7 +221,7 @@ export async function scanRemoteMovies(
 
       movies.push({
         id,
-        title: probe?.title ?? name,
+        title: probe?.title || name,
         filePath: emberPath,
         coverUrl,
         runtime: probe?.duration ? Math.round(probe.duration) : undefined,
