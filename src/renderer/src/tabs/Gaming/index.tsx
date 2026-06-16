@@ -21,6 +21,7 @@ import {
 } from "../../components/GalleryView";
 import { GameCard } from "../../components/GameCard/GameCard";
 import { DetailPanel } from "../../components/DetailPanel/DetailPanel";
+import { ImageLightbox } from "../../components/ImageLightbox/ImageLightbox";
 import { OskInput } from "../../components/OnScreenKeyboard/OnScreenKeyboard";
 import { RecentlyPlayedRow } from "../../components/RecentlyPlayedRow/RecentlyPlayedRow";
 import { CoreSelector } from "../../components/CoreSelector/CoreSelector";
@@ -230,6 +231,7 @@ export const GamingTab: React.FC = () => {
   const [showLaunchSettings, setShowLaunchSettings] = useState(false);
   const [collectionItemIds, setCollectionItemIds] = useState<Set<string>>(new Set());
   const [localScreenshots, setLocalScreenshots] = useState<string[]>([]);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const gridRef = useRef<VirtualGridHandle>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const galleryView = useGalleryView();
@@ -1023,6 +1025,15 @@ export const GamingTab: React.FC = () => {
     onCancel: () => setSelected(null),
   });
 
+  const screenshotUrls = useMemo(() => {
+    const urls = localScreenshots.length
+      ? localScreenshots.slice(0, 6)
+      : detailGameData?.screenshots?.length
+        ? detailGameData.screenshots.slice(0, 6)
+        : [detailGameData?.bannerUrl, detailGameData?.coverUrl].filter(Boolean);
+    return urls.filter((u): u is string => !!u);
+  }, [localScreenshots, detailGameData]);
+
   return (
     <div className="flex flex-col h-full">
       <div style={{ padding: 16, paddingBottom: 0 }}>
@@ -1594,7 +1605,7 @@ export const GamingTab: React.FC = () => {
             ) : (
               <>
                 {/* Screenshots from game data + locally captured */}
-                {(detailGameData?.screenshots?.length || localScreenshots.length || detailGameData?.bannerUrl || detailGameData?.coverUrl) && (
+                {screenshotUrls.length > 0 && (
                   <div>
                     <div
                       className="text-xs font-semibold uppercase tracking-wide mb-2"
@@ -1606,23 +1617,16 @@ export const GamingTab: React.FC = () => {
                       className="flex gap-2 overflow-x-auto pb-1"
                       style={{ scrollbarWidth: "thin" }}
                     >
-                      {(
-                        localScreenshots.length
-                          ? localScreenshots.slice(0, 6)
-                          : detailGameData?.screenshots?.length
-                            ? detailGameData.screenshots.slice(0, 6)
-                            : [detailGameData?.bannerUrl, detailGameData?.coverUrl].filter(Boolean)
-                      )
-                        .filter((u): u is string => !!u)
-                        .map((url, i) => (
-                          <img
-                            key={i}
-                            src={url}
-                            alt=""
-                            className="h-28 flex-shrink-0 rounded-[var(--radius-card)] object-cover"
-                            style={{ maxWidth: 220 }}
-                          />
-                        ))}
+                      {screenshotUrls.map((url, i) => (
+                        <img
+                          key={i}
+                          src={url}
+                          alt=""
+                          className="h-28 flex-shrink-0 rounded-[var(--radius-card)] object-cover cursor-pointer hover:brightness-110 transition-[filter]"
+                          style={{ maxWidth: 220 }}
+                          onClick={() => setLightboxIndex(i)}
+                        />
+                      ))}
                     </div>
                   </div>
                 )}
@@ -1817,6 +1821,12 @@ export const GamingTab: React.FC = () => {
           </div>
         )}
       </DetailPanel>
+      <ImageLightbox
+        open={lightboxIndex !== null}
+        images={screenshotUrls}
+        initialIndex={lightboxIndex ?? 0}
+        onClose={() => setLightboxIndex(null)}
+      />
       {menu}
       <CollectionManager
         open={showCollectionManager}
