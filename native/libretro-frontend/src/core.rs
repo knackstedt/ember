@@ -195,6 +195,12 @@ impl CoreInstance {
         }
         *self.audio.lock() = None;
     }
+
+    pub fn set_mute(&self, mute: bool) {
+        if let Some(ref sys) = *self.audio.lock() {
+            sys.set_mute(mute);
+        }
+    }
 }
 
 extern "C" fn core_environment_callback(cmd: c_uint, data: *mut c_void) -> bool {

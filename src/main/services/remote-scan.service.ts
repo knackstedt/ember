@@ -103,7 +103,14 @@ function summarizeExecError(err: unknown): string {
       !line.startsWith("configuration:") &&
       !line.startsWith("  --") &&
       !line.startsWith("lib") &&
-      !line.startsWith("WARNING:")
+      !line.startsWith("WARNING:") &&
+      !line.startsWith("frame=") &&
+      !line.startsWith("size=") &&
+      !line.startsWith("Lsize=") &&
+      !line.startsWith("time=") &&
+      !line.startsWith("speed=") &&
+      !line.startsWith("fps=") &&
+      !line.startsWith("q=")
     ) {
       return line;
     }
@@ -133,7 +140,7 @@ async function probVideoHttp(url: string, source?: RemoteSource): Promise<{
 } | null> {
   try {
     const { stdout } = await execAsync(
-      `ffprobe -v quiet -print_format json -show_streams -show_format "${url.replace(/"/g, '\\"')}"`,
+      `ffprobe -hide_banner -loglevel error -v quiet -print_format json -show_streams -show_format "${url.replace(/"/g, '\\"')}"`,
       { timeout: 30000 },
     );
     const data = JSON.parse(stdout);

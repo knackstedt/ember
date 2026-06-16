@@ -157,6 +157,16 @@ impl LibretroFrontend {
         Ok(true)
     }
 
+    #[napi]
+    pub fn set_mute(&self, core_id: i32, mute: bool) -> Result<bool> {
+        let cores = self.cores.lock();
+        let handle = cores
+            .get(core_id as usize)
+            .ok_or_else(|| Error::new(Status::InvalidArg, "Invalid core ID"))?;
+        handle.core.lock().set_mute(mute);
+        Ok(true)
+    }
+
     /// Zero-copy frame access: returns an external ArrayBuffer pointing to the
     /// pre-allocated reusable frame buffer. The buffer is valid until the next
     /// frame is written. Callers must check width/height first and copy/upload

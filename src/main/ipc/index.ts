@@ -46,6 +46,7 @@ import {
 import { getProtonRating } from "../services/protondb.service";
 import { performGameScan } from "../services/game-scan.service";
 import { loadFlashThumbnail, clearInFlight, setFlashThumbnailConcurrency } from "../services/flash-thumbnail.service";
+import { loadLibretroThumbnail, isLibretroPlatform, listLocalScreenshots } from "../services/libretro-thumbnail.service";
 import { searchGame } from "../services/rawg.service";
 import { searchMovie, searchShow } from "../services/tmdb.service";
 import {
@@ -236,6 +237,7 @@ function ensureLibretroWorker(): ChildProcess {
     /^done resetting jit mem/i,
     /^\s*\d{8}\/\d{8}\s*$/, // standalone permission hex lines like "00000000/00000000"
     /^\s*\d{8}\/\d{8}\s+\S+$/, // lines with hex data trailing
+    /^NDS SRAM: Flush requested/i,
   ];
 
   function shouldLogWorkerLine(line: string): boolean {
@@ -322,7 +324,7 @@ async function destroyWorker(): Promise<void> {
   });
 }
 
-function workerCall(method: string, ...args: any[]): Promise<any> {
+export function workerCall(method: string, ...args: any[]): Promise<any> {
   const worker = ensureLibretroWorker();
   const id = ++workerReqId;
   return new Promise((resolve, reject) => {
@@ -808,9 +810,16 @@ export function registerIpcHandlers(window: BrowserWindow): void {
   });
 
   ipcMain.handle("games:loadThumbnail", async (_e, game: Game) => {
-    if (game.platform !== "flash" || !game.romPath) return null;
-    const url = await loadFlashThumbnail(game);
-    return url ?? null;
+    if (!game.romPath) return null;
+    if (game.platform === "flash") {
+      const url = await loadFlashThumbnail(game);
+      return url ?? null;
+    }
+    if (isLibretroPlatform(game.platform)) {
+      const url = await loadLibretroThumbnail(game);
+      return url ?? null;
+    }
+    return null;
   });
 
   // Enhanced metadata handlers using unified metadata service
@@ -1015,6 +1024,16 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     },
   );
 
+  // List locally-captured screenshots for a game (libretro numbered frames)
+  ipcMain.handle("games:localScreenshots", async (_e, gameId: string) => {
+    try {
+      return listLocalScreenshots(gameId);
+    } catch (err) {
+      log.error("ipc:games:localScreenshots", String(err));
+      return [];
+    }
+  });
+
   // Fetch videos specifically (lazy loading for detail view)
   ipcMain.handle(
     "games:metadata:videos",
@@ -1104,6 +1123,56 @@ export function registerIpcHandlers(window: BrowserWindow): void {
         log.info("ipc:games:regenerateThumbnail", `cleared inFlight for ${id}`);
         const url = await loadFlashThumbnail(game);
         log.info("ipc:games:regenerateThumbnail", `loadFlashThumbnail returned ${url}`);
+        return url ?? null;
+      }
+      if (isLibretroPlatform(game.platform) && game.romPath) {
+        const { join } = await import("path");
+        const { existsSync, unlinkSync } = await import("fs");
+        const coverRoot = join(app.getPath("userData"), "covers", "libretro");
+        const screenshotDir = join(coverRoot, "screenshots");
+        const generatedDir = join(coverRoot, "generated");
+        const id = game.id;
+        for (const ext of [".png", ".jpg", ".webp"]) {
+          const p = join(screenshotDir, `${id}${ext}`);
+          if (existsSync(p)) {
+            try {
+              unlinkSync(p);
+              log.info("ipc:games:regenerateThumbnail", `deleted libretro ${p}`);
+            } catch {}
+          }
+        }
+        // Delete numbered screenshots
+        for (let i = 0; i < 20; i++) {
+          const p = join(screenshotDir, `${id}_${i}.png`);
+          if (existsSync(p)) {
+            try {
+              unlinkSync(p);
+              log.info("ipc:games:regenerateThumbnail", `deleted libretro ${p}`);
+            } catch {}
+          } else {
+            break;
+          }
+        }
+        const svg = join(generatedDir, `${id}.svg`);
+        if (existsSync(svg)) {
+          try {
+            unlinkSync(svg);
+            log.info("ipc:games:regenerateThumbnail", `deleted libretro ${svg}`);
+          } catch {}
+        }
+        const brokenSvg = join(generatedDir, `${id}-broken.svg`);
+        if (existsSync(brokenSvg)) {
+          try {
+            unlinkSync(brokenSvg);
+            log.info("ipc:games:regenerateThumbnail", `deleted libretro ${brokenSvg}`);
+          } catch {}
+        }
+        try {
+          await GameRepo.setCorrupt(id, false);
+          log.info("ipc:games:regenerateThumbnail", `cleared corrupt for ${id}`);
+        } catch {}
+        const url = await loadLibretroThumbnail(game);
+        log.info("ipc:games:regenerateThumbnail", `loadLibretroThumbnail returned ${url}`);
         return url ?? null;
       }
       const settings = await getSettings();
@@ -1658,6 +1727,8 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     const cacheDirs = [
       join(userData, "covers", "flash", "screenshots"),
       join(userData, "covers", "flash", "generated"),
+      join(userData, "covers", "libretro", "screenshots"),
+      join(userData, "covers", "libretro", "generated"),
       join(userData, "covers", "music"),
       join(userData, "covers", "artists"),
       join(userData, "thumbnails", "movies"),
@@ -1688,6 +1759,8 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     const cacheDirs = [
       join(userData, "covers", "flash", "screenshots"),
       join(userData, "covers", "flash", "generated"),
+      join(userData, "covers", "libretro", "screenshots"),
+      join(userData, "covers", "libretro", "generated"),
       join(userData, "covers", "music"),
       join(userData, "covers", "artists"),
       join(userData, "thumbnails", "movies"),
@@ -1725,6 +1798,8 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     const cacheDirs = [
       join(userData, "covers", "flash", "screenshots"),
       join(userData, "covers", "flash", "generated"),
+      join(userData, "covers", "libretro", "screenshots"),
+      join(userData, "covers", "libretro", "generated"),
       join(userData, "covers", "music"),
       join(userData, "covers", "artists"),
       join(userData, "thumbnails", "movies"),

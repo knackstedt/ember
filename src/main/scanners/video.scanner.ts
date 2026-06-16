@@ -76,7 +76,7 @@ async function probVideo(filePath: string): Promise<{
   if (!(await checkFfmpeg())) return null;
   try {
     const { stdout } = await execAsync(
-      `ffprobe -v quiet -print_format json -show_streams -show_format "${filePath.replace(/"/g, '\\"')}"`,
+      `ffprobe -hide_banner -loglevel error -v quiet -print_format json -show_streams -show_format "${filePath.replace(/"/g, '\\"')}"`,
       { timeout: 30000 },
     );
     const data: FfprobeData = JSON.parse(stdout);
@@ -116,7 +116,14 @@ function summarizeExecError(err: unknown): string {
       !line.startsWith("configuration:") &&
       !line.startsWith("  --") &&
       !line.startsWith("lib") &&
-      !line.startsWith("WARNING:")
+      !line.startsWith("WARNING:") &&
+      !line.startsWith("frame=") &&
+      !line.startsWith("size=") &&
+      !line.startsWith("Lsize=") &&
+      !line.startsWith("time=") &&
+      !line.startsWith("speed=") &&
+      !line.startsWith("fps=") &&
+      !line.startsWith("q=")
     ) {
       return line;
     }
@@ -129,9 +136,16 @@ async function extractEmbeddedVideoCover(
   dest: string,
 ): Promise<boolean> {
   if (!(await checkFfmpeg())) return false;
+  // Cover extraction requires parsing the container to locate the embedded
+  // picture stream. Over HTTP this is unreliable (especially for MKV where
+  // ffmpeg may need range-request support), so skip it and fall back to a
+  // frame thumbnail which works fine for remote files.
+  if (filePath.startsWith("http://") || filePath.startsWith("https://")) {
+    return false;
+  }
   try {
     const { stdout } = await execAsync(
-      `ffprobe -v quiet -select_streams v -show_entries stream_disposition=attached_pic -of json "${filePath.replace(/"/g, '\\"')}"`,
+      `ffprobe -hide_banner -loglevel warning -v quiet -select_streams v -show_entries stream_disposition=attached_pic -of json "${filePath.replace(/"/g, '\\"')}"`,
       { timeout: 30000 },
     );
     const data = JSON.parse(stdout);
@@ -141,7 +155,7 @@ async function extractEmbeddedVideoCover(
     );
     if (picIndex >= 0) {
       await execAsync(
-        `ffmpeg -i "${filePath.replace(/"/g, '\\"')}" -map 0:v:${picIndex} -frames:v 1 -q:v 2 -y "${dest}"`,
+        `ffmpeg -hide_banner -loglevel warning -i "${filePath.replace(/"/g, '\\"')}" -map 0:v:${picIndex} -frames:v 1 -q:v 2 -pix_fmt yuvj420p -y "${dest}"`,
         { timeout: 30000 },
       );
       if (existsSync(dest) && statSync(dest).size > 0) return true;
@@ -157,9 +171,9 @@ async function extractEmbeddedVideoCover(
     if (isConnectionError(err)) {
       throw err; // Let caller retry with restarted serve
     }
-    log.error(
+    log.warn(
       "video.scanner",
-      `extractEmbeddedVideoCover failed: ${summarizeExecError(err)}`,
+      `extractEmbeddedVideoCover failed for ${filePath}: ${summarizeExecError(err)}`,
     );
     return false;
   }
@@ -171,36 +185,40 @@ async function generateFrameThumbnail(
   duration?: number,
 ): Promise<boolean> {
   if (!(await checkFfmpeg())) return false;
-  try {
-    let seekSec = 30;
-    if (duration && duration > 0) {
-      seekSec = Math.max(5, Math.min(Math.round(duration * 0.1), 300));
-    }
-    const hh = String(Math.floor(seekSec / 3600)).padStart(2, "0");
-    const mm = String(Math.floor((seekSec % 3600) / 60)).padStart(2, "0");
-    const ss = String(seekSec % 60).padStart(2, "0");
-    const seek = `${hh}:${mm}:${ss}`;
-    await execAsync(
-      `ffmpeg -ss ${seek} -i "${filePath.replace(/"/g, '\\"')}" -frames:v 1 -q:v 2 -vf "scale=480:-1" -y "${dest}"`,
-      { timeout: 30000 },
-    );
-    if (existsSync(dest) && statSync(dest).size > 0) return true;
+  const tryCapture = async (seek: string): Promise<boolean> => {
     try {
-      unlinkSync(dest);
-    } catch {
-      /* ignore */
+      await execAsync(
+        `ffmpeg -hide_banner -loglevel error -ss ${seek} -i "${filePath.replace(/"/g, '\\"')}" -frames:v 1 -q:v 2 -vf "scale=480:-1" -pix_fmt yuvj420p -y "${dest}"`,
+        { timeout: 30000 },
+      );
+      if (existsSync(dest) && statSync(dest).size > 0) return true;
+      try {
+        unlinkSync(dest);
+      } catch {
+        /* ignore */
+      }
+      return false;
+    } catch (err) {
+      if (isConnectionError(err)) throw err;
+      return false;
     }
-    return false;
-  } catch (err) {
-    if (isConnectionError(err)) {
-      throw err; // Let caller retry with restarted serve
-    }
-    log.error(
-      "video.scanner",
-      `generateFrameThumbnail failed: ${summarizeExecError(err)}`,
-    );
-    return false;
+  };
+  let seekSec = 30;
+  if (duration && duration > 0) {
+    seekSec = Math.max(5, Math.min(Math.round(duration * 0.1), 300));
   }
+  const hh = String(Math.floor(seekSec / 3600)).padStart(2, "0");
+  const mm = String(Math.floor((seekSec % 3600) / 60)).padStart(2, "0");
+  const ss = String(seekSec % 60).padStart(2, "0");
+  const primarySeek = `${hh}:${mm}:${ss}`;
+  if (await tryCapture(primarySeek)) return true;
+  // Fallback: seek early and let ffmpeg decode to the target (slower but more accurate)
+  if (await tryCapture("00:00:01")) return true;
+  log.error(
+    "video.scanner",
+    `generateFrameThumbnail failed for ${filePath}`,
+  );
+  return false;
 }
 
 export async function generateMovieThumbnail(

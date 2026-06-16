@@ -114,7 +114,12 @@ export const useGamesStore = create<GamesState>((set, get) => ({
 
   loadThumbnail: async (id) => {
     const game = get().games.find((g) => g.id === id);
-    if (!game || game.coverUrl || game.platform !== "flash") return;
+    const libretroPlatforms = new Set<GamePlatform>([
+      "nes", "snes", "gb", "gba", "n64", "genesis", "sms",
+      "gamegear", "pce", "psx", "dreamcast", "nds", "dos",
+    ]);
+    const isLibretro = libretroPlatforms.has(game?.platform as GamePlatform);
+    if (!game || game.coverUrl || (game.platform !== "flash" && !isLibretro)) return;
     if (get().pendingThumbnailIds.has(id)) return;
     set((s) => {
       const next = new Set(s.pendingThumbnailIds);

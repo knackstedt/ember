@@ -151,7 +151,12 @@ const LazyGameCard: React.FC<{
   const coreVersion = useGamesStore((s) => s.coreVersion);
 
   useEffect(() => {
-    if (game.platform === "flash" && !game.coverUrl) {
+    const libretroPlatforms = new Set<string>([
+      "nes", "snes", "gb", "gba", "n64", "genesis", "sms",
+      "gamegear", "pce", "psx", "dreamcast", "nds", "dos",
+    ]);
+    const isLibretro = libretroPlatforms.has(game.platform);
+    if ((game.platform === "flash" || isLibretro) && !game.coverUrl) {
       loadThumbnail(game.id);
     }
   }, [game.id, game.platform, game.coverUrl, loadThumbnail]);
@@ -224,6 +229,7 @@ export const GamingTab: React.FC = () => {
   const [showCollectionManager, setShowCollectionManager] = useState(false);
   const [showLaunchSettings, setShowLaunchSettings] = useState(false);
   const [collectionItemIds, setCollectionItemIds] = useState<Set<string>>(new Set());
+  const [localScreenshots, setLocalScreenshots] = useState<string[]>([]);
   const gridRef = useRef<VirtualGridHandle>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const galleryView = useGalleryView();
@@ -303,6 +309,27 @@ export const GamingTab: React.FC = () => {
       setTopBarFocused(false);
     }
   }, [selected]);
+
+  /* Fetch locally-captured screenshots when a game is selected */
+  useEffect(() => {
+    if (!selected) {
+      setLocalScreenshots([]);
+      return;
+    }
+    const libretroPlatforms = new Set<string>([
+      "nes", "snes", "gb", "gba", "n64", "genesis", "sms",
+      "gamegear", "pce", "psx", "dreamcast", "nds", "dos",
+    ]);
+    if (!libretroPlatforms.has(selected.platform)) {
+      setLocalScreenshots([]);
+      return;
+    }
+    window.htpc.games.getLocalScreenshots(selected.id).then((urls) => {
+      setLocalScreenshots(urls);
+    }).catch(() => {
+      setLocalScreenshots([]);
+    });
+  }, [selected?.id, selected?.platform]);
 
   /* Dispatch selection changes for command palette context */
   useEffect(() => {
@@ -1566,8 +1593,8 @@ export const GamingTab: React.FC = () => {
               <GameSessionSettings game={selected} />
             ) : (
               <>
-                {/* Screenshots from game data */}
-                {(detailGameData?.screenshots?.length || detailGameData?.bannerUrl || detailGameData?.coverUrl) && (
+                {/* Screenshots from game data + locally captured */}
+                {(detailGameData?.screenshots?.length || localScreenshots.length || detailGameData?.bannerUrl || detailGameData?.coverUrl) && (
                   <div>
                     <div
                       className="text-xs font-semibold uppercase tracking-wide mb-2"
@@ -1579,9 +1606,12 @@ export const GamingTab: React.FC = () => {
                       className="flex gap-2 overflow-x-auto pb-1"
                       style={{ scrollbarWidth: "thin" }}
                     >
-                      {(detailGameData?.screenshots?.length
-                        ? detailGameData.screenshots.slice(0, 6)
-                        : [detailGameData?.bannerUrl, detailGameData?.coverUrl].filter(Boolean)
+                      {(
+                        localScreenshots.length
+                          ? localScreenshots.slice(0, 6)
+                          : detailGameData?.screenshots?.length
+                            ? detailGameData.screenshots.slice(0, 6)
+                            : [detailGameData?.bannerUrl, detailGameData?.coverUrl].filter(Boolean)
                       )
                         .filter((u): u is string => !!u)
                         .map((url, i) => (

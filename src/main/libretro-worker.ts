@@ -104,6 +104,9 @@ process.on("message", (req: any) => {
       case "setAnalogState":
         result = Frontend.setAnalogState(args[0], args[1], args[2], args[3], args[4]);
         break;
+      case "setMute":
+        result = Frontend.setMute(args[0], args[1]);
+        break;
       default:
         process.send!({ id, error: `Unknown method: ${method}` });
         return;

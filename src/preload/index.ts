@@ -449,6 +449,9 @@ const htpc = {
     }): Promise<unknown[]> =>
       ipcRenderer.invoke("games:metadata:videos", options),
 
+    getLocalScreenshots: (gameId: string): Promise<string[]> =>
+      ipcRenderer.invoke("games:localScreenshots", gameId),
+
     fetchProtonRating: (steamAppId: number): Promise<string> =>
       ipcRenderer.invoke("games:metadata:proton", steamAppId),
     hide: (id: string, value: boolean): Promise<void> =>
