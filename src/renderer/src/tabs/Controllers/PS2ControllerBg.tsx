@@ -1,9 +1,12 @@
-<?xml version="1.0" encoding="iso-8859-1"?>
-<!-- Uploaded to: SVG Repo, www.svgrepo.com, Generator: SVG Repo Mixer Tools -->
-<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
-<svg fill="#000000" version="1.1" id="Capa_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" 
-	 width="800px" height="800px" viewBox="0 0 581.118 581.118"
-	 xml:space="preserve">
+import React from "react";
+
+export const PS2ControllerBg: React.FC = () => (
+  <g
+    fill="var(--color-surface-raised)"
+    stroke="var(--color-border)"
+    strokeWidth="1.5"
+    className="ps2-controller-bg"
+  >
 <g>
 	<g>
 		<path d="M114.003,255.595c-5.043,3.696-10.324,8.09-11.102,9.663c-1.353,2.705-3.244,17.252-2.889,22.24
@@ -147,4 +150,5 @@
 			C268.527,201.874,269.353,202.859,270.437,203.63z"/>
 	</g>
 </g>
-</svg>
+  </g>
+);

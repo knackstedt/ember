@@ -1,14 +1,12 @@
 import React from "react";
-import { PS4ControllerBg } from "./PS4ControllerBg";
+import { PS2ControllerBg } from "./PS2ControllerBg";
 import { PSXIcon, PSCircleIcon, PSSquareIcon, PSTriangleIcon } from "./PlayStationIcons";
 
-interface PS4ControllerProps {
+interface PS2ControllerProps {
   highlightCode?: string | null;
   learnCode?: string | null;
   pressedCodes?: string[];
   axes?: Record<string, number>;
-  touchpadX?: number;
-  touchpadY?: number;
 }
 
 /* ── helpers ── */
@@ -75,65 +73,60 @@ const STYLES = {
   },
 };
 
-/* ── overlay positions (tuned to ps4.svg viewBox 0 0 575.395 575.395) ── */
+/* ── overlay positions (tuned to ps2.svg viewBox 0 0 581.118 581.118) ── */
 
 /* Upper-right diamond — SQUARE and TRIANGLE swapped */
 const FACE = {
-  north: { cx: 466.5, cy: 230.598, r: 22, label: "△", color: "#5b9bd5", labelCx: 466.5, labelCy: 236.5, Icon: PSSquareIcon },
-  south: { cx: 466.5, cy: 310.776, r: 22, label: "✕", color: "#e05252", labelCx: 466.5, labelCy: 316.5, Icon: PSXIcon },
-  west:  { cx: 426.408, cy: 270.69, r: 22, label: "□", color: "#f0c040", labelCx: 426.408, labelCy: 276.5, Icon: PSTriangleIcon },
-  east:  { cx: 506.592, cy: 270.69, r: 22, label: "○", color: "#5bba47", labelCx: 506.592, labelCy: 276.5, Icon: PSCircleIcon },
+  north: { cx: 465.824, cy: 194.529, r: 22, label: "△", color: "#5b9bd5", labelCx: 465.824, labelCy: 199.5, Icon: PSSquareIcon },
+  south: { cx: 465.824, cy: 287.774, r: 22, label: "✕", color: "#e05252", labelCx: 465.824, labelCy: 292.5, Icon: PSXIcon },
+  west:  { cx: 419.202, cy: 241.152, r: 22, label: "□", color: "#f0c040", labelCx: 419.202, labelCy: 246.5, Icon: PSTriangleIcon },
+  east:  { cx: 512.446, cy: 241.152, r: 22, label: "○", color: "#5bba47", labelCx: 512.446, labelCy: 246.5, Icon: PSCircleIcon },
 };
 
 /* Top shoulder buttons */
 const BUMPERS = {
-  left_bumper:  { cx: 120, cy: 185, r: 24, label: "L1", labelCx: 120, labelCy: 190 },
-  right_bumper: { cx: 455, cy: 185, r: 24, label: "R1", labelCx: 455, labelCy: 190 },
+  left_bumper:  { cx: 125, cy: 140, r: 24, label: "L1", labelCx: 125, labelCy: 145 },
+  right_bumper: { cx: 460, cy: 140, r: 24, label: "R1", labelCx: 460, labelCy: 145 },
 };
 
 /* Center button shapes */
 const CENTER = {
-  select: { cx: 170, cy: 217, r: 14, label: "SH" },
-  home:   { cx: 287, cy: 345, r: 26, label: "PS", color: "#3a8cd4" },
-  start:  { cx: 405, cy: 217, r: 14, label: "OP" },
+  select: { cx: 238, cy: 242, r: 14, label: "SL" },
+  home:   { cx: 290.559, cy: 296, r: 28, label: "PS", color: "#3a8cd4" },
+  start:  { cx: 340, cy: 242, r: 14, label: "ST" },
 };
-
-/* Touchpad above center */
-const TOUCHPAD = { cx: 287.5, cy: 240, w: 185, h: 100, rx: 9 };
 
 /* D-pad — plus shape with configurable dead space in the center */
 const DPAD = {
-  cx: 106,
-  cy: 274,
-  armLen: 48,
-  armThick: 34,
-  deadR: 14,
+  cx: 114,
+  cy: 244,
+  armLen: 50,
+  armThick: 36,
+  deadR: 12,
 };
 
 /* Sticks */
 const THUMB_BASE = {
-  left:  { cx: 190.892, cy: 354, r: 50 },
-  right: { cx: 378.482, cy: 354, r: 50 },
+  left:  { cx: 200.111, cy: 324.402, r: 50 },
+  right: { cx: 381.362, cy: 324.402, r: 50 },
 };
 
 const THUMB = {
-  left_thumb:  { cx: 190.892, cy: 354, r: 28, label: "L3", labelCx: 190.892, labelCy: 332 },
-  right_thumb: { cx: 378.482, cy: 354, r: 28, label: "R3", labelCx: 378.482, labelCy: 332 },
+  left_thumb:  { cx: 200.111, cy: 324.402, r: 28, label: "L3", labelCx: 200.111, labelCy: 329.5 },
+  right_thumb: { cx: 381.362, cy: 324.402, r: 28, label: "R3", labelCx: 381.362, labelCy: 329.5 },
 };
 
 /* Triggers */
 const TRIGGER = {
-  left_trigger:  { x: 55, y: 125, w: 80, h: 55, label: "L2", labelCx: 95, labelCy: 155, barX: 130, barY: 125, barW: 12, barH: 55 },
-  right_trigger: { x: 440, y: 125, w: 80, h: 55, label: "R2", labelCx: 480, labelCy: 155, barX: 433, barY: 125, barW: 12, barH: 55 },
+  left_trigger:  { x: 60, y: 60, w: 80, h: 55, label: "L2", labelCx: 100, labelCy: 90, barX: 135, barY: 60, barW: 12, barH: 55 },
+  right_trigger: { x: 445, y: 60, w: 80, h: 55, label: "R2", labelCx: 485, labelCy: 90, barX: 438, barY: 60, barW: 12, barH: 55 },
 };
 
-export const PS4Controller: React.FC<PS4ControllerProps> = React.memo(({
+export const PS2Controller: React.FC<PS2ControllerProps> = React.memo(({
   highlightCode,
   learnCode,
   pressedCodes,
   axes,
-  touchpadX,
-  touchpadY,
 }) => {
   const accentCode = learnCode ?? highlightCode;
   const pressedSet = React.useMemo(() => new Set(pressedCodes ?? []), [pressedCodes]);
@@ -170,20 +163,16 @@ export const PS4Controller: React.FC<PS4ControllerProps> = React.memo(({
   const armFill   = (on: boolean) => on ? STYLES.colors.active : STYLES.colors.surface;
   const armStroke = (on: boolean) => on ? STYLES.colors.active : STYLES.colors.border;
 
-  /* Touchpad state */
-  const touchpadPressed = pressedSet.has("touchpad");
-  const hasTouch = touchpadX !== undefined && touchpadY !== undefined;
-
   return (
     <svg
-      viewBox="0 0 575.395 575.395"
+      viewBox="0 0 581.118 581.118"
       width="100%"
       height="auto"
       style={{ maxWidth: 520, display: "block", margin: "0 auto" }}
-      aria-label="PS4 controller diagram"
+      aria-label="PS2 controller diagram"
     >
       {/* ── Background controller image ── */}
-      <PS4ControllerBg />
+      <PS2ControllerBg />
 
       {/* ── Triggers ── */}
       {Object.entries(TRIGGER).map(([code, t]) => {
@@ -254,45 +243,6 @@ export const PS4Controller: React.FC<PS4ControllerProps> = React.memo(({
           </g>
         );
       })}
-
-      {/* ── Touchpad ── */}
-      <g>
-        <rect
-          x={TOUCHPAD.cx - TOUCHPAD.w / 2}
-          y={TOUCHPAD.cy - TOUCHPAD.h / 2}
-          width={TOUCHPAD.w}
-          height={TOUCHPAD.h}
-          rx={TOUCHPAD.rx}
-          fill={touchpadPressed ? baseFill(false, true) : STYLES.colors.surface}
-          stroke={touchpadPressed ? STYLES.colors.active : STYLES.colors.border}
-          strokeWidth={STYLES.rect.strokeWidth}
-          opacity={touchpadPressed ? STYLES.rect.activeOpacity : 0.7}
-        />
-        {/* Touch indicator */}
-        {hasTouch && (
-          <circle
-            cx={TOUCHPAD.cx + (touchpadX! - 0.5) * TOUCHPAD.w}
-            cy={TOUCHPAD.cy + (touchpadY! - 0.5) * TOUCHPAD.h}
-            r={6}
-            fill={STYLES.colors.active}
-            opacity={0.9}
-          />
-        )}
-        {/* Click indicator ring */}
-        {touchpadPressed && (
-          <rect
-            x={TOUCHPAD.cx - TOUCHPAD.w / 2 + 3}
-            y={TOUCHPAD.cy - TOUCHPAD.h / 2 + 3}
-            width={TOUCHPAD.w - 6}
-            height={TOUCHPAD.h - 6}
-            rx={TOUCHPAD.rx - 3}
-            fill="none"
-            stroke={STYLES.colors.active}
-            strokeWidth={2}
-            opacity={0.8}
-          />
-        )}
-      </g>
 
       {/* ── D-Pad ── */}
       <g>
@@ -370,7 +320,7 @@ export const PS4Controller: React.FC<PS4ControllerProps> = React.memo(({
         />
       </g>
 
-      {/* ── Center buttons (Share / PS / Options) ── */}
+      {/* ── Center buttons (Select / PS / Start) ── */}
       {Object.entries(CENTER).map(([code, c]) => {
         const active = accentCode === code;
         const isPressed = pressedSet.has(code);
@@ -463,4 +413,4 @@ export const PS4Controller: React.FC<PS4ControllerProps> = React.memo(({
   );
 });
 
-PS4Controller.displayName = "PS4Controller";
+PS2Controller.displayName = "PS2Controller";

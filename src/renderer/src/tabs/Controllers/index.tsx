@@ -20,6 +20,10 @@ import {
   Activity,
   Cpu,
   Clock,
+  Pencil,
+  RefreshCw,
+  Copy,
+  Bug,
 } from "lucide-react";
 import { useInputStore } from "../../store/input.store";
 import type { LiveControllerState } from "../../store/input.store";
@@ -31,14 +35,20 @@ import {
 } from "../../../../shared/types";
 import { XboxController } from "./XboxController";
 import { PS4Controller } from "./PS4Controller";
+import { PS2Controller } from "./PS2Controller";
 import { GameCubeController } from "./GameCubeController";
+import { N64Controller } from "./N64Controller";
+import { SwitchController } from "./SwitchController";
+import { WiiController } from "./WiiController";
 import {
   PSXIcon,
   PSCircleIcon,
   PSSquareIcon,
   PSTriangleIcon,
 } from "./PlayStationIcons";
-import { subscribeLearning, setLearningDeviceId } from "../../hooks/useControllerWorker";
+import { subscribeLearning, setLearningDeviceIds } from "../../hooks/useControllerWorker";
+import { useContextMenu } from "../../hooks/useContextMenu";
+import { ContextMenuOption } from "../../components/ContextMenu/ContextMenu";
 
 const CONTROLLER_ICON_SIZE = 28;
 
@@ -50,6 +60,8 @@ const CONTROLLER_ICONS: Record<ControllerType, React.ReactNode> = {
   ps4: <Gamepad2 size={CONTROLLER_ICON_SIZE} />,
   ps5: <Gamepad2 size={CONTROLLER_ICON_SIZE} />,
   gamecube: <Gamepad2 size={CONTROLLER_ICON_SIZE} />,
+  n64: <Gamepad2 size={CONTROLLER_ICON_SIZE} />,
+  switch: <Gamepad2 size={CONTROLLER_ICON_SIZE} />,
   wiimote: <Gamepad2 size={CONTROLLER_ICON_SIZE} />,
   generic: <Gamepad2 size={CONTROLLER_ICON_SIZE} />,
 };
@@ -127,7 +139,7 @@ const DEFAULT_ACTIONS = [
   "fullscreen",
 ];
 
-const BUTTON_LABELS: Record<string, React.ReactNode> = {
+const GENERIC_BUTTON_LABELS: Record<string, React.ReactNode> = {
   south: <>A / <PSXIcon /></>,
   east: <>B / <PSCircleIcon /></>,
   west: <>X / <PSSquareIcon /></>,
@@ -146,9 +158,72 @@ const BUTTON_LABELS: Record<string, React.ReactNode> = {
   dpad_down: "D-Pad Down",
   dpad_left: "D-Pad Left",
   dpad_right: "D-Pad Right",
+  c: "C (Nunchuk)",
+  z: "Z (Nunchuk)",
 };
 
-const BUTTON_CODES = Object.keys(BUTTON_LABELS);
+const TYPE_BUTTON_LABELS: Partial<Record<ControllerType, Record<string, React.ReactNode>>> = {
+  switch: {
+    south: "B",
+    east: "A",
+    west: "Y",
+    north: "X",
+    left_bumper: "L",
+    right_bumper: "R",
+    left_trigger: "ZL",
+    right_trigger: "ZR",
+    select: "−",
+    start: "+",
+    home: "Home",
+    left_thumb: "LS / L3",
+    right_thumb: "RS / R3",
+    dpad_up: "D-Pad Up",
+    dpad_down: "D-Pad Down",
+    dpad_left: "D-Pad Left",
+    dpad_right: "D-Pad Right",
+  },
+  n64: {
+    south: "A",
+    east: "B",
+    north: "C↑",
+    west: "C←",
+    left_bumper: "L",
+    right_bumper: "R",
+    left_trigger: "Z",
+    start: "Start",
+    left_thumb: "Stick",
+    c_up: "C↑",
+    c_down: "C↓",
+    c_left: "C←",
+    c_right: "C→",
+    dpad_up: "D-Pad Up",
+    dpad_down: "D-Pad Down",
+    dpad_left: "D-Pad Left",
+    dpad_right: "D-Pad Right",
+  },
+  wiimote: {
+    south: "A",
+    east: "B",
+    west: "1",
+    north: "2",
+    select: "−",
+    start: "+",
+    home: "Home",
+    left_thumb: "Nunchuk Stick",
+    c: "C",
+    z: "Z",
+    dpad_up: "D-Pad Up",
+    dpad_down: "D-Pad Down",
+    dpad_left: "D-Pad Left",
+    dpad_right: "D-Pad Right",
+  },
+};
+
+function getButtonLabel(type: ControllerType, code: string): React.ReactNode {
+  return TYPE_BUTTON_LABELS[type]?.[code] ?? GENERIC_BUTTON_LABELS[code] ?? code;
+}
+
+const BUTTON_CODES = Object.keys(GENERIC_BUTTON_LABELS);
 
 const STANDARD_AXIS_NAMES = new Set([
   "left_x",
@@ -161,6 +236,13 @@ const STANDARD_AXIS_NAMES = new Set([
   "dpad_y",
 ]);
 
+let devToolsOpen = false;
+window.htpc.devtools
+  ?.isOpen?.()
+  .then((open) => { devToolsOpen = open; })
+  .catch(() => { /* ignore */ });
+window.htpc.devtools?.onChange?.((open) => { devToolsOpen = open; });
+
 function isKnownButton(name: string): boolean {
   return BUTTON_CODES.includes(name);
 }
@@ -172,6 +254,7 @@ function isKnownAxis(name: string): boolean {
 interface MappingRowProps {
   inputCode: string;
   currentAction: string;
+  controllerType: ControllerType;
   isLearning: boolean;
   learnedRaw: number | null;
   onStartLearn: () => void;
@@ -183,6 +266,7 @@ interface MappingRowProps {
 const MappingRow: React.FC<MappingRowProps> = ({
   inputCode,
   currentAction,
+  controllerType,
   isLearning,
   learnedRaw,
   onStartLearn,
@@ -216,7 +300,7 @@ const MappingRow: React.FC<MappingRowProps> = ({
         className="text-sm font-mono w-28 shrink-0"
         style={{ color: "var(--color-text)" }}
       >
-        {BUTTON_LABELS[inputCode] ?? inputCode}
+        {getButtonLabel(controllerType, inputCode)}
       </span>
 
       {isLearning ? (
@@ -372,9 +456,24 @@ function DiagramForDevice({
         axes={axes}
       />
     );
-  if (type === "ps4" || type === "ps5" || type === "ps3")
+  if (type === "ps4" || type === "ps5") {
+    if (axes?.touchpad_x !== undefined) {
+      console.log("[DiagramForDevice] touchpad props", axes.touchpad_x, axes.touchpad_y);
+    }
     return (
       <PS4Controller
+        highlightCode={highlight}
+        learnCode={learn}
+        pressedCodes={pressed}
+        axes={axes}
+        touchpadX={axes?.touchpad_x}
+        touchpadY={axes?.touchpad_y}
+      />
+    );
+  }
+  if (type === "ps1" || type === "ps2" || type === "ps3")
+    return (
+      <PS2Controller
         highlightCode={highlight}
         learnCode={learn}
         pressedCodes={pressed}
@@ -384,6 +483,33 @@ function DiagramForDevice({
   if (type === "gamecube")
     return (
       <GameCubeController
+        highlightCode={highlight}
+        learnCode={learn}
+        pressedCodes={pressed}
+        axes={axes}
+      />
+    );
+  if (type === "n64")
+    return (
+      <N64Controller
+        highlightCode={highlight}
+        learnCode={learn}
+        pressedCodes={pressed}
+        axes={axes}
+      />
+    );
+  if (type === "switch")
+    return (
+      <SwitchController
+        highlightCode={highlight}
+        learnCode={learn}
+        pressedCodes={pressed}
+        axes={axes}
+      />
+    );
+  if (type === "wiimote")
+    return (
+      <WiiController
         highlightCode={highlight}
         learnCode={learn}
         pressedCodes={pressed}
@@ -401,6 +527,115 @@ function DiagramForDevice({
   );
 }
 
+/* ── Wii device grouping ── */
+interface DeviceGroup {
+  device: ControllerDevice;
+  members: ControllerDevice[];
+}
+
+function groupDevices(devices: ControllerDevice[]): DeviceGroup[] {
+  const result: DeviceGroup[] = [];
+  const wiimoteDevices = devices.filter((d) => d.type === "wiimote");
+  const otherDevices = devices.filter((d) => d.type !== "wiimote");
+
+  const groups = new Map<string, ControllerDevice[]>();
+  for (const dev of wiimoteDevices) {
+    const key = dev.physPath ?? "unknown";
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(dev);
+  }
+
+  for (const [physPath, members] of groups) {
+    const main =
+      members.find((d) => d.name.toLowerCase().includes("wii remote") && !d.name.toLowerCase().includes("accelerometer") && !d.name.toLowerCase().includes("ir") && !d.name.toLowerCase().includes("nunchuk")) ??
+      members[0];
+    result.push({
+      device: {
+        ...main,
+        id: `wiimote-group:${physPath}`,
+        name: "Wii Remote",
+        buttonCount: members.reduce((s, d) => s + d.buttonCount, 0),
+        axisCount: members.reduce((s, d) => s + d.axisCount, 0),
+      },
+      members,
+    });
+  }
+
+  for (const dev of otherDevices) {
+    result.push({ device: dev, members: [dev] });
+  }
+
+  return result;
+}
+
+function isWiimoteGroup(device: ControllerDevice | null): boolean {
+  return !!device && device.id.startsWith("wiimote-group:");
+}
+
+function getGroupMembers(
+  device: ControllerDevice | null,
+  allDevices: ControllerDevice[],
+): ControllerDevice[] {
+  if (!device || !isWiimoteGroup(device)) return device ? [device] : [];
+  const physPath = device.id.replace("wiimote-group:", "");
+  return allDevices.filter(
+    (d) => d.type === "wiimote" && (d.physPath ?? "unknown") === physPath,
+  );
+}
+
+function aggregateLiveState(
+  members: ControllerDevice[],
+  liveStates: Record<string, LiveControllerState>,
+): LiveControllerState | null {
+  if (members.length === 0) return null;
+  // Exclude accelerometer and IR devices — their axes pollute the gamepad state
+  const gamepadMembers = members.filter(
+    (m) => !m.name.toLowerCase().includes("accelerometer") && !m.name.toLowerCase().includes(" ir"),
+  );
+  const states = gamepadMembers.map((m) => liveStates[m.id]).filter(Boolean) as LiveControllerState[];
+  if (states.length === 0) return null;
+  const buttons: Record<string, boolean> = {};
+  const axes: Record<string, number> = {};
+  for (const s of states) {
+    for (const [k, v] of Object.entries(s.buttons)) {
+      if (v) buttons[k] = true;
+    }
+    for (const [k, v] of Object.entries(s.axes)) {
+      axes[k] = v;
+    }
+  }
+  return {
+    buttons,
+    axes,
+    lastUpdated: Math.max(...states.map((s) => s.lastUpdated)),
+  };
+}
+
+function aggregateRawDiscovery(
+  members: ControllerDevice[],
+  rawDiscoveries: Record<string, import("../../store/input.store").RawInputDiscovery>,
+): import("../../store/input.store").RawInputDiscovery | null {
+  if (members.length === 0) return null;
+  const gamepadMembers = members.filter(
+    (m) => !m.name.toLowerCase().includes("accelerometer") && !m.name.toLowerCase().includes(" ir"),
+  );
+  const discs = gamepadMembers.map((m) => rawDiscoveries[m.id]).filter(Boolean) as import("../../store/input.store").RawInputDiscovery[];
+  if (discs.length === 0) return null;
+  const buttons: Record<number, string> = {};
+  const axes: Record<number, { min: number; max: number; name: string }> = {};
+  for (const d of discs) {
+    for (const [k, v] of Object.entries(d.buttons)) {
+      const num = Number(k);
+      buttons[num] = v;
+    }
+    for (const [k, v] of Object.entries(d.axes)) {
+      const num = Number(k);
+      axes[num] = v;
+    }
+  }
+  return { buttons, axes };
+}
+
 export const ControllersTab: React.FC = () => {
   const {
     devices,
@@ -416,54 +651,161 @@ export const ControllersTab: React.FC = () => {
   const [mappings, setMappings] = useState<ButtonMapping[]>([]);
   const [learningCode, setLearningCode] = useState<string | null>(null);
   const [learnedRaw, setLearnedRaw] = useState<number | null>(null);
+  const [learnedDeviceId, setLearnedDeviceId] = useState<string | null>(null);
   const [hoveredCode, setHoveredCode] = useState<string | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
   const [rawExpanded, setRawExpanded] = useState(false);
+  const [aliases, setAliases] = useState<Record<string, string>>({});
   const learningRef = useRef<string | null>(null);
   learningRef.current = learningCode;
 
+  /* ── Event-rate tracking for debug spam-detection ── */
+  const eventHistoryRef = useRef<{
+    byInput: Map<string, number[]>;
+    byDevice: Map<string, number[]>;
+  }>({ byInput: new Map(), byDevice: new Map() });
+  const [eventRates, setEventRates] = useState<{
+    inputHz: number;
+    deviceHz: number;
+  }>({ inputHz: 0, deviceHz: 0 });
+
+  const grouped = groupDevices(devices);
+  const groupMembers = getGroupMembers(selectedDevice, devices);
+
   const liveState: LiveControllerState | null = selectedDevice
-    ? (liveStates[selectedDevice.id] ?? null)
+    ? isWiimoteGroup(selectedDevice)
+      ? aggregateLiveState(groupMembers, liveStates)
+      : (liveStates[selectedDevice.id] ?? null)
+    : null;
+
+  const rawDiscovery = selectedDevice
+    ? isWiimoteGroup(selectedDevice)
+      ? aggregateRawDiscovery(groupMembers, rawDiscoveries)
+      : (rawDiscoveries[selectedDevice.id] ?? null)
     : null;
 
   useEffect(() => {
-    if (devices.length > 0 && !selectedDevice) setSelectedDevice(devices[0]);
-  }, [devices]);
+    if (grouped.length > 0 && !selectedDevice) setSelectedDevice(grouped[0].device);
+  }, [grouped]);
+
+  useEffect(() => {
+    async function loadAliases() {
+      const next: Record<string, string> = {};
+      const aliasIds = new Set<string>();
+      for (const dev of devices) aliasIds.add(dev.id);
+      for (const g of grouped) {
+        for (const m of g.members) aliasIds.add(m.id);
+      }
+      await Promise.all(
+        Array.from(aliasIds).map(async (id) => {
+          const alias = await window.htpc.input.getAlias(id);
+          if (alias) next[id] = alias;
+        }),
+      );
+      setAliases(next);
+    }
+    void loadAliases();
+  }, [devices.map((d) => d.id).join(",")]);
 
   useEffect(() => {
     if (!selectedDevice) return;
-    window.htpc.input.getMappings(selectedDevice.id).then(setMappings);
+    if (isWiimoteGroup(selectedDevice) && groupMembers.length > 0) {
+      Promise.all(groupMembers.map((m) => window.htpc.input.getMappings(m.id)))
+        .then((results) => {
+          const merged: ButtonMapping[] = [];
+          const seen = new Set<string>();
+          for (const result of results) {
+            for (const m of result) {
+              if (!seen.has(m.inputCode)) {
+                seen.add(m.inputCode);
+                merged.push(m);
+              }
+            }
+          }
+          setMappings(merged);
+        });
+    } else {
+      window.htpc.input.getMappings(selectedDevice.id).then(setMappings);
+    }
     setLearningCode(null);
     setLearnedRaw(null);
+    setLearnedDeviceId(null);
   }, [selectedDevice]);
 
   useEffect(() => {
     if (!learningCode || !selectedDevice) {
-      setLearningDeviceId(null);
+      setLearningDeviceIds([]);
       return;
     }
-    setLearningDeviceId(selectedDevice.id);
+    const targetIds = isWiimoteGroup(selectedDevice)
+      ? groupMembers.map((m) => m.id)
+      : [selectedDevice.id];
+    setLearningDeviceIds(targetIds);
     const unsub = subscribeLearning((ev) => {
       if (learningRef.current && ev.rawCode !== undefined) {
         setLearnedRaw(ev.rawCode);
+        setLearnedDeviceId(ev.deviceId ?? null);
       }
     });
     return () => {
       unsub();
-      setLearningDeviceId(null);
+      setLearningDeviceIds([]);
     };
   }, [learningCode, selectedDevice]);
+
+  useEffect(() => {
+    if (!lastEvent) return;
+    const now = Date.now();
+    const hist = eventHistoryRef.current;
+
+    const inputKey = `${lastEvent.deviceId}:${lastEvent.action ?? lastEvent.axis ?? lastEvent.rawCode ?? "event"}`;
+    const inputArr = hist.byInput.get(inputKey) ?? [];
+    inputArr.push(now);
+    hist.byInput.set(inputKey, inputArr);
+
+    const devArr = hist.byDevice.get(lastEvent.deviceId) ?? [];
+    devArr.push(now);
+    hist.byDevice.set(lastEvent.deviceId, devArr);
+
+    const WINDOW_MS = 1000;
+    const cutoff = now - WINDOW_MS;
+
+    for (const [k, arr] of hist.byInput) {
+      const filtered = arr.filter((t) => t > cutoff);
+      if (filtered.length === 0) hist.byInput.delete(k);
+      else hist.byInput.set(k, filtered);
+    }
+    for (const [k, arr] of hist.byDevice) {
+      const filtered = arr.filter((t) => t > cutoff);
+      if (filtered.length === 0) hist.byDevice.delete(k);
+      else hist.byDevice.set(k, filtered);
+    }
+
+    const inputHz = (hist.byInput.get(inputKey)?.length ?? 0);
+    const deviceHz = (hist.byDevice.get(lastEvent.deviceId)?.length ?? 0);
+    setEventRates({ inputHz, deviceHz });
+  }, [lastEvent]);
 
   const saveMapping = useCallback(
     (inputCode: string, action: string, rawCode?: number | null): void => {
       if (!selectedDevice) return;
       const codeToSave =
         rawCode !== null && rawCode !== undefined ? String(rawCode) : inputCode;
-      window.htpc.input.setMapping(selectedDevice.id, codeToSave, action);
+      let targetDeviceId: string;
+      if (isWiimoteGroup(selectedDevice)) {
+        if (learnedDeviceId) {
+          targetDeviceId = learnedDeviceId;
+        } else {
+          targetDeviceId = groupMembers[0]?.id ?? selectedDevice.id;
+        }
+      } else {
+        targetDeviceId = selectedDevice.id;
+      }
+      window.htpc.input.setMapping(targetDeviceId, codeToSave, action);
       setMappings((prev) => {
         const idx = prev.findIndex((m) => m.inputCode === codeToSave);
         const entry: ButtonMapping = {
-          deviceId: selectedDevice.id,
+          deviceId: targetDeviceId,
           inputCode: codeToSave,
           action,
         };
@@ -475,12 +817,18 @@ export const ControllersTab: React.FC = () => {
         return [...prev, entry];
       });
     },
-    [selectedDevice],
+    [selectedDevice, learnedDeviceId, groupMembers],
   );
 
   const resetMappings = async (): Promise<void> => {
     if (!selectedDevice) return;
-    await window.htpc.input.resetMappings(selectedDevice.id);
+    if (isWiimoteGroup(selectedDevice) && groupMembers.length > 0) {
+      await Promise.all(
+        groupMembers.map((m) => window.htpc.input.resetMappings(m.id)),
+      );
+    } else {
+      await window.htpc.input.resetMappings(selectedDevice.id);
+    }
     setMappings([]);
     setConfirmReset(false);
   };
@@ -495,13 +843,106 @@ export const ControllersTab: React.FC = () => {
     setLearnedRaw(null);
   };
 
+  const deviceItems = grouped.map((g) => g.device);
+  const deviceFocusedIndex = deviceItems.findIndex(
+    (d) => d.id === selectedDevice?.id,
+  );
+
+  const { menu: deviceCtxMenu, bindItem: bindDeviceItem } = useContextMenu({
+    items: deviceItems,
+    focusedIndex: Math.max(0, deviceFocusedIndex),
+    getOptions: (dev): ContextMenuOption[] => {
+      const opts: ContextMenuOption[] = [
+        {
+          id: "rename",
+          label: aliases[dev.id] ? "Edit Name" : "Rename",
+          icon: <Pencil size={16} />,
+        },
+        {
+          id: "reconnect",
+          label: "Reconnect / Resync",
+          icon: <RefreshCw size={16} />,
+        },
+      ];
+      if (devToolsOpen) {
+        opts.push({
+          id: "copy-id",
+          label: "Copy ID",
+          icon: <Copy size={16} />,
+        });
+        opts.push({
+          id: "debug",
+          label: "Debug",
+          icon: <Bug size={16} />,
+        });
+      }
+      const path = isWiimoteGroup(dev)
+        ? getGroupMembers(dev, devices)[0]?.id ?? dev.id
+        : dev.id;
+      opts.push({
+        id: "__sep__path",
+        label: path,
+        header: true,
+      });
+      return opts;
+    },
+    onAction: (dev, optionId) => {
+      const members = getGroupMembers(dev, devices);
+      const aliasTargetId = members.length > 1 ? members[0].id : dev.id;
+      switch (optionId) {
+        case "rename": {
+          const current = aliases[aliasTargetId] ?? dev.name;
+          const name = window.prompt("Controller name:", current);
+          if (name === null) return;
+          const trimmed = name.trim();
+          if (trimmed === "" || trimmed === dev.name) {
+            if (aliases[aliasTargetId]) {
+              window.htpc.input.removeAlias(aliasTargetId).then(() => {
+                setAliases((prev) => {
+                  const next = { ...prev };
+                  delete next[aliasTargetId];
+                  return next;
+                });
+              });
+            }
+            return;
+          }
+          window.htpc.input.setAlias(aliasTargetId, trimmed).then(() => {
+            setAliases((prev) => ({ ...prev, [aliasTargetId]: trimmed }));
+          });
+          break;
+        }
+        case "reconnect": {
+          for (const m of members) {
+            void window.htpc.input.reconnectDevice(m.id);
+          }
+          break;
+        }
+        case "copy-id": {
+          void navigator.clipboard.writeText(dev.id);
+          break;
+        }
+        case "debug": {
+          // eslint-disable-next-line no-console
+          console.log("Controller device:", dev, "members:", members);
+          break;
+        }
+      }
+    },
+  });
+
   const hasDiagram =
     selectedDevice &&
     (selectedDevice.type === "xbox" ||
       selectedDevice.type === "ps4" ||
       selectedDevice.type === "ps5" ||
+      selectedDevice.type === "ps1" ||
+      selectedDevice.type === "ps2" ||
       selectedDevice.type === "ps3" ||
-      selectedDevice.type === "gamecube");
+      selectedDevice.type === "gamecube" ||
+      selectedDevice.type === "n64" ||
+      selectedDevice.type === "switch" ||
+      selectedDevice.type === "wiimote");
 
   return (
     <div className="h-full flex gap-4 p-4 overflow-hidden">
@@ -514,7 +955,7 @@ export const ControllersTab: React.FC = () => {
           Devices
         </h2>
 
-        {devices.length === 0 ? (
+        {deviceItems.length === 0 ? (
           <div
             className="text-sm text-center py-8"
             style={{ color: "var(--color-text-dim)" }}
@@ -527,58 +968,63 @@ export const ControllersTab: React.FC = () => {
           </div>
         ) : (
           <div className="flex flex-col gap-2">
-            {devices.map((dev) => (
-              <motion.button
-                key={dev.id}
-                className="flex gap-3 items-center p-3 rounded-[var(--radius-card)] text-left"
-                style={{
-                  background:
-                    selectedDevice?.id === dev.id
-                      ? "var(--color-surface-raised)"
-                      : "var(--color-surface)",
-                  border: `1px solid ${selectedDevice?.id === dev.id ? "var(--color-accent)" : "var(--color-border)"}`,
-                  boxShadow:
-                    selectedDevice?.id === dev.id
-                      ? "var(--shadow-glow)"
-                      : "none",
-                }}
-                onClick={() => setSelectedDevice(dev)}
-                whileTap={{ scale: 0.98 }}
-              >
-                <div className="relative shrink-0">
-                  {CONTROLLER_ICONS[dev.type]}
-                  {dev.connectionType && (
+            {deviceItems.map((dev, index) => {
+              const members = getGroupMembers(dev, devices);
+              const aliasId = members.length > 1 ? members[0].id : dev.id;
+              return (
+                <motion.button
+                  key={dev.id}
+                  className="flex gap-3 items-center p-3 rounded-[var(--radius-card)] text-left"
+                  style={{
+                    background:
+                      selectedDevice?.id === dev.id
+                        ? "var(--color-surface-raised)"
+                        : "var(--color-surface)",
+                    border: `1px solid ${selectedDevice?.id === dev.id ? "var(--color-accent)" : "var(--color-border)"}`,
+                    boxShadow:
+                      selectedDevice?.id === dev.id
+                        ? "var(--shadow-glow)"
+                        : "none",
+                  }}
+                  onClick={() => setSelectedDevice(dev)}
+                  whileTap={{ scale: 0.98 }}
+                  {...bindDeviceItem(dev, index)}
+                >
+                  <div className="relative shrink-0">
+                    {CONTROLLER_ICONS[dev.type]}
+                    {dev.connectionType && (
+                      <span
+                        className="absolute -bottom-0.5 -right-0.5 inline-flex items-center justify-center w-4 h-4 rounded-full"
+                        style={{
+                          background: "var(--color-surface-raised)",
+                          border: "1px solid var(--color-border)",
+                        }}
+                        title={CONNECTION_LABELS[dev.connectionType]}
+                      >
+                        {React.cloneElement(
+                          CONNECTION_ICONS[dev.connectionType] as React.ReactElement,
+                          { size: 10 },
+                        )}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex flex-col min-w-0 flex-1">
                     <span
-                      className="absolute -bottom-0.5 -right-0.5 inline-flex items-center justify-center w-4 h-4 rounded-full"
-                      style={{
-                        background: "var(--color-surface-raised)",
-                        border: "1px solid var(--color-border)",
-                      }}
-                      title={CONNECTION_LABELS[dev.connectionType]}
+                      className="text-sm font-medium truncate"
+                      style={{ color: "var(--color-text)" }}
                     >
-                      {React.cloneElement(
-                        CONNECTION_ICONS[dev.connectionType] as React.ReactElement,
-                        { size: 10 },
-                      )}
+                      {aliases[aliasId] ?? dev.name}
                     </span>
-                  )}
-                </div>
-                <div className="flex flex-col min-w-0 flex-1">
-                  <span
-                    className="text-sm font-medium truncate"
-                    style={{ color: "var(--color-text)" }}
-                  >
-                    {dev.name}
-                  </span>
-                  <span
-                    className="text-[10px] capitalize"
-                    style={{ color: "var(--color-text-dim)" }}
-                  >
-                    {dev.type}
-                  </span>
-                </div>
-              </motion.button>
-            ))}
+                    <span
+                      className="text-[10px] capitalize"
+                      style={{ color: "var(--color-text-dim)" }}
+                    >
+                      {dev.type}
+                    </span>
+                  </div>
+                </motion.button>
+              );
+            })}
           </div>
         )}
 
@@ -597,14 +1043,47 @@ export const ControllersTab: React.FC = () => {
               Last Input
             </div>
             <div style={{ color: "var(--color-text-dim)" }}>
-              <div>Source: {lastEvent.source}</div>
-              <div>Action: {lastEvent.action ?? lastEvent.axis}</div>
+              <div className="truncate" title={lastEvent.deviceName}>
+                Name: {lastEvent.deviceName}
+              </div>
+              <div className="truncate" title={lastEvent.deviceId}>
+                Path: {lastEvent.deviceId}
+              </div>
+              <div>Input: {lastEvent.action ?? lastEvent.axis ?? `raw-${lastEvent.rawCode}`}</div>
               {lastEvent.rawCode !== undefined && (
                 <div>Raw: {lastEvent.rawCode}</div>
               )}
               {lastEvent.value !== undefined && (
-                <div>Value: {lastEvent.value}</div>
+                <div>Value: {lastEvent.value.toFixed(3)}</div>
               )}
+              <div className="flex gap-2 mt-1">
+                <span
+                  className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono"
+                  style={{
+                    background:
+                      eventRates.inputHz > 30
+                        ? "color-mix(in srgb, #f87171 20%, var(--color-surface))"
+                        : "var(--color-surface)",
+                    color:
+                      eventRates.inputHz > 30 ? "#f87171" : "var(--color-text-dim)",
+                    border: "1px solid var(--color-border)",
+                  }}
+                  title="Events/sec for this specific input (spam indicator)"
+                >
+                  {eventRates.inputHz} Hz
+                </span>
+                <span
+                  className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono"
+                  style={{
+                    background: "var(--color-surface)",
+                    color: "var(--color-text-dim)",
+                    border: "1px solid var(--color-border)",
+                  }}
+                  title="Events/sec for this whole device"
+                >
+                  dev {eventRates.deviceHz} Hz
+                </span>
+              </div>
             </div>
           </div>
         )}
@@ -623,7 +1102,7 @@ export const ControllersTab: React.FC = () => {
                     className="text-lg font-semibold"
                     style={{ color: "var(--color-text)" }}
                   >
-                    {selectedDevice.name}
+                    {aliases[selectedDevice.id] ?? selectedDevice.name}
                   </h2>
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs" style={{ color: "var(--color-text-dim)" }}>
                     <span className="capitalize">{selectedDevice.type}</span>
@@ -872,7 +1351,7 @@ export const ControllersTab: React.FC = () => {
                           className="text-[10px] font-medium uppercase"
                           style={{ color: "var(--color-text-dim)" }}
                         >
-                          {BUTTON_LABELS[code] ?? code}
+                          {selectedDevice && getButtonLabel(selectedDevice.type, code)}
                         </span>
                         <div
                           className="w-3 h-3 rounded-full"
@@ -989,7 +1468,7 @@ export const ControllersTab: React.FC = () => {
                   <span style={{ color: "var(--color-text)" }}>
                     Learning{" "}
                     <strong>
-                      {BUTTON_LABELS[learningCode] ?? learningCode}
+                      {selectedDevice && getButtonLabel(selectedDevice.type, learningCode)}
                     </strong>{" "}
                     — press any button on the controller
                     {learnedRaw !== null && (
@@ -1030,6 +1509,7 @@ export const ControllersTab: React.FC = () => {
                     key={code}
                     inputCode={code}
                     currentAction={mapping?.action ?? ""}
+                    controllerType={selectedDevice.type}
                     isLearning={learningCode === code}
                     learnedRaw={learningCode === code ? learnedRaw : null}
                     onStartLearn={() => startLearn(code)}
@@ -1049,9 +1529,9 @@ export const ControllersTab: React.FC = () => {
 
             {/* Unknown Inputs */}
             {selectedDevice &&
-              rawDiscoveries[selectedDevice.id] &&
+              rawDiscovery &&
               (() => {
-                const disc = rawDiscoveries[selectedDevice.id];
+                const disc = rawDiscovery;
                 const unknownButtons = Object.entries(disc.buttons).filter(
                   ([, name]) => !isKnownButton(name),
                 );
@@ -1122,7 +1602,7 @@ export const ControllersTab: React.FC = () => {
               })()}
 
             {/* Raw Input (collapsed) */}
-            {selectedDevice && rawDiscoveries[selectedDevice.id] && (
+            {selectedDevice && rawDiscovery && (
               <div className="flex flex-col gap-2">
                 <button
                   className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider"
@@ -1145,7 +1625,7 @@ export const ControllersTab: React.FC = () => {
                       exit={{ opacity: 0, height: 0 }}
                     >
                       {Object.entries(
-                        rawDiscoveries[selectedDevice.id].buttons,
+                        rawDiscovery.buttons,
                       ).map(([rawCode, name]) => (
                         <div
                           key={`raw-btn-${rawCode}`}
@@ -1170,7 +1650,7 @@ export const ControllersTab: React.FC = () => {
                         </div>
                       ))}
                       {Object.entries(
-                        rawDiscoveries[selectedDevice.id].axes,
+                        rawDiscovery.axes,
                       ).map(([rawCode, info]) => (
                         <div
                           key={`raw-axis-${rawCode}`}
@@ -1210,6 +1690,7 @@ export const ControllersTab: React.FC = () => {
           </div>
         )}
       </div>
+      {deviceCtxMenu}
     </div>
   );
 };

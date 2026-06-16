@@ -28,6 +28,8 @@ interface SlotState {
   axisMap: Record<number, string>;
   lastAxisCode: number;
   lastButtonCode: number;
+  touchpadX?: number;
+  touchpadY?: number;
 }
 
 const slots: (SlotState | null)[] = Array(16).fill(null);
@@ -58,10 +60,46 @@ const GENERIC_AXIS_MAP: Record<number, string> = {
   17: "dpad_y",
 };
 
-function getAxisMap(name: string): Record<number, string> {
+/** Nintendo Switch Pro Controller / Joy-Con.
+ *  Right stick is on 3/4; triggers are typically digital buttons. */
+const SWITCH_AXIS_MAP: Record<number, string> = {
+  0: "left_x",
+  1: "left_y",
+  3: "right_x",
+  4: "right_y",
+  16: "dpad_x",
+  17: "dpad_y",
+};
+
+/** xwiimote driver — IR and accelerometer axes must not map to gamepad controls. */
+const WIIMOTE_AXIS_MAP: Record<number, string> = {
+  0: "left_x",
+  1: "left_y",
+  2: "accel_z",
+  3: "accel_rx",
+  4: "accel_ry",
+  5: "accel_rz",
+  16: "ir_x",
+  17: "ir_y",
+};
+
+/** PlayStation controllers (DualShock / DualSense) — adds touchpad axes. */
+const PS_AXIS_MAP: Record<number, string> = {
+  ...XBOX_AXIS_MAP,
+  1000: "touchpad_x",
+  1001: "touchpad_y",
+};
+
+function getAxisMap(name: string, driverName?: string): Record<number, string> {
   const n = name.toLowerCase();
   if (n === "gamepad p5" || /gamepad\s*p\d/.test(n)) return GENERIC_AXIS_MAP;
   if (n.includes("microntek") || n.includes("gamecube")) return GENERIC_AXIS_MAP;
+  if (n.includes("nintendo") && n.includes("pro controller")) return SWITCH_AXIS_MAP;
+  if (n.includes("joy-con") || n.includes("switch")) return SWITCH_AXIS_MAP;
+  if (n.includes("wiimote") || n.includes("wii remote")) return WIIMOTE_AXIS_MAP;
+  if (n.includes("dualsense") || n.includes("dualshock") || n.includes("playstation")) {
+    return PS_AXIS_MAP;
+  }
   return XBOX_AXIS_MAP;
 }
 
@@ -93,7 +131,7 @@ const BTN_MAP: Record<number, string> = {
   306: "c",
   307: "west",
   308: "north",
-  309: "z",
+  309: "capture",
   310: "left_bumper",
   311: "right_bumper",
   312: "left_trigger_btn",
@@ -103,12 +141,57 @@ const BTN_MAP: Record<number, string> = {
   316: "home",
   317: "left_thumb",
   318: "right_thumb",
+  330: "touchpad", // DualSense / DS4 touchpad click
   // D-pad as buttons
   544: "dpad_up",
   545: "dpad_down",
   546: "dpad_left",
   547: "dpad_right",
+  // Nintendo Wii Remote buttons
+  103: "dpad_up",
+  105: "dpad_left",
+  106: "dpad_right",
+  108: "dpad_down",
+  257: "west", // 1
+  258: "north", // 2
+  407: "start", // +
+  412: "select", // -
 };
+
+/** Nintendo Switch Pro Controller button remaps.
+ *  - X/Y swapped on the diamond
+ *  - ZL/ZR (312/313) are digital buttons, map to trigger actions for the diagram */
+const SWITCH_BTN_MAP: Record<number, string> = {
+  ...BTN_MAP,
+  307: "north",        // physical X button (top)
+  308: "west",         // physical Y button (left)
+  312: "left_trigger",  // ZL
+  313: "right_trigger", // ZR
+};
+
+/** DragonRise N64 USB adapter button remaps.
+ *  - A/B swapped vs standard layout
+ *  - C-pad and D-pad down use non-standard raw codes
+ *  - Raw codes 9 and 10 both map to Z trigger */
+const N64_BTN_MAP: Record<number, string> = {
+  ...BTN_MAP,
+  9: "z",
+  10: "z",
+  304: "east",        // physical B button
+  305: "south",       // physical A button
+  307: "c_left",
+  308: "c_down",
+  314: "c_up",
+  315: "c_right",
+};
+
+function getBtnMap(name: string, type?: ControllerTypeEnum): Record<number, string> {
+  if (type === ControllerTypeEnum.N64) return N64_BTN_MAP;
+  const n = name.toLowerCase();
+  if (n.includes("nintendo") && n.includes("pro controller")) return SWITCH_BTN_MAP;
+  if (n.includes("joy-con") || n.includes("switch")) return SWITCH_BTN_MAP;
+  return BTN_MAP;
+}
 
 const ACTION_TO_BIT: Record<string, number> = {
   south: 0,
@@ -143,7 +226,7 @@ function applyDeadzone(val: number, axisName: string): number {
 }
 
 /* ── Slot management ── */
-function ensureSlot(idx: number, deviceId: string, name: string, type: ControllerTypeEnum): SlotState {
+function ensureSlot(idx: number, deviceId: string, name: string, type: ControllerTypeEnum, driverName?: string): SlotState {
   let s = slots[idx];
   if (!s) {
     s = {
@@ -154,7 +237,7 @@ function ensureSlot(idx: number, deviceId: string, name: string, type: Controlle
       axes: new Float32Array(8),
       buttons: {},
       rawButtons: {},
-      axisMap: getAxisMap(name),
+      axisMap: getAxisMap(name, driverName),
       lastAxisCode: 0,
       lastButtonCode: 0,
     };
@@ -186,6 +269,8 @@ function buildStateUpdate() {
       rawButtons: { ...slot.rawButtons },
       lastAxisCode: slot.lastAxisCode,
       lastButtonCode: slot.lastButtonCode,
+      touchpadX: slot.touchpadX,
+      touchpadY: slot.touchpadY,
     });
   }
   return result;
@@ -224,6 +309,16 @@ function flushStateUpdate() {
   }
 }
 
+/** PlayStation controllers (some Bluetooth models) report Square and Triangle
+ *  swapped at the evdev level. Fix them here so the UI and action mapping are
+ *  consistent with the physical button layout. */
+function fixPlayStationAction(type: ControllerTypeEnum, action: string): string {
+  if (type !== ControllerTypeEnum.PS3 && type !== ControllerTypeEnum.PS4 && type !== ControllerTypeEnum.PS5) return action;
+  if (action === "west") return "north";
+  if (action === "north") return "west";
+  return action;
+}
+
 /* ── Event processing ── */
 function handleCompactEvent(buf: ArrayBuffer): void {
   const view = new DataView(buf);
@@ -234,18 +329,27 @@ function handleCompactEvent(buf: ArrayBuffer): void {
 
   switch (ev.kind) {
     case CompactEventKind.AXIS: {
-      const axisName = slot.axisMap[ev.code] ?? `abs_${ev.code}`;
-      // ev.value is already normalised by evdev.ts; just apply deadzone
-      const deadzoned = applyDeadzone(ev.value, axisName);
-      const axisIdx = AXIS_NAME_TO_INDEX[axisName];
-      if (axisIdx !== undefined) {
-        slot.axes[axisIdx] = deadzoned;
+      if (ev.code === 1000) {
+        slot.touchpadX = ev.value;
+        console.log("[worker] touchpadX", ev.value);
+      } else if (ev.code === 1001) {
+        slot.touchpadY = ev.value;
+        console.log("[worker] touchpadY", ev.value);
+      } else {
+        const axisName = slot.axisMap[ev.code] ?? `abs_${ev.code}`;
+        // ev.value is already normalised by evdev.ts; just apply deadzone
+        const deadzoned = applyDeadzone(ev.value, axisName);
+        const axisIdx = AXIS_NAME_TO_INDEX[axisName];
+        if (axisIdx !== undefined) {
+          slot.axes[axisIdx] = deadzoned;
+        }
       }
       slot.lastAxisCode = ev.code;
       break;
     }
     case CompactEventKind.BUTTON_PRESS: {
-      const action = BTN_MAP[ev.code] ?? `btn_${ev.code}`;
+      const btnMap = getBtnMap(slot.name, slot.type);
+      const action = fixPlayStationAction(slot.type, btnMap[ev.code] ?? `btn_${ev.code}`);
       slot.buttons[action] = true;
       slot.rawButtons[ev.code] = true;
       slot.lastButtonCode = ev.code;
@@ -255,7 +359,8 @@ function handleCompactEvent(buf: ArrayBuffer): void {
       break;
     }
     case CompactEventKind.BUTTON_RELEASE: {
-      const action = BTN_MAP[ev.code] ?? `btn_${ev.code}`;
+      const btnMap = getBtnMap(slot.name, slot.type);
+      const action = fixPlayStationAction(slot.type, btnMap[ev.code] ?? `btn_${ev.code}`);
       slot.buttons[action] = false;
       slot.rawButtons[ev.code] = false;
       slot.lastButtonCode = ev.code;
@@ -271,9 +376,9 @@ self.onmessage = (e: MessageEvent) => {
   const msg = e.data;
 
   if (msg?.type === "connect") {
-    const { controllerIdx, deviceId, name, deviceType } = msg;
+    const { controllerIdx, deviceId, name, deviceType, driverName } = msg;
     const enumType = typeof deviceType === "number" ? deviceType : controllerTypeToEnum(deviceType);
-    const slot = ensureSlot(controllerIdx, deviceId, name, enumType);
+    const slot = ensureSlot(controllerIdx, deviceId, name, enumType, driverName);
     slot.connected = true;
     self.postMessage({ type: "device-connected", controllerIdx, deviceId, name, deviceType: enumToControllerType(enumType) });
     scheduleStateUpdate();

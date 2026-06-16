@@ -42,7 +42,9 @@ function detectTypeFromGamepad(id: string, name: string, vendorId: number): Cont
   }
   if (n.includes("dualsense")) return "ps5";
   if (n.includes("dualshock") || n.includes("dual shock")) return "ps4";
-  if (n.includes("nintendo") || n.includes("switch") || n.includes("pro controller")) return "gamecube";
+  if (n.includes("nintendo") && n.includes("pro controller")) return "switch";
+  if (n.includes("joy-con") || n.includes("switch")) return "switch";
+  if (n.includes("nintendo")) return "gamecube";
   if (n.includes("wiimote") || n.includes("wii remote")) return "wiimote";
   if (n.includes("gamepad") || n.includes("controller")) return "xbox";
   return "generic";

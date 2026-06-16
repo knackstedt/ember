@@ -41,6 +41,8 @@ interface ActiveDeviceEntry {
   /** Rolling window of recent event latencies (ms) */
   latencySamples: number[];
   lastActivityAt: number;
+  /** True if this is a touchpad auxiliary device for a controller */
+  isTouchpad?: boolean;
 }
 const activeDevices = new Map<string, ActiveDeviceEntry>();
 
@@ -52,7 +54,7 @@ const FAILURE_COOLDOWN_MS = 30_000;
 function allocControllerIdx(): number {
   const used = new Set<number>();
   for (const d of activeDevices.values()) used.add(d.controllerIdx);
-  for (let i = 0; i < 8; i++) if (!used.has(i)) return i;
+  for (let i = 0; i < 80; i++) if (!used.has(i)) return i;
   return -1;
 }
 
@@ -76,7 +78,7 @@ function readSysfsInt(path: string): number | undefined {
   return Number.isNaN(n) ? undefined : n;
 }
 
-const MAC_RE = /^[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}$/;
+const MAC_RE = /^[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/;
 
 function detectConnectionType(
   phys: string | null,
@@ -84,12 +86,18 @@ function detectConnectionType(
   productId: number,
 ): ControllerConnectionType {
   const p = (phys ?? "").trim();
-  // Bluetooth phys is a MAC address or contains "bluetooth"
+  // Bluetooth phys is a MAC address (sometimes with a channel suffix like /7)
+  // or contains "bluetooth"
   if (MAC_RE.test(p) || p.toLowerCase().includes("bluetooth")) return "bluetooth";
-  // USB Xbox Wireless Adapter (vendor-only detection since there are
-  // several product IDs for the adapter and its firmware variants)
+  // USB Xbox Wireless Adapter — detect by vendor/product BEFORE the generic
+  // usb- fallback so receiver dongles don't show as wired.
   if (vendorId === 0x045e) {
-    const dongleProducts = new Set([0x02fe, 0x02fd, 0x0916, 0x0b4f, 0x0816]);
+    const dongleProducts = new Set([
+      // Xbox One / Series wireless adapters
+      0x02fe, 0x02fd, 0x0916, 0x0b4f, 0x0816,
+      // Xbox 360 wireless receiver (genuine and clone)
+      0x0719, 0x0291,
+    ]);
     if (dongleProducts.has(productId)) return "dongle";
   }
   // Sony wireless adapter
@@ -98,6 +106,9 @@ function detectConnectionType(
   if (vendorId === 0x2dc8) return "dongle";
   // Generic USB — could be wired or a dongle we don't recognise.
   if (p.startsWith("usb-")) return "wired";
+  // Sony (PlayStation) controllers that aren't on USB are almost always
+  // Bluetooth (hid-sony driver). Default to wireless when unsure.
+  if (vendorId === 0x054c && !p.startsWith("usb-")) return "bluetooth";
   // Default to wired for everything else. Most controllers on a desktop
   // PC are physically connected; "unknown" is unhelpful noise.
   return "wired";
@@ -220,7 +231,33 @@ const GENERIC_AXIS_MAP: Record<number, string> = {
   17: "dpad_y",
 };
 
-function getAxisMap(name: string): Record<number, string> {
+/** Nintendo Switch Pro Controller / Joy-Con via usbhid/hid-nintendo.
+ *  Right stick is on 3/4; triggers are typically digital buttons (L/R/ZL/ZR). */
+const SWITCH_AXIS_MAP: Record<number, string> = {
+  0: "left_x",
+  1: "left_y",
+  3: "right_x",
+  4: "right_y",
+  16: "dpad_x",
+  17: "dpad_y",
+};
+
+/** xwiimote driver axes.
+ *  The nunchuk stick uses ABS_X/ABS_Y. IR and accelerometer share the
+ *  same codes on different devices — map them to harmless names so
+ *  they don't pollute the gamepad state. */
+const WIIMOTE_AXIS_MAP: Record<number, string> = {
+  0: "left_x",
+  1: "left_y",
+  2: "accel_z",
+  3: "accel_rx",
+  4: "accel_ry",
+  5: "accel_rz",
+  16: "ir_x",
+  17: "ir_y",
+};
+
+function getAxisMap(name: string, driverName?: string): Record<number, string> {
   const n = name.toLowerCase();
   // "Gamepad P5" and similar generic HID pads use an alternate layout
   if (n === "gamepad p5" || /gamepad\s*p\d/.test(n)) {
@@ -228,8 +265,20 @@ function getAxisMap(name: string): Record<number, string> {
   }
   // Generic USB GameCube adapters (e.g. Microntek) expose right stick on
   // codes 2 and 5 instead of the Xbox-style 3 and 4.
-  if (n.includes("microntek") || n.includes("gamecube")) {
+  if (n.includes("microntek") || n.includes("gamecube") || n.includes("n64")) {
     return GENERIC_AXIS_MAP;
+  }
+  // Nintendo Switch Pro Controller / Joy-Con
+  if (n.includes("nintendo") && n.includes("pro controller")) {
+    return SWITCH_AXIS_MAP;
+  }
+  if (n.includes("joy-con") || n.includes("switch")) {
+    return SWITCH_AXIS_MAP;
+  }
+  // Nintendo Wii Remote / extension devices (xwiimote driver).
+  // IR and accelerometer axes must NOT map to gamepad controls.
+  if (n.includes("wiimote") || n.includes("wii remote")) {
+    return WIIMOTE_AXIS_MAP;
   }
   return XBOX_AXIS_MAP;
 }
@@ -265,9 +314,10 @@ function normalizeAxis(value: number, code: number, axisName?: string): number {
   if (value >= 0 && value <= 255) {
     // 0..255 range: generic HID pad (or ds4drv triggers)
     if (isTrigger) return value / 255;
-    // Stick deadzone: ±8 around center (128) so imperfect centering reads as 0
+    // Stick deadzone: ±12 around center (128) so imperfect centering reads as 0.
+    // (±12 ≈ 9% — generic HID pads often have noisier centres than xpad.)
     const centered = value - 128;
-    if (Math.abs(centered) <= 8) return 0;
+    if (Math.abs(centered) <= 12) return 0;
     return centered / 128;
   }
 
@@ -283,39 +333,6 @@ function normalizeAxis(value: number, code: number, axisName?: string): number {
   if (Math.abs(value) <= 1024) return 0;
   return value / 32767;
 }
-
-const BTN_MAP: Record<number, string> = {
-  // Old-style joystick buttons (e.g. Microntek USB GameCube adapters)
-  288: "west", // Y
-  289: "north", // X
-  290: "south", // A
-  291: "east", // B
-  292: "left_trigger_btn", // L
-  293: "right_trigger_btn", // R
-  294: "z", // Z
-  297: "start", // Start
-  // Standard gamepad buttons (xpad, ds4drv, etc)
-  304: "south",
-  305: "east",
-  306: "c",
-  307: "west",
-  308: "north",
-  309: "z",
-  310: "left_bumper",
-  311: "right_bumper",
-  312: "left_trigger_btn",
-  313: "right_trigger_btn",
-  314: "select",
-  315: "start",
-  316: "home",
-  317: "left_thumb",
-  318: "right_thumb",
-  // D-pad as buttons
-  544: "dpad_up",
-  545: "dpad_down",
-  546: "dpad_left",
-  547: "dpad_right",
-};
 
 const KEY_MAP: Record<number, string> = {
   103: "up",
@@ -348,7 +365,16 @@ function detectControllerType(
     n.includes("nintendo rvu")
   )
     return "wiimote";
-  if (n.includes("gamecube") || n.includes("microntek") || vendorId === 0x057e || vendorId === 0x0079) return "gamecube";
+  // Nintendo Switch controllers (Pro Controller, Joy-Con, etc)
+  if (vendorId === 0x057e) {
+    if (productId === 0x2009 || n.includes("pro controller")) return "switch";
+    if (productId === 0x2006 || productId === 0x2007 || n.includes("joy-con")) return "switch";
+    if (n.includes("switch")) return "switch";
+  }
+  // N64 USB adapter (DragonRise 0x0079:0x181C "Android Gamepad")
+  if (vendorId === 0x0079 && productId === 0x181c) return "n64";
+  if (n.includes("gamecube") || n.includes("microntek") || vendorId === 0x0079) return "gamecube";
+  if (n.includes("n64")) return "n64";
   if (n.includes("dualshock") || n.includes("dual shock")) return "ps4";
   if (n.includes("dualsense")) return "ps5";
   // Most generic USB gamepads present as Xbox-style (standard mapping).
@@ -363,7 +389,7 @@ const EV_KEY = 0x01;
 const CONTROLLER_NAME_HINTS = [
   "controller", "gamepad", "joystick", "pad", "xbox", "dualshock",
   "dualsense", "playstation", "switch", "pro controller", "wiimote",
-  "wii remote", "gamecube", "nintendo", "8bitdo", "steam controller",
+  "wii remote", "gamecube", "n64", "nintendo", "8bitdo", "steam controller",
 ];
 
 function nameLooksLikeController(name: string): boolean {
@@ -371,8 +397,24 @@ function nameLooksLikeController(name: string): boolean {
   return CONTROLLER_NAME_HINTS.some((hint) => lower.includes(hint));
 }
 
+/** Reject motion-sensor / IMU sub-devices that share the same USB/BT
+ *  connection as the actual gamepad.  They expose ABS axes (gyro/accel)
+ *  and names containing "controller", so they slip through the usual
+ *  heuristics and appear as duplicate gamepads. */
+function isMotionSensorDevice(name: string): boolean {
+  const lower = name.toLowerCase();
+  return lower.includes("motion sensors") || lower.includes(" imu");
+}
+
+/** True for touchpad auxiliary devices (e.g. DualSense touchpad). */
+function isTouchpadDevice(name: string): boolean {
+  const lower = name.toLowerCase();
+  return lower.includes("touchpad") || lower.includes("trackpad");
+}
+
 function hasControllerCapabilities(eventPath: string, name?: string): boolean {
   try {
+    if (name && isMotionSensorDevice(name)) return false;
     if (name && nameLooksLikeController(name)) return true;
 
     const deviceNum = eventPath.replace("/dev/input/event", "");
@@ -418,22 +460,75 @@ function getDeviceInfo(
   }
 }
 
+/** Find an already-opened controller that matches this vendor/product.
+ *  When `physHint` is provided, it is used to disambiguate multiple
+ *  identical controllers (same USB port / BT MAC). */
+function findParentControllerIdx(vendorId: number, productId: number, physHint?: string): number {
+  let fallbackIdx = -1;
+  for (const entry of activeDevices.values()) {
+    if (entry.info.vendorId !== vendorId || entry.info.productId !== productId || entry.isTouchpad) {
+      continue;
+    }
+    if (physHint && entry.info.physPath) {
+      const parentPhys = entry.info.physPath;
+      const tpPhys = physHint;
+      // Exact match (bluetooth) or same USB root (differ only by /inputN)
+      if (parentPhys === tpPhys || parentPhys.split("/input")[0] === tpPhys.split("/input")[0]) {
+        return entry.controllerIdx;
+      }
+    } else {
+      fallbackIdx = entry.controllerIdx;
+    }
+  }
+  return fallbackIdx;
+}
+
+/** Try to read the ABS max value for a given axis code from sysfs.
+ *  Falls back to a sensible default if sysfs doesn't expose it. */
+function readAbsMax(eventPath: string, code: number): number {
+  try {
+    const deviceNum = eventPath.replace("/dev/input/event", "");
+    const paths = [
+      `/sys/class/input/event${deviceNum}/device/absinfo/${code}`,
+      `/sys/class/input/event${deviceNum}/device/device/absinfo/${code}`,
+    ];
+    for (const p of paths) {
+      if (existsSync(p)) {
+        const text = readFileSync(p, "utf-8").trim();
+        const parts = text.split(/\s+/);
+        if (parts.length >= 3) {
+          const max = parseInt(parts[2], 10);
+          if (!Number.isNaN(max) && max > 0) return max;
+        }
+      }
+    }
+  } catch { /* ignore */ }
+  // DualSense touchpad is 1920x1080; generic fallback
+  return code === 1 ? 1079 : 1919;
+}
+
 async function openDevice(
   eventPath: string,
   window: BrowserWindow,
   info: { name: string; vendorId: number; productId: number },
+  parentControllerIdx?: number,
 ): Promise<ActiveDeviceEntry | null> {
-
+  const isTouchpad = isTouchpadDevice(info.name);
   const controllerType = detectControllerType(
     info.name,
     info.vendorId,
     info.productId,
   );
   const deviceId = eventPath;
-  const controllerIdx = allocControllerIdx();
-  if (controllerIdx < 0) {
-    log.warn("evdev", `Too many controllers, skipping ${eventPath}`);
-    return null;
+  let controllerIdx: number;
+  if (parentControllerIdx !== undefined) {
+    controllerIdx = parentControllerIdx;
+  } else {
+    controllerIdx = allocControllerIdx();
+    if (controllerIdx < 0) {
+      log.warn("evdev", `Too many controllers, skipping ${eventPath}`);
+      return null;
+    }
   }
 
   const extra = getExtraDeviceInfo(eventPath, info.vendorId, info.productId);
@@ -452,12 +547,21 @@ async function openDevice(
     ...extra,
   };
 
-  if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
+  if (!isTouchpad && !window.isDestroyed() && !window.webContents.isDestroyed()) {
     window.webContents.send("input:device-connected", deviceInfo);
   }
 
   // Pick the correct axis map for this controller model
-  const axisMap = getAxisMap(info.name);
+  const axisMap = getAxisMap(info.name, extra.driverName);
+
+  // Pre-read touchpad abs ranges so we can normalise to 0..1
+  const touchpadAbsMax: Record<number, number> = {};
+  if (isTouchpad) {
+    touchpadAbsMax[0] = readAbsMax(eventPath, 0);
+    touchpadAbsMax[1] = readAbsMax(eventPath, 1);
+    touchpadAbsMax[53] = readAbsMax(eventPath, 53);
+    touchpadAbsMax[54] = readAbsMax(eventPath, 54);
+  }
 
   // Pure Node.js binary reader — struct input_event is 24 bytes on 64-bit Linux
   const EVENT_SIZE = 24; // sec(8) + usec(8) + type(2) + code(2) + value(4)
@@ -500,14 +604,23 @@ async function openDevice(
         if (type === EV_SYN) continue;
 
         if (type === EV_KEY) {
-          const isBtn = code >= 0x100;
+          // Wii Remote d-pad keys (103/105/106/108) are directional buttons,
+          // not keyboard keys. Treat them as controller buttons when the
+          // device is a wiimote so they go through the compact event path.
+          const isWiiDpad = controllerType === "wiimote" && [103, 105, 106, 108].includes(code);
+          const isBtn = code >= 0x100 || isWiiDpad;
           if (isBtn) {
+            let outCode = code;
+            // Map touchpad click to a standard code the worker recognises
+            if (isTouchpad && (code === 272 || code === 330)) {
+              outCode = 330; // BTN_TOUCH → "touchpad" in worker
+            }
             compactBuf.writeUInt8(
               value ? CompactEventKind.BUTTON_PRESS : CompactEventKind.BUTTON_RELEASE,
               0,
             );
             compactBuf.writeUInt8(controllerIdx, 1);
-            compactBuf.writeUInt16LE(code, 2);
+            compactBuf.writeUInt16LE(outCode, 2);
             compactBuf.writeFloatLE(value ? 1 : 0, 4);
             compactBuf.writeUInt32LE(Date.now() >>> 0, 8);
             if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
@@ -530,11 +643,30 @@ async function openDevice(
             }
           }
         } else if (type === EV_ABS) {
-          const mappedAxis = axisMap[code] ?? `abs_${code}`;
-          const normalized = normalizeAxis(value, code, mappedAxis);
+          let outCode = code;
+          let normalized: number;
+          if (isTouchpad) {
+            if (code === 0 || code === 53) {
+              outCode = 1000; // touchpad_x
+              const max = touchpadAbsMax[code] ?? 1919;
+              normalized = Math.max(0, Math.min(1, value / max));
+              log.info("evdev", `Touchpad X event: code=${code} raw=${value} max=${max} norm=${normalized.toFixed(3)} idx=${controllerIdx}`);
+            } else if (code === 1 || code === 54) {
+              outCode = 1001; // touchpad_y
+              const max = touchpadAbsMax[code] ?? 1079;
+              normalized = Math.max(0, Math.min(1, value / max));
+              log.info("evdev", `Touchpad Y event: code=${code} raw=${value} max=${max} norm=${normalized.toFixed(3)} idx=${controllerIdx}`);
+            } else {
+              const mappedAxis = axisMap[code] ?? `abs_${code}`;
+              normalized = normalizeAxis(value, code, mappedAxis);
+            }
+          } else {
+            const mappedAxis = axisMap[code] ?? `abs_${code}`;
+            normalized = normalizeAxis(value, code, mappedAxis);
+          }
           compactBuf.writeUInt8(CompactEventKind.AXIS, 0);
           compactBuf.writeUInt8(controllerIdx, 1);
-          compactBuf.writeUInt16LE(code, 2);
+          compactBuf.writeUInt16LE(outCode, 2);
           compactBuf.writeFloatLE(normalized, 4);
           compactBuf.writeUInt32LE(Date.now() >>> 0, 8);
           if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
@@ -553,7 +685,9 @@ async function openDevice(
       log.warn("evdev", `Error reading ${eventPath} (${info.name}): ${err}`);
       stream.destroy();
       activeDevices.delete(eventPath);
-      if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
+      // Touchpads share a slot with their parent controller; don't
+      // send disconnect for auxiliary devices.
+      if (!isTouchpad && !window.isDestroyed() && !window.webContents.isDestroyed()) {
         window.webContents.send("input:device-disconnected", { deviceId, controllerIdx });
       }
     });
@@ -566,11 +700,12 @@ async function openDevice(
       device: stream,
       info: deviceInfo,
       controllerIdx,
+      isTouchpad,
       latencySamples: [],
       lastActivityAt: Date.now(),
       close: () => {
         stream.destroy();
-        if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
+        if (!isTouchpad && !window.isDestroyed() && !window.webContents.isDestroyed()) {
           window.webContents.send("input:device-disconnected", { deviceId, controllerIdx });
         }
       },
@@ -600,6 +735,9 @@ async function scanDevices(): Promise<void> {
     .filter((e) => e.startsWith("event"))
     .map((e) => join(INPUT_DIR, e));
 
+  const touchpadCandidates: { device: string; info: { name: string; vendorId: number; productId: number } }[] = [];
+
+  // First pass: open regular controllers (skip motion sensors and touchpads)
   for (const device of eventDevices) {
     if (activeDevices.has(device)) continue;
     const lastFail = recentFailures.get(device);
@@ -608,6 +746,10 @@ async function scanDevices(): Promise<void> {
     const info = getDeviceInfo(device);
     if (!info) continue;
     if (!hasControllerCapabilities(device, info.name)) continue;
+    if (isTouchpadDevice(info.name)) {
+      touchpadCandidates.push({ device, info });
+      continue;
+    }
     try {
       const handle = await withTimeout(
         openDevice(device, targetWindow, info),
@@ -617,12 +759,41 @@ async function scanDevices(): Promise<void> {
       if (handle) {
         activeDevices.set(device, handle);
         recentFailures.delete(device);
+        log.info("evdev", `Opened ${device} (${info.name})`);
       }
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code === "EACCES") {
         recentFailures.set(device, Date.now());
       }
       log.warn("evdev", `Skipping ${device} due to timeout/error: ${err}`);
+    }
+  }
+
+  // Second pass: open touchpads, associating them with their parent controller
+  for (const { device, info } of touchpadCandidates) {
+    if (activeDevices.has(device)) continue;
+    const extra = getExtraDeviceInfo(device, info.vendorId, info.productId);
+    const parentIdx = findParentControllerIdx(info.vendorId, info.productId, extra.physPath);
+    if (parentIdx < 0) {
+      // Parent not yet opened — retry on next scan
+      continue;
+    }
+    try {
+      const handle = await withTimeout(
+        openDevice(device, targetWindow, info, parentIdx),
+        2000,
+        `openDevice(${device})`,
+      );
+      if (handle) {
+        activeDevices.set(device, handle);
+        recentFailures.delete(device);
+        log.info("evdev", `Opened touchpad ${device} (${info.name}) -> controller ${parentIdx}`);
+      }
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === "EACCES") {
+        recentFailures.set(device, Date.now());
+      }
+      log.warn("evdev", `Skipping touchpad ${device} due to timeout/error: ${err}`);
     }
   }
 
@@ -694,8 +865,29 @@ export async function destroyInputSystem(): Promise<void> {
   activeDevices.clear();
 }
 
+/** Force-close a device and clear its failure cooldown so it is re-scanned immediately. */
+export function rescanDevice(deviceId: string): void {
+  for (const [path, handle] of activeDevices) {
+    if (handle.info.id === deviceId) {
+      handle.close();
+      activeDevices.delete(path);
+      recentFailures.delete(path);
+      return;
+    }
+  }
+  // If not currently active, clear any failure cooldown anyway
+  for (const [path] of recentFailures) {
+    if (path.endsWith(deviceId.replace("/dev/input/", ""))) {
+      recentFailures.delete(path);
+      return;
+    }
+  }
+}
+
 export function getConnectedDevices(): ControllerDevice[] {
-  return Array.from(activeDevices.values()).map((h) => {
+  return Array.from(activeDevices.values())
+    .filter((h) => !h.isTouchpad)
+    .map((h) => {
     const info = { ...h.info };
     // Refresh dynamic fields
     const avgLatency =

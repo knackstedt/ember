@@ -216,6 +216,11 @@ async function runMigrations(db: Surreal): Promise<void> {
     DEFINE FIELD IF NOT EXISTS action ON controller_mapping TYPE string;
     DEFINE INDEX IF NOT EXISTS mapping_unique ON controller_mapping FIELDS deviceId, inputCode UNIQUE;
 
+    DEFINE TABLE IF NOT EXISTS controller_alias SCHEMAFULL;
+    DEFINE FIELD IF NOT EXISTS deviceId ON controller_alias TYPE string;
+    DEFINE FIELD IF NOT EXISTS alias ON controller_alias TYPE string;
+    DEFINE INDEX IF NOT EXISTS alias_unique ON controller_alias FIELDS deviceId UNIQUE;
+
     DEFINE TABLE IF NOT EXISTS broken_flash_game SCHEMAFULL;
     DEFINE FIELD IF NOT EXISTS id ON broken_flash_game TYPE string;
     DEFINE FIELD IF NOT EXISTS gameId ON broken_flash_game TYPE string;

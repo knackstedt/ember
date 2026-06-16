@@ -603,6 +603,14 @@ const htpc = {
       ipcRenderer.invoke("input:mappings:set", deviceId, inputCode, action),
     resetMappings: (deviceId: string): Promise<void> =>
       ipcRenderer.invoke("input:mappings:reset", deviceId),
+    getAlias: (deviceId: string): Promise<string | null> =>
+      ipcRenderer.invoke("input:alias:get", deviceId),
+    setAlias: (deviceId: string, alias: string): Promise<void> =>
+      ipcRenderer.invoke("input:alias:set", deviceId, alias),
+    removeAlias: (deviceId: string): Promise<void> =>
+      ipcRenderer.invoke("input:alias:remove", deviceId),
+    reconnectDevice: (deviceId: string): Promise<void> =>
+      ipcRenderer.invoke("input:device:reconnect", deviceId),
     onEvent: (cb: (buffer: ArrayBuffer) => void) => {
       const handler = (_: Electron.IpcRendererEvent, buffer: ArrayBuffer) =>
         cb(buffer);

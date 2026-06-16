@@ -7,6 +7,7 @@ export interface ContextMenuOption {
   icon?: React.ReactNode;
   disabled?: boolean;
   destructive?: boolean;
+  header?: boolean;
 }
 
 interface ContextMenuProps {
@@ -105,12 +106,12 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
           transition={{ duration: 0.12, ease: "easeOut" }}
         >
           {options.map((opt, i) => {
-            const isSep = opt.disabled && opt.id.startsWith("__sep");
+            const isSep = opt.header || (opt.disabled && opt.id.startsWith("__sep"));
             if (isSep) {
               return (
                 <div
                   key={opt.id}
-                  className="px-3 py-1.5 text-xs font-medium uppercase tracking-wide"
+                  className={`px-3 py-1.5 text-xs font-medium tracking-wide ${opt.header ? "" : "uppercase"}`}
                   style={{ color: "var(--color-text-dim)", borderTop: "1px solid var(--color-border)" }}
                 >
                   {opt.label}

@@ -297,6 +297,8 @@ export type ControllerType =
   | "ps4"
   | "ps5"
   | "gamecube"
+  | "n64"
+  | "switch"
   | "wiimote"
   | "generic";
 

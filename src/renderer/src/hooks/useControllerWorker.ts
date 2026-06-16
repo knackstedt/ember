@@ -20,17 +20,19 @@ interface WorkerSlotState {
   rawButtons: Record<string, boolean>;
   lastAxisCode: number;
   lastButtonCode: number;
+  touchpadX?: number;
+  touchpadY?: number;
 }
 
 interface ControllerWorkerState {
   devices: ControllerDevice[];
-  learningDeviceId: string | null;
-  setLearningDeviceId: (id: string | null) => void;
+  learningDeviceIds: string[];
+  setLearningDeviceIds: (ids: string[]) => void;
 }
 
 let globalWorker: Worker | null = null;
 let globalDevices: ControllerDevice[] = [];
-let globalLearningDeviceId: string | null = null;
+let globalLearningDeviceIds: string[] = [];
 let learningListeners = new Set<(ev: NormalizedInputEvent) => void>();
 let eventListeners = new Set<(ev: NormalizedInputEvent) => void>();
 let deviceChangeListeners = new Set<() => void>();
@@ -90,7 +92,7 @@ function getOrCreateWorker(): Worker {
         break;
       }
       case "learn-event": {
-        if (msg.deviceId === globalLearningDeviceId) {
+        if (globalLearningDeviceIds.length === 0 || globalLearningDeviceIds.includes(msg.deviceId)) {
           const ev: NormalizedInputEvent = {
             source: "gamepad",
             deviceId: msg.deviceId,
@@ -135,6 +137,12 @@ function handleStateUpdate(slots: WorkerSlotState[]) {
       dpad_x: slot.axes[6] ?? 0,
       dpad_y: slot.axes[7] ?? 0,
     };
+    if (slot.touchpadX !== undefined) axes.touchpad_x = slot.touchpadX;
+    if (slot.touchpadY !== undefined) axes.touchpad_y = slot.touchpadY;
+
+    if (axes.touchpad_x !== undefined) {
+      console.log("[useControllerWorker] state-update touchpad", axes.touchpad_x, axes.touchpad_y);
+    }
 
     const prev = prevLiveStates[deviceId];
 
@@ -242,10 +250,10 @@ export function subscribeLearning(cb: (ev: NormalizedInputEvent) => void): () =>
   return () => learningListeners.delete(cb);
 }
 
-/** Enable/disable learning mode for a specific device. */
-export function setLearningDeviceId(id: string | null): void {
-  globalLearningDeviceId = id;
-  getControllerWorker()?.postMessage({ type: "set-learning", active: !!id });
+/** Enable/disable learning mode for specific devices. */
+export function setLearningDeviceIds(ids: string[]): void {
+  globalLearningDeviceIds = ids;
+  getControllerWorker()?.postMessage({ type: "set-learning", active: ids.length > 0 });
 }
 
 /** Subscribe to synthesized controller events from worker state updates. */
@@ -257,7 +265,7 @@ export function subscribeControllerEvents(cb: (ev: NormalizedInputEvent) => void
 export function useControllerWorker(): ControllerWorkerState {
   const workerRef = useRef<Worker | null>(null);
   const [devices, setDevices] = useState<ControllerDevice[]>([]);
-  const [learningDeviceId, setLearningDeviceIdState] = useState<string | null>(null);
+  const [learningDeviceIds, setLearningDeviceIdsState] = useState<string[]>([]);
 
   useEffect(() => {
     const worker = getOrCreateWorker();
@@ -290,6 +298,7 @@ export function useControllerWorker(): ControllerWorkerState {
           deviceId: dev.id,
           name: dev.name,
           deviceType: dev.type,
+          driverName: dev.driverName,
         });
       });
 
@@ -320,6 +329,7 @@ export function useControllerWorker(): ControllerWorkerState {
             deviceId: dev.id,
             name: dev.name,
             deviceType: dev.type,
+            driverName: dev.driverName,
           });
         }
       });
@@ -334,16 +344,16 @@ export function useControllerWorker(): ControllerWorkerState {
     };
   }, []);
 
-  const setLearningDeviceId = useCallback((id: string | null) => {
-    globalLearningDeviceId = id;
-    setLearningDeviceIdState(id);
-    workerRef.current?.postMessage({ type: "set-learning", active: !!id });
+  const setLearningDeviceIds = useCallback((ids: string[]) => {
+    globalLearningDeviceIds = ids;
+    setLearningDeviceIdsState(ids);
+    workerRef.current?.postMessage({ type: "set-learning", active: ids.length > 0 });
   }, []);
 
   return {
     devices,
-    learningDeviceId,
-    setLearningDeviceId,
+    learningDeviceIds,
+    setLearningDeviceIds,
   };
 }
 

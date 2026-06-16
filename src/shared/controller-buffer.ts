@@ -77,6 +77,8 @@ export const enum ControllerTypeEnum {
   GAMECUBE = 6,
   WIIMOTE = 7,
   GENERIC = 8,
+  SWITCH = 9,
+  N64 = 10,
 }
 
 export function controllerTypeToEnum(type: string): ControllerTypeEnum {
@@ -88,6 +90,8 @@ export function controllerTypeToEnum(type: string): ControllerTypeEnum {
     case "ps4": return ControllerTypeEnum.PS4;
     case "ps5": return ControllerTypeEnum.PS5;
     case "gamecube": return ControllerTypeEnum.GAMECUBE;
+    case "n64": return ControllerTypeEnum.N64;
+    case "switch": return ControllerTypeEnum.SWITCH;
     case "wiimote": return ControllerTypeEnum.WIIMOTE;
     default: return ControllerTypeEnum.GENERIC;
   }
@@ -102,6 +106,8 @@ export function enumToControllerType(t: ControllerTypeEnum): string {
     case ControllerTypeEnum.PS4: return "ps4";
     case ControllerTypeEnum.PS5: return "ps5";
     case ControllerTypeEnum.GAMECUBE: return "gamecube";
+    case ControllerTypeEnum.N64: return "n64";
+    case ControllerTypeEnum.SWITCH: return "switch";
     case ControllerTypeEnum.WIIMOTE: return "wiimote";
     default: return "generic";
   }

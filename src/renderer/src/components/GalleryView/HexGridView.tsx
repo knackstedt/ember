@@ -69,6 +69,10 @@ const HexCell: React.FC<HexCellProps> = ({ hex, isFocused, cellWidth, hexHeight,
     hex.onVisible?.();
   }, [hex.onVisible]);
 
+  useEffect(() => {
+    setImgError(false);
+  }, [hex.coverUrl]);
+
   if (hex.skeleton) {
     return (
       <div

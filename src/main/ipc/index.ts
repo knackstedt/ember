@@ -38,6 +38,7 @@ import {
   MusicRepo,
   TVRepo,
   MappingRepo,
+  AliasRepo,
   BrokenFlashRepo,
   CollectionRepo,
   RemoteSourceRepo,
@@ -67,7 +68,7 @@ import {
   setPluginEnabled,
   listManagedPlugins,
 } from "../services/plugin-manager.service";
-import { getConnectedDevices } from "../input/evdev";
+import { getConnectedDevices, rescanDevice } from "../input/evdev";
 import { getXdgVideosDir, getXdgMusicDir } from "../scanners/xdg";
 import { getDefaultScanSources, getDefaultScanSourcesAsync } from "../scanners/defaults";
 import { isOllamaAvailable, naturalLanguageToFilter, aiGroupItems } from "../services/local-ai.service";
@@ -1670,6 +1671,22 @@ export function registerIpcHandlers(window: BrowserWindow): void {
 
   ipcMain.handle("input:mappings:reset", async (_e, deviceId: string) => {
     await MappingRepo.reset(deviceId);
+  });
+
+  ipcMain.handle("input:alias:get", async (_e, deviceId: string) => {
+    return AliasRepo.get(deviceId);
+  });
+
+  ipcMain.handle("input:alias:set", async (_e, deviceId: string, alias: string) => {
+    await AliasRepo.set(deviceId, alias);
+  });
+
+  ipcMain.handle("input:alias:remove", async (_e, deviceId: string) => {
+    await AliasRepo.remove(deviceId);
+  });
+
+  ipcMain.handle("input:device:reconnect", async (_e, deviceId: string) => {
+    rescanDevice(deviceId);
   });
 
   ipcMain.handle("plugins:list", async () => {

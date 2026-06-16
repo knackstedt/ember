@@ -434,6 +434,35 @@ export const MappingRepo = {
 };
 
 /* ------------------------------------------------------------------ */
+/*  Controller Alias Repository                                        */
+/* ------------------------------------------------------------------ */
+
+export const AliasRepo = {
+  async get(deviceId: string): Promise<string | null> {
+    const db = getDb();
+    const result = await db.query<[Array<{ alias: string }>]>(
+      "SELECT alias FROM controller_alias WHERE deviceId = $deviceId",
+      { deviceId },
+    );
+    const rows = result[0] ?? [];
+    return rows[0]?.alias ?? null;
+  },
+
+  async set(deviceId: string, alias: string): Promise<void> {
+    const db = getDb();
+    await db.query(
+      "UPSERT controller_alias SET deviceId = $deviceId, alias = $alias WHERE deviceId = $deviceId",
+      { deviceId, alias },
+    );
+  },
+
+  async remove(deviceId: string): Promise<void> {
+    const db = getDb();
+    await db.query("DELETE FROM controller_alias WHERE deviceId = $deviceId", { deviceId });
+  },
+};
+
+/* ------------------------------------------------------------------ */
 /*  Broken Flash Game Repository                                       */
 /* ------------------------------------------------------------------ */
 
