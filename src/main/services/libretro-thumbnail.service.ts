@@ -188,6 +188,63 @@ function isImageUniform(width: number, height: number, rgba: Buffer): boolean {
   return variance < 600;
 }
 
+function isSolidRegion(
+  rgba: Buffer,
+  width: number,
+  startY: number,
+  regionHeight: number,
+  ignoreX?: number,
+  ignoreY?: number,
+): boolean {
+  if (regionHeight <= 0 || width <= 0) return false;
+  const firstIdx = startY * width * 4;
+  const r = rgba[firstIdx];
+  const g = rgba[firstIdx + 1];
+  const b = rgba[firstIdx + 2];
+  let strayFound = false;
+  for (let y = startY; y < startY + regionHeight; y++) {
+    for (let x = 0; x < width; x++) {
+      const idx = (y * width + x) * 4;
+      if (rgba[idx] === r && rgba[idx + 1] === g && rgba[idx + 2] === b) continue;
+      if (!strayFound && ignoreX !== undefined && ignoreY !== undefined) {
+        if (x === ignoreX && y === ignoreY && rgba[idx] === 255 && rgba[idx + 1] === 255 && rgba[idx + 2] === 255) {
+          strayFound = true;
+          continue;
+        }
+      }
+      return false;
+    }
+  }
+  return true;
+}
+
+function cropSolidDsScreens(
+  width: number,
+  height: number,
+  rgba: Buffer,
+  platform: string,
+): { width: number; height: number; rgba: Buffer } {
+  if (platform !== "nds" && platform !== "3ds") return { width, height, rgba };
+  const halfHeight = Math.floor(height / 2);
+  if (halfHeight < 4) return { width, height, rgba };
+  const ignoreX = 0;
+  const ignoreY = halfHeight;
+  const topSolid = isSolidRegion(rgba, width, 0, halfHeight, ignoreX, ignoreY);
+  const bottomSolid = isSolidRegion(rgba, width, halfHeight, height - halfHeight, ignoreX, ignoreY);
+  if (topSolid && !bottomSolid) {
+    const newHeight = height - halfHeight;
+    const cropped = Buffer.alloc(width * newHeight * 4);
+    rgba.copy(cropped, 0, halfHeight * width * 4);
+    return { width, height: newHeight, rgba: cropped };
+  }
+  if (!topSolid && bottomSolid) {
+    const cropped = Buffer.alloc(width * halfHeight * 4);
+    rgba.copy(cropped, 0, 0, halfHeight * width * 4);
+    return { width, height: halfHeight, rgba: cropped };
+  }
+  return { width, height, rgba };
+}
+
 /* ------------------------------------------------------------------ */
 /*  Capture config                                                     */
 /* ------------------------------------------------------------------ */
@@ -297,16 +354,20 @@ async function runLibretroCapture(
         }
 
         const rgba = Buffer.from(frame.data, "base64");
-        if (isImageUniform(frame.width, frame.height, rgba)) {
+        const cropped = cropSolidDsScreens(frame.width, frame.height, rgba, game.platform);
+        const cw = cropped.width;
+        const ch = cropped.height;
+        const cbuf = cropped.rgba;
+        if (isImageUniform(cw, ch, cbuf)) {
           log.info("libretro:screenshot", `uniform frame at ${delayMs}ms for ${game.title}, skipping`);
           continue;
         }
 
-        const score = scoreFrameVariance(frame.width, frame.height, rgba);
-        const png = rgbaToPng(frame.width, frame.height, rgba);
-        log.info("libretro:screenshot", `captured ${frame.width}x${frame.height} at ${delayMs}ms score=${score.toFixed(1)} for ${game.title}`);
+        const score = scoreFrameVariance(cw, ch, cbuf);
+        const png = rgbaToPng(cw, ch, cbuf);
+        log.info("libretro:screenshot", `captured ${cw}x${ch} at ${delayMs}ms score=${score.toFixed(1)} for ${game.title}`);
 
-        capturedFrames.push({ width: frame.width, height: frame.height, png, score });
+        capturedFrames.push({ width: cw, height: ch, png, score });
       }
 
       await workerCall("stop", coreId);
