@@ -133,11 +133,6 @@ export default function App(): React.ReactElement {
 
   const inputDevices = useInputStore((s) => s.devices);
 
-  /* Controller cursors — always call hook, control via `enabled` */
-  const [activeTab, setActiveTab] = useState<TabId>("gaming");
-  useBrowserControllerNav({ enabled: !loading, evdevActive: inputDevices.length > 0 });
-
-
   const hasPlayer = useMusicPlayerStore((s) => s.queue.length > 0);
   const setBladeCollapsed = useMusicPlayerStore((s) => s.setBladeCollapsed);
   const videoOpen = useVideoPlayerStore((s) => !!s.src);
@@ -146,6 +141,10 @@ export default function App(): React.ReactElement {
   const pluginOpen = usePluginPlayerStore((s) => s.open);
   const libretroOpen = useLibretroPlayerStore((s) => s.open);
   const anyEmulatorOpen = flashOpen || jsnesOpen || pluginOpen || libretroOpen;
+
+  /* Controller cursors — always call hook, control via `enabled` */
+  const [activeTab, setActiveTab] = useState<TabId>("gaming");
+  useBrowserControllerNav({ enabled: !loading && !anyEmulatorOpen, evdevActive: inputDevices.length > 0 });
   const activeTabRef = useRef<TabId>(activeTab);
   activeTabRef.current = activeTab;
   const [evdevGamepadActive, setEvdevGamepadActive] = useState(false);

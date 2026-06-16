@@ -16,6 +16,7 @@ export interface HexCellData {
   platform?: string;
   onClick?: () => void;
   onFavorite?: () => void;
+  onVisible?: () => void;
   skeleton?: boolean;
 }
 
@@ -63,6 +64,10 @@ interface HexCellProps {
 const HexCell: React.FC<HexCellProps> = ({ hex, isFocused, cellWidth, hexHeight, itemProps }) => {
   const [imgError, setImgError] = React.useState(false);
   const hasCover = hex.coverUrl && !imgError;
+
+  useEffect(() => {
+    hex.onVisible?.();
+  }, [hex.onVisible]);
 
   if (hex.skeleton) {
     return (

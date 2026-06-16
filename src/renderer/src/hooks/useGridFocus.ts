@@ -41,7 +41,7 @@ export function useGridFocus<T>({
 
   useEffect(() => {
     if (enabled && items.length > 0) {
-      setFocusedIndex((prev) => (prev >= items.length ? 0 : prev));
+      setFocusedIndex((prev) => (prev >= items.length ? items.length - 1 : prev));
     }
   }, [items.length, enabled]);
 

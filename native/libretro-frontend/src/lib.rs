@@ -138,12 +138,27 @@ impl LibretroFrontend {
     }
 
     #[napi]
-    pub fn set_input_state(&self, core_id: i32, port: i32, _device: i32, _index: i32, id: i32, value: i32) -> Result<bool> {
+    pub fn set_input_state(&self, core_id: i32, port: i32, device: i32, _index: i32, id: i32, value: i32) -> Result<bool> {
         let cores = self.cores.lock();
         let handle = cores
             .get(core_id as usize)
             .ok_or_else(|| Error::new(Status::InvalidArg, "Invalid core ID"))?;
-        handle.core.lock().input.set_button(port as u32, id as u32, value != 0);
+        let core = handle.core.lock();
+        match device {
+            1 => {
+                // JOYPAD
+                core.input.set_button(port as u32, id as u32, value != 0);
+            }
+            2 => {
+                // MOUSE
+                core.input.set_mouse_field(port as u32, id as u32, value as i16);
+            }
+            6 => {
+                // POINTER
+                core.input.set_pointer_field(port as u32, id as u32, value as i16);
+            }
+            _ => {}
+        }
         Ok(true)
     }
 

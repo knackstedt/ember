@@ -138,6 +138,11 @@ function getMissingCoreTooltip(game: Game): string | undefined {
   return `No ${platformLabel} emulator cores are installed. Install it in settings.`;
 }
 
+const LIBRETRO_THUMB_PLATFORMS = new Set<string>([
+  "nes", "snes", "gb", "gba", "n64", "genesis", "sms",
+  "gamegear", "pce", "psx", "dreamcast", "nds", "dos",
+]);
+
 const LazyGameCard: React.FC<{
   game: Game;
   index: number;
@@ -152,11 +157,7 @@ const LazyGameCard: React.FC<{
   const coreVersion = useGamesStore((s) => s.coreVersion);
 
   useEffect(() => {
-    const libretroPlatforms = new Set<string>([
-      "nes", "snes", "gb", "gba", "n64", "genesis", "sms",
-      "gamegear", "pce", "psx", "dreamcast", "nds", "dos",
-    ]);
-    const isLibretro = libretroPlatforms.has(game.platform);
+    const isLibretro = LIBRETRO_THUMB_PLATFORMS.has(game.platform);
     if ((game.platform === "flash" || isLibretro) && !game.coverUrl) {
       loadThumbnail(game.id);
     }
@@ -189,6 +190,17 @@ const LazyGameCard: React.FC<{
   );
 });
 
+const LazyGameThumbnail: React.FC<{ game: Game }> = React.memo(({ game }) => {
+  const loadThumbnail = useGamesStore((s) => s.loadThumbnail);
+  useEffect(() => {
+    const isLibretro = LIBRETRO_THUMB_PLATFORMS.has(game.platform);
+    if ((game.platform === "flash" || isLibretro) && !game.coverUrl) {
+      loadThumbnail(game.id);
+    }
+  }, [game.id, game.platform, game.coverUrl, loadThumbnail]);
+  return null;
+});
+
 function gameBadge(game: Game): { label: string; color: string } | undefined {
   if (game.protonRating && game.protonRating !== "unknown") {
     return {
@@ -219,6 +231,7 @@ export const GamingTab: React.FC = () => {
   const deleteGame = useGamesStore((s) => s.delete);
   const regenerateThumbnail = useGamesStore((s) => s.regenerateThumbnail);
   const updateLastPlayed = useGamesStore((s) => s.updateLastPlayed);
+  const loadThumbnail = useGamesStore((s) => s.loadThumbnail);
   const pendingThumbnailIds = useGamesStore((s) => s.pendingThumbnailIds);
   const regeneratingIds = useGamesStore((s) => s.regeneratingIds);
   useGamesStore((s) => s.coreVersion); // forces re-render when cores change
@@ -744,14 +757,21 @@ export const GamingTab: React.FC = () => {
         platform: game.platform,
         onClick: () => { setFocusedIndex(index); setSelected(game); },
         onFavorite: () => toggleFavorite(game.id),
+        onVisible: () => {
+          const isLibretro = LIBRETRO_THUMB_PLATFORMS.has(game.platform);
+          if ((game.platform === "flash" || isLibretro) && !game.coverUrl) {
+            loadThumbnail(game.id);
+          }
+        },
       };
     },
-    [pendingThumbnailIds, regeneratingIds, toggleFavorite],
+    [pendingThumbnailIds, regeneratingIds, toggleFavorite, loadThumbnail],
   );
 
   const renderListItem = useCallback(
     (game: Game, index: number) => (
       <div className="flex items-center gap-3 w-full h-full px-3" {...bindItem(game, index)}>
+        <LazyGameThumbnail game={game} />
         <div
           className="w-12 h-[72px] flex-shrink-0 rounded overflow-hidden bg-cover bg-center"
           style={{
@@ -790,6 +810,7 @@ export const GamingTab: React.FC = () => {
             background: `linear-gradient(180deg, ${color}, #0f0f1e)`,
           }}
         >
+          <LazyGameThumbnail game={game} />
           {!isHovered && (
             <div className="absolute inset-0 flex items-center justify-center">
               <span
@@ -844,6 +865,7 @@ export const GamingTab: React.FC = () => {
     (game: Game, _index: number, { isHovered, isFocused }: { isHovered: boolean; isFocused: boolean }) => {
       return (
         <div className="w-full h-full relative">
+          <LazyGameThumbnail game={game} />
           <GalleryImage
             src={game.coverUrl}
             alt={game.title}
@@ -878,6 +900,7 @@ export const GamingTab: React.FC = () => {
       const b = gameBadge(game);
       return (
         <div className="p-1 w-full h-full flex flex-col min-w-0" {...bindItem(game, index)}>
+          <LazyGameThumbnail game={game} />
           <div
             className="flex-1 relative overflow-hidden"
             style={{

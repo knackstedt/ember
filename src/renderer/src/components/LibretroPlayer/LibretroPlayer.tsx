@@ -5,23 +5,34 @@ import { VERTEX_SHADER, wrapFragmentBody, getShaderPreset } from "./shaders";
 import { GamePlatform } from "../../../../shared/types";
 import { subscribeControllerEvents } from "../../hooks/useControllerWorker";
 
-function platformToButtonMap(_platform: GamePlatform): Record<string, number> {
+function platformToButtonMap(platform: GamePlatform): Record<string, number> {
   const common: Record<string, number> = {
     ArrowUp: 4,
     ArrowDown: 5,
     ArrowLeft: 6,
     ArrowRight: 7,
     Enter: 3,
-    Shift: 10,
+    " ": 3,
+    Shift: 2,
+    Backspace: 2,
     z: 0,
-    x: 1,
-    a: 8,
+    x: 8,
+    a: 1,
     s: 9,
-    q: 12,
-    w: 13,
+    q: 10,
+    w: 11,
+    d: 12,
+    c: 13,
     e: 14,
     r: 15,
   };
+  if (platform === "nds") {
+    return {
+      ...common,
+      l: 10,
+      k: 11,
+    };
+  }
   return common;
 }
 
@@ -53,6 +64,8 @@ export const LibretroPlayer: React.FC = () => {
   const uniformsRef = useRef<Record<string, WebGLUniformLocation | null>>({});
   const [showControls, setShowControls] = useState(false);
   const [currentFps, setCurrentFps] = useState(0);
+  const [cursorVisible, setCursorVisible] = useState(true);
+  const cursorTimerRef = useRef<number | null>(null);
   const lastFormatRef = useRef<number>(-1);
 
   const compileShader = useCallback(
@@ -270,6 +283,7 @@ export const LibretroPlayer: React.FC = () => {
     const buttonMap = platformToButtonMap(platform);
 
     const onKeyDown = (e: KeyboardEvent) => {
+      if (e.repeat) return;
       if (e.key === "Escape") {
         close();
         return;
@@ -280,6 +294,7 @@ export const LibretroPlayer: React.FC = () => {
       }
       const id = buttonMap[e.key];
       if (id !== undefined) {
+        e.preventDefault();
         window.htpc.libretro.setInput(coreId, 0, 1, 0, id, 1);
       }
     };
@@ -318,12 +333,40 @@ export const LibretroPlayer: React.FC = () => {
       right_bumper: 11,
     };
 
+    const AXIS_SCALE = 32767;
+
     const unsub = subscribeControllerEvents((ev) => {
-      if (ev.type !== "button_press" && ev.type !== "button_release") return;
-      const value = ev.type === "button_press" ? 1 : 0;
-      const id = gamepadMap[ev.action ?? ""];
-      if (id !== undefined) {
-        window.htpc.libretro.setInput(coreId, 0, 1, 0, id, value);
+      if (ev.type === "button_press" || ev.type === "button_release") {
+        const value = ev.type === "button_press" ? 1 : 0;
+        const id = gamepadMap[ev.action ?? ""];
+        if (id !== undefined) {
+          window.htpc.libretro.setInput(coreId, 0, 1, 0, id, value);
+        }
+        return;
+      }
+
+      if (ev.type === "axis" && ev.axis && ev.value !== undefined) {
+        const val = Math.round(ev.value * AXIS_SCALE);
+        switch (ev.axis) {
+          case "left_x":
+            window.htpc.libretro.setAnalog(coreId, 0, 0, 0, val);
+            break;
+          case "left_y":
+            window.htpc.libretro.setAnalog(coreId, 0, 0, 1, val);
+            break;
+          case "right_x":
+            window.htpc.libretro.setAnalog(coreId, 0, 1, 0, val);
+            break;
+          case "right_y":
+            window.htpc.libretro.setAnalog(coreId, 0, 1, 1, val);
+            break;
+          case "left_trigger":
+            window.htpc.libretro.setAnalog(coreId, 0, 2, 0, val);
+            break;
+          case "right_trigger":
+            window.htpc.libretro.setAnalog(coreId, 0, 2, 1, val);
+            break;
+        }
       }
     });
 
@@ -331,6 +374,79 @@ export const LibretroPlayer: React.FC = () => {
       unsub();
     };
   }, [open, coreId]);
+
+  useEffect(() => {
+    if (!open || coreId === null) return;
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const POINTER_SCALE = 0x7fff;
+
+    const sendPointer = (clientX: number, clientY: number, pressed: boolean) => {
+      const rect = canvas.getBoundingClientRect();
+      const x = clientX - rect.left;
+      const y = clientY - rect.top;
+      if (x < 0 || x > rect.width || y < 0 || y > rect.height) return;
+
+      const normX = Math.round(((x / rect.width) * 2 - 1) * POINTER_SCALE);
+      const normY = Math.round(((y / rect.height) * 2 - 1) * POINTER_SCALE);
+
+      window.htpc.libretro.setInput(coreId, 0, 6, 0, 0, normX);
+      window.htpc.libretro.setInput(coreId, 0, 6, 0, 1, normY);
+      window.htpc.libretro.setInput(coreId, 0, 6, 0, 2, pressed ? 1 : 0);
+    };
+
+    const onPointerDown = (e: PointerEvent) => {
+      e.preventDefault();
+      sendPointer(e.clientX, e.clientY, true);
+    };
+    const onPointerMove = (e: PointerEvent) => {
+      e.preventDefault();
+      sendPointer(e.clientX, e.clientY, e.buttons > 0);
+    };
+    const onPointerUp = (e: PointerEvent) => {
+      e.preventDefault();
+      sendPointer(e.clientX, e.clientY, false);
+    };
+
+    canvas.addEventListener("pointerdown", onPointerDown);
+    canvas.addEventListener("pointermove", onPointerMove);
+    canvas.addEventListener("pointerup", onPointerUp);
+    canvas.addEventListener("pointerleave", onPointerUp);
+    canvas.addEventListener("pointercancel", onPointerUp);
+
+    return () => {
+      canvas.removeEventListener("pointerdown", onPointerDown);
+      canvas.removeEventListener("pointermove", onPointerMove);
+      canvas.removeEventListener("pointerup", onPointerUp);
+      canvas.removeEventListener("pointerleave", onPointerUp);
+      canvas.removeEventListener("pointercancel", onPointerUp);
+    };
+  }, [open, coreId]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const onMouseMove = () => {
+      setCursorVisible(true);
+      if (cursorTimerRef.current) {
+        window.clearTimeout(cursorTimerRef.current);
+      }
+      cursorTimerRef.current = window.setTimeout(() => {
+        setCursorVisible(false);
+      }, 2000);
+    };
+
+    window.addEventListener("mousemove", onMouseMove);
+    return () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      if (cursorTimerRef.current) {
+        window.clearTimeout(cursorTimerRef.current);
+        cursorTimerRef.current = null;
+      }
+    };
+  }, [open]);
 
   if (!open) return null;
 
@@ -349,6 +465,7 @@ export const LibretroPlayer: React.FC = () => {
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
+        cursor: cursorVisible ? "default" : "none",
       }}
       onMouseMove={() => setShowControls(true)}
     >
