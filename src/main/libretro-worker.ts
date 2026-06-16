@@ -107,6 +107,9 @@ process.on("message", (req: any) => {
       case "setMute":
         result = Frontend.setMute(args[0], args[1]);
         break;
+      case "setAudioEnabled":
+        result = Frontend.setAudioEnabled(args[0], args[1]);
+        break;
       default:
         process.send!({ id, error: `Unknown method: ${method}` });
         return;

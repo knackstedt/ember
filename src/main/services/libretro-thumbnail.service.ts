@@ -1,9 +1,10 @@
 import { app } from "electron";
 import { join, dirname, basename, extname } from "path";
-import { existsSync, mkdirSync, writeFileSync, readFileSync } from "fs";
+import { existsSync, mkdirSync, writeFileSync, readFileSync, unlinkSync } from "fs";
 import { deflateSync } from "zlib";
 import { createHash } from "crypto";
 import { getDb } from "../db";
+import { GameRepo } from "../db/repository";
 import { Game } from "../../shared/types";
 import { findSidecarImage, searchOnlineThumbnail } from "./flash-thumbnail.service";
 import { detectInstalledCores } from "./package-manager.service";
@@ -56,10 +57,10 @@ const CORE_PRIORITY: Record<string, string[]> = {
   pce: ["beetle_pce", "beetle_pce_fast"],
 };
 
-async function findCoreForRom(romPath: string): Promise<{ corePath: string; coreName: string } | null> {
+export async function findCoresForRom(romPath: string): Promise<{ corePath: string; coreName: string }[]> {
   const ext = (romPath.match(/\.[^.]+$/)?.[0] ?? "").toLowerCase();
   const platform = PLATFORM_EXTS[ext];
-  if (!platform) return null;
+  if (!platform) return [];
 
   const installed = await detectInstalledCores();
   const compatible = installed.filter((c) => {
@@ -67,7 +68,7 @@ async function findCoreForRom(romPath: string): Promise<{ corePath: string; core
     return cexts.includes(ext);
   });
 
-  if (compatible.length === 0) return null;
+  if (compatible.length === 0) return [];
 
   const priorityList = CORE_PRIORITY[platform] ?? [];
   compatible.sort((a, b) => {
@@ -79,7 +80,7 @@ async function findCoreForRom(romPath: string): Promise<{ corePath: string; core
     return a.coreName.localeCompare(b.coreName);
   });
 
-  return { corePath: compatible[0].corePath, coreName: compatible[0].coreName };
+  return compatible.map((c) => ({ corePath: c.corePath, coreName: c.coreName }));
 }
 
 /* ------------------------------------------------------------------ */
@@ -238,7 +239,6 @@ async function runLibretroCapture(
 
   const config = loadCaptureConfig(romPath);
   let coreId: number | null = null;
-  let bestFrame: { width: number; height: number; png: Buffer; score: number } | null = null;
   const capturedFrames: { width: number; height: number; png: Buffer; score: number }[] = [];
 
   return new Promise<{ url?: string; source?: string }>(async (resolve) => {
@@ -261,6 +261,11 @@ async function runLibretroCapture(
       coreId = coreInfo.id;
       log.info("libretro:screenshot", `loaded core ${coreInfo.name} (id=${coreId}) for ${game.title}`);
 
+      try {
+        await workerCall("setAudioEnabled", coreId, false);
+      } catch {
+        // Addon may be from an older build; audio will still run, which is fine.
+      }
       await workerCall("loadGame", coreId, romPath);
       log.info("libretro:screenshot", `loaded game ${romPath}`);
 
@@ -302,9 +307,6 @@ async function runLibretroCapture(
         log.info("libretro:screenshot", `captured ${frame.width}x${frame.height} at ${delayMs}ms score=${score.toFixed(1)} for ${game.title}`);
 
         capturedFrames.push({ width: frame.width, height: frame.height, png, score });
-        if (!bestFrame || score > bestFrame.score) {
-          bestFrame = { width: frame.width, height: frame.height, png, score };
-        }
       }
 
       await workerCall("stop", coreId);
@@ -315,9 +317,10 @@ async function runLibretroCapture(
 
       clearTimeout(timeout);
 
-      if (bestFrame) {
-        writeFileSync(destPath, bestFrame.png);
-        log.info("libretro:screenshot", `saved best screenshot for ${game.title} score=${bestFrame.score.toFixed(1)}`);
+      const lastFrame = capturedFrames.at(-1);
+      if (lastFrame) {
+        writeFileSync(destPath, lastFrame.png);
+        log.info("libretro:screenshot", `saved last screenshot for ${game.title} score=${lastFrame.score.toFixed(1)}`);
         // Save all captured frames as numbered screenshots for the gallery
         for (let i = 0; i < capturedFrames.length; i++) {
           const framePath = join(screenshotDir, `${id}_${i}.png`);
@@ -388,13 +391,18 @@ class ScreenshotQueue {
     const romPath = game.romPath;
     if (!romPath) return {};
 
-    const core = await findCoreForRom(romPath);
-    if (!core) {
+    const cores = await findCoresForRom(romPath);
+    if (cores.length === 0) {
       log.warn("libretro:screenshot", `no core found for ${game.title} (${romPath})`);
       return {};
     }
 
-    return runLibretroCapture(romPath, core.corePath, game);
+    for (const core of cores) {
+      const result = await runLibretroCapture(romPath, core.corePath, game);
+      if (result.url) return result;
+      log.warn("libretro:screenshot", `core ${core.coreName} failed for ${game.title}, trying next...`);
+    }
+    return {};
   }
 }
 
@@ -646,6 +654,7 @@ async function updateGameCover(id: string, url: string, source?: string): Promis
 
 export async function loadLibretroThumbnail(
   game: Game,
+  onNoCore?: () => void,
 ): Promise<string | undefined> {
   const romPath = game.romPath;
   if (!romPath) {
@@ -689,6 +698,22 @@ export async function loadLibretroThumbnail(
       return online;
     }
 
+    const cores = await findCoresForRom(romPath);
+    if (cores.length === 0) {
+      onNoCore?.();
+      const procedural = generateProceduralThumbnail(romPath, id);
+      if (procedural) {
+        await updateGameCover(id, procedural, "procedural");
+        return procedural;
+      }
+      const broken = generateBrokenThumbnail(id, game.slug ?? id, game.platform ?? "libretro");
+      if (broken) {
+        await updateGameCover(id, broken, "broken");
+        return broken;
+      }
+      return undefined;
+    }
+
     const screenshot = await screenshotQueue.enqueue(game);
     if (screenshot.url) {
       await updateGameCover(id, screenshot.url, screenshot.source);
@@ -715,5 +740,29 @@ export async function loadLibretroThumbnail(
     libretroThumbnailSemaphore.release();
     inFlight.delete(id);
   }
+}
+
+export async function requeueThumbnailsForPlatforms(platforms: string[]): Promise<number> {
+  if (platforms.length === 0) return 0;
+  const games = await GameRepo.list();
+  let queued = 0;
+  for (const game of games) {
+    if (!game.romPath || !platforms.includes(game.platform)) continue;
+    const hasRealThumbnail = game.coverUrl && !game.coverUrl.includes("/generated/");
+    if (hasRealThumbnail) continue;
+
+    const id = game.id;
+    // Remove generated thumbnails so they get re-processed
+    const svg = join(generatedDir, `${id}.svg`);
+    const brokenSvg = join(generatedDir, `${id}-broken.svg`);
+    try { unlinkSync(svg); } catch {}
+    try { unlinkSync(brokenSvg); } catch {}
+    inFlight.delete(id);
+
+    loadLibretroThumbnail(game).catch(() => {});
+    queued++;
+  }
+  log.info("libretro:requeue", `queued ${queued} games for platforms ${platforms.join(", ")}`);
+  return queued;
 }
 

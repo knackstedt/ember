@@ -31,6 +31,7 @@ pub struct CoreInstance {
     pub running: Arc<AtomicBool>,
     pub pixel_format: Arc<Mutex<u32>>,
     pub game_data: Option<Vec<u8>>,
+    pub audio_enabled: bool,
 }
 
 impl CoreInstance {
@@ -57,6 +58,7 @@ impl CoreInstance {
             running: running.clone(),
             pixel_format: pixel_format.clone(),
             game_data: None,
+            audio_enabled: true,
         }));
 
         // Set thread-local state before calling any core functions
@@ -163,17 +165,23 @@ impl CoreInstance {
         self.av_info = Some(av_info);
 
         // Initialize audio system with correct sample rate
-        match AudioSystem::new() {
-            Ok(sys) => {
-                sys.set_sample_rate(av_info.timing.sample_rate);
-                *self.audio.lock() = Some(sys);
-            }
-            Err(e) => {
-                eprintln!("Failed to initialize audio: {}", e);
+        if self.audio_enabled {
+            match AudioSystem::new() {
+                Ok(sys) => {
+                    sys.set_sample_rate(av_info.timing.sample_rate);
+                    *self.audio.lock() = Some(sys);
+                }
+                Err(e) => {
+                    eprintln!("Failed to initialize audio: {}", e);
+                }
             }
         }
 
         Ok(())
+    }
+
+    pub fn set_audio_enabled(&mut self, enabled: bool) {
+        self.audio_enabled = enabled;
     }
 
     pub fn run_frame(&self) {

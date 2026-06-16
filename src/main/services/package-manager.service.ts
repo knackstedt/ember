@@ -816,6 +816,20 @@ export async function installPackage(
 
   if (result && def.category === "core" && window && !window.isDestroyed()) {
     window.webContents.send("libretro:cores:changed");
+    const platforms = def.platforms ?? [];
+    if (platforms.length > 0) {
+      import("./libretro-thumbnail.service")
+        .then(({ requeueThumbnailsForPlatforms }) => requeueThumbnailsForPlatforms(platforms))
+        .then((count) => {
+          if (count > 0 && window && !window.isDestroyed()) {
+            window.webContents.send("toast:push", {
+              type: "info",
+              message: `Queued ${count} ROM${count > 1 ? "s" : ""} for thumbnailing`,
+            });
+          }
+        })
+        .catch(() => {});
+    }
   }
 
   return result;

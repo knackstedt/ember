@@ -318,11 +318,15 @@ export default function App(): React.ReactElement {
       });
     });
 
+    const unsubToast = window.htpc.onToastPush((toast) => {
+      useToastStore.getState().push(toast);
+    });
+
     const unsubLibretro = window.htpc.libretro.onOpen((opts) => {
       useLibretroPlayerStore.getState().launch(opts);
     });
 
-    return () => { unsubScan(); unsubCores(); unsubHook(); unsubLibretro(); };
+    return () => { unsubScan(); unsubCores(); unsubHook(); unsubToast(); unsubLibretro(); };
   }, []);
 
   useEffect(() => {

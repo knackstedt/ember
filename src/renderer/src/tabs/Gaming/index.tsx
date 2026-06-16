@@ -1631,6 +1631,14 @@ export const GamingTab: React.FC = () => {
                   </div>
                 )}
 
+                {/* Thumbnailing status */}
+                {(pendingThumbnailIds.has(selected.id) || regeneratingIds.has(selected.id)) && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <Loader size={14} className="animate-spin" style={{ color: "var(--color-accent)" }} />
+                    <span style={{ color: "var(--color-text-dim)" }}>Generating thumbnail...</span>
+                  </div>
+                )}
+
                 {/* Videos from lazy metadata */}
                 {detailGameData?.videos && detailGameData.videos.length > 0 && (
                   <div>

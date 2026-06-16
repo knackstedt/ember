@@ -864,6 +864,12 @@ const htpc = {
     return () => ipcRenderer.removeListener("session-hook:error", handler);
   },
 
+  onToastPush: (cb: (toast: { type: "info" | "success" | "error" | "progress"; message: string }) => void) => {
+    const handler = (_: Electron.IpcRendererEvent, toast: { type: "info" | "success" | "error" | "progress"; message: string }) => cb(toast);
+    ipcRenderer.on("toast:push", handler);
+    return () => ipcRenderer.removeListener("toast:push", handler);
+  },
+
   devtools: {
     isOpen: (): Promise<boolean> => ipcRenderer.invoke("devtools:is-open"),
     onChange: (cb: (open: boolean) => void) => {
