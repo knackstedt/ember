@@ -4,7 +4,7 @@ import path, { join } from "path";
 import { readFileSync, createReadStream, statSync, lstatSync, readlinkSync, unlinkSync, writeFileSync, existsSync, mkdirSync, readdirSync } from "fs";
 import { initDb } from "./db";
 import { registerIpcHandlers } from "./ipc";
-import { initInputSystem, destroyInputSystem, clearFailureCooldowns } from "./input/evdev";
+import { initInputSystem, destroyInputSystem, clearFailureCooldowns, triggerRescan } from "./input/evdev";
 import { getSettings, setSetting } from "./services/settings.service";
 import { setFlashThumbnailConcurrency } from "./services/flash-thumbnail.service";
 import { getWindowState, saveWindowState } from "./services/window-state.service";
@@ -589,6 +589,7 @@ app.whenReady().then(async () => {
 
   powerMonitor.on("resume", () => {
     clearFailureCooldowns();
+    triggerRescan();
   });
 
   app.on("activate", () => {

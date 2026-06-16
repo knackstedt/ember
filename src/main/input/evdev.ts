@@ -546,10 +546,12 @@ async function openDevice(
     });
 
     stream.on("error", (err) => {
-      if ((err as NodeJS.ErrnoException).code === "EACCES") {
-        recentFailures.set(eventPath, Date.now());
-      }
+      // EACCES on an already-open stream means the fd went stale
+      // (sleep/wake, USB re-enumeration). Don't put it on the long
+      // failure cooldown — the device should be retried immediately.
+      // Only initial open failures go into recentFailures.
       log.warn("evdev", `Error reading ${eventPath} (${info.name}): ${err}`);
+      stream.destroy();
       activeDevices.delete(eventPath);
       if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
         window.webContents.send("input:device-disconnected", { deviceId, controllerIdx });
@@ -582,6 +584,57 @@ async function openDevice(
   }
 }
 
+let targetWindow: BrowserWindow | null = null;
+
+async function scanDevices(): Promise<void> {
+  if (!targetWindow || targetWindow.isDestroyed()) return;
+
+  let entries: string[];
+  try {
+    entries = readdirSync(INPUT_DIR);
+  } catch {
+    return;
+  }
+
+  const eventDevices = entries
+    .filter((e) => e.startsWith("event"))
+    .map((e) => join(INPUT_DIR, e));
+
+  for (const device of eventDevices) {
+    if (activeDevices.has(device)) continue;
+    const lastFail = recentFailures.get(device);
+    if (lastFail && Date.now() - lastFail < FAILURE_COOLDOWN_MS) continue;
+
+    const info = getDeviceInfo(device);
+    if (!info) continue;
+    if (!hasControllerCapabilities(device, info.name)) continue;
+    try {
+      const handle = await withTimeout(
+        openDevice(device, targetWindow, info),
+        2000,
+        `openDevice(${device})`,
+      );
+      if (handle) {
+        activeDevices.set(device, handle);
+        recentFailures.delete(device);
+      }
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === "EACCES") {
+        recentFailures.set(device, Date.now());
+      }
+      log.warn("evdev", `Skipping ${device} due to timeout/error: ${err}`);
+    }
+  }
+
+  for (const [path] of activeDevices) {
+    if (!existsSync(path)) {
+      activeDevices.get(path)?.close();
+      activeDevices.delete(path);
+      recentFailures.delete(path);
+    }
+  }
+}
+
 function withTimeout<T>(
   promise: Promise<T>,
   ms: number,
@@ -604,52 +657,7 @@ export async function initInputSystem(window: BrowserWindow): Promise<void> {
     return;
   }
 
-  const scanDevices = async (): Promise<void> => {
-    let entries: string[];
-    try {
-      entries = readdirSync(INPUT_DIR);
-    } catch {
-      return;
-    }
-
-    const eventDevices = entries
-      .filter((e) => e.startsWith("event"))
-      .map((e) => join(INPUT_DIR, e));
-
-    for (const device of eventDevices) {
-      if (activeDevices.has(device)) continue;
-      const lastFail = recentFailures.get(device);
-      if (lastFail && Date.now() - lastFail < FAILURE_COOLDOWN_MS) continue;
-
-      const info = getDeviceInfo(device);
-      if (!info) continue;
-      if (!hasControllerCapabilities(device, info.name)) continue;
-      try {
-        const handle = await withTimeout(
-          openDevice(device, window, info),
-          2000,
-          `openDevice(${device})`,
-        );
-        if (handle) {
-          activeDevices.set(device, handle);
-          recentFailures.delete(device);
-        }
-      } catch (err) {
-        if ((err as NodeJS.ErrnoException).code === "EACCES") {
-          recentFailures.set(device, Date.now());
-        }
-        log.warn("evdev", `Skipping ${device} due to timeout/error: ${err}`);
-      }
-    }
-
-    for (const [path] of activeDevices) {
-      if (!existsSync(path)) {
-        activeDevices.get(path)?.close();
-        activeDevices.delete(path);
-        recentFailures.delete(path);
-      }
-    }
-  };
+  targetWindow = window;
 
   try {
     await withTimeout(scanDevices(), 5000, "scanDevices");
@@ -661,6 +669,13 @@ export async function initInputSystem(window: BrowserWindow): Promise<void> {
   } catch (err) {
     log.warn("evdev", `Initial device scan timed out: ${err}`);
   }
+}
+
+/** Trigger an immediate rescan (e.g. after system resume). */
+export function triggerRescan(): void {
+  scanDevices().catch((err) =>
+    log.warn("evdev", `triggerRescan error: ${err}`),
+  );
 }
 
 /** Clear all recent-failure cooldowns (call on system resume). */
