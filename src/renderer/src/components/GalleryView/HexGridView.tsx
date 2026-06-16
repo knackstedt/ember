@@ -481,7 +481,7 @@ export const HexGridView = React.forwardRef(function HexGridViewInner<T>(
         return nextIndex;
       },
     }),
-    [cols],
+    [cols, items.length],
   );
 
   const pairSize = 2 * cols - 1;
@@ -524,11 +524,6 @@ export const HexGridView = React.forwardRef(function HexGridViewInner<T>(
             overflow: "visible",
           }}
         >
-          {isEvenRow && rowItems.length < cols
-            ? Array.from({ length: cols - rowItems.length }, (_, i) => (
-                <div key={`spacer-${i}`} style={{ width: cellWidth, flexShrink: 0 }} />
-              ))
-            : null}
           {rowItems.map(({ item, index }) => {
             const hex = renderHexRef.current(item, index);
             const isFocused = index === focusedIndex;
