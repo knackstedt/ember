@@ -188,34 +188,26 @@ function isImageUniform(width: number, height: number, rgba: Buffer): boolean {
   return variance < 600;
 }
 
-function isSolidRegion(
+function regionEntropy(
   rgba: Buffer,
   width: number,
+  height: number,
   startY: number,
-  regionHeight: number,
-  ignoreX?: number,
-  ignoreY?: number,
-): boolean {
-  if (regionHeight <= 0 || width <= 0) return false;
-  const firstIdx = startY * width * 4;
-  const r = rgba[firstIdx];
-  const g = rgba[firstIdx + 1];
-  const b = rgba[firstIdx + 2];
-  let strayFound = false;
-  for (let y = startY; y < startY + regionHeight; y++) {
-    for (let x = 0; x < width; x++) {
+  lines: number,
+): number {
+  if (lines <= 0 || width <= 0) return 0;
+  const samples: number[] = [];
+  const stepX = Math.max(1, Math.floor(width / 16));
+  for (let y = startY; y < startY + lines && y < height; y++) {
+    for (let x = 0; x < width; x += stepX) {
       const idx = (y * width + x) * 4;
-      if (rgba[idx] === r && rgba[idx + 1] === g && rgba[idx + 2] === b) continue;
-      if (!strayFound && ignoreX !== undefined && ignoreY !== undefined) {
-        if (x === ignoreX && y === ignoreY && rgba[idx] === 255 && rgba[idx + 1] === 255 && rgba[idx + 2] === 255) {
-          strayFound = true;
-          continue;
-        }
-      }
-      return false;
+      const lum = 0.299 * rgba[idx] + 0.587 * rgba[idx + 1] + 0.114 * rgba[idx + 2];
+      samples.push(lum);
     }
   }
-  return true;
+  if (samples.length < 2) return 0;
+  const mean = samples.reduce((a, b) => a + b, 0) / samples.length;
+  return samples.reduce((sum, s) => sum + (s - mean) * (s - mean), 0) / samples.length;
 }
 
 function cropSolidDsScreens(
@@ -225,24 +217,28 @@ function cropSolidDsScreens(
   platform: string,
 ): { width: number; height: number; rgba: Buffer } {
   if (platform !== "nds" && platform !== "3ds") return { width, height, rgba };
+  if (height < 8) return { width, height, rgba };
+
   const halfHeight = Math.floor(height / 2);
-  if (halfHeight < 4) return { width, height, rgba };
-  const ignoreX = 0;
-  const ignoreY = halfHeight;
-  const topSolid = isSolidRegion(rgba, width, 0, halfHeight, ignoreX, ignoreY);
-  const bottomSolid = isSolidRegion(rgba, width, halfHeight, height - halfHeight, ignoreX, ignoreY);
-  if (topSolid && !bottomSolid) {
+  const topEntropy = regionEntropy(rgba, width, height, 0, halfHeight);
+  const bottomEntropy = regionEntropy(rgba, width, height, halfHeight, height - halfHeight);
+
+  // Default to the top screen. Only switch to the bottom screen if the
+  // top is essentially blank (very low variance) while the bottom has
+  // meaningful content.
+  const BLANK = 100;
+  const MEANINGFUL = 500;
+  if (topEntropy < BLANK && bottomEntropy > MEANINGFUL) {
     const newHeight = height - halfHeight;
     const cropped = Buffer.alloc(width * newHeight * 4);
     rgba.copy(cropped, 0, halfHeight * width * 4);
     return { width, height: newHeight, rgba: cropped };
   }
-  if (!topSolid && bottomSolid) {
-    const cropped = Buffer.alloc(width * halfHeight * 4);
-    rgba.copy(cropped, 0, 0, halfHeight * width * 4);
-    return { width, height: halfHeight, rgba: cropped };
-  }
-  return { width, height, rgba };
+
+  // Keep the top screen.
+  const cropped = Buffer.alloc(width * halfHeight * 4);
+  rgba.copy(cropped, 0, 0, halfHeight * width * 4);
+  return { width, height: halfHeight, rgba: cropped };
 }
 
 /* ------------------------------------------------------------------ */
