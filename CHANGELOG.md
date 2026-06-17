@@ -2,6 +2,33 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.2.1](https://github.com/knackstedt/ember/compare/v0.2.0...v0.2.1) (2026-06-17)
+
+
+### Features
+
+* **db:** add frontpageEnabled default to streaming service normalization ([a207c93](https://github.com/knackstedt/ember/commit/a207c93b96dd28b7b9f6f397d66021a668135d8c))
+* **input:** add controller alias support, touchpad input handling, and expand controller compatibility ([0242cb8](https://github.com/knackstedt/ember/commit/0242cb87cf01a094d4cffab06871297a2ef01b34))
+* **input:** improve evdev device recovery after system sleep/wake with immediate rescan ([18583cb](https://github.com/knackstedt/ember/commit/18583cbd6d2d428c6be5afe8afb08f6ce52dc6d3))
+* **launcher:** add Steam game process tracking with playtime, window management, and auto-shutdown ([cb5f96e](https://github.com/knackstedt/ember/commit/cb5f96e491eacaca4118f4c8c00080ec69b5c241))
+* **libretro:** add audio mute support and automated thumbnail capture with fallback frame extraction ([09d746c](https://github.com/knackstedt/ember/commit/09d746caf6118dae7e8b00d38fd6a77fe6f37f3a))
+* **libretro:** add automatic dual-screen cropping for NDS/3DS thumbnails with solid region detection ([2953ffd](https://github.com/knackstedt/ember/commit/2953ffdf32a5700f2ff4d383df3eec3120437e6e))
+* **libretro:** add mouse/pointer input support with analog stick mapping and touch controls for NDS emulation ([f92b477](https://github.com/knackstedt/ember/commit/f92b47746f91261e3cd8bd00d905d87f813b2679))
+* **libretro:** add panic recovery to audio callbacks, optimize buffer operations, add audio toggle, and improve thumbnail generation with multi-core fallback ([556a223](https://github.com/knackstedt/ember/commit/556a22323698c26ce319b616508483742e5771d4))
+* **libretro:** replace solid region detection with entropy-based screen selection for NDS/3DS thumbnails ([90fd3f9](https://github.com/knackstedt/ember/commit/90fd3f9a4163bd95eac21c97755ec0081b6e345f))
+* **repo:** add GitHub issue templates, PR template, contributing guide, code of conduct, and install script ([6719e8b](https://github.com/knackstedt/ember/commit/6719e8b2c07134d18aa4bcdda84b6cb8ebdec116))
+* **settings:** add gamePaths configuration for custom game directories and improve scanner path handling ([6b76d02](https://github.com/knackstedt/ember/commit/6b76d02070537caa187b563766cc94cb85f3e070))
+* **ui:** add focus trap hook, skeleton loading states, and conditional player rendering ([1d61b77](https://github.com/knackstedt/ember/commit/1d61b777b8d7e229e4ea4afbcf02533a065f0843))
+* **ui:** add ImageLightbox component with keyboard/gamepad navigation and integrate into gaming tab screenshots ([73717d3](https://github.com/knackstedt/ember/commit/73717d3052bb4ac0189665d158bf473ad8a0a3e6))
+* **ui:** fix HexGridView navigation dependency and remove unnecessary spacer elements ([9fe6e85](https://github.com/knackstedt/ember/commit/9fe6e8509c4819a5bdc327b0035a9be21621cc56))
+* **video:** add mpv-based video decoder with hardware acceleration, subtitle/audio track support, and playback controls ([214a15f](https://github.com/knackstedt/ember/commit/214a15f48439a03f9330186eab5dc3396b562b01))
+* **website:** replace MDX splash page with custom Astro landing page ([8a31bcb](https://github.com/knackstedt/ember/commit/8a31bcbbbb9cd6ef998e3c607d2ca94321582381))
+
+
+### Bug Fixes
+
+* **video:** replace nullish coalescing with logical OR for probe title fallback ([c5d720a](https://github.com/knackstedt/ember/commit/c5d720af1dcf53e981d9fe6297b0474a9055ad76))
+
 ## [0.2.0](https://github.com/knackstedt/ember/compare/v0.1.1...v0.2.0) (2026-06-14)
 
 
