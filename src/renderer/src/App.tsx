@@ -141,10 +141,12 @@ export default function App(): React.ReactElement {
   const pluginOpen = usePluginPlayerStore((s) => s.open);
   const libretroOpen = useLibretroPlayerStore((s) => s.open);
   const anyEmulatorOpen = flashOpen || jsnesOpen || pluginOpen || libretroOpen;
+  const [gameRunning, setGameRunning] = useState(false);
+  const gameRunningRef = useRef(false);
 
   /* Controller cursors — always call hook, control via `enabled` */
   const [activeTab, setActiveTab] = useState<TabId>("gaming");
-  useBrowserControllerNav({ enabled: !loading && !anyEmulatorOpen, evdevActive: inputDevices.length > 0 });
+  useBrowserControllerNav({ enabled: !loading && !anyEmulatorOpen && !gameRunning, evdevActive: inputDevices.length > 0 });
   const activeTabRef = useRef<TabId>(activeTab);
   activeTabRef.current = activeTab;
   const [evdevGamepadActive, setEvdevGamepadActive] = useState(false);
@@ -237,7 +239,7 @@ export default function App(): React.ReactElement {
   executeCommandRef.current = executeCommand;
 
   // Fallback gamepad input via browser Gamepad API (works without evdev permissions)
-  useGamepadApi(!anyEmulatorOpen && inputDevices.length === 0 && !evdevGamepadActive, activeTab);
+  useGamepadApi(!anyEmulatorOpen && !gameRunning && inputDevices.length === 0 && !evdevGamepadActive, activeTab);
 
   useEffect(() => {
     load();
@@ -325,7 +327,19 @@ export default function App(): React.ReactElement {
       useLibretroPlayerStore.getState().launch(opts);
     });
 
-    return () => { unsubScan(); unsubCores(); unsubHook(); unsubToast(); unsubLibretro(); };
+    const unsubGameStarted = window.htpc.onGameStarted((gameId) => {
+      gameRunningRef.current = true;
+      setGameRunning(true);
+      console.log(`[renderer] External game started: ${gameId}`);
+    });
+
+    const unsubGameStopped = window.htpc.onGameStopped((gameId) => {
+      gameRunningRef.current = false;
+      setGameRunning(false);
+      console.log(`[renderer] External game stopped: ${gameId}`);
+    });
+
+    return () => { unsubScan(); unsubCores(); unsubHook(); unsubToast(); unsubLibretro(); unsubGameStarted(); unsubGameStopped(); };
   }, []);
 
   useEffect(() => {
@@ -461,6 +475,11 @@ export default function App(): React.ReactElement {
       if (ev.source === "gamepad" && !evdevGamepadActiveRef.current) {
         evdevGamepadActiveRef.current = true;
         setEvdevGamepadActive(true);
+      }
+
+      // When an external game is running, suppress all controller navigation in Ember
+      if (gameRunningRef.current) {
+        return;
       }
 
       // When an emulator has focus, only allow mapped controller keybinds

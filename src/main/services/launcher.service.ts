@@ -1,5 +1,6 @@
 import { spawn, spawnSync, ChildProcess } from "child_process";
-import { existsSync } from "fs";
+import { existsSync, readdirSync, readFileSync } from "fs";
+import { BrowserWindow } from "electron";
 import { Game, Movie, MusicTrack } from "../../shared/types";
 import { createLogger } from "../util/logger";
 import { GameRepo } from "../db/repository";
@@ -11,6 +12,135 @@ const log = createLogger("info");
 
 const activeProcesses = new Map<string, ChildProcess>();
 const playTimeTimers = new Map<string, { startTime: number; timer: NodeJS.Timeout }>();
+
+/** Steam launch tracking — remembers whether steam was running before we started */
+const steamLaunchState = new Map<string, { wasRunning: boolean; isFlatpak: boolean }>();
+
+function getMainWindow(): BrowserWindow | null {
+  const wins = BrowserWindow.getAllWindows();
+  return wins.find((w) => !w.isDestroyed()) ?? null;
+}
+
+function sendGameStarted(gameId: string): void {
+  const win = getMainWindow();
+  if (win && !win.isDestroyed() && !win.webContents.isDestroyed()) {
+    win.webContents.send("game:started", gameId);
+  }
+}
+
+function sendGameStopped(gameId: string): void {
+  const win = getMainWindow();
+  if (win && !win.isDestroyed() && !win.webContents.isDestroyed()) {
+    win.webContents.send("game:stopped", gameId);
+  }
+}
+
+function minimizeWindow(): void {
+  const win = getMainWindow();
+  if (win && !win.isDestroyed()) {
+    win.minimize();
+  }
+}
+
+function restoreAndFocusWindow(): void {
+  const win = getMainWindow();
+  if (win && !win.isDestroyed()) {
+    if (win.isMinimized()) win.restore();
+    win.focus();
+  }
+}
+
+function isSteamRunning(): boolean {
+  try {
+    const result = spawnSync("sh", ["-c", "pgrep -x steam || pidof steam"], { stdio: "pipe" });
+    if (result.status === 0) {
+      const pids = result.stdout.toString().trim().split(/\s+/).filter(Boolean);
+      return pids.length > 0;
+    }
+  } catch {
+    // ignore
+  }
+  return false;
+}
+
+function findSteamGamePid(steamAppId: number): number | null {
+  try {
+    const entries = readdirSync("/proc");
+    for (const entry of entries) {
+      const pid = parseInt(entry, 10);
+      if (isNaN(pid)) continue;
+      try {
+        const environ = readFileSync(`/proc/${pid}/environ`, "utf8");
+        if (
+          environ.includes(`SteamAppId=${steamAppId}`) ||
+          environ.includes(`SteamGameId=${steamAppId}`)
+        ) {
+          return pid;
+        }
+      } catch {
+        // ignore unreadable /proc entries (kernel threads, exited processes, etc.)
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+async function waitForSteamGamePid(steamAppId: number): Promise<number | null> {
+  const start = Date.now();
+
+  // Phase 1: rapid polling for 2 minutes (covers most native launches)
+  const fastDeadline = start + 120_000;
+  while (Date.now() < fastDeadline) {
+    const pid = findSteamGamePid(steamAppId);
+    if (pid !== null) return pid;
+    await new Promise((r) => setTimeout(r, 500));
+  }
+
+  // Phase 2: slow polling every 15s for the next 10 minutes (covers Proton shader compilation)
+  const slowDeadline = start + 720_000; // 12 minutes total
+  while (Date.now() < slowDeadline) {
+    const pid = findSteamGamePid(steamAppId);
+    if (pid !== null) return pid;
+    await new Promise((r) => setTimeout(r, 15_000));
+  }
+
+  return null;
+}
+
+async function pollProcUntilGone(pid: number, intervalMs = 2000): Promise<void> {
+  return new Promise((resolve) => {
+    const check = () => {
+      try {
+        process.kill(pid, 0);
+        // process still alive
+        setTimeout(check, intervalMs);
+      } catch {
+        resolve();
+      }
+    };
+    check();
+  });
+}
+
+function shutdownSteam(isFlatpak: boolean): void {
+  if (isFlatpak) {
+    const proc = spawn("flatpak", ["run", "com.valvesoftware.Steam", "-shutdown"], {
+      detached: true,
+      stdio: "ignore",
+    });
+    proc.unref();
+    log.info("launcher", "Sent shutdown to Flatpak Steam");
+  } else {
+    const proc = spawn("steam", ["-shutdown"], {
+      detached: true,
+      stdio: "ignore",
+    });
+    proc.unref();
+    log.info("launcher", "Sent shutdown to Steam");
+  }
+}
 
 /** Prefer compressed ROM if available and valid, otherwise fall back to romPath */
 function resolveRomPath(game: Game): string | undefined {
@@ -72,13 +202,13 @@ function isSystemDolphinInstalled(): boolean {
   return result.status === 0;
 }
 
-function findSteamCommand(): { cmd: string; args: string[] } | null {
+function findSteamCommand(): { cmd: string; args: string[]; isFlatpak: boolean } | null {
   // Prefer native Steam binary in PATH
   const steamInPath = spawnSync("sh", ["-c", "command -v steam"], {
     stdio: "ignore",
   });
   if (steamInPath.status === 0) {
-    return { cmd: "steam", args: ["-silent"] };
+    return { cmd: "steam", args: ["-silent"], isFlatpak: false };
   }
 
   // Fall back to Flatpak Steam
@@ -96,6 +226,7 @@ function findSteamCommand(): { cmd: string; args: string[] } | null {
         return {
           cmd: "flatpak",
           args: ["run", "com.valvesoftware.Steam", "-silent"],
+          isFlatpak: true,
         };
       }
     } catch {
@@ -182,10 +313,17 @@ export async function launchGame(game: Game): Promise<void> {
         );
       }
       const steam = findSteamCommand();
-      const steamCmd = steam?.cmd ?? "xdg-open";
-      const steamArgs = steam
-        ? [...steam.args, `steam://rungameid/${game.steamAppId}`]
-        : [`steam://rungameid/${game.steamAppId}`];
+      if (!steam) {
+        return Promise.reject(
+          new Error(`Steam not found. Install native Steam or Flatpak Steam (com.valvesoftware.Steam).`),
+        );
+      }
+
+      const wasRunning = isSteamRunning();
+      steamLaunchState.set(game.id, { wasRunning, isFlatpak: steam.isFlatpak });
+
+      const steamCmd = steam.cmd;
+      const steamArgs = [...steam.args, "-applaunch", String(game.steamAppId)];
 
       log.info(
         "launcher",
@@ -204,14 +342,50 @@ export async function launchGame(game: Game): Promise<void> {
       });
       steamProc.unref();
 
-      // Steam dispatcher exits immediately; we cannot track lifetime.
-      // Fire after-start immediately and document that after-close/after-crash
-      // are not supported for steam:// launches.
-      void runSessionHooks(game, "after-start");
-      GameRepo.setLastPlayed(game.id, Date.now()).catch((err) => {
-        log.warn("launcher", `Failed to set lastPlayed for ${game.id}: ${err}`);
-      });
+      // Wait for the actual game process to appear in /proc, then track its lifetime
+      (async () => {
+        log.info("launcher", `Waiting for Steam game ${game.steamAppId} to start…`);
+        const gamePid = await waitForSteamGamePid(game.steamAppId);
+        if (gamePid === null) {
+          log.warn("launcher", `Timed out waiting for Steam game ${game.steamAppId} process; playtime tracking disabled.`);
+          void runSessionHooks(game, "after-start");
+          GameRepo.setLastPlayed(game.id, Date.now()).catch((err) => {
+            log.warn("launcher", `Failed to set lastPlayed for ${game.id}: ${err}`);
+          });
+          return;
+        }
 
+        log.info("launcher", `Detected Steam game PID ${gamePid} for AppID ${game.steamAppId}`);
+        startPlayTimeTracking(game.id);
+        void runSessionHooks(game, "after-start");
+        sendGameStarted(game.id);
+        minimizeWindow();
+
+        try {
+          await pollProcUntilGone(gamePid, 2000);
+          log.info("launcher", `Steam game ${game.steamAppId} (PID ${gamePid}) has exited.`);
+        } catch (err) {
+          log.error("launcher", `Error polling Steam game ${game.steamAppId}: ${err}`);
+        } finally {
+          stopPlayTimeTracking(game.id);
+          sendGameStopped(game.id);
+          restoreAndFocusWindow();
+
+          const launchState = steamLaunchState.get(game.id);
+          steamLaunchState.delete(game.id);
+          if (launchState && !launchState.wasRunning) {
+            log.info("launcher", "Steam was not running before launch; shutting it down.");
+            shutdownSteam(launchState.isFlatpak);
+          }
+
+          void runSessionHooks(game, "after-close");
+          GameRepo.setLastPlayed(game.id, Date.now()).catch((err) => {
+            log.warn("launcher", `Failed to set lastPlayed for ${game.id}: ${err}`);
+          });
+        }
+      })();
+
+      // Return immediately so the UI isn't blocked
       return Promise.resolve();
     }
     case "dolphin-gc":

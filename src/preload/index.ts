@@ -878,6 +878,18 @@ const htpc = {
     return () => ipcRenderer.removeListener("toast:push", handler);
   },
 
+  onGameStarted: (cb: (gameId: string) => void) => {
+    const handler = (_: Electron.IpcRendererEvent, gameId: string) => cb(gameId);
+    ipcRenderer.on("game:started", handler);
+    return () => ipcRenderer.removeListener("game:started", handler);
+  },
+
+  onGameStopped: (cb: (gameId: string) => void) => {
+    const handler = (_: Electron.IpcRendererEvent, gameId: string) => cb(gameId);
+    ipcRenderer.on("game:stopped", handler);
+    return () => ipcRenderer.removeListener("game:stopped", handler);
+  },
+
   devtools: {
     isOpen: (): Promise<boolean> => ipcRenderer.invoke("devtools:is-open"),
     onChange: (cb: (open: boolean) => void) => {
