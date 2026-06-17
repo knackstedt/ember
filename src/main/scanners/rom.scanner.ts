@@ -174,7 +174,7 @@ function getRetroarchContentDir(): string | null {
   return null;
 }
 
-export function scanRomGames(): Game[] {
+export function scanRomGames(romPaths: string[] = []): Game[] {
   const roots = [
     join(homedir(), "Roms"),
     join(homedir(), "ROMs"),
@@ -183,6 +183,7 @@ export function scanRomGames(): Game[] {
     join(homedir(), "roms"),
     join(homedir(), "Emulation", "roms"),
     join(homedir(), "retropie", "roms"),
+    ...romPaths,
   ].filter(existsSync);
 
   const retroarchDir = getRetroarchContentDir();

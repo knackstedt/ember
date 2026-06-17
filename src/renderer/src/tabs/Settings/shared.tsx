@@ -101,6 +101,7 @@ export function PathList({
   hint?: string;
 }): React.ReactElement {
   const [newPath, setNewPath] = useState("");
+  const safePaths = paths ?? [];
   return (
     <div className="flex flex-col gap-2">
       <label
@@ -120,7 +121,7 @@ export function PathList({
           ↪ auto-scans: {hint}
         </p>
       )}
-      {paths.map((p, i) => (
+      {safePaths.map((p, i) => (
         <div key={i} className="flex gap-2 items-center">
           <span
             className="flex-1 text-sm px-3 py-1.5 rounded"
@@ -134,7 +135,7 @@ export function PathList({
             {p}
           </span>
           <button
-            onClick={() => onChange(paths.filter((_, j) => j !== i))}
+            onClick={() => onChange(safePaths.filter((_, j) => j !== i))}
             className="px-2 py-1 text-xs rounded"
             style={{
               background: "#ff444420",
@@ -161,7 +162,7 @@ export function PathList({
           }}
           onKeyDown={(e) => {
             if (e.key === "Enter" && newPath.trim()) {
-              onChange([...paths, newPath.trim()]);
+              onChange([...safePaths, newPath.trim()]);
               setNewPath("");
             }
           }}
@@ -174,7 +175,7 @@ export function PathList({
           }}
           onClick={() => {
             if (newPath.trim()) {
-              onChange([...paths, newPath.trim()]);
+              onChange([...safePaths, newPath.trim()]);
               setNewPath("");
             }
           }}
@@ -191,7 +192,7 @@ export function PathList({
           }}
           onClick={async () => {
             const dir = await window.htpc.openDirectory();
-            if (dir) onChange([...paths, dir]);
+            if (dir) onChange([...safePaths, dir]);
           }}
           whileTap={{ scale: 0.96 }}
         >

@@ -149,7 +149,7 @@ export function scanFlashGames(): Game[] {
       const title = swfMeta.title && swfMeta.title.length > 0 && !isGenericFlexTitle && !isGenericActionScriptTitle ? swfMeta.title : fileTitle;
       const id = hashId("flash", fullPath);
 
-      log.info("flash", `found ${title} → ${id} path: ${fullPath}`);
+      // log.info("flash", `found ${title} → ${id} path: ${fullPath}`);
 
       games.push({
         id,

@@ -464,6 +464,8 @@ export interface AppSettings {
   defaultEmulatorShader?: string;
   /** Extra directories to scan for ROMs */
   romPaths?: string[];
+  /** Extra directories to scan for games (PC / native / Dolphin) */
+  gamePaths?: string[];
   /** Extra directories to scan for movies */
   moviePaths?: string[];
   /** Extra directories to scan for music */

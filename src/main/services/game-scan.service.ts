@@ -14,6 +14,7 @@ import { scanWindowsGames } from "../scanners/windows.scanner";
 import { scanItchGames } from "../scanners/itch.scanner";
 import { Game } from "../../shared/types";
 import { createLogger } from "../util/logger";
+import { getSettings } from "./settings.service";
 import { calculateCRC32, calculateMD5, calculateSHA1, getRomHashes } from "./metadata/datfiles.service";
 
 const log = createLogger("info");
@@ -233,12 +234,17 @@ async function scanInMainThread(
     }
   };
 
+  const settings = await getSettings();
+  const romPaths = settings.romPaths ?? [];
+  const gamePaths = settings.gamePaths ?? [];
+  const dolphinExtra = [...gamePaths, ...romPaths];
+
   report("steam", 0, 0, "scanning");
   const steam = scanSteamGames();
   report("steam", steam.length, steam.length, "done");
 
   report("dolphin", 0, 0, "scanning");
-  const dolphin = scanDolphinGames(extraPaths);
+  const dolphin = scanDolphinGames(dolphinExtra);
   report("dolphin", dolphin.length, dolphin.length, "done");
 
   const heroic = scanHeroicGames();
@@ -246,7 +252,7 @@ async function scanInMainThread(
   const desktop = scanDesktopGames();
 
   const flash = scanFlashGames();
-  const roms = scanRomGames();
+  const roms = scanRomGames(romPaths);
   const v86 = scanV86Games();
   const windows = scanWindowsGames();
   const itch = scanItchGames();
@@ -286,6 +292,10 @@ export async function performGameScan(
     );
     return scanInMainThread(window, extraPaths);
   }
+
+  const settings = await getSettings();
+  const romPaths = settings.romPaths ?? [];
+  const gamePaths = settings.gamePaths ?? [];
 
   return new Promise((resolve, reject) => {
     const worker = new Worker(workerPath);
@@ -334,6 +344,6 @@ export async function performGameScan(
       reject(err);
     });
 
-    worker.postMessage(extraPaths);
+    worker.postMessage({ extraPaths, romPaths, gamePaths });
   });
 }

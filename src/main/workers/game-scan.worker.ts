@@ -8,8 +8,10 @@ import { scanRomGames } from "../scanners/rom.scanner";
 import { scanV86Games } from "../scanners/v86.scanner";
 import { scanWindowsGames } from "../scanners/windows.scanner";
 
-parentPort?.once("message", (extraPaths?: string[]) => {
+parentPort?.once("message", ({ extraPaths, romPaths, gamePaths }: { extraPaths?: string[]; romPaths?: string[]; gamePaths?: string[] } = {}) => {
   try {
+    const dolphinExtra = [...(gamePaths ?? []), ...(romPaths ?? [])];
+
     parentPort?.postMessage({
       type: "progress",
       scanner: "steam",
@@ -33,7 +35,7 @@ parentPort?.once("message", (extraPaths?: string[]) => {
       total: 0,
       status: "scanning",
     });
-    const dolphin = scanDolphinGames(extraPaths);
+    const dolphin = scanDolphinGames(dolphinExtra);
     parentPort?.postMessage({
       type: "progress",
       scanner: "dolphin",
@@ -46,7 +48,7 @@ parentPort?.once("message", (extraPaths?: string[]) => {
     const lutris = scanLutrisGames();
     const desktop = scanDesktopGames();
     const flash = scanFlashGames();
-    const roms = scanRomGames();
+    const roms = scanRomGames(romPaths);
     const v86 = scanV86Games();
     const windows = scanWindowsGames();
 

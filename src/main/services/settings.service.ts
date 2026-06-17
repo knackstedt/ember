@@ -8,6 +8,7 @@ const DEFAULTS: AppSettings = {
   moviePaths: [],
   musicPaths: [],
   romPaths: [],
+  gamePaths: [],
   disabledTabs: [],
   dailyBackground: { enabled: false, source: "bing" },
   background: "theme",

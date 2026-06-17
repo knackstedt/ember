@@ -77,8 +77,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   load: async () => {
     try {
       const s = await window.htpc.settings.get();
-      document.documentElement.setAttribute("data-theme", s.theme);
-      set({ settings: s, loading: false });
+      const merged = { ...defaults, ...s };
+      document.documentElement.setAttribute("data-theme", merged.theme);
+      set({ settings: merged, loading: false });
     } catch {
       document.documentElement.setAttribute("data-theme", defaults.theme);
       set({ settings: defaults, loading: false });
