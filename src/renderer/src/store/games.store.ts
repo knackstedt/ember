@@ -40,6 +40,39 @@ interface GamesState {
   filtered: () => Game[];
 }
 
+function shallowEqualGame(a: Game, b: Game): boolean {
+  const keys = Object.keys(a) as (keyof Game)[];
+  for (const key of keys) {
+    if (key === "tags" || key === "sessionHooks") {
+      if (JSON.stringify(a[key]) !== JSON.stringify(b[key])) return false;
+    } else if (a[key] !== b[key]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function mergeGames(existing: Game[], incoming: Game[]): Game[] {
+  if (existing.length === 0) return incoming;
+  const existingMap = new Map(existing.map((g) => [g.id, g]));
+  const nextGames: Game[] = [];
+  let changed = false;
+  for (const incomingGame of incoming) {
+    const existingGame = existingMap.get(incomingGame.id);
+    if (!existingGame) {
+      nextGames.push(incomingGame);
+      changed = true;
+    } else if (!shallowEqualGame(existingGame, incomingGame)) {
+      nextGames.push(incomingGame);
+      changed = true;
+    } else {
+      nextGames.push(existingGame);
+    }
+  }
+  if (!changed && nextGames.length === existing.length) return existing;
+  return nextGames;
+}
+
 export const useGamesStore = create<GamesState>((set, get) => ({
   games: [],
   loading: false,
@@ -56,7 +89,10 @@ export const useGamesStore = create<GamesState>((set, get) => ({
     set({ loading: true });
     try {
       const games = await window.htpc.games.list();
-      set({ games, loading: false });
+      set((state) => ({
+        games: mergeGames(state.games, games),
+        loading: false,
+      }));
     } catch {
       set({ loading: false });
     }
@@ -262,3 +298,21 @@ export const useGamesStore = create<GamesState>((set, get) => ({
     return result;
   },
 }));
+
+// Listen for background scan triggers from main process
+if (window.htpc.onScanTrigger) {
+  window.htpc.onScanTrigger((payload) => {
+    if (payload.types.includes("games")) {
+      void useGamesStore.getState().scan();
+    }
+  });
+}
+
+// Refresh store when a background scan completes (catches missing marks)
+if (window.htpc.onBackgroundScanComplete) {
+  window.htpc.onBackgroundScanComplete((payload) => {
+    if (payload.type === "games") {
+      void useGamesStore.getState().load();
+    }
+  });
+}

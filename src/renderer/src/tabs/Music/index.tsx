@@ -992,7 +992,7 @@ export const MusicTab: React.FC = () => {
               minItemWidth={180}
               onColumnCountChange={setTrackColumnCount}
               rowHeight={240}
-              renderItem={renderTrackItem}
+              renderHex={renderTrackItem}
               focusedIndex={trackFocusedIndex}
               scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
             />

@@ -3,6 +3,72 @@ import { Movie, MusicTrack, TVShow } from "../../../shared/types";
 import { useMusicPlayerStore } from "./musicPlayer.store";
 import { useCoverCacheStore } from "./coverCache.store";
 
+function shallowEqualMovie(a: Movie, b: Movie): boolean {
+  const keys = Object.keys(a) as (keyof Movie)[];
+  for (const key of keys) {
+    if (key === "tags" || key === "genres") {
+      if (JSON.stringify(a[key]) !== JSON.stringify(b[key])) return false;
+    } else if (a[key] !== b[key]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function mergeMovies(existing: Movie[], incoming: Movie[]): Movie[] {
+  if (existing.length === 0) return incoming;
+  const existingMap = new Map(existing.map((m) => [m.id, m]));
+  const nextMovies: Movie[] = [];
+  let changed = false;
+  for (const incomingMovie of incoming) {
+    const existingMovie = existingMap.get(incomingMovie.id);
+    if (!existingMovie) {
+      nextMovies.push(incomingMovie);
+      changed = true;
+    } else if (!shallowEqualMovie(existingMovie, incomingMovie)) {
+      nextMovies.push(incomingMovie);
+      changed = true;
+    } else {
+      nextMovies.push(existingMovie);
+    }
+  }
+  if (!changed && nextMovies.length === existing.length) return existing;
+  return nextMovies;
+}
+
+function shallowEqualTrack(a: MusicTrack, b: MusicTrack): boolean {
+  const keys = Object.keys(a) as (keyof MusicTrack)[];
+  for (const key of keys) {
+    if (key === "tags") {
+      if (JSON.stringify(a[key]) !== JSON.stringify(b[key])) return false;
+    } else if (a[key] !== b[key]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function mergeTracks(existing: MusicTrack[], incoming: MusicTrack[]): MusicTrack[] {
+  if (existing.length === 0) return incoming;
+  const existingMap = new Map(existing.map((t) => [t.id, t]));
+  const nextTracks: MusicTrack[] = [];
+  let changed = false;
+  for (const incomingTrack of incoming) {
+    const existingTrack = existingMap.get(incomingTrack.id);
+    if (!existingTrack) {
+      nextTracks.push(incomingTrack);
+      changed = true;
+    } else if (!shallowEqualTrack(existingTrack, incomingTrack)) {
+      nextTracks.push(incomingTrack);
+      changed = true;
+    } else {
+      nextTracks.push(existingTrack);
+    }
+  }
+  if (!changed && nextTracks.length === existing.length) return existing;
+  return nextTracks;
+}
+
 interface MoviesState {
   movies: Movie[];
   loading: boolean;
@@ -41,8 +107,15 @@ export const useMoviesStore = create<MoviesState>((set, get) => ({
 
   load: async () => {
     set({ loading: true });
-    const movies = await window.htpc.movies.list().catch(() => []);
-    set({ movies, loading: false });
+    try {
+      const movies = await window.htpc.movies.list().catch(() => []);
+      set((state) => ({
+        movies: mergeMovies(state.movies, movies),
+        loading: false,
+      }));
+    } catch {
+      set({ loading: false });
+    }
   },
 
   scan: async () => {
@@ -204,8 +277,15 @@ export const useMusicStore = create<MusicState>((set, get) => ({
 
   load: async () => {
     set({ loading: true });
-    const tracks = await window.htpc.music.list().catch(() => []);
-    set({ tracks, loading: false });
+    try {
+      const tracks = await window.htpc.music.list().catch(() => []);
+      set((state) => ({
+        tracks: mergeTracks(state.tracks, tracks),
+        loading: false,
+      }));
+    } catch {
+      set({ loading: false });
+    }
   },
 
   scan: async () => {
@@ -444,3 +524,27 @@ export const useTvStore = create<TvState>((set, get) => ({
     return r.filter((s) => s.title.toLowerCase().includes(q));
   },
 }));
+
+// Listen for background scan triggers from main process
+if (window.htpc.onScanTrigger) {
+  window.htpc.onScanTrigger((payload) => {
+    if (payload.types.includes("movies")) {
+      void useMoviesStore.getState().scan();
+    }
+    if (payload.types.includes("music")) {
+      void useMusicStore.getState().scan();
+    }
+  });
+}
+
+// Refresh stores when a background scan completes (catches missing marks)
+if (window.htpc.onBackgroundScanComplete) {
+  window.htpc.onBackgroundScanComplete((payload) => {
+    if (payload.type === "movies") {
+      void useMoviesStore.getState().load();
+    }
+    if (payload.type === "music") {
+      void useMusicStore.getState().load();
+    }
+  });
+}

@@ -38,6 +38,19 @@
   box-shadow: 0 0 0 2px var(--color-accent), rgba(0, 0, 0, 0.8) calc((var(--pointer-from-left) * 10px) - 3px) calc((var(--pointer-from-top) * 20px) - 6px) 20px -5px;
 }
 
+.gc-card-wrapper.gc-missing .gc-card {
+  box-shadow: 0 0 0 2px #ff2222, rgba(0, 0, 0, 0.8) calc((var(--pointer-from-left) * 10px) - 3px) calc((var(--pointer-from-top) * 20px) - 6px) 20px -5px;
+}
+
+.gc-missing-badge {
+  animation: gc-missing-pulse 2s ease-in-out infinite;
+}
+
+@keyframes gc-missing-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
 .gc-behind {
   position: absolute;
   inset: 0;

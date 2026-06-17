@@ -427,6 +427,12 @@ const AddRemoteSourceModal: React.FC<AddRemoteSourceModalProps> = ({ onClose, on
       );
       onAdded();
       onClose();
+      // Trigger background scans for the source's media types
+      for (const type of mediaTypes) {
+        if (type === "movie") void window.htpc.movies.scan();
+        if (type === "music") void window.htpc.music.scan();
+        if (type === "rom") void window.htpc.games.scan();
+      }
     } catch (err) {
       setError(String(err));
     } finally {

@@ -185,7 +185,7 @@ export const GameCard: React.FC<GameCardProps> = React.memo(({
 
   return (
     <motion.div
-      className={`gc-card-wrapper ${isFocused ? "focused" : ""}`}
+      className={`gc-card-wrapper ${isFocused ? "focused" : ""} ${missing ? "gc-missing" : ""}`}
       style={cardStyle}
       whileTap={{ scale: 0.96 }}
       onClick={onSelect}
@@ -237,13 +237,17 @@ export const GameCard: React.FC<GameCardProps> = React.memo(({
 
               {missing && (
                 <span
-                  className="gc-badge"
+                  className="gc-badge gc-missing-badge"
                   style={{
-                    backgroundColor: "#ff4444",
+                    backgroundColor: "#ff2222",
                     color: "#ffffff",
+                    boxShadow: "0 0 8px #ff2222",
+                    fontSize: "11px",
+                    fontWeight: 800,
+                    letterSpacing: "0.08em",
                   }}
                 >
-                  Missing
+                  MISSING
                 </span>
               )}
               {!missing && badge && (

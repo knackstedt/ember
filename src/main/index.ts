@@ -585,6 +585,15 @@ app.whenReady().then(async () => {
 
   await createWindow();
 
+  // Trigger background scans after the window is ready so the renderer
+  // can show cached data immediately and refresh when scans complete.
+  setTimeout(() => {
+    const win = getMainWindow();
+    if (win && !win.isDestroyed() && !win.webContents.isDestroyed()) {
+      win.webContents.send("scan:trigger", { types: ["games", "movies", "music"] });
+    }
+  }, 2000);
+
   startRemoteAvailabilityWorker();
 
   powerMonitor.on("resume", () => {

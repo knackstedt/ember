@@ -261,7 +261,11 @@ export const MusicRepo = {
   async list(): Promise<MusicTrack[]> {
     const db = getDb();
     const result = await db.query<[MusicTrack[]]>("SELECT * FROM music_track ORDER BY title ASC");
-    return (result[0] ?? []) as MusicTrack[];
+    const tracks = (result[0] ?? []) as MusicTrack[];
+    for (const t of tracks) {
+      t.id = extractRecordId(t.id);
+    }
+    return tracks;
   },
 
   async upsert(track: MusicTrack): Promise<void> {

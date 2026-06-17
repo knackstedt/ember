@@ -89,7 +89,9 @@ export const MediaCard: React.FC<MediaCardProps> = React.memo(({
         ${
           isFocused
             ? "ring-2 ring-accent shadow-glow"
-            : "ring-1 ring-border"
+            : missing
+              ? "ring-2 ring-[#ff2222]"
+              : "ring-1 ring-border"
         }
         hover:ring-2 hover:ring-accent hover:shadow-glow
       `}
@@ -137,13 +139,14 @@ export const MediaCard: React.FC<MediaCardProps> = React.memo(({
 
         {missing && (
           <span
-            className="absolute top-2 left-2 px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wide"
+            className="absolute top-2 left-2 px-2 py-0.5 rounded text-xs font-extrabold uppercase tracking-wider"
             style={{
-              backgroundColor: "#ff4444",
+              backgroundColor: "#ff2222",
               color: "#ffffff",
+              boxShadow: "0 0 8px #ff2222",
             }}
           >
-            Missing
+            MISSING
           </span>
         )}
         {!missing && badge && (

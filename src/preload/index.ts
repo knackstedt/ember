@@ -658,6 +658,8 @@ const htpc = {
     clear: (): Promise<boolean> => ipcRenderer.invoke("db:clear"),
     clearAll: (): Promise<boolean> => ipcRenderer.invoke("db:clear-all"),
     wipeThumbnails: (): Promise<boolean> => ipcRenderer.invoke("db:wipe-thumbnails"),
+    deleteMissing: (): Promise<{ games: number; movies: number; music: number }> =>
+      ipcRenderer.invoke("db:delete-missing"),
   },
 
   openDirectory: (): Promise<string | null> =>
@@ -851,6 +853,18 @@ const htpc = {
     const handler = (_: Electron.IpcRendererEvent, p: ScanProgress) => cb(p);
     ipcRenderer.on("scan:progress", handler);
     return () => ipcRenderer.removeListener("scan:progress", handler);
+  },
+
+  onScanTrigger: (cb: (payload: { types: ("games" | "movies" | "music")[] }) => void) => {
+    const handler = (_: Electron.IpcRendererEvent, payload: { types: ("games" | "movies" | "music")[] }) => cb(payload);
+    ipcRenderer.on("scan:trigger", handler);
+    return () => ipcRenderer.removeListener("scan:trigger", handler);
+  },
+
+  onBackgroundScanComplete: (cb: (payload: { type: "games" | "movies" | "music" }) => void) => {
+    const handler = (_: Electron.IpcRendererEvent, payload: { type: "games" | "movies" | "music" }) => cb(payload);
+    ipcRenderer.on("scan:background:complete", handler);
+    return () => ipcRenderer.removeListener("scan:background:complete", handler);
   },
 
   videoDecoder: videoDecoderApi,

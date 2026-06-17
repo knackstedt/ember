@@ -1,4 +1,4 @@
-import { join, dirname } from "path";
+import { join, dirname, resolve } from "path";
 import { readFileSync, rmSync, mkdirSync, readdirSync, existsSync, statSync } from "fs";
 import { BrowserWindow, ipcMain, app, dialog, shell, session } from "electron";
 import { spawn, ChildProcess } from "child_process";
@@ -359,6 +359,58 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     sendToWindow(window, "scan:progress", progress);
   };
 
+  async function markMissingMovies(
+    scannedPaths: string[],
+    foundMovies: { id: string; filePath?: string }[],
+  ): Promise<void> {
+    const foundIds = new Set(foundMovies.map((m) => m.id));
+    const allMovies = await MovieRepo.list();
+    const resolvedPaths = scannedPaths.map((p) => resolve(p));
+    for (const movie of allMovies) {
+      if (movie.sourceLocation !== "local") continue;
+      if (!movie.filePath) continue;
+      const isFromScannedPath = resolvedPaths.some((p) =>
+        movie.filePath!.startsWith(p),
+      );
+      if (!isFromScannedPath) continue;
+      if (!foundIds.has(movie.id) && !movie.missing) {
+        await MovieRepo.setMissing(movie.id, true);
+        log.info("movies:scan", `marked missing: ${movie.title}`);
+      } else if (foundIds.has(movie.id) && movie.missing) {
+        await MovieRepo.setMissing(movie.id, false);
+        log.info("movies:scan", `restored: ${movie.title}`);
+      }
+    }
+  }
+
+  async function markMissingMusic(
+    scannedPaths: string[],
+    foundTracks: { id: string; filePath?: string }[],
+  ): Promise<void> {
+    const foundIds = new Set(foundTracks.map((t) => t.id));
+    const allTracks = await MusicRepo.list();
+    const resolvedPaths = scannedPaths.map((p) => resolve(p));
+    for (const track of allTracks) {
+      if (track.sourceLocation !== "local") continue;
+      if (!track.filePath) continue;
+      const isFromScannedPath = resolvedPaths.some((p) =>
+        track.filePath!.startsWith(p),
+      );
+      if (!isFromScannedPath) continue;
+      if (!foundIds.has(track.id) && !track.missing) {
+        await MusicRepo.setMissing(track.id, true);
+        log.info("music:scan", `marked missing: ${track.title}`);
+      } else if (foundIds.has(track.id) && track.missing) {
+        await MusicRepo.setMissing(track.id, false);
+        log.info("music:scan", `restored: ${track.title}`);
+      }
+    }
+  }
+
+  function sendScanTrigger(types: ("games" | "movies" | "music")[]): void {
+    sendToWindow(window, "scan:trigger", { types });
+  }
+
   ipcMain.handle("devtools:is-open", () => {
     return window.webContents.isDevToolsOpened();
   });
@@ -392,6 +444,14 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     if ("flashThumbnailConcurrency" in partial) {
       setFlashThumbnailConcurrency(partial.flashThumbnailConcurrency ?? 4);
     }
+    const triggerTypes: ("games" | "movies" | "music")[] = [];
+    if ("moviePaths" in partial) triggerTypes.push("movies");
+    if ("musicPaths" in partial) triggerTypes.push("music");
+    if ("romPaths" in partial || "gamePaths" in partial) triggerTypes.push("games");
+    if (triggerTypes.length > 0) {
+      // Defer so the settings save finishes and renderer can react
+      setTimeout(() => sendScanTrigger(triggerTypes), 300);
+    }
   });
 
   ipcMain.handle("app:fullscreen", (_e, value: boolean) => {
@@ -417,6 +477,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     const result = await performGameScan(window, extraPaths);
     // Also scan remote sources configured for ROMs
     void scanAllRemoteSources("rom", sendRemoteProgress);
+    sendToWindow(window, "scan:background:complete", { type: "games" });
     return result;
   });
 
@@ -1304,10 +1365,17 @@ export function registerIpcHandlers(window: BrowserWindow): void {
       ) {
         defined.lastPlayed = existingRecord.lastPlayed;
       }
+      // Ensure found movies are not marked missing
+      defined.missing = false;
       await db.query(`UPSERT movie:⟨${defined.id}⟩ CONTENT $movie`, {
         movie: defined,
       });
     }
+
+    // Mark any local movies from scanned paths that were not found as missing
+    const allScannedPaths = [getXdgVideosDir(), ...(extraPaths ?? [])].map((p) => resolve(p)).filter(existsSync);
+    await markMissingMovies(allScannedPaths, movies);
+
     sendToWindow(window, "scan:progress", {
       scanner: "movies",
       current: movies.length,
@@ -1316,6 +1384,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     });
     // Also scan remote sources configured for movies
     void scanAllRemoteSources("movie", sendRemoteProgress);
+    sendToWindow(window, "scan:background:complete", { type: "movies" });
     return movies;
   });
 
@@ -1431,9 +1500,14 @@ export function registerIpcHandlers(window: BrowserWindow): void {
       const track = tracks[i];
       if (i % 100 === 0)
         log.debug("music:scan", `db insert ${i + 1}/${tracks.length}`);
-      await MusicRepo.upsert(track);
+      await MusicRepo.upsert({ ...track, missing: false });
     }
     log.debug("music:scan", "DB insert done");
+
+    // Mark any local tracks from scanned paths that were not found as missing
+    const allScannedPaths = [getXdgMusicDir(), ...(extraPaths ?? [])].filter(existsSync);
+    await markMissingMusic(allScannedPaths, tracks);
+
     sendToWindow(window, "scan:progress", {
       scanner: "music",
       current: tracks.length,
@@ -1442,6 +1516,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     });
     // Also scan remote sources configured for music
     void scanAllRemoteSources("music", sendRemoteProgress);
+    sendToWindow(window, "scan:background:complete", { type: "music" });
     return tracks;
   });
 
@@ -1844,6 +1919,16 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     }
 
     return true;
+  });
+
+  ipcMain.handle("db:delete-missing", async () => {
+    const [games, movies, music] = await Promise.all([
+      GameRepo.deleteMissing(),
+      MovieRepo.deleteMissing(),
+      MusicRepo.deleteMissing(),
+    ]);
+    log.info("db:delete-missing", `deleted ${games} games, ${movies} movies, ${music} tracks`);
+    return { games, movies, music };
   });
 
   ipcMain.handle("dialog:open-directory", async () => {

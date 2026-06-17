@@ -78,7 +78,7 @@ function extractRecordId(raw: unknown): string | null {
   return null;
 }
 
-async function cleanupStaleGames(
+async function markStaleGamesMissing(
   db: ReturnType<typeof getDb>,
   scannedGames: Game[],
 ): Promise<void> {
@@ -96,26 +96,38 @@ async function cleanupStaleGames(
     }
 
     if (!MANAGED_PLATFORMS.has(game.platform)) continue;
-    if (scannedIds.has(id)) continue;
 
-    let shouldDelete = false;
+    if (scannedIds.has(id)) {
+      // Game was found in scan: ensure it is not marked missing
+      if (game.missing) {
+        try {
+          await db.query(`UPDATE game:⟨${id}⟩ SET missing = false`);
+          log.info("cleanup", `Restored game ${id} (${game.title})`);
+        } catch (err) {
+          log.warn("cleanup", `Failed to restore ${id}: ${err}`);
+        }
+      }
+      continue;
+    }
+
+    let shouldMarkMissing = false;
 
     if (game.platform === "steam") {
       // Steam games not found in scan were skipped because install dir is missing or empty
-      shouldDelete = true;
+      shouldMarkMissing = true;
     } else {
       const target = resolveTargetPath(game);
       if (target && target.startsWith("/")) {
-        shouldDelete = !existsSync(target);
+        shouldMarkMissing = !existsSync(target);
       }
     }
 
-    if (shouldDelete) {
-      log.info("cleanup", `Removing stale game ${id} (${game.title}) platform=${game.platform}`);
+    if (shouldMarkMissing && !game.missing) {
+      log.info("cleanup", `Marking missing game ${id} (${game.title}) platform=${game.platform}`);
       try {
-        await db.query(`DELETE game:⟨${id}⟩`);
+        await db.query(`UPDATE game:⟨${id}⟩ SET missing = true`);
       } catch (err) {
-        log.warn("cleanup", `Failed to delete ${id}: ${err}`);
+        log.warn("cleanup", `Failed to mark missing ${id}: ${err}`);
       }
     }
   }
@@ -274,7 +286,7 @@ async function scanInMainThread(
     }
   }
 
-  await cleanupStaleGames(db, enrichedGames);
+  await markStaleGamesMissing(db, enrichedGames);
 
   return enrichedGames;
 }
@@ -324,7 +336,7 @@ export async function performGameScan(
               }
             }
 
-            await cleanupStaleGames(db, enrichedGames);
+            await markStaleGamesMissing(db, enrichedGames);
 
             worker.terminate();
             resolve(enrichedGames);
