@@ -136,7 +136,7 @@ export function scanDolphinGames(extraPaths: string[] = []): Game[] {
       }
       const title = titleFromFilename(basename(fullPath));
       const id = hashId("dolphin", fullPath);
-      log.info("dolphin", `found ${title} → ${id} platform: ${platform} path: ${fullPath}`);
+      log.debug("dolphin", `found ${title} → ${id} platform: ${platform} path: ${fullPath}`);
 
       games.push({
         id,
