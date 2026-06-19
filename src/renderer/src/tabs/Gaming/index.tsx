@@ -1355,7 +1355,7 @@ export const GamingTab: React.FC = () => {
         style={{ padding: 16 }}
       >
         {/* Grid content */}
-        {loading || scanning || remoteScanning ? (
+        {loading || (items.length === 0 && (scanning || remoteScanning)) ? (
           (() => {
             switch (galleryView) {
               case "list":

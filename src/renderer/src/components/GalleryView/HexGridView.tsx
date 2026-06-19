@@ -38,7 +38,8 @@ const HEX_CLIP = "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)"
 
 const PLACEHOLDER_COLORS = ["#1a1a2e", "#16213e", "#0f3460", "#1b1b2f", "#2d132c", "#1c1c1c"];
 
-function placeholderColor(title: string): string {
+function placeholderColor(title: string | undefined): string {
+  if (!title) return PLACEHOLDER_COLORS[0];
   let hash = 0;
   for (let i = 0; i < title.length; i++) hash = title.charCodeAt(i) + ((hash << 5) - hash);
   return PLACEHOLDER_COLORS[Math.abs(hash) % PLACEHOLDER_COLORS.length];

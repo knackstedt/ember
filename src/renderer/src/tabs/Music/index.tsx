@@ -643,6 +643,22 @@ export const MusicTab: React.FC = () => {
     },
   });
 
+  const renderGroupHex = useCallback(
+    (group: MusicGroup, index: number) => {
+      return {
+        coverUrl: artistThumbnails[group.name] ?? group.coverUrl,
+        title: group.name,
+        subtitle: `${group.trackCount} track${group.trackCount !== 1 ? "s" : ""}`,
+        isLoading: browseMode === "artists" && !!artistThumbnailsLoading[group.name],
+        onClick: () => {
+          setGroupFocusedIndex(index);
+          setSelectedGroup(group.name);
+        },
+      } as HexCellData;
+    },
+    [setGroupFocusedIndex, artistThumbnails, artistThumbnailsLoading, browseMode],
+  );
+
   const renderGroupItem = useCallback(
     (group: MusicGroup, index: number) => (
       <div className="p-1.5 w-full h-full flex flex-col min-w-0" {...bindGroupItem(group, index)}>
@@ -659,6 +675,34 @@ export const MusicTab: React.FC = () => {
       </div>
     ),
     [bindGroupItem, groupFocusedIndex, setGroupFocusedIndex, artistThumbnails, artistThumbnailsLoading, browseMode],
+  );
+
+  const renderTrackHex = useCallback(
+    (track: MusicTrack, index: number) => {
+      const source = getSourceBadge(track.sourceLocation);
+      const cachedUrl = useCoverCacheStore.getState().urls[track.id];
+      return {
+        coverUrl: track.albumArtUrl ?? cachedUrl,
+        title: track.title,
+        subtitle: track.artist ?? track.album,
+        badge: source.badge,
+        badgeColor: source.badgeColor,
+        isFavorite: track.isFavorite,
+        missing: track.missing,
+        onClick: () => {
+          setTrackFocusedIndex(index);
+          play(trackItems, index);
+          setSelected(track);
+        },
+        onFavorite: () => toggleFavorite(track.id),
+        onVisible: () => {
+          if (!track.albumArtUrl && !cachedUrl) {
+            useMusicStore.getState().loadThumbnail(track.id);
+          }
+        },
+      } as HexCellData;
+    },
+    [setTrackFocusedIndex, play, trackItems, toggleFavorite],
   );
 
   const renderTrackItem = useCallback(
@@ -1013,8 +1057,7 @@ export const MusicTab: React.FC = () => {
               items={itemsToRender}
               minItemWidth={180}
               onColumnCountChange={setTrackColumnCount}
-              rowHeight={240}
-              renderHex={renderTrackItem}
+              renderHex={renderTrackHex}
               focusedIndex={trackFocusedIndex}
               scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
             />
@@ -1091,8 +1134,7 @@ export const MusicTab: React.FC = () => {
               items={itemsToRender}
               minItemWidth={180}
               onColumnCountChange={setGroupColumnCount}
-              rowHeight={240}
-              renderHex={renderGroupItem}
+              renderHex={renderGroupHex}
               focusedIndex={groupFocusedIndex}
               scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
             />

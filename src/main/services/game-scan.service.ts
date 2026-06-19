@@ -88,6 +88,8 @@ async function markStaleGamesMissing(
 
   log.info("cleanup", `Checking ${existingGames.length} existing games against ${scannedIds.size} scanned games`);
 
+  const updatePromises: Promise<void>[] = [];
+
   for (const game of existingGames) {
     const id = extractRecordId(game.id);
     if (!id) {
@@ -100,12 +102,11 @@ async function markStaleGamesMissing(
     if (scannedIds.has(id)) {
       // Game was found in scan: ensure it is not marked missing
       if (game.missing) {
-        try {
-          await db.query(`UPDATE game:⟨${id}⟩ SET missing = false`);
-          log.info("cleanup", `Restored game ${id} (${game.title})`);
-        } catch (err) {
-          log.warn("cleanup", `Failed to restore ${id}: ${err}`);
-        }
+        updatePromises.push(
+          db.query(`UPDATE game:⟨${id}⟩ SET missing = false`)
+            .then(() => log.info("cleanup", `Restored game ${id} (${game.title})`))
+            .catch((err) => log.warn("cleanup", `Failed to restore ${id}: ${err}`))
+        );
       }
       continue;
     }
@@ -124,12 +125,17 @@ async function markStaleGamesMissing(
 
     if (shouldMarkMissing && !game.missing) {
       log.info("cleanup", `Marking missing game ${id} (${game.title}) platform=${game.platform}`);
-      try {
-        await db.query(`UPDATE game:⟨${id}⟩ SET missing = true`);
-      } catch (err) {
-        log.warn("cleanup", `Failed to mark missing ${id}: ${err}`);
-      }
+      updatePromises.push(
+        db.query(`UPDATE game:⟨${id}⟩ SET missing = true`)
+          .catch((err) => log.warn("cleanup", `Failed to mark missing ${id}: ${err}`))
+      );
     }
+  }
+
+  // Await in chunks
+  const chunkSize = 50;
+  for (let i = 0; i < updatePromises.length; i += chunkSize) {
+    await Promise.all(updatePromises.slice(i, i + chunkSize));
   }
 }
 
@@ -148,31 +154,23 @@ async function calculateRomHashes(romPath?: string): Promise<{ crc32?: string; m
   }
 }
 
-async function preserveExistingFields(
-  db: ReturnType<typeof getDb>,
+async function fetchExistingGameFields(db: ReturnType<typeof getDb>): Promise<Map<string, any>> {
+  const rows = await db.query<[any[]]>(`SELECT id, playTime, lastPlayed, isFavorite, tags, rating, hidden, coverUrl, coverSource, corrupt, wineRunner, wineCustomCommand, umuCustomCommand, compressedRomPath, compressionFormat FROM game`);
+  const existing = rows[0] ?? [];
+  const map = new Map<string, any>();
+  for (const row of existing) {
+    const id = extractRecordId(row.id);
+    if (id) {
+      map.set(id, row);
+    }
+  }
+  return map;
+}
+
+function applyExistingFields(
   game: Record<string, unknown>,
-): Promise<Record<string, unknown>> {
-  const rows = await db.query<
-    [
-      {
-        playTime?: number;
-        lastPlayed?: number;
-        isFavorite?: boolean;
-        tags?: string[];
-        rating?: number;
-        hidden?: boolean;
-        coverUrl?: string;
-        coverSource?: string;
-        corrupt?: boolean;
-        wineRunner?: string;
-        wineCustomCommand?: string;
-        umuCustomCommand?: string;
-        compressedRomPath?: string;
-        compressionFormat?: string;
-      }[],
-    ]
-  >(`SELECT playTime, lastPlayed, isFavorite, tags, rating, hidden, coverUrl, coverSource, corrupt, wineRunner, wineCustomCommand, umuCustomCommand, compressedRomPath, compressionFormat FROM game:⟨${game.id}⟩`);
-  const existing = rows[0]?.[0];
+  existing?: Record<string, unknown>,
+): Record<string, unknown> {
   if (existing) {
     if (existing.playTime !== undefined && existing.playTime !== null) {
       game.playTime = existing.playTime;
@@ -194,9 +192,10 @@ async function preserveExistingFields(
     }
     if (existing.coverUrl !== undefined && existing.coverUrl !== null) {
       // Don't preserve raw local paths — the scanner now serves them via ember://media/
+      const coverUrl = String(existing.coverUrl);
       const isRawLocal =
-        existing.coverUrl.startsWith("/") ||
-        existing.coverUrl.startsWith("file://");
+        coverUrl.startsWith("/") ||
+        coverUrl.startsWith("file://");
       if (!isRawLocal) {
         game.coverUrl = existing.coverUrl;
       }
@@ -275,15 +274,23 @@ async function scanInMainThread(
   const enrichedGames = all;
 
   const db = getDb();
-  for (const game of enrichedGames) {
-    try {
-      const normalized = await preserveExistingFields(db, normalizeGame(game));
-      await db.query(`UPSERT game:⟨${game.id}⟩ CONTENT $game`, {
-        game: normalized,
-      });
-    } catch (err) {
-      log.warn("scan", `Failed to upsert ${game.id}: ${err}`);
-    }
+  const existingMap = await fetchExistingGameFields(db);
+
+  const chunkSize = 50;
+  for (let i = 0; i < enrichedGames.length; i += chunkSize) {
+    const chunk = enrichedGames.slice(i, i + chunkSize);
+    await Promise.all(
+      chunk.map(async (game) => {
+        try {
+          const normalized = applyExistingFields(normalizeGame(game), existingMap.get(game.id));
+          await db.query(`UPSERT game:⟨${game.id}⟩ CONTENT $game`, {
+            game: normalized,
+          });
+        } catch (err) {
+          log.warn("scan", `Failed to upsert ${game.id}: ${err}`);
+        }
+      })
+    );
   }
 
   await markStaleGamesMissing(db, enrichedGames);
@@ -325,15 +332,23 @@ export async function performGameScan(
             const enrichedGames = games;
 
             const db = getDb();
-            for (const game of enrichedGames) {
-              try {
-                const normalized = await preserveExistingFields(db, normalizeGame(game));
-                await db.query(`UPSERT game:⟨${game.id}⟩ CONTENT $game`, {
-                  game: normalized,
-                });
-              } catch (err) {
-                log.warn("scan", `Failed to upsert ${game.id}: ${err}`);
-              }
+            const existingMap = await fetchExistingGameFields(db);
+
+            const chunkSize = 50;
+            for (let i = 0; i < enrichedGames.length; i += chunkSize) {
+              const chunk = enrichedGames.slice(i, i + chunkSize);
+              await Promise.all(
+                chunk.map(async (game) => {
+                  try {
+                    const normalized = applyExistingFields(normalizeGame(game), existingMap.get(game.id));
+                    await db.query(`UPSERT game:⟨${game.id}⟩ CONTENT $game`, {
+                      game: normalized,
+                    });
+                  } catch (err) {
+                    log.warn("scan", `Failed to upsert ${game.id}: ${err}`);
+                  }
+                })
+              );
             }
 
             await markStaleGamesMissing(db, enrichedGames);
