@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AlertTriangle, Loader } from "lucide-react";
+import { useInputStore } from "../../store/input.store";
 
 interface ConfirmDialogProps {
   isOpen: boolean;
@@ -32,10 +33,29 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   onConfirmRef.current = onConfirm;
   const onCancelRef = useRef(onCancel);
   onCancelRef.current = onCancel;
+  const loadingRef = useRef(loading);
+  loadingRef.current = loading;
+  const confirmRef = useRef<HTMLButtonElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (isOpen) setActiveIndex(1);
   }, [isOpen]);
+
+  useEffect(() => {
+    useInputStore.getState().setNavSuspended(isOpen);
+    return () => {
+      useInputStore.getState().setNavSuspended(false);
+    };
+  }, [isOpen]);
+
+  // Keep browser focus in sync with the active button so Enter/Space click the
+  // highlighted button and keyboard focus is visibly inside the dialog.
+  useEffect(() => {
+    if (!isOpen) return;
+    const button = activeIndex === 0 ? confirmRef.current : cancelRef.current;
+    button?.focus();
+  }, [isOpen, activeIndex]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -45,15 +65,31 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
         e.preventDefault();
         e.stopImmediatePropagation();
         onCancelRef.current();
-      } else if (e.key === "ArrowLeft" || e.key === "ArrowRight" || e.key === "ArrowUp" || e.key === "ArrowDown") {
+      } else if (
+        e.key === "ArrowLeft" ||
+        e.key === "ArrowRight" ||
+        e.key === "ArrowUp" ||
+        e.key === "ArrowDown" ||
+        e.key === "a" ||
+        e.key === "d" ||
+        e.key === "w" ||
+        e.key === "s"
+      ) {
         e.preventDefault();
         e.stopImmediatePropagation();
         setActiveIndex((i) => (i === 0 ? 1 : 0));
-      } else if (e.key === "Enter") {
+      } else if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
         e.stopImmediatePropagation();
-        if (activeIndexRef.current === 0) onConfirmRef.current();
-        else onCancelRef.current();
+        if (activeIndexRef.current === 0) {
+          if (!loadingRef.current) onConfirmRef.current();
+        } else {
+          onCancelRef.current();
+        }
+      } else if (e.key === "Tab") {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        setActiveIndex((i) => (i === 0 ? 1 : 0));
       }
     };
 
@@ -65,8 +101,11 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
       if (detail.action === "left" || detail.action === "right" || detail.action === "up" || detail.action === "down") {
         setActiveIndex((i) => (i === 0 ? 1 : 0));
       } else if (detail.action === "confirm") {
-        if (activeIndexRef.current === 0) onConfirmRef.current();
-        else onCancelRef.current();
+        if (activeIndexRef.current === 0) {
+          if (!loadingRef.current) onConfirmRef.current();
+        } else {
+          onCancelRef.current();
+        }
       } else if (detail.action === "cancel") {
         onCancelRef.current();
       }
@@ -129,6 +168,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 
             <div className="flex flex-row gap-3 justify-end">
               <button
+                ref={confirmRef}
                 className="px-4 py-2 rounded-[var(--radius-card)] text-sm transition-colors"
                 style={{
                   background:
@@ -148,12 +188,14 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
                   opacity: loading ? 0.6 : 1,
                 }}
                 onClick={onConfirm}
+                onFocus={() => setActiveIndex(0)}
                 disabled={loading}
               >
                 {loading && <Loader size={14} className="animate-spin inline mr-1.5" />}
                 {confirmLabel}
               </button>
               <button
+                ref={cancelRef}
                 className="px-4 py-2 rounded-[var(--radius-card)] text-sm transition-colors"
                 style={{
                   background:
@@ -166,6 +208,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
                   }`,
                 }}
                 onClick={onCancel}
+                onFocus={() => setActiveIndex(1)}
                 disabled={loading}
               >
                 {cancelLabel}
