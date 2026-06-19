@@ -21,6 +21,20 @@ const DEFAULTS: AppSettings = {
   galleryView: "theme-default",
   flashThumbnailConcurrency: 4,
   volume: 1,
+  dashboardLayout: {
+    widgets: [
+      { id: "widget-recent-games", type: "recent-games", title: "Recently Played" },
+      { id: "widget-favorites", type: "favorite-games", title: "Favorites" },
+      { id: "widget-clock", type: "clock", title: "Clock" },
+      { id: "widget-system", type: "system-info", title: "System" },
+    ],
+    grid: [
+      { i: "widget-recent-games", x: 0, y: 0, w: 6, h: 4, minW: 3, minH: 2 },
+      { i: "widget-favorites", x: 6, y: 0, w: 6, h: 4, minW: 3, minH: 2 },
+      { i: "widget-clock", x: 0, y: 4, w: 3, h: 2, minW: 2, minH: 2 },
+      { i: "widget-system", x: 3, y: 4, w: 3, h: 2, minW: 2, minH: 2 },
+    ],
+  },
 };
 
 let cachedSettings: AppSettings | null = null;
