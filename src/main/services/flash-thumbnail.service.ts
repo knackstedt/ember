@@ -53,7 +53,7 @@ interface FlashCaptureConfig {
 const DEFAULT_CAPTURE_CONFIG: FlashCaptureConfig = {
   width: 800,
   height: 600,
-  waitMs: 40000,
+  waitMs: 80000,
   timeoutMs: 120000,
   backgroundColor: "#000",
 };
