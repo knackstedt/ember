@@ -2,6 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─── Themeable game launch overlay defaults ───────────────── */
+[data-theme] {
+  --color-launching-overlay: rgba(0, 0, 0, 0.55);
+  --color-launching-spinner: var(--color-accent);
+  --color-launching-text: var(--color-accent);
+}
+
 /* ─── Theme: Dark OLED ─────────────────────────────────────── */
 [data-theme="dark-oled"] {
   --color-bg: #000000;

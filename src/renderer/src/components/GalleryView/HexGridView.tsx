@@ -61,13 +61,30 @@ interface HexCellProps {
   itemProps?: Record<string, unknown>;
 }
 
-const HexCell: React.FC<HexCellProps> = ({ hex, isFocused, cellWidth, hexHeight, itemProps }) => {
+function hexDataEqual(a: HexCellData, b: HexCellData): boolean {
+  return (
+    a.coverUrl === b.coverUrl &&
+    a.title === b.title &&
+    a.subtitle === b.subtitle &&
+    a.badge === b.badge &&
+    a.badgeColor === b.badgeColor &&
+    a.isFavorite === b.isFavorite &&
+    a.isLoading === b.isLoading &&
+    a.missing === b.missing &&
+    a.progress === b.progress &&
+    a.platform === b.platform &&
+    a.skeleton === b.skeleton
+  );
+}
+
+const HexCell = React.memo(function HexCellInner({ hex, isFocused, cellWidth, hexHeight, itemProps }: HexCellProps) {
   const [imgError, setImgError] = React.useState(false);
   const hasCover = hex.coverUrl && !imgError;
 
   useEffect(() => {
     hex.onVisible?.();
-  }, [hex.onVisible]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     setImgError(false);
@@ -124,6 +141,8 @@ const HexCell: React.FC<HexCellProps> = ({ hex, isFocused, cellWidth, hexHeight,
         filter: isFocused
           ? "drop-shadow(0 0 10px var(--color-accent)) drop-shadow(0 0 4px var(--color-accent))"
           : undefined,
+        willChange: "transform",
+        backfaceVisibility: "hidden",
       }}
       {...itemProps}
       onClick={() => hex.onClick?.()}
@@ -241,6 +260,7 @@ const HexCell: React.FC<HexCellProps> = ({ hex, isFocused, cellWidth, hexHeight,
             </div>
           )}
 
+
           {hex.progress !== undefined && hex.progress > 0 && (
             <div
               style={{
@@ -349,7 +369,25 @@ const HexCell: React.FC<HexCellProps> = ({ hex, isFocused, cellWidth, hexHeight,
       </div>
     </div>
   );
-};
+}, (prev, next) => {
+  return (
+    prev.isFocused === next.isFocused &&
+    prev.cellWidth === next.cellWidth &&
+    prev.hexHeight === next.hexHeight &&
+    hexDataEqual(prev.hex, next.hex)
+  );
+});
+
+const HexGridItem = React.forwardRef<
+  HTMLDivElement,
+  { style: CSSProperties; index: number; children: React.ReactNode }
+>(function HexGridItemInner({ style, children }, ref) {
+  return (
+    <div ref={ref} style={{ ...style, overflow: "visible" }}>
+      {children}
+    </div>
+  );
+});
 
 function useContainerWidth(ref: React.RefObject<HTMLDivElement | null>) {
   const [width, setWidth] = React.useState(0);
@@ -392,7 +430,7 @@ export const HexGridView = React.forwardRef(function HexGridViewInner<T>(
     className,
     style,
     scrollRef,
-    overscan = 2,
+    overscan = 4,
     bindItem,
   }: HexGridViewProps<T>,
   forwardedRef: React.Ref<{ scrollToItem(index: number): void; getNextIndex(currentIndex: number, action: NavAction): number | null }>,
@@ -570,6 +608,7 @@ export const HexGridView = React.forwardRef(function HexGridViewInner<T>(
           count={rowCount}
           itemSize={rowHeight}
           overscan={overscan}
+          item={HexGridItem}
         >
           {(rowIndex) => renderRow(rowIndex)}
         </Virtualizer>
@@ -588,6 +627,7 @@ export const HexGridView = React.forwardRef(function HexGridViewInner<T>(
         count={rowCount}
         itemSize={rowHeight}
         overscan={overscan}
+        item={HexGridItem}
       >
         {(rowIndex) => renderRow(rowIndex)}
       </Virtualizer>

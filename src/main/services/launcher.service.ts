@@ -1,5 +1,6 @@
-import { spawn, spawnSync, ChildProcess } from "child_process";
+import { spawn, spawnSync, ChildProcess, execFile } from "child_process";
 import { existsSync, readdirSync, readFileSync } from "fs";
+import { promisify } from "util";
 import { BrowserWindow } from "electron";
 import { Game, Movie, MusicTrack } from "../../shared/types";
 import { createLogger } from "../util/logger";
@@ -12,6 +13,52 @@ const log = createLogger("info");
 
 const activeProcesses = new Map<string, ChildProcess>();
 const playTimeTimers = new Map<string, { startTime: number; timer: NodeJS.Timeout }>();
+const execFileAsync = promisify(execFile);
+
+async function findWindowsForPid(pid: number): Promise<number[]> {
+  if (process.platform !== "linux") return [];
+  try {
+    const { stdout } = await execFileAsync("xdotool", ["search", "--pid", String(pid)]);
+    return stdout
+      .split("\n")
+      .map((line) => parseInt(line.trim(), 10))
+      .filter((n) => !Number.isNaN(n));
+  } catch {
+    // xdotool missing or no match; fall back to xprop enumeration
+  }
+  try {
+    const { stdout: rootStdout } = await execFileAsync("xprop", ["-root", "_NET_CLIENT_LIST"]);
+    const match = rootStdout.match(/window id # (0x[0-9a-fA-F]+(?:,\s*0x[0-9a-fA-F]+)*)/);
+    if (!match) return [];
+    const ids = match[1].split(", ");
+    const found: number[] = [];
+    for (const id of ids) {
+      try {
+        const { stdout } = await execFileAsync("xprop", ["-id", id, "_NET_WM_PID"]);
+        const pidMatch = stdout.match(/_NET_WM_PID\(CARDINAL\) = (\d+)/);
+        if (pidMatch && Number(pidMatch[1]) === pid) {
+          found.push(parseInt(id, 16));
+        }
+      } catch {
+        // ignore individual window failures
+      }
+    }
+    return found;
+  } catch {
+    return [];
+  }
+}
+
+async function waitForGameWindow(pid: number | undefined, timeoutMs = 10000): Promise<boolean> {
+  if (!pid) return false;
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    const windows = await findWindowsForPid(pid);
+    if (windows.length > 0) return true;
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  return false;
+}
 
 /** Steam launch tracking — remembers whether steam was running before we started */
 const steamLaunchState = new Map<string, { wasRunning: boolean; isFlatpak: boolean }>();
@@ -32,6 +79,20 @@ function sendGameStopped(gameId: string): void {
   const win = getMainWindow();
   if (win && !win.isDestroyed() && !win.webContents.isDestroyed()) {
     win.webContents.send("game:stopped", gameId);
+  }
+}
+
+function sendGameLaunching(gameId: string, title: string): void {
+  const win = getMainWindow();
+  if (win && !win.isDestroyed() && !win.webContents.isDestroyed()) {
+    win.webContents.send("game:launching", { gameId, title });
+  }
+}
+
+function sendGameLaunchFailed(gameId: string, reason: string): void {
+  const win = getMainWindow();
+  if (win && !win.isDestroyed() && !win.webContents.isDestroyed()) {
+    win.webContents.send("game:launch-failed", { gameId, reason });
   }
 }
 
@@ -325,6 +386,8 @@ export async function launchGame(game: Game): Promise<void> {
       const steamCmd = steam.cmd;
       const steamArgs = [...steam.args, "-applaunch", String(game.steamAppId)];
 
+      sendGameLaunching(game.id, game.title);
+
       log.info(
         "launcher",
         `Spawning: ${steamCmd} ${steamArgs
@@ -339,6 +402,7 @@ export async function launchGame(game: Game): Promise<void> {
       });
       steamProc.on("error", (err) => {
         log.error("launcher", `Spawn error for "${game.title}": ${err}`);
+        sendGameLaunchFailed(game.id, err.message);
       });
       steamProc.unref();
 
@@ -347,7 +411,9 @@ export async function launchGame(game: Game): Promise<void> {
         log.info("launcher", `Waiting for Steam game ${game.steamAppId} to start…`);
         const gamePid = await waitForSteamGamePid(game.steamAppId);
         if (gamePid === null) {
-          log.warn("launcher", `Timed out waiting for Steam game ${game.steamAppId} process; playtime tracking disabled.`);
+          const reason = `Timed out waiting for Steam game ${game.steamAppId} process; it may not have started.`;
+          log.warn("launcher", reason);
+          sendGameLaunchFailed(game.id, reason);
           void runSessionHooks(game, "after-start");
           GameRepo.setLastPlayed(game.id, Date.now()).catch((err) => {
             log.warn("launcher", `Failed to set lastPlayed for ${game.id}: ${err}`);
@@ -358,6 +424,10 @@ export async function launchGame(game: Game): Promise<void> {
         log.info("launcher", `Detected Steam game PID ${gamePid} for AppID ${game.steamAppId}`);
         startPlayTimeTracking(game.id);
         void runSessionHooks(game, "after-start");
+        const foundWindow = await waitForGameWindow(gamePid, 10000);
+        if (!foundWindow) {
+          log.warn("launcher", `Window for Steam game ${game.steamAppId} not detected; minimizing after timeout`);
+        }
         sendGameStarted(game.id);
         minimizeWindow();
 
@@ -451,15 +521,18 @@ export async function launchGame(game: Game): Promise<void> {
       // Handled via in-renderer emulator components
       return Promise.resolve();
     case "itch": {
+      sendGameLaunching(game.id, game.title);
       const result = await launchItchGame(game);
       if (result.success) {
         startPlayTimeTracking(game.id);
+        sendGameStarted(game.id);
         GameRepo.setLastPlayed(game.id, Date.now()).catch((err) => {
           log.warn("launcher", `Failed to set lastPlayed for ${game.id}: ${err}`);
         });
         return Promise.resolve();
       }
-      return Promise.reject(new Error(result.error ?? "Failed to launch itch game"));
+      const reason = result.error ?? "Failed to launch itch game";
+      return Promise.reject(new Error(reason));
     }
     default:
       if (game.execPath) {
@@ -483,6 +556,8 @@ export async function launchGame(game: Game): Promise<void> {
   const launchEnv = { ...process.env, ...game.launchEnv };
   const launchCwd = game.launchWorkingDir || undefined;
 
+  sendGameLaunching(game.id, game.title);
+
   return new Promise<void>((resolve, reject) => {
     const proc = spawn(cmd, args, {
       detached: true,
@@ -493,6 +568,7 @@ export async function launchGame(game: Game): Promise<void> {
 
     let settled = false;
     let spawnOk = false;
+    let hasStarted = false;
     let stderrBuf = "";
 
     if (isDolphin && proc.stderr) {
@@ -513,15 +589,24 @@ export async function launchGame(game: Game): Promise<void> {
     proc.on("spawn", () => {
       spawnOk = true;
       startPlayTimeTracking(game.id);
+      const windowPromise = waitForGameWindow(proc.pid, 10000);
       setTimeout(() => {
         if (settled) return;
         settled = true;
+        hasStarted = true;
         proc.unref();
         activeProcesses.set(game.id, proc);
         log.info("launcher", `"${game.title}" started successfully`);
         if (isDolphin) fullscreenDolphinWindow();
         void runSessionHooks(game, "after-start", launchEnv);
         resolve();
+        void windowPromise.then((found) => {
+          if (!found) {
+            log.warn("launcher", `Window for "${game.title}" not detected; minimizing after timeout`);
+          }
+          sendGameStarted(game.id);
+          minimizeWindow();
+        });
       }, 1500);
     });
 
@@ -534,6 +619,11 @@ export async function launchGame(game: Game): Promise<void> {
         void runSessionHooks(game, "after-crash", launchEnv);
       } else if (closed) {
         void runSessionHooks(game, "after-close", launchEnv);
+      }
+      if (hasStarted) {
+        log.info("launcher", `"${game.title}" exited (code=${code}, signal=${signal})`);
+        sendGameStopped(game.id);
+        return;
       }
       if (!settled && spawnOk) {
         settled = true;

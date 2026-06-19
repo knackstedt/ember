@@ -36,6 +36,8 @@ import { PluginPlayer } from "./components/PluginPlayer/PluginPlayer";
 import { usePluginPlayerStore } from "./store/pluginPlayer.store";
 import { LibretroPlayer } from "./components/LibretroPlayer/LibretroPlayer";
 import { useLibretroPlayerStore } from "./store/libretroPlayer.store";
+import { useGameLaunchStore } from "./store/gameLaunch.store";
+import { GameLaunchOverlay } from "./components/GameLaunchOverlay/GameLaunchOverlay";
 import { useContextMenuStore } from "./store/contextMenu.store";
 import { QueueBlade } from "./components/QueueBlade/QueueBlade";
 import { ErrorBoundary } from "./components/ErrorBoundary/ErrorBoundary";
@@ -327,19 +329,31 @@ export default function App(): React.ReactElement {
       useLibretroPlayerStore.getState().launch(opts);
     });
 
+    const unsubGameLaunching = window.htpc.onGameLaunching((detail) => {
+      useGameLaunchStore.getState().setLaunching(detail.gameId, detail.title);
+      console.log(`[renderer] External game launching: ${detail.gameId}`);
+    });
+
+    const unsubGameLaunchFailed = window.htpc.onGameLaunchFailed((detail) => {
+      useGameLaunchStore.getState().setFailed(detail.gameId, detail.reason);
+      console.log(`[renderer] External game launch failed: ${detail.gameId}`);
+    });
+
     const unsubGameStarted = window.htpc.onGameStarted((gameId) => {
       gameRunningRef.current = true;
       setGameRunning(true);
+      useGameLaunchStore.getState().setStarted(gameId);
       console.log(`[renderer] External game started: ${gameId}`);
     });
 
     const unsubGameStopped = window.htpc.onGameStopped((gameId) => {
       gameRunningRef.current = false;
       setGameRunning(false);
+      useGameLaunchStore.getState().setStopped(gameId);
       console.log(`[renderer] External game stopped: ${gameId}`);
     });
 
-    return () => { unsubScan(); unsubCores(); unsubHook(); unsubToast(); unsubLibretro(); unsubGameStarted(); unsubGameStopped(); };
+    return () => { unsubScan(); unsubCores(); unsubHook(); unsubToast(); unsubLibretro(); unsubGameLaunching(); unsubGameLaunchFailed(); unsubGameStarted(); unsubGameStopped(); };
   }, []);
 
   useEffect(() => {
@@ -1064,6 +1078,9 @@ export default function App(): React.ReactElement {
       <ErrorBoundary variant="section">
         <CredentialPrompt />
       </ErrorBoundary>
+
+      {/* Game launch overlay */}
+      <GameLaunchOverlay />
     </div>
   );
 }

@@ -892,6 +892,18 @@ const htpc = {
     return () => ipcRenderer.removeListener("toast:push", handler);
   },
 
+  onGameLaunching: (cb: (detail: { gameId: string; title: string }) => void) => {
+    const handler = (_: Electron.IpcRendererEvent, detail: { gameId: string; title: string }) => cb(detail);
+    ipcRenderer.on("game:launching", handler);
+    return () => ipcRenderer.removeListener("game:launching", handler);
+  },
+
+  onGameLaunchFailed: (cb: (detail: { gameId: string; reason: string }) => void) => {
+    const handler = (_: Electron.IpcRendererEvent, detail: { gameId: string; reason: string }) => cb(detail);
+    ipcRenderer.on("game:launch-failed", handler);
+    return () => ipcRenderer.removeListener("game:launch-failed", handler);
+  },
+
   onGameStarted: (cb: (gameId: string) => void) => {
     const handler = (_: Electron.IpcRendererEvent, gameId: string) => cb(gameId);
     ipcRenderer.on("game:started", handler);

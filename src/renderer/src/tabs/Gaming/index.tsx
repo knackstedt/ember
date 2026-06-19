@@ -37,6 +37,7 @@ import { usePluginPlayerStore } from "../../store/pluginPlayer.store";
 import { useLibretroPlayerStore } from "../../store/libretroPlayer.store";
 import { SHADER_PRESETS } from "../../components/LibretroPlayer/shaders";
 import { useToastStore } from "../../store/toast.store";
+import { useGameLaunchStore } from "../../store/gameLaunch.store";
 import { useSettingsStore } from "../../store/settings.store";
 import { useCollectionsStore, evaluateSmartFilter, sortByCollection } from "../../store/collections.store";
 import { CollectionsBar } from "../../components/CollectionsBar/CollectionsBar";
@@ -782,12 +783,14 @@ export const GamingTab: React.FC = () => {
           }}
         />
         <div className="flex-1 min-w-0 flex flex-col justify-center">
-          <div
-            className="font-medium truncate text-sm"
-            style={{ color: index === focusedIndex ? "var(--color-accent)" : "var(--color-text)" }}
-          >
-            {game.title}
-          </div>
+          <div className="flex items-center gap-2 min-w-0">
+            <div
+              className="font-medium truncate text-sm"
+              style={{ color: index === focusedIndex ? "var(--color-accent)" : "var(--color-text)" }}
+            >
+              {game.title}
+            </div>
+                      </div>
           <div className="text-xs truncate" style={{ color: "var(--color-text-dim)" }}>
             {game.platform}
             {game.releaseYear ? ` · ${game.releaseYear}` : ""}
@@ -855,7 +858,7 @@ export const GamingTab: React.FC = () => {
               }}
             />
           )}
-        </div>
+                  </div>
       );
     },
     [],
@@ -889,7 +892,7 @@ export const GamingTab: React.FC = () => {
               }}
             />
           )}
-        </div>
+                  </div>
       );
     },
     [],
@@ -940,7 +943,7 @@ export const GamingTab: React.FC = () => {
               <span className="text-[9px]" style={{ color: "var(--color-accent)" }}>
                 {game.platform}
               </span>
-              {b && (
+                            {b && (
                 <span className="text-[8px] px-1 rounded" style={{ background: b.color, color: "#fff" }}>
                   {b.label}
                 </span>
@@ -1020,15 +1023,12 @@ export const GamingTab: React.FC = () => {
       });
       return;
     }
+    useGameLaunchStore.getState().setLaunching(game.id, game.title);
     try {
       await window.htpc.games.launch(game);
     } catch (err: any) {
-      const message =
-        err?.message ?? "Failed to launch game";
-      useToastStore.getState().push({
-        type: "error",
-        message,
-      });
+      const message = err?.message ?? "Failed to launch game";
+      useGameLaunchStore.getState().setFailed(game.id, message);
     }
   };
 
