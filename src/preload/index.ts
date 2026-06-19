@@ -458,6 +458,8 @@ const htpc = {
       ipcRenderer.invoke("games:hide", id, value),
     delete: (id: string): Promise<void> =>
       ipcRenderer.invoke("games:delete", id),
+    uninstall: (game: Game): Promise<{ success: boolean; error?: string; method?: string }> =>
+      ipcRenderer.invoke("games:uninstall", game),
     emulatorConfig: {
       get: (id: string): Promise<GameEmulatorConfig> =>
         ipcRenderer.invoke("games:emulatorConfig:get", id),
@@ -532,6 +534,8 @@ const htpc = {
       ipcRenderer.invoke("movies:hide", id, value),
     delete: (id: string): Promise<void> =>
       ipcRenderer.invoke("movies:delete", id),
+    uninstall: (movie: Movie): Promise<{ success: boolean; error?: string; method?: string }> =>
+      ipcRenderer.invoke("movies:uninstall", movie),
     regenerateThumbnail: (movie: Movie): Promise<string | null> =>
       ipcRenderer.invoke("movies:regenerateThumbnail", movie),
   },
@@ -558,6 +562,8 @@ const htpc = {
       ipcRenderer.invoke("music:hide", id, value),
     delete: (id: string): Promise<void> =>
       ipcRenderer.invoke("music:delete", id),
+    uninstall: (track: MusicTrack): Promise<{ success: boolean; error?: string; method?: string }> =>
+      ipcRenderer.invoke("music:uninstall", track),
     enrich: (track: MusicTrack): Promise<{
       updates: Partial<MusicTrack>;
       coverArtUrl?: string;

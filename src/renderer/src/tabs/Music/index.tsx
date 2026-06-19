@@ -29,6 +29,7 @@ import { useDetailController } from "../../hooks/useDetailController";
 import { useCoverCacheStore } from "../../store/coverCache.store";
 import { useContextMenu } from "../../hooks/useContextMenu";
 import { ContextMenuOption } from "../../components/ContextMenu/ContextMenu";
+import { ConfirmDialog } from "../../components/ConfirmDialog/ConfirmDialog";
 import {
   Star,
   StarOff,
@@ -146,6 +147,10 @@ interface MusicGroup {
   coverUrl?: string;
 }
 
+function canDeleteTrack(track: MusicTrack): boolean {
+  return !track.sourceLocation || track.sourceLocation === "local";
+}
+
 export const MusicTab: React.FC = () => {
   const tracks = useMusicStore((s) => s.tracks);
   const loading = useMusicStore((s) => s.loading);
@@ -169,6 +174,7 @@ export const MusicTab: React.FC = () => {
   const pickCoverImage = useMusicStore((s) => s.pickCoverImage);
   const hide = useMusicStore((s) => s.hide);
   const deleteTrack = useMusicStore((s) => s.delete);
+  const uninstallTrack = useMusicStore((s) => s.uninstall);
   const artistThumbnails = useMusicStore((s) => s.artistThumbnails);
   const artistThumbnailsLoading = useMusicStore((s) => s.artistThumbnailsLoading);
   const loadArtistThumbnail = useMusicStore((s) => s.loadArtistThumbnail);
@@ -208,6 +214,10 @@ export const MusicTab: React.FC = () => {
     setFacetFilters((prev) => ({ ...prev, [field]: value }));
   };
   const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<{ open: boolean; track: MusicTrack | null }>({
+    open: false,
+    track: null,
+  });
 
   const collections = useCollectionsStore((s) => s.collections);
   const loadCollections = useCollectionsStore((s) => s.load);
@@ -552,6 +562,13 @@ export const MusicTab: React.FC = () => {
           destructive: true,
         });
       }
+      opts.push({
+        id: "deleteFile",
+        label: "Delete file",
+        icon: <Trash2 size={16} />,
+        destructive: true,
+        disabled: !canDeleteTrack(track),
+      });
       if (musicCollections.length > 0) {
         opts.push({ id: "__sep__", label: "Collections", disabled: true });
         for (const c of musicCollections) {
@@ -583,6 +600,11 @@ export const MusicTab: React.FC = () => {
           break;
         case "delete":
           deleteTrack(track.id);
+          break;
+        case "deleteFile":
+          if (canDeleteTrack(track)) {
+            setConfirmDelete({ open: true, track });
+          }
           break;
         case "tags":
           setSelected(track);
@@ -1992,6 +2014,32 @@ export const MusicTab: React.FC = () => {
       </DetailPanel>
       {subTab === "local" && trackCtxMenu}
       {subTab === "local" && groupCtxMenu}
+      <ConfirmDialog
+        isOpen={confirmDelete.open}
+        title="Delete file"
+        message={confirmDelete.track ? `Delete ${confirmDelete.track.title}? This will move the file to trash.` : ""}
+        confirmLabel="Delete"
+        destructive
+        onConfirm={() => {
+          const track = confirmDelete.track;
+          if (!track) return;
+          setConfirmDelete({ open: false, track: null });
+          uninstallTrack(track).then((result) => {
+            if (result.success) {
+              useToastStore.getState().push({
+                type: "success",
+                message: `${track.title} deleted`,
+              });
+            } else {
+              useToastStore.getState().push({
+                type: "error",
+                message: `Failed to delete ${track.title}: ${result.error ?? "Unknown error"}`,
+              });
+            }
+          });
+        }}
+        onCancel={() => setConfirmDelete({ open: false, track: null })}
+      />
       <CollectionManager
         open={showCollectionManager}
         onClose={() => setShowCollectionManager(false)}

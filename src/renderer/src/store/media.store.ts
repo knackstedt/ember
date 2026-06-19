@@ -90,6 +90,7 @@ interface MoviesState {
   updateProgress: (id: string, progress: number | null) => void;
   hide: (id: string) => Promise<void>;
   delete: (id: string) => Promise<void>;
+  uninstall: (movie: Movie) => Promise<{ success: boolean; error?: string; method?: string }>;
   regenerateThumbnail: (id: string) => Promise<void>;
   filtered: () => Movie[];
 }
@@ -168,6 +169,16 @@ export const useMoviesStore = create<MoviesState>((set, get) => ({
     set((s) => ({
       movies: s.movies.filter((m) => m.id !== id),
     }));
+  },
+
+  uninstall: async (movie) => {
+    const result = await window.htpc.movies.uninstall(movie);
+    if (result.success) {
+      set((s) => ({
+        movies: s.movies.filter((m) => m.id !== movie.id),
+      }));
+    }
+    return result;
   },
 
   regenerateThumbnail: async (id) => {
@@ -258,6 +269,7 @@ interface MusicState {
   loadArtistThumbnail: (artist: string) => Promise<void>;
   hide: (id: string) => Promise<void>;
   delete: (id: string) => Promise<void>;
+  uninstall: (track: MusicTrack) => Promise<{ success: boolean; error?: string; method?: string }>;
   filtered: () => MusicTrack[];
 }
 
@@ -387,6 +399,16 @@ export const useMusicStore = create<MusicState>((set, get) => ({
     set((s) => ({
       tracks: s.tracks.filter((t) => t.id !== id),
     }));
+  },
+
+  uninstall: async (track) => {
+    const result = await window.htpc.music.uninstall(track);
+    if (result.success) {
+      set((s) => ({
+        tracks: s.tracks.filter((t) => t.id !== track.id),
+      }));
+    }
+    return result;
   },
 
   filtered: () => {

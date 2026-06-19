@@ -29,6 +29,7 @@ import { useGridFocus, NavAction } from "../../hooks/useGridFocus";
 import { useDetailController } from "../../hooks/useDetailController";
 import { useContextMenu } from "../../hooks/useContextMenu";
 import { ContextMenuOption } from "../../components/ContextMenu/ContextMenu";
+import { ConfirmDialog } from "../../components/ConfirmDialog/ConfirmDialog";
 import {
   Star,
   StarOff,
@@ -56,6 +57,10 @@ import { getSourceBadge } from "../../lib/source-badge";
 
 type SubTab = "local" | "streaming" | "ai-groups";
 
+function canDeleteMovie(movie: Movie): boolean {
+  return !movie.sourceLocation || movie.sourceLocation === "local";
+}
+
 export const MoviesTab: React.FC = () => {
   const movies = useMoviesStore((s) => s.movies);
   const loading = useMoviesStore((s) => s.loading);
@@ -72,6 +77,7 @@ export const MoviesTab: React.FC = () => {
   const filtered = useMoviesStore((s) => s.filtered);
   const hide = useMoviesStore((s) => s.hide);
   const deleteMovie = useMoviesStore((s) => s.delete);
+  const uninstallMovie = useMoviesStore((s) => s.uninstall);
   const regenerateThumbnail = useMoviesStore((s) => s.regenerateThumbnail);
   const regeneratingIds = useMoviesStore((s) => s.regeneratingIds);
   const openVideo = useVideoPlayerStore((s) => s.open);
@@ -100,6 +106,10 @@ export const MoviesTab: React.FC = () => {
     setFacetFilters((prev) => ({ ...prev, [field]: value }));
   };
   const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<{ open: boolean; movie: Movie | null }>({
+    open: false,
+    movie: null,
+  });
 
   const collections = useCollectionsStore((s) => s.collections);
   const loadCollections = useCollectionsStore((s) => s.load);
@@ -314,6 +324,13 @@ export const MoviesTab: React.FC = () => {
           destructive: true,
         });
       }
+      opts.push({
+        id: "deleteFile",
+        label: "Delete file",
+        icon: <Trash2 size={16} />,
+        destructive: true,
+        disabled: !canDeleteMovie(movie),
+      });
       if (movieCollections.length > 0) {
         opts.push({ id: "__sep__", label: "Collections", disabled: true });
         for (const c of movieCollections) {
@@ -345,6 +362,11 @@ export const MoviesTab: React.FC = () => {
           break;
         case "delete":
           deleteMovie(movie.id);
+          break;
+        case "deleteFile":
+          if (canDeleteMovie(movie)) {
+            setConfirmDelete({ open: true, movie });
+          }
           break;
         case "tags":
           setSelected(movie);
@@ -1323,6 +1345,32 @@ export const MoviesTab: React.FC = () => {
         }
       />
       {menu}
+      <ConfirmDialog
+        isOpen={confirmDelete.open}
+        title="Delete file"
+        message={confirmDelete.movie ? `Delete ${confirmDelete.movie.title}? This will move the file to trash.` : ""}
+        confirmLabel="Delete"
+        destructive
+        onConfirm={() => {
+          const movie = confirmDelete.movie;
+          if (!movie) return;
+          setConfirmDelete({ open: false, movie: null });
+          uninstallMovie(movie).then((result) => {
+            if (result.success) {
+              useToastStore.getState().push({
+                type: "success",
+                message: `${movie.title} deleted`,
+              });
+            } else {
+              useToastStore.getState().push({
+                type: "error",
+                message: `Failed to delete ${movie.title}: ${result.error ?? "Unknown error"}`,
+              });
+            }
+          });
+        }}
+        onCancel={() => setConfirmDelete({ open: false, movie: null })}
+      />
       <CollectionManager
         open={showCollectionManager}
         onClose={() => setShowCollectionManager(false)}

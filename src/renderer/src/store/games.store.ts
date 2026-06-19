@@ -22,6 +22,7 @@ interface GamesState {
   setTags: (id: string, tags: string[]) => Promise<void>;
   hide: (id: string) => Promise<void>;
   delete: (id: string) => Promise<void>;
+  uninstall: (game: Game) => Promise<{ success: boolean; error?: string; method?: string }>;
   loadThumbnail: (id: string) => Promise<void>;
   regenerateThumbnail: (id: string) => Promise<void>;
   getEmulatorConfig: (id: string) => Promise<GameEmulatorConfig>;
@@ -146,6 +147,16 @@ export const useGamesStore = create<GamesState>((set, get) => ({
     set((s) => ({
       games: s.games.filter((g) => g.id !== id),
     }));
+  },
+
+  uninstall: async (game) => {
+    const result = await window.htpc.games.uninstall(game);
+    if (result.success) {
+      set((s) => ({
+        games: s.games.filter((g) => g.id !== game.id),
+      }));
+    }
+    return result;
   },
 
   loadThumbnail: async (id) => {

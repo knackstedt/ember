@@ -16,6 +16,11 @@ import {
   startPlayTimeTracking,
   stopPlayTimeTracking,
 } from "../services/launcher.service";
+import {
+  uninstallGame,
+  uninstallMovie,
+  uninstallMusic,
+} from "../services/uninstall.service";
 import { scanMusicFiles } from "../scanners/music.scanner";
 import {
   searchCoverArt,
@@ -840,6 +845,10 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     await GameRepo.delete(id);
   });
 
+  ipcMain.handle("games:uninstall", async (_e, game: Game) => {
+    return uninstallGame(game);
+  });
+
   ipcMain.handle("games:emulatorConfig:get", async (_e, id: string) => {
     return GameRepo.getEmulatorConfig(id);
   });
@@ -1430,6 +1439,10 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     await MovieRepo.delete(id);
   });
 
+  ipcMain.handle("movies:uninstall", async (_e, movie: Movie) => {
+    return uninstallMovie(movie);
+  });
+
   ipcMain.handle(
     "movies:progress:set",
     async (_e, id: string, progress: number | null) => {
@@ -1560,6 +1573,10 @@ export function registerIpcHandlers(window: BrowserWindow): void {
 
   ipcMain.handle("music:delete", async (_e, id: string) => {
     await MusicRepo.delete(id);
+  });
+
+  ipcMain.handle("music:uninstall", async (_e, track: MusicTrack) => {
+    return uninstallMusic(track);
   });
 
   ipcMain.handle("music:searchCoverArt", async (_e, track: MusicTrack) => {

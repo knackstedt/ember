@@ -31,6 +31,7 @@ import { useGridFocus, NavAction } from "../../hooks/useGridFocus";
 import { useDetailController } from "../../hooks/useDetailController";
 import { useContextMenu } from "../../hooks/useContextMenu";
 import { ContextMenuOption } from "../../components/ContextMenu/ContextMenu";
+import { ConfirmDialog } from "../../components/ConfirmDialog/ConfirmDialog";
 import { useFlashPlayerStore } from "../../store/flashPlayer.store";
 import { useJsnesPlayerStore } from "../../store/jsnesPlayer.store";
 import { usePluginPlayerStore } from "../../store/pluginPlayer.store";
@@ -212,6 +213,26 @@ function gameBadge(game: Game): { label: string; color: string } | undefined {
   return undefined;
 }
 
+function uninstallLabelForGame(game: Game): string {
+  if (game.id.startsWith("steam_")) return "Uninstall";
+  if (game.id.startsWith("heroic_")) return "Uninstall";
+  if (game.id.startsWith("lutris_")) return "Uninstall";
+  if (game.id.startsWith("itch_")) return "Uninstall";
+  return "Delete file";
+}
+
+function canUninstallGame(game: Game): boolean {
+  return !game.sourceLocation || game.sourceLocation === "local";
+}
+
+function uninstallMessageForGame(game: Game): string {
+  if (game.id.startsWith("steam_")) return `Uninstall ${game.title} via Steam?`;
+  if (game.id.startsWith("heroic_")) return `Uninstall ${game.title} via Heroic?`;
+  if (game.id.startsWith("lutris_")) return `Uninstall ${game.title} via Lutris?`;
+  if (game.id.startsWith("itch_")) return `Uninstall ${game.title} via itch.io?`;
+  return `Delete ${game.title}? This will move the install files to trash.`;
+}
+
 export const GamingTab: React.FC = () => {
   const games = useGamesStore((s) => s.games);
   const loading = useGamesStore((s) => s.loading);
@@ -230,6 +251,7 @@ export const GamingTab: React.FC = () => {
   const setTags = useGamesStore((s) => s.setTags);
   const hide = useGamesStore((s) => s.hide);
   const deleteGame = useGamesStore((s) => s.delete);
+  const uninstallGame = useGamesStore((s) => s.uninstall);
   const regenerateThumbnail = useGamesStore((s) => s.regenerateThumbnail);
   const updateLastPlayed = useGamesStore((s) => s.updateLastPlayed);
   const loadThumbnail = useGamesStore((s) => s.loadThumbnail);
@@ -266,6 +288,10 @@ export const GamingTab: React.FC = () => {
 
   const [topBarFocused, setTopBarFocused] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [confirmUninstall, setConfirmUninstall] = useState<{ open: boolean; game: Game | null }>({
+    open: false,
+    game: null,
+  });
 
   const collections = useCollectionsStore((s) => s.collections);
   const loadCollections = useCollectionsStore((s) => s.load);
@@ -560,6 +586,13 @@ export const GamingTab: React.FC = () => {
           destructive: true,
         });
       }
+      opts.push({
+        id: "uninstall",
+        label: uninstallLabelForGame(game),
+        icon: <Trash2 size={16} />,
+        destructive: true,
+        disabled: !canUninstallGame(game),
+      });
       opts.push({ id: "remove", label: "Remove from library", icon: <Trash2 size={16} />, destructive: true });
       if (gameCollections.length > 0) {
         opts.push({ id: "__sep__", label: "Collections", disabled: true });
@@ -624,6 +657,12 @@ export const GamingTab: React.FC = () => {
         }
         case "delete": {
           deleteGame(game.id);
+          break;
+        }
+        case "uninstall": {
+          if (canUninstallGame(game)) {
+            setConfirmUninstall({ open: true, game });
+          }
           break;
         }
         case "remove": {
@@ -1859,6 +1898,33 @@ export const GamingTab: React.FC = () => {
         onClose={() => setLightboxIndex(null)}
       />
       {menu}
+      <ConfirmDialog
+        isOpen={confirmUninstall.open}
+        title={confirmUninstall.game ? uninstallLabelForGame(confirmUninstall.game) : "Uninstall"}
+        message={confirmUninstall.game ? uninstallMessageForGame(confirmUninstall.game) : ""}
+        confirmLabel={confirmUninstall.game ? uninstallLabelForGame(confirmUninstall.game) : "Confirm"}
+        destructive
+        onConfirm={() => {
+          const game = confirmUninstall.game;
+          if (!game) return;
+          setConfirmUninstall({ open: false, game: null });
+          uninstallGame(game).then((result) => {
+            const isDelete = uninstallLabelForGame(game) === "Delete file";
+            if (result.success) {
+              useToastStore.getState().push({
+                type: "success",
+                message: `${game.title} ${isDelete ? "deleted" : "uninstalled"}`,
+              });
+            } else {
+              useToastStore.getState().push({
+                type: "error",
+                message: `Failed to ${isDelete ? "delete" : "uninstall"} ${game.title}: ${result.error ?? "Unknown error"}`,
+              });
+            }
+          });
+        }}
+        onCancel={() => setConfirmUninstall({ open: false, game: null })}
+      />
       <CollectionManager
         open={showCollectionManager}
         onClose={() => setShowCollectionManager(false)}
