@@ -378,34 +378,6 @@ export function DashboardTab(): React.ReactElement {
 
   return (
     <div className="flex flex-col h-full overflow-hidden" ref={layoutRef}>
-      {/* Toolbar */}
-      <div
-        className="flex items-center justify-end gap-2 px-4 py-2 flex-shrink-0"
-        style={{ borderBottom: "1px solid var(--color-border)" }}
-      >
-        {editMode && selectedId && (
-          <button
-            onClick={() => removeWidget(selectedId)}
-            className="flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors"
-            style={{
-              background: "rgba(239,68,68,0.15)",
-              color: "#ef4444",
-            }}
-          >
-            <Trash2 size={12} />
-            Remove
-          </button>
-        )}
-        <button
-          onClick={() => setAddDialogOpen(true)}
-          className="flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors"
-          style={{ background: "var(--color-surface-raised)" }}
-        >
-          <Plus size={12} />
-          Add Widget
-        </button>
-      </div>
-
       {/* Grid */}
       <div ref={containerRef} className="flex-1 min-h-0 overflow-auto p-4 relative">
         <Responsive
@@ -503,8 +475,8 @@ export function DashboardTab(): React.ReactElement {
           })}
         </Responsive>
 
-        {/* Floating Edit button + controller hint */}
-        <div className="absolute bottom-4 right-4 flex flex-col items-end gap-1 z-20">
+        {/* Floating action buttons + controller hint */}
+        <div className="absolute bottom-4 right-4 flex flex-col items-end gap-2 z-20">
           {!editMode && (
             <span
               className="text-[10px] opacity-40 flex items-center gap-1 px-2 py-0.5 rounded"
@@ -516,7 +488,7 @@ export function DashboardTab(): React.ReactElement {
           )}
           {westProgress > 0 && !editMode && (
             <div
-              className="w-full h-0.5 rounded-full mb-1"
+              className="w-full h-0.5 rounded-full"
               style={{
                 background: "var(--color-accent)",
                 width: `${westProgress * 100}%`,
@@ -524,19 +496,49 @@ export function DashboardTab(): React.ReactElement {
               }}
             />
           )}
-          <button
-            onClick={() => setEditMode((v) => !v)}
-            className="flex items-center justify-center w-10 h-10 rounded-full transition-colors"
-            style={{
-              background: editMode ? "var(--color-accent)" : "var(--color-surface-raised)",
-              color: editMode ? "var(--color-bg)" : "var(--color-text)",
-              boxShadow: "var(--shadow-card)",
-              border: "1px solid var(--color-border)",
-            }}
-            title={editMode ? "Done" : "Edit Layout"}
-          >
-            {editMode ? <Check size={18} /> : <Move size={18} />}
-          </button>
+          <div className="flex items-center gap-2">
+            {editMode && selectedId && (
+              <button
+                onClick={() => removeWidget(selectedId)}
+                className="flex items-center justify-center w-10 h-10 rounded-full transition-colors"
+                style={{
+                  background: "rgba(239,68,68,0.15)",
+                  color: "#ef4444",
+                  boxShadow: "var(--shadow-card)",
+                  border: "1px solid var(--color-border)",
+                }}
+                title="Remove selected widget"
+              >
+                <Trash2 size={18} />
+              </button>
+            )}
+            <button
+              onClick={() => setAddDialogOpen(true)}
+              className="flex items-center justify-center w-10 h-10 rounded-full transition-colors"
+              style={{
+                background: "var(--color-surface-raised)",
+                color: "var(--color-text)",
+                boxShadow: "var(--shadow-card)",
+                border: "1px solid var(--color-border)",
+              }}
+              title="Add Widget"
+            >
+              <Plus size={18} />
+            </button>
+            <button
+              onClick={() => setEditMode((v) => !v)}
+              className="flex items-center justify-center w-10 h-10 rounded-full transition-colors"
+              style={{
+                background: editMode ? "var(--color-accent)" : "var(--color-surface-raised)",
+                color: editMode ? "var(--color-bg)" : "var(--color-text)",
+                boxShadow: "var(--shadow-card)",
+                border: "1px solid var(--color-border)",
+              }}
+              title={editMode ? "Done" : "Edit Layout"}
+            >
+              {editMode ? <Check size={18} /> : <Move size={18} />}
+            </button>
+          </div>
         </div>
       </div>
 
