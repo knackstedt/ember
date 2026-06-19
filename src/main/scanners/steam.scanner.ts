@@ -130,6 +130,7 @@ export function scanSteamGames(): Game[] {
           execPath: `steam://rungameid/${appId}`,
           tags: [],
           sourceLocation: "local",
+          source: "steam",
         });
       } catch {
         log.error("scanSteamGames", `Failed to parse Steam game: ${entry}`);

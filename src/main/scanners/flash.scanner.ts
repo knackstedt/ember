@@ -160,6 +160,7 @@ export function scanFlashGames(): Game[] {
         description: swfMeta.description,
         tags: [],
         sourceLocation: resolveSourceLocation(fullPath),
+        source: "flash",
       });
     });
   }

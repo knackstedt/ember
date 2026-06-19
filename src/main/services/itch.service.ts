@@ -44,6 +44,7 @@ export function listInstalledItchGames(): Game[] {
         developer: game.user?.displayName ?? game.user?.username,
         tags: [],
         sourceLocation: resolveSourceLocation(exe),
+        source: "itch",
       });
     }
   } catch (err: any) {

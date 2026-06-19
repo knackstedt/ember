@@ -22,7 +22,7 @@ const defaults: AppSettings = {
   hardwareAcceleration: true,
   disabledTabs: [],
   dailyBackground: { enabled: false, source: "bing" },
-  background: { type: "theme" },
+  background: "theme",
   defaultEmulatorShader: "",
   emulatorShaders: {},
   commandKeybinds: {},
@@ -82,6 +82,8 @@ const defaults: AppSettings = {
       { i: "widget-system", x: 3, y: 4, w: 3, h: 2, minW: 2, minH: 2 },
     ],
   },
+  disabledScanSources: [],
+  corruptedFilesPolicy: "warn",
 };
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({

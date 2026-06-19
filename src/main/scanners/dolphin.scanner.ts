@@ -146,6 +146,7 @@ export function scanDolphinGames(extraPaths: string[] = []): Game[] {
         execPath: `dolphin-emu --exec="${fullPath}"`,
         tags: [],
         sourceLocation: resolveSourceLocation(fullPath),
+        source: "dolphin",
       });
     });
   }

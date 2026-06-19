@@ -112,6 +112,7 @@ export function scanDesktopGames(): Game[] {
           description: data.Comment,
           tags: [],
           sourceLocation: resolveSourceLocation(data.Exec),
+          source: "desktop",
         });
       } catch {
         continue;

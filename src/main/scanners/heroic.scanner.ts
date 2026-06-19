@@ -99,6 +99,7 @@ function parseLibrary(
         description: g.extra?.about?.longDescription,
         tags: [],
         sourceLocation: resolveSourceLocation(g.install?.executable),
+        source: "heroic" as const,
       }));
   } catch {
     log.error("parseLibrary", `Failed to parse Heroic library: ${path}`);
@@ -162,6 +163,7 @@ export function scanLutrisGames(): Game[] {
           ? `ember://media/${join(homedir(), ".cache", "lutris", "coverart", `${data.slug}.jpg`)}`
           : undefined,
         tags: [],
+        source: "lutris",
       });
     } catch {
       log.error("scanLutrisGames", `Failed to parse Lutris game: ${entry}`);

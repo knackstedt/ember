@@ -98,7 +98,7 @@ function hashId(prefix: string, fullPath: string): string {
   return `${prefix}_${createHash("sha256").update(fullPath).digest("hex").slice(0, 16)}`;
 }
 
-export function scanV86Games(): Game[] {
+export function scanV86Games(romPaths: string[] = [], gamePaths: string[] = []): Game[] {
   const roots = [
     join(homedir(), "Roms"),
     join(homedir(), "ROMs"),
@@ -107,6 +107,8 @@ export function scanV86Games(): Game[] {
     join(homedir(), "roms"),
     join(homedir(), "DOS"),
     join(homedir(), "dos"),
+    ...romPaths,
+    ...gamePaths,
   ].filter(existsSync);
 
   log.info("v86", `scanning roots: ${roots.join(", ")}`);
@@ -140,6 +142,7 @@ export function scanV86Games(): Game[] {
         romPath: fullPath,
         tags: [],
         sourceLocation: resolveSourceLocation(fullPath),
+        source: "v86",
       });
     });
   }

@@ -252,6 +252,7 @@ export function scanRomGames(romPaths: string[] = []): Game[] {
         romPath: fullPath,
         tags: [],
         sourceLocation: resolveSourceLocation(fullPath),
+        source: "rom",
       });
     });
   }

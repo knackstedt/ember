@@ -9,6 +9,7 @@ import { Game } from "../../shared/types";
 import { findSidecarImage, searchOnlineThumbnail } from "./flash-thumbnail.service";
 import { detectInstalledCores } from "./package-manager.service";
 import { workerCall } from "../ipc";
+import { applyCorruptPolicy } from "./settings.service";
 import { createLogger } from "../util/logger";
 
 const log = createLogger("info");
@@ -692,6 +693,9 @@ async function updateGameCover(id: string, url: string, source?: string): Promis
         await db.query(`UPDATE game:⟨${id}⟩ SET coverUrl = $url, coverSource = $source, corrupt = $broken`, { url, source, broken });
       } else {
         await db.query(`UPDATE game:⟨${id}⟩ SET coverUrl = $url, corrupt = $broken`, { url, broken });
+      }
+      if (broken) {
+        await applyCorruptPolicy(id, "game");
       }
       return;
     } catch (err: any) {

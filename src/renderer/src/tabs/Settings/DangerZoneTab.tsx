@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSettingsStore } from "../../store/settings.store";
 import { useToastStore } from "../../store/toast.store";
@@ -10,7 +10,15 @@ import {
   RefreshCw,
   Archive,
   Ghost,
+  ShieldAlert,
+  Gamepad2,
+  Film,
+  Music,
+  FolderOpen,
+  Check,
+  X,
 } from "lucide-react";
+import { Game, Movie, MusicTrack } from "../../../../shared/types";
 
 interface DangerActionProps {
   icon: React.ReactNode;
@@ -132,12 +140,201 @@ const DangerAction: React.FC<DangerActionProps> = ({
   );
 };
 
+type CorruptType = "game" | "movie" | "music";
+
+interface CorruptedEntry {
+  id: string;
+  type: CorruptType;
+  title: string;
+  path: string;
+}
+
+const TYPE_ICONS: Record<CorruptType, React.ElementType> = {
+  game: Gamepad2,
+  movie: Film,
+  music: Music,
+};
+
+const TYPE_LABELS: Record<CorruptType, string> = {
+  game: "Game",
+  movie: "Movie",
+  music: "Music",
+};
+
+const POLICY_OPTIONS: { value: "warn" | "hide" | "delete"; label: string }[] = [
+  { value: "warn", label: "Warn" },
+  { value: "hide", label: "Hide" },
+  { value: "delete", label: "Delete" },
+];
+
+function CorruptedItemCard({
+  entry,
+  onOpenLocation,
+}: {
+  entry: CorruptedEntry;
+  onOpenLocation: (entry: CorruptedEntry) => void;
+}) {
+  const Icon = TYPE_ICONS[entry.type];
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.98 }}
+      className="flex flex-col gap-2 p-3 rounded-[var(--radius-card)]"
+      style={{
+        background: "var(--color-surface)",
+        border: "1px solid var(--color-border)",
+      }}
+    >
+      <div className="flex items-start gap-3">
+        <div
+          className="p-2 rounded-lg shrink-0"
+          style={{ background: "var(--color-surface-raised)" }}
+        >
+          <Icon size={18} style={{ color: "var(--color-accent)" }} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <span
+            className="text-xs px-1.5 py-0.5 rounded font-medium"
+            style={{
+              background: "#ff444420",
+              color: "#ff4444",
+            }}
+          >
+            {TYPE_LABELS[entry.type]}
+          </span>
+          <p
+            className="font-medium text-sm truncate mt-1"
+            style={{ color: "var(--color-text)" }}
+            title={entry.title}
+          >
+            {entry.title}
+          </p>
+          {entry.path && (
+            <p
+              className="text-xs truncate"
+              style={{ color: "var(--color-text-dim)" }}
+              title={entry.path}
+            >
+              {entry.path}
+            </p>
+          )}
+        </div>
+      </div>
+      {entry.path && (
+        <motion.button
+          className="self-start flex items-center gap-2 px-3 py-1.5 rounded-[var(--radius-card)] text-xs"
+          style={{
+            background: "var(--color-surface-raised)",
+            color: "var(--color-text)",
+            border: "1px solid var(--color-border)",
+          }}
+          onClick={() => onOpenLocation(entry)}
+          whileTap={{ scale: 0.96 }}
+        >
+          <FolderOpen size={14} />
+          Open file location
+        </motion.button>
+      )}
+    </motion.div>
+  );
+}
+
 export const DangerZoneTab: React.FC = () => {
-  const { settings } = useSettingsStore();
+  const { settings, update } = useSettingsStore();
   const [compressing, setCompressing] = useState(false);
   const [clearingMissing, setClearingMissing] = useState(false);
+  const [corruptEntries, setCorruptEntries] = useState<CorruptedEntry[]>([]);
+  const [corruptLoading, setCorruptLoading] = useState(true);
+  const [corruptDeleting, setCorruptDeleting] = useState(false);
+  const [corruptConfirming, setCorruptConfirming] = useState(false);
+
+  const policy = settings?.corruptedFilesPolicy ?? "warn";
 
   if (!settings) return null;
+
+  const loadCorrupt = async () => {
+    setCorruptLoading(true);
+    try {
+      const { games, movies, music } = await window.htpc.db.listCorrupt();
+      const next: CorruptedEntry[] = [
+        ...games.map((g: Game) => ({
+          id: g.id,
+          type: "game" as CorruptType,
+          title: g.title,
+          path: g.compressedRomPath || g.romPath || g.execPath || "",
+        })),
+        ...movies.map((m: Movie) => ({
+          id: m.id,
+          type: "movie" as CorruptType,
+          title: m.title,
+          path: m.filePath,
+        })),
+        ...music.map((t: MusicTrack) => ({
+          id: t.id,
+          type: "music" as CorruptType,
+          title: t.title,
+          path: t.filePath,
+        })),
+      ];
+      setCorruptEntries(next);
+    } catch (err) {
+      useToastStore.getState().push({
+        type: "error",
+        message: `Failed to load corrupted entries: ${String(err)}`,
+      });
+    } finally {
+      setCorruptLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadCorrupt();
+  }, []);
+
+  const corruptCounts = useMemo(() => {
+    return {
+      games: corruptEntries.filter((e) => e.type === "game").length,
+      movies: corruptEntries.filter((e) => e.type === "movie").length,
+      music: corruptEntries.filter((e) => e.type === "music").length,
+    };
+  }, [corruptEntries]);
+
+  const handleOpenCorruptLocation = async (entry: CorruptedEntry) => {
+    if (!entry.path) return;
+    try {
+      await window.htpc.shell.showItemInFolder(entry.path);
+    } catch (err) {
+      useToastStore.getState().push({
+        type: "error",
+        message: `Failed to open location: ${String(err)}`,
+      });
+    }
+  };
+
+  const handleDeleteAllCorrupt = async () => {
+    setCorruptDeleting(true);
+    try {
+      const result = await window.htpc.db.deleteCorrupt();
+      useToastStore.getState().push({
+        type: "success",
+        message: `Deleted ${result.games} games, ${result.movies} movies, ${result.music} tracks marked as corrupt.`,
+      });
+      useGamesStore.getState().load();
+      useMoviesStore.getState().load();
+      useMusicStore.getState().load();
+      setCorruptEntries([]);
+      setCorruptConfirming(false);
+    } catch (err) {
+      useToastStore.getState().push({
+        type: "error",
+        message: `Failed to delete corrupted entries: ${String(err)}`,
+      });
+    } finally {
+      setCorruptDeleting(false);
+    }
+  };
 
   const handleCompressAll = async () => {
     setCompressing(true);
@@ -252,6 +449,227 @@ export const DangerZoneTab: React.FC = () => {
           loading={clearingMissing}
           onConfirm={handleClearMissing}
         />
+      </section>
+
+      <section className="flex flex-col gap-4">
+        <div className="flex items-center gap-2 mb-2">
+          <ShieldAlert size={20} style={{ color: "#ff4444" }} />
+          <h2 className="text-lg font-semibold" style={{ color: "var(--color-text)" }}>
+            Corrupted Files
+          </h2>
+        </div>
+        <p className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+          Manage library entries whose files were detected as corrupt or malformed.
+        </p>
+
+        <div className="flex flex-col gap-3">
+          <h3 className="text-sm font-medium" style={{ color: "var(--color-text)" }}>
+            Corrupted files policy
+          </h3>
+          <p className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+            Choose how the app handles newly detected corrupt files.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {POLICY_OPTIONS.map((option) => {
+              const active = policy === option.value;
+              return (
+                <motion.button
+                  key={option.value}
+                  className="px-4 py-2 rounded-[var(--radius-card)] text-sm"
+                  style={{
+                    background: active
+                      ? "var(--color-accent)"
+                      : "var(--color-surface-raised)",
+                    color: active ? "var(--color-bg)" : "var(--color-text)",
+                    border: "1px solid var(--color-border)",
+                  }}
+                  onClick={() => update({ corruptedFilesPolicy: option.value })}
+                  whileTap={{ scale: 0.96 }}
+                >
+                  {option.label}
+                </motion.button>
+              );
+            })}
+          </div>
+          {policy === "delete" && (
+            <div
+              className="flex items-start gap-2 p-3 rounded-[var(--radius-card)] text-sm"
+              style={{
+                background: "#ff444420",
+                border: "1px solid #ff444430",
+                color: "#ff4444",
+              }}
+            >
+              <AlertTriangle size={16} className="shrink-0 mt-0.5" />
+              <span>
+                Experimental: the "Delete" policy will automatically remove corrupted
+                library entries when they are detected. This is a destructive action
+                and cannot be undone.
+              </span>
+            </div>
+          )}
+          {policy === "hide" && (
+            <p className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+              Corrupted entries will be hidden from the main library views but remain
+              visible in this list.
+            </p>
+          )}
+          {policy === "warn" && (
+            <p className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+              Corrupted entries will be flagged and listed here for manual review.
+            </p>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div className="flex flex-wrap gap-2 text-sm">
+            <span style={{ color: "var(--color-text-dim)" }}>
+              {corruptCounts.games} games
+            </span>
+            <span style={{ color: "var(--color-border)" }}>•</span>
+            <span style={{ color: "var(--color-text-dim)" }}>
+              {corruptCounts.movies} movies
+            </span>
+            <span style={{ color: "var(--color-border)" }}>•</span>
+            <span style={{ color: "var(--color-text-dim)" }}>
+              {corruptCounts.music} music tracks
+            </span>
+          </div>
+          <div className="flex items-center gap-3">
+            <motion.button
+              className="flex items-center gap-2 px-3 py-2 rounded-[var(--radius-card)] text-sm"
+              style={{
+                background: "var(--color-surface-raised)",
+                color: "var(--color-text)",
+                border: "1px solid var(--color-border)",
+              }}
+              onClick={loadCorrupt}
+              whileTap={{ scale: 0.96 }}
+            >
+              <RefreshCw size={14} />
+              Refresh
+            </motion.button>
+            <AnimatePresence mode="wait">
+              {corruptConfirming ? (
+                <motion.div
+                  key="confirm"
+                  className="flex items-center gap-2"
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 4 }}
+                >
+                  <motion.button
+                    className="flex items-center gap-2 px-3 py-2 rounded-[var(--radius-card)] text-sm"
+                    style={{ background: "#e05252", color: "#fff" }}
+                    onClick={handleDeleteAllCorrupt}
+                    whileTap={{ scale: 0.96 }}
+                    disabled={corruptDeleting}
+                  >
+                    {corruptDeleting ? (
+                      <RefreshCw size={14} className="animate-spin" />
+                    ) : (
+                      <Check size={14} />
+                    )}
+                    Confirm
+                  </motion.button>
+                  <motion.button
+                    className="flex items-center gap-2 px-3 py-2 rounded-[var(--radius-card)] text-sm"
+                    style={{
+                      background: "var(--color-surface)",
+                      color: "var(--color-text)",
+                      border: "1px solid var(--color-border)",
+                    }}
+                    onClick={() => setCorruptConfirming(false)}
+                    whileTap={{ scale: 0.96 }}
+                    disabled={corruptDeleting}
+                  >
+                    <X size={14} />
+                    Cancel
+                  </motion.button>
+                </motion.div>
+              ) : (
+                <motion.button
+                  key="delete"
+                  className="flex items-center gap-2 px-3 py-2 rounded-[var(--radius-card)] text-sm"
+                  style={{
+                    background: "#ff444420",
+                    color: "#ff4444",
+                    border: "1px solid #ff444430",
+                  }}
+                  onClick={() => setCorruptConfirming(true)}
+                  whileTap={{ scale: 0.96 }}
+                  disabled={corruptEntries.length === 0}
+                >
+                  <Trash2 size={14} />
+                  Delete all
+                </motion.button>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+
+        {corruptConfirming && (
+          <div
+            className="p-3 rounded-[var(--radius-card)] text-sm"
+            style={{
+              background: "#ff444420",
+              border: "1px solid #ff444430",
+              color: "#ff4444",
+            }}
+          >
+            <div className="flex items-start gap-2">
+              <AlertTriangle size={16} className="shrink-0 mt-0.5" />
+              <span>
+                Permanently delete all {corruptEntries.length} corrupted library entries?
+                This cannot be undone.
+              </span>
+            </div>
+          </div>
+        )}
+
+        {corruptLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <div
+              className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin"
+              style={{
+                borderColor: "var(--color-accent)",
+                borderTopColor: "transparent",
+              }}
+            />
+          </div>
+        ) : corruptEntries.length === 0 ? (
+          <div
+            className="flex flex-col items-center justify-center gap-3 py-12 rounded-[var(--radius-card)]"
+            style={{
+              background: "var(--color-surface-raised)",
+              border: "1px solid var(--color-border)",
+            }}
+          >
+            <AlertTriangle size={32} style={{ color: "var(--color-accent)" }} />
+            <p style={{ color: "var(--color-text-dim)" }}>
+              No corrupted entries found.
+            </p>
+          </div>
+        ) : (
+          <div
+            className="grid gap-3"
+            style={{
+              gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+            }}
+            data-nav-orientation="grid"
+            data-nav-columns="3"
+          >
+            <AnimatePresence>
+              {corruptEntries.map((entry) => (
+                <CorruptedItemCard
+                  key={`${entry.type}:${entry.id}`}
+                  entry={entry}
+                  onOpenLocation={handleOpenCorruptLocation}
+                />
+              ))}
+            </AnimatePresence>
+          </div>
+        )}
       </section>
 
       <section className="flex flex-col gap-4">

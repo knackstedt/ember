@@ -13,6 +13,7 @@ import { scanV86Games } from "../scanners/v86.scanner";
 import { scanWindowsGames } from "../scanners/windows.scanner";
 import { scanItchGames } from "../scanners/itch.scanner";
 import { Game } from "../../shared/types";
+import { SCAN_SOURCE_ID_PREFIXES } from "../../shared/scan-sources";
 import { createLogger } from "../util/logger";
 import { getSettings } from "./settings.service";
 import { calculateCRC32, calculateMD5, calculateSHA1, getRomHashes } from "./metadata/datfiles.service";
@@ -41,6 +42,16 @@ const MANAGED_PLATFORMS = new Set([
   "genesis", "sms", "gamegear", "pce", "psx", "nds", "dreamcast",
   "flash", "dos", "windows",
 ]);
+
+function gameSource(game: Game): string | undefined {
+  if (game.source) return game.source;
+  const id = extractRecordId(game.id);
+  if (!id) return undefined;
+  for (const [source, prefixes] of Object.entries(SCAN_SOURCE_ID_PREFIXES)) {
+    if (prefixes.some((p) => id.startsWith(p))) return source;
+  }
+  return undefined;
+}
 
 function resolveTargetPath(game: Game): string | undefined {
   // Prefer compressed ROM if it still exists, so games aren't removed
@@ -85,6 +96,8 @@ async function markStaleGamesMissing(
   const scannedIds = new Set(scannedGames.map((g) => g.id));
   const result = await db.query<[Game[]]>("SELECT * FROM game");
   const existingGames = (result[0] ?? []) as Game[];
+  const settings = await getSettings();
+  const disabledSources = new Set(settings.disabledScanSources ?? []);
 
   log.info("cleanup", `Checking ${existingGames.length} existing games against ${scannedIds.size} scanned games`);
 
@@ -98,6 +111,10 @@ async function markStaleGamesMissing(
     }
 
     if (!MANAGED_PLATFORMS.has(game.platform)) continue;
+
+    // Don't mark games from disabled scan sources as missing, since they are intentionally skipped.
+    const source = gameSource(game);
+    if (source && disabledSources.has(source)) continue;
 
     if (scannedIds.has(id)) {
       // Game was found in scan: ensure it is not marked missing
@@ -248,25 +265,32 @@ async function scanInMainThread(
   const settings = await getSettings();
   const romPaths = settings.romPaths ?? [];
   const gamePaths = settings.gamePaths ?? [];
+  const disabledSources = new Set(settings.disabledScanSources ?? []);
   const dolphinExtra = [...gamePaths, ...romPaths];
+  const isEnabled = (source: string) => !disabledSources.has(source);
 
-  report("steam", 0, 0, "scanning");
-  const steam = scanSteamGames();
-  report("steam", steam.length, steam.length, "done");
+  const reportAndScan = <T>(
+    scanner: string,
+    fn: () => T[],
+  ): T[] => {
+    report(scanner, 0, 0, "scanning");
+    const result = fn();
+    report(scanner, result.length, result.length, "done");
+    return result;
+  };
 
-  report("dolphin", 0, 0, "scanning");
-  const dolphin = scanDolphinGames(dolphinExtra);
-  report("dolphin", dolphin.length, dolphin.length, "done");
-
-  const heroic = scanHeroicGames();
-  const lutris = scanLutrisGames();
-  const desktop = scanDesktopGames();
-
-  const flash = scanFlashGames();
-  const roms = scanRomGames(romPaths);
-  const v86 = scanV86Games();
-  const windows = scanWindowsGames();
-  const itch = scanItchGames();
+  const steam = isEnabled("steam") ? reportAndScan("steam", scanSteamGames) : [];
+  const dolphin = isEnabled("dolphin")
+    ? reportAndScan("dolphin", () => scanDolphinGames(dolphinExtra))
+    : [];
+  const heroic = isEnabled("heroic") ? scanHeroicGames() : [];
+  const lutris = isEnabled("lutris") ? scanLutrisGames() : [];
+  const desktop = isEnabled("desktop") ? scanDesktopGames() : [];
+  const flash = isEnabled("flash") ? scanFlashGames() : [];
+  const roms = isEnabled("rom") ? scanRomGames(romPaths) : [];
+  const v86 = isEnabled("v86") ? scanV86Games(romPaths, gamePaths) : [];
+  const windows = isEnabled("windows") ? scanWindowsGames(gamePaths, romPaths) : [];
+  const itch = isEnabled("itch") ? scanItchGames() : [];
 
   const all = [...steam, ...dolphin, ...heroic, ...lutris, ...desktop, ...flash, ...roms, ...v86, ...windows, ...itch];
 
@@ -315,6 +339,7 @@ export async function performGameScan(
   const settings = await getSettings();
   const romPaths = settings.romPaths ?? [];
   const gamePaths = settings.gamePaths ?? [];
+  const disabledScanSources = settings.disabledScanSources ?? [];
 
   return new Promise((resolve, reject) => {
     const worker = new Worker(workerPath);
@@ -371,6 +396,6 @@ export async function performGameScan(
       reject(err);
     });
 
-    worker.postMessage({ extraPaths, romPaths, gamePaths });
+    worker.postMessage({ extraPaths, romPaths, gamePaths, disabledScanSources });
   });
 }
