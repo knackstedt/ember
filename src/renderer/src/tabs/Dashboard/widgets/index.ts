@@ -1,0 +1,13 @@
+export { ClockWidget } from "./ClockWidget";
+export { SystemInfoWidget } from "./SystemInfoWidget";
+export { RecentGamesWidget } from "./RecentGamesWidget";
+export { FavoriteGamesWidget } from "./FavoriteGamesWidget";
+export { StatsWidget } from "./StatsWidget";
+export { NowPlayingWidget } from "./NowPlayingWidget";
+export { WebviewWidget } from "./WebviewWidget";
+export { WeatherWidget } from "./WeatherWidget";
+export { AchievementsWidget } from "./AchievementsWidget";
+export { RecentMoviesWidget } from "./RecentMoviesWidget";
+export { RecentMusicWidget } from "./RecentMusicWidget";
+export { NewsWidget } from "./NewsWidget";
+export { QuickLaunchWidget } from "./QuickLaunchWidget";

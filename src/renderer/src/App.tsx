@@ -8,6 +8,7 @@ import {
   Store,
   Settings,
   Maximize,
+  LayoutDashboard,
 } from "lucide-react";
 import { useSettingsStore } from "./store/settings.store";
 import { useInputStore } from "./store/input.store";
@@ -19,6 +20,7 @@ import { StreamingTab } from "./tabs/Streaming";
 import { StoreTab } from "./tabs/Store";
 import { SettingsTab } from "./tabs/Settings";
 import { ControllersTab } from "./tabs/Controllers";
+import { DashboardTab } from "./tabs/Dashboard";
 import { TabId, ScanProgress, AppSettings, NormalizedInputEvent } from "../../shared/types";
 import { useGamesStore } from "./store/games.store";
 import { useMoviesStore, useMusicStore, useTvStore } from "./store/media.store";
@@ -105,6 +107,7 @@ interface TabDef {
 }
 
 const TABS: TabDef[] = [
+  { id: "dashboard", label: "Dashboard", Icon: LayoutDashboard, component: DashboardTab },
   { id: "gaming", label: "Gaming", Icon: Gamepad2, component: GamingTab },
   { id: "movies", label: "Movies", Icon: Film, component: MoviesTab },
   { id: "music", label: "Music", Icon: Music, component: MusicTab },

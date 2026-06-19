@@ -7,6 +7,11 @@ import { useJsnesPlayerStore } from "./store/jsnesPlayer.store";
 import { usePluginPlayerStore } from "./store/pluginPlayer.store";
 import { ErrorBoundary } from "./components/ErrorBoundary/ErrorBoundary";
 
+// Polyfill process for libraries (e.g. react-grid-layout) that check process.env.NODE_ENV
+if (typeof window !== "undefined" && !(window as any).process) {
+  (window as any).process = { env: {} };
+}
+
 // Expose stores on window for debugging and automated validation
 (window as any).useFlashPlayerStore = useFlashPlayerStore;
 (window as any).useJsnesPlayerStore = useJsnesPlayerStore;
