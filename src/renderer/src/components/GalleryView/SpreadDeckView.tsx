@@ -16,6 +16,10 @@ export interface SpreadDeckViewProps<T> {
   focusedIndex?: number;
   /** Called when the computed items-per-deck changes (e.g. on resize) */
   onItemsPerRowChange?: (count: number) => void;
+  /** Called when a card is clicked by mouse or virtual cursor. */
+  onItemClick?: (item: T, index: number) => void;
+  /** Binds context-menu / long-press handlers to each card. */
+  bindItem?: (item: T, index: number) => Record<string, unknown>;
 }
 
 const CARD_WIDTH = 152;
@@ -40,6 +44,8 @@ export const SpreadDeckView = React.forwardRef(function SpreadDeckViewInner<T>(
     overscan = 2,
     focusedIndex = -1,
     onItemsPerRowChange,
+    onItemClick,
+    bindItem,
   }: SpreadDeckViewProps<T>,
   forwardedRef: React.Ref<{ scrollToItem(index: number): void }>,
 ): React.ReactElement {
@@ -51,6 +57,10 @@ export const SpreadDeckView = React.forwardRef(function SpreadDeckViewInner<T>(
   renderCardRef.current = renderCard;
   const onItemsPerRowChangeRef = useRef(onItemsPerRowChange);
   onItemsPerRowChangeRef.current = onItemsPerRowChange;
+  const onItemClickRef = useRef(onItemClick);
+  onItemClickRef.current = onItemClick;
+  const bindItemRef = useRef(bindItem);
+  bindItemRef.current = bindItem;
 
   // Measure container width so we can fit as many cards as possible per deck
   useLayoutEffect(() => {
@@ -126,6 +136,7 @@ export const SpreadDeckView = React.forwardRef(function SpreadDeckViewInner<T>(
                 const isHovered = hoveredGlobalIndex === globalIndex;
                 const isFocused = focusedIndex === globalIndex;
                 const isActive = isHovered || isFocused;
+                const itemProps = bindItemRef.current ? bindItemRef.current(item, globalIndex) : {};
                 return (
                   <div
                     key={globalIndex}
@@ -144,6 +155,8 @@ export const SpreadDeckView = React.forwardRef(function SpreadDeckViewInner<T>(
                     }}
                     onMouseEnter={() => setHoveredGlobalIndex(globalIndex)}
                     onMouseLeave={() => setHoveredGlobalIndex((prev) => (prev === globalIndex ? null : prev))}
+                    onClick={() => onItemClickRef.current?.(item, globalIndex)}
+                    {...itemProps}
                   >
                     {renderCardRef.current(item, globalIndex, { isHovered, isFocused })}
                   </div>

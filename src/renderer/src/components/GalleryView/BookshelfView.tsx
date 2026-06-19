@@ -16,6 +16,10 @@ export interface BookshelfViewProps<T> {
   focusedIndex?: number;
   /** Called when the computed items-per-shelf changes (e.g. on resize) */
   onItemsPerRowChange?: (count: number) => void;
+  /** Called when a spine is clicked by mouse or virtual cursor. */
+  onItemClick?: (item: T, index: number) => void;
+  /** Binds context-menu / long-press handlers to each spine. */
+  bindItem?: (item: T, index: number) => Record<string, unknown>;
 }
 
 const SPINE_COLLAPSED = 36;
@@ -42,6 +46,8 @@ export const BookshelfView = React.forwardRef(function BookshelfViewInner<T>(
     overscan = 2,
     focusedIndex = -1,
     onItemsPerRowChange,
+    onItemClick,
+    bindItem,
   }: BookshelfViewProps<T>,
   forwardedRef: React.Ref<{ scrollToItem(index: number): void }>,
 ): React.ReactElement {
@@ -53,6 +59,10 @@ export const BookshelfView = React.forwardRef(function BookshelfViewInner<T>(
   renderSpineRef.current = renderSpine;
   const onItemsPerRowChangeRef = useRef(onItemsPerRowChange);
   onItemsPerRowChangeRef.current = onItemsPerRowChange;
+  const onItemClickRef = useRef(onItemClick);
+  onItemClickRef.current = onItemClick;
+  const bindItemRef = useRef(bindItem);
+  bindItemRef.current = bindItem;
 
   // Measure container width so we can fit as many spines as possible per shelf
   useLayoutEffect(() => {
@@ -126,6 +136,7 @@ export const BookshelfView = React.forwardRef(function BookshelfViewInner<T>(
               const isHovered = hoveredGlobalIndex === globalIndex;
               const isFocused = focusedIndex === globalIndex;
               const isActive = isHovered || isFocused;
+              const itemProps = bindItemRef.current ? bindItemRef.current(item, globalIndex) : {};
               return (
                 <div
                   key={globalIndex}
@@ -140,6 +151,8 @@ export const BookshelfView = React.forwardRef(function BookshelfViewInner<T>(
                   }}
                   onMouseEnter={() => setHoveredGlobalIndex(globalIndex)}
                   onMouseLeave={() => setHoveredGlobalIndex((prev) => (prev === globalIndex ? null : prev))}
+                  onClick={() => onItemClickRef.current?.(item, globalIndex)}
+                  {...itemProps}
                 >
                   {renderSpineRef.current(item, globalIndex, { isHovered, isFocused })}
                 </div>
