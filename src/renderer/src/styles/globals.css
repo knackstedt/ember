@@ -332,6 +332,18 @@ section {
   height: 100% !important;
 }
 
+/* ─── Dashboard grid resize handles ────────────────────────── */
+.react-grid-item > .react-resizable-handle {
+  width: 24px !important;
+  height: 24px !important;
+}
+.react-grid-item > .react-resizable-handle::after {
+  width: 12px !important;
+  height: 12px !important;
+  border-right-color: var(--color-accent) !important;
+  border-bottom-color: var(--color-accent) !important;
+}
+
 /* ─── Skeleton shimmer ─────────────────────────────────────── */
 .skeleton-shimmer {
   position: relative;
