@@ -14,6 +14,7 @@ import { scanWindowsGames } from "../scanners/windows.scanner";
 import { scanItchGames } from "../scanners/itch.scanner";
 import { Game } from "../../shared/types";
 import { SCAN_SOURCE_ID_PREFIXES } from "../../shared/scan-sources";
+import type { ScanSourceId } from "../../shared/scan-sources";
 import { createLogger } from "../util/logger";
 import { getSettings } from "./settings.service";
 import { calculateCRC32, calculateMD5, calculateSHA1, getRomHashes } from "./metadata/datfiles.service";
@@ -42,16 +43,6 @@ const MANAGED_PLATFORMS = new Set([
   "genesis", "sms", "gamegear", "pce", "psx", "nds", "dreamcast",
   "flash", "dos", "windows",
 ]);
-
-function gameSource(game: Game): string | undefined {
-  if (game.source) return game.source;
-  const id = extractRecordId(game.id);
-  if (!id) return undefined;
-  for (const [source, prefixes] of Object.entries(SCAN_SOURCE_ID_PREFIXES)) {
-    if (prefixes.some((p) => id.startsWith(p))) return source;
-  }
-  return undefined;
-}
 
 function resolveTargetPath(game: Game): string | undefined {
   // Prefer compressed ROM if it still exists, so games aren't removed
@@ -89,6 +80,16 @@ function extractRecordId(raw: unknown): string | null {
   return null;
 }
 
+function gameSource(game: Game): ScanSourceId | undefined {
+  if (game.source) return game.source;
+  const id = extractRecordId(game.id);
+  if (!id) return undefined;
+  for (const [source, prefixes] of Object.entries(SCAN_SOURCE_ID_PREFIXES)) {
+    if (prefixes.some((p) => id.startsWith(p))) return source as ScanSourceId;
+  }
+  return undefined;
+}
+
 async function markStaleGamesMissing(
   db: ReturnType<typeof getDb>,
   scannedGames: Game[],
@@ -101,7 +102,7 @@ async function markStaleGamesMissing(
 
   log.info("cleanup", `Checking ${existingGames.length} existing games against ${scannedIds.size} scanned games`);
 
-  const updatePromises: Promise<void>[] = [];
+  const updatePromises: Promise<unknown>[] = [];
 
   for (const game of existingGames) {
     const id = extractRecordId(game.id);
@@ -267,10 +268,10 @@ async function scanInMainThread(
   const gamePaths = settings.gamePaths ?? [];
   const disabledSources = new Set(settings.disabledScanSources ?? []);
   const dolphinExtra = [...gamePaths, ...romPaths];
-  const isEnabled = (source: string) => !disabledSources.has(source);
+  const isEnabled = (source: ScanSourceId) => !disabledSources.has(source);
 
   const reportAndScan = <T>(
-    scanner: string,
+    scanner: ScanSourceId,
     fn: () => T[],
   ): T[] => {
     report(scanner, 0, 0, "scanning");

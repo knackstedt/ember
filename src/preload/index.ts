@@ -17,12 +17,15 @@ import {
   ScanProgress,
   Collection,
   CollectionItem,
+  Playlist,
   SmartFilterGroup,
   StreamingService,
   ExtensionInstallResult,
   StreamingExtension,
   ManagedPackage,
   PackageOperationProgress,
+  AudioTags,
+  ReorganizeResult,
 } from "../shared/types";
 import { GameMetadata } from "../shared/metadata";
 
@@ -458,6 +461,10 @@ const htpc = {
       ipcRenderer.invoke("games:hide", id, value),
     delete: (id: string): Promise<void> =>
       ipcRenderer.invoke("games:delete", id),
+    countBySource: (source: string): Promise<number> =>
+      ipcRenderer.invoke("games:countBySource", source),
+    deleteBySource: (source: string): Promise<number> =>
+      ipcRenderer.invoke("games:deleteBySource", source),
     uninstall: (game: Game): Promise<{ success: boolean; error?: string; method?: string }> =>
       ipcRenderer.invoke("games:uninstall", game),
     emulatorConfig: {
@@ -550,6 +557,8 @@ const htpc = {
       ipcRenderer.invoke("music:favorite", id, value),
     tag: (id: string, tags: string[]): Promise<void> =>
       ipcRenderer.invoke("music:tag", id, tags),
+    writeTags: (filePath: string, tags: AudioTags): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke("music:writeTags", filePath, tags),
     searchCoverArt: (track: MusicTrack): Promise<string | null> =>
       ipcRenderer.invoke("music:searchCoverArt", track),
     pickCoverImage: (track: MusicTrack): Promise<string | null> =>
@@ -576,6 +585,12 @@ const htpc = {
         artistImageUrl?: string;
       }>
     > => ipcRenderer.invoke("music:enrichBatch", tracks),
+    setLastPlayed: (id: string, timestamp: number): Promise<void> =>
+      ipcRenderer.invoke("music:lastPlayed", id, timestamp),
+    reorganizePreview: (pattern: string): Promise<ReorganizeResult> =>
+      ipcRenderer.invoke("music:reorganizePreview", pattern),
+    reorganize: (pattern: string): Promise<ReorganizeResult> =>
+      ipcRenderer.invoke("music:reorganize", pattern),
   },
 
   tv: {
@@ -666,6 +681,10 @@ const htpc = {
     wipeThumbnails: (): Promise<boolean> => ipcRenderer.invoke("db:wipe-thumbnails"),
     deleteMissing: (): Promise<{ games: number; movies: number; music: number }> =>
       ipcRenderer.invoke("db:delete-missing"),
+    listCorrupt: (): Promise<{ games: Game[]; movies: Movie[]; music: MusicTrack[] }> =>
+      ipcRenderer.invoke("db:list-corrupt"),
+    deleteCorrupt: (): Promise<{ games: number; movies: number; music: number }> =>
+      ipcRenderer.invoke("db:delete-corrupt"),
   },
 
   openDirectory: (): Promise<string | null> =>
@@ -745,6 +764,16 @@ const htpc = {
     smartEvaluate: (itemType: string, filter: SmartFilterGroup): Promise<string[]> => ipcRenderer.invoke("collections:smart:evaluate", itemType, filter),
   },
 
+  playlist: {
+    list: (): Promise<Playlist[]> => ipcRenderer.invoke("playlist:list"),
+    create: (playlist: Playlist): Promise<Playlist> => ipcRenderer.invoke("playlist:create", playlist),
+    update: (id: string, data: Partial<Playlist>): Promise<Playlist> => ipcRenderer.invoke("playlist:update", id, data),
+    delete: (id: string): Promise<void> => ipcRenderer.invoke("playlist:delete", id),
+    addTracks: (id: string, trackIds: string[]): Promise<Playlist | null> => ipcRenderer.invoke("playlist:addTracks", id, trackIds),
+    removeTracks: (id: string, trackIds: string[]): Promise<Playlist | null> => ipcRenderer.invoke("playlist:removeTracks", id, trackIds),
+    reorder: (id: string, trackIds: string[]): Promise<Playlist | null> => ipcRenderer.invoke("playlist:reorder", id, trackIds),
+  },
+
   localAi: {
     available: (): Promise<boolean> => ipcRenderer.invoke("localAi:available"),
     nlToFilter: (query: string, itemType: string): Promise<SmartFilterGroup | null> =>
@@ -807,6 +836,35 @@ const htpc = {
         ipcRenderer.invoke("streaming:extensions:remove", extId),
       apply: (partition: string, extensions: StreamingExtension[]): Promise<void> =>
         ipcRenderer.invoke("streaming:extensions:apply", partition, extensions),
+    },
+    adapter: {
+      authenticate: (serviceId: string): Promise<import("../main/services/streaming/adapters/base.adapter").StreamingAdapterConfig> =>
+        ipcRenderer.invoke("streaming:adapter:authenticate", serviceId),
+      disconnect: (serviceId: string): Promise<{ success: boolean }> =>
+        ipcRenderer.invoke("streaming:adapter:disconnect", serviceId),
+      search: (serviceId: string, query: string, types?: ("track" | "album" | "artist" | "playlist")[]): Promise<import("../main/services/streaming/adapters/base.adapter").StreamingSearchResult[]> =>
+        ipcRenderer.invoke("streaming:adapter:search", serviceId, query, types),
+      play: (serviceId: string, uri?: string): Promise<{ success: boolean }> =>
+        ipcRenderer.invoke("streaming:adapter:play", serviceId, uri),
+      pause: (serviceId: string): Promise<{ success: boolean }> =>
+        ipcRenderer.invoke("streaming:adapter:pause", serviceId),
+      next: (serviceId: string): Promise<{ success: boolean }> =>
+        ipcRenderer.invoke("streaming:adapter:next", serviceId),
+      previous: (serviceId: string): Promise<{ success: boolean }> =>
+        ipcRenderer.invoke("streaming:adapter:previous", serviceId),
+      currentlyPlaying: (serviceId: string): Promise<import("../main/services/streaming/adapters/base.adapter").CurrentlyPlaying | null> =>
+        ipcRenderer.invoke("streaming:adapter:currentlyPlaying", serviceId),
+      getDevices: (serviceId: string): Promise<import("../main/services/streaming/adapters/base.adapter").StreamingDevice[]> =>
+        ipcRenderer.invoke("streaming:adapter:getDevices", serviceId),
+      getTrack: (serviceId: string, id: string): Promise<import("../main/services/streaming/adapters/base.adapter").StreamingTrack | null> =>
+        ipcRenderer.invoke("streaming:adapter:getTrack", serviceId, id),
+      getAlbum: (serviceId: string, id: string): Promise<import("../main/services/streaming/adapters/base.adapter").StreamingAlbum | null> =>
+        ipcRenderer.invoke("streaming:adapter:getAlbum", serviceId, id),
+      getPlaylist: (serviceId: string, id: string): Promise<import("../main/services/streaming/adapters/base.adapter").StreamingPlaylist | null> =>
+        ipcRenderer.invoke("streaming:adapter:getPlaylist", serviceId, id),
+    },
+    mediaKeys: (action: "play" | "pause" | "next" | "previous") => {
+      ipcRenderer.send("streaming:mediaKeys", action);
     },
   },
 
@@ -871,6 +929,12 @@ const htpc = {
     const handler = (_: Electron.IpcRendererEvent, payload: { type: "games" | "movies" | "music" }) => cb(payload);
     ipcRenderer.on("scan:background:complete", handler);
     return () => ipcRenderer.removeListener("scan:background:complete", handler);
+  },
+
+  onMusicFilesMoved: (cb: (payload: { moves: import("../shared/types").ReorganizeMove[] }) => void) => {
+    const handler = (_: Electron.IpcRendererEvent, payload: { moves: import("../shared/types").ReorganizeMove[] }) => cb(payload);
+    ipcRenderer.on("music:filesMoved", handler);
+    return () => ipcRenderer.removeListener("music:filesMoved", handler);
   },
 
   videoDecoder: videoDecoderApi,

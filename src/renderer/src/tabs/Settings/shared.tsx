@@ -253,8 +253,8 @@ export function Toggle({
   onChange: (v: boolean) => void;
 }): React.ReactElement {
   return (
-    <div className="flex items-center justify-between py-2">
-      <div className="flex flex-col gap-0.5">
+    <div className="flex items-center justify-between gap-4 py-2">
+      <div className="flex flex-col gap-0.5 min-w-0">
         <span className="text-sm" style={{ color: "var(--color-text)" }}>
           {label}
         </span>
@@ -266,7 +266,7 @@ export function Toggle({
       </div>
       <button
         onClick={() => onChange(!value)}
-        className="w-11 h-6 rounded-full transition-colors relative"
+        className="w-11 h-6 rounded-full transition-colors relative flex-shrink-0"
         style={{
           background: value
             ? "var(--color-accent)"

@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { Movie, MusicTrack, TVShow } from "../../../shared/types";
+import { Movie, MusicTrack, TVShow, AudioTags } from "../../../shared/types";
 import { useMusicPlayerStore } from "./musicPlayer.store";
 import { useCoverCacheStore } from "./coverCache.store";
 
@@ -270,6 +270,7 @@ interface MusicState {
   hide: (id: string) => Promise<void>;
   delete: (id: string) => Promise<void>;
   uninstall: (track: MusicTrack) => Promise<{ success: boolean; error?: string; method?: string }>;
+  writeTags: (id: string, tags: AudioTags) => Promise<{ success: boolean; error?: string }>;
   filtered: () => MusicTrack[];
 }
 
@@ -407,6 +408,33 @@ export const useMusicStore = create<MusicState>((set, get) => ({
       set((s) => ({
         tracks: s.tracks.filter((t) => t.id !== track.id),
       }));
+    }
+    return result;
+  },
+
+  writeTags: async (id, tags) => {
+    const track = get().tracks.find((t) => t.id === id);
+    if (!track) return { success: false, error: "Track not found" };
+    const result = await window.htpc.music.writeTags(track.filePath, tags);
+    if (result.success) {
+      set((s) => ({
+        tracks: s.tracks.map((t) =>
+          t.id === id
+            ? {
+                ...t,
+                title: tags.title ?? t.title,
+                artist: tags.artist ?? t.artist,
+                album: tags.album ?? t.album,
+                albumArtist: tags.albumArtist ?? t.albumArtist,
+                genre: tags.genre ?? t.genre,
+                year: tags.year ?? t.year,
+                trackNumber: tags.trackNumber ?? t.trackNumber,
+                discNumber: tags.discNumber ?? t.discNumber,
+              }
+            : t,
+        ),
+      }));
+      useMusicPlayerStore.getState().updateTrackMetadata?.(id, tags);
     }
     return result;
   },

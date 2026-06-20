@@ -10,6 +10,7 @@ import {
   ListView,
   HexGridView,
   BookshelfView,
+  BookshelfSpine,
   SpreadDeckView,
   NeonGridView,
   GalleryImage,
@@ -475,61 +476,14 @@ export const MoviesTab: React.FC = () => {
 
   const renderSpine = useCallback(
     (movie: Movie, _index: number, { isHovered, isFocused }: { isHovered: boolean; isFocused: boolean }) => {
-      const color = movie.coverUrl ? "#1a1a2e" : "#16213e";
       return (
-        <div
-          className="w-full h-full relative"
-          style={{
-            background: `linear-gradient(180deg, ${color}, #0f0f1e)`,
-          }}
-        >
-          {!isHovered && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <span
-                className="text-[10px] font-bold text-white/80 tracking-wide"
-                style={{
-                  writingMode: "vertical-rl",
-                  textOrientation: "mixed",
-                  transform: "rotate(180deg)",
-                  maxHeight: "85%",
-                  overflow: "hidden",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {movie.title}
-              </span>
-            </div>
-          )}
-          {isHovered && (
-            <>
-              <GalleryImage
-                src={movie.coverUrl}
-                alt={movie.title}
-                style={{ width: "100%", height: "100%" }}
-              />
-              <div
-                className="absolute bottom-0 left-0 right-0 p-2"
-                style={{
-                  background: "linear-gradient(to top, rgba(0,0,0,0.92), transparent)",
-                }}
-              >
-                <div className="text-[10px] font-bold text-white truncate">{movie.title}</div>
-                <div className="text-[9px] text-white/50 truncate">
-                  {movie.releaseYear} · {movie.genres?.[0]}
-                </div>
-              </div>
-            </>
-          )}
-          {isFocused && (
-            <div
-              className="absolute inset-0 pointer-events-none"
-              style={{
-                boxShadow: "inset 0 0 0 2px var(--color-accent)",
-                zIndex: 10,
-              }}
-            />
-          )}
-        </div>
+        <BookshelfSpine
+          coverUrl={movie.coverUrl}
+          title={movie.title}
+          subtitle={movie.releaseYear ? `${movie.releaseYear}${movie.genres?.[0] ? ` · ${movie.genres[0]}` : ""}` : movie.genres?.[0]}
+          isHovered={isHovered}
+          isFocused={isFocused}
+        />
       );
     },
     [],
@@ -720,6 +674,8 @@ export const MoviesTab: React.FC = () => {
               renderSpine={renderSpine}
               focusedIndex={focusedIndex}
               onItemsPerRowChange={(count) => setViewColumnCount(count)}
+              onItemClick={(movie, index) => { setFocusedIndex(index); setSelected(movie); }}
+              bindItem={bindItem}
               scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
             />
           );
@@ -731,6 +687,8 @@ export const MoviesTab: React.FC = () => {
               renderCard={renderDeckCard}
               focusedIndex={focusedIndex}
               onItemsPerRowChange={(count) => setViewColumnCount(count)}
+              onItemClick={(movie, index) => { setFocusedIndex(index); setSelected(movie); }}
+              bindItem={bindItem}
               scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
             />
           );
@@ -761,7 +719,7 @@ export const MoviesTab: React.FC = () => {
           );
       }
     },
-    [galleryView, isNeonGrid, focusedIndex, gridRef, renderListItem, renderItem, renderSpine, renderDeckCard, renderNeonCard, scrollContainerRef],
+    [galleryView, isNeonGrid, focusedIndex, gridRef, renderListItem, renderItem, renderSpine, renderDeckCard, renderNeonCard, scrollContainerRef, setFocusedIndex, setSelected, bindItem],
   );
 
   const recentlyPlayed = [...movies]

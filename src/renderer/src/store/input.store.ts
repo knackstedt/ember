@@ -24,6 +24,7 @@ interface InputState {
   rawDiscoveries: Record<string, RawInputDiscovery>;
   controllersTabLocked: boolean;
   controllersTabUnlockProgress: number;
+  navSuspended: boolean;
   addDevice: (device: ControllerDevice) => void;
   removeDevice: (id: string) => void;
   setLastEvent: (event: NormalizedInputEvent) => void;
@@ -32,6 +33,7 @@ interface InputState {
   clearRawDiscovery: (deviceId: string) => void;
   setControllersTabLocked: (locked: boolean) => void;
   setControllersTabUnlockProgress: (progress: number) => void;
+  setNavSuspended: (suspended: boolean) => void;
 }
 
 export const useInputStore = create<InputState>((set) => ({
@@ -42,6 +44,7 @@ export const useInputStore = create<InputState>((set) => ({
   rawDiscoveries: {},
   controllersTabLocked: true,
   controllersTabUnlockProgress: 0,
+  navSuspended: false,
 
   addDevice: (device) =>
     set((s) => ({
@@ -148,4 +151,6 @@ export const useInputStore = create<InputState>((set) => ({
 
   setControllersTabUnlockProgress: (progress) =>
     set({ controllersTabUnlockProgress: progress }),
+
+  setNavSuspended: (suspended) => set({ navSuspended: suspended }),
 }));

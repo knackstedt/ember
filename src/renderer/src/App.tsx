@@ -15,7 +15,7 @@ import { useInputStore } from "./store/input.store";
 import { ThemeBackground } from "./components/ThemeBackground/ThemeBackground";
 import { GamingTab } from "./tabs/Gaming";
 import { MoviesTab } from "./tabs/Movies";
-import { MusicTab } from "./tabs/Music";
+import { MusicTab } from "./music/MusicTab";
 import { StreamingTab } from "./tabs/Streaming";
 import { StoreTab } from "./tabs/Store";
 import { SettingsTab } from "./tabs/Settings";
@@ -26,8 +26,8 @@ import { useGamesStore } from "./store/games.store";
 import { useMoviesStore, useMusicStore, useTvStore } from "./store/media.store";
 import { ToastContainer } from "./components/Toast/Toast";
 import { useToastStore } from "./store/toast.store";
-import { MusicPlayer } from "./components/MusicPlayer/MusicPlayer";
 import { useMusicPlayerStore } from "./store/musicPlayer.store";
+import { MusicPlayerShell } from "./music/components/MusicPlayerShell";
 import { VideoPlayer } from "./components/VideoPlayer/VideoPlayer";
 import { useVideoPlayerStore } from "./store/videoPlayer.store";
 import { FlashPlayer } from "./components/FlashPlayer/FlashPlayer";
@@ -41,7 +41,7 @@ import { useLibretroPlayerStore } from "./store/libretroPlayer.store";
 import { useGameLaunchStore } from "./store/gameLaunch.store";
 import { GameLaunchOverlay } from "./components/GameLaunchOverlay/GameLaunchOverlay";
 import { useContextMenuStore } from "./store/contextMenu.store";
-import { QueueBlade } from "./components/QueueBlade/QueueBlade";
+
 import { ErrorBoundary } from "./components/ErrorBoundary/ErrorBoundary";
 import { CommandPalette } from "./components/CommandPalette/CommandPalette";
 import { CredentialPrompt } from "./components/CredentialPrompt/CredentialPrompt";
@@ -139,7 +139,6 @@ export default function App(): React.ReactElement {
   const inputDevices = useInputStore((s) => s.devices);
 
   const hasPlayer = useMusicPlayerStore((s) => s.queue.length > 0);
-  const setBladeCollapsed = useMusicPlayerStore((s) => s.setBladeCollapsed);
   const videoOpen = useVideoPlayerStore((s) => !!s.src);
   const flashOpen = useFlashPlayerStore((s) => s.open);
   const jsnesOpen = useJsnesPlayerStore((s) => s.open);
@@ -324,6 +323,13 @@ export default function App(): React.ReactElement {
       });
     });
 
+    const unsubMusicMoved = window.htpc.onMusicFilesMoved(({ moves }) => {
+      for (const move of moves) {
+        useMusicPlayerStore.getState().updateTrackFilePath(move.id, move.newPath);
+      }
+      useMusicStore.getState().load();
+    });
+
     const unsubToast = window.htpc.onToastPush((toast) => {
       useToastStore.getState().push(toast);
     });
@@ -356,7 +362,7 @@ export default function App(): React.ReactElement {
       console.log(`[renderer] External game stopped: ${gameId}`);
     });
 
-    return () => { unsubScan(); unsubCores(); unsubHook(); unsubToast(); unsubLibretro(); unsubGameLaunching(); unsubGameLaunchFailed(); unsubGameStarted(); unsubGameStopped(); };
+    return () => { unsubScan(); unsubCores(); unsubHook(); unsubMusicMoved(); unsubToast(); unsubLibretro(); unsubGameLaunching(); unsubGameLaunchFailed(); unsubGameStarted(); unsubGameStopped(); };
   }, []);
 
   useEffect(() => {
@@ -386,7 +392,6 @@ export default function App(): React.ReactElement {
   }, []);
 
   useEffect(() => {
-    setBladeCollapsed(anyEmulatorOpen);
     if (anyEmulatorOpen) {
       useFocusZoneStore.getState().clearZone();
     }
@@ -564,6 +569,36 @@ export default function App(): React.ReactElement {
         return;
       }
 
+      // Suppress background navigation while a modal dialog is open, but still
+      // forward directional/confirm/cancel actions to the dialog's capture listener.
+      if (useInputStore.getState().navSuspended) {
+        if (ev.type === "axis" && ev.axis) {
+          const axis = ev.axis ?? "";
+          const prev = axisValuesRef.current[axis] ?? 0;
+          axisValuesRef.current[axis] = ev.value ?? 0;
+          const action = getAxisNavAction(axis, ev.value ?? 0);
+          const prevAction = getAxisNavAction(axis, prev);
+          if (action && action !== prevAction && canDispatchAxisNav(axis)) {
+            dispatchNavAction(action);
+          }
+          return;
+        }
+        if (ev.type === "button_press") {
+          const dialogActionMap: Record<string, string> = {
+            dpad_up: "up",
+            dpad_down: "down",
+            dpad_left: "left",
+            dpad_right: "right",
+            south: "confirm",
+            east: "cancel",
+          };
+          const action = dialogActionMap[ev.action ?? ""];
+          if (action) dispatchNavAction(action);
+          return;
+        }
+        return;
+      }
+
       // Suppress axis navigation when this device has an OSK open
       if (ev.type === "axis" && useControllerOskStore.getState().isOpen(ev.deviceId)) {
         return;
@@ -728,6 +763,12 @@ export default function App(): React.ReactElement {
       // Skip command execution if commands are suspended (e.g., during keybind recording)
       const commandsSuspended = useCommandsStore.getState().commandsSuspended;
       if (commandsSuspended) {
+        return;
+      }
+
+      // Skip background shortcuts while a modal dialog is open. The dialog's capture
+      // listener handles Escape/Enter/Arrows and stops their propagation.
+      if (useInputStore.getState().navSuspended) {
         return;
       }
 
@@ -1023,44 +1064,26 @@ export default function App(): React.ReactElement {
           </div>
         </nav>
 
-        {/* Main area: tab content + queue blade */}
-        <div className="flex-1 min-h-0 flex flex-row overflow-hidden">
-          {/* Tab content */}
-          <div className="flex-1 min-h-0 relative">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={activeTab}
-                className="absolute inset-0"
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-                transition={{ duration: 0.15, ease: "easeOut" }}
-              >
-                <ErrorBoundary variant="section">
-                  <ActiveComponent />
-                </ErrorBoundary>
-              </motion.div>
-            </AnimatePresence>
-          </div>
-
-          {/* Queue blade */}
-          <AnimatePresence>
-            {hasPlayer && (
-              <ErrorBoundary variant="section" key="queue-blade">
-                <QueueBlade />
+        {/* Main area: tab content */}
+        <div className="flex-1 min-h-0 relative overflow-hidden">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              className="absolute inset-0"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.15, ease: "easeOut" }}
+            >
+              <ErrorBoundary variant="section">
+                <ActiveComponent />
               </ErrorBoundary>
-            )}
+            </motion.div>
           </AnimatePresence>
         </div>
 
-        {/* Music mini-player */}
-        <AnimatePresence>
-          {hasPlayer && (
-            <ErrorBoundary variant="section">
-              <MusicPlayer />
-            </ErrorBoundary>
-          )}
-        </AnimatePresence>
+        {/* Music player shell (mini bar / overlay / fullscreen) */}
+        <MusicPlayerShell />
       </div>
 
       {/* Libretro native core player */}

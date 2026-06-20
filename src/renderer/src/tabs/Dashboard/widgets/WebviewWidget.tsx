@@ -9,22 +9,17 @@ export const WebviewWidget: React.FC<{
 
   if (!url) {
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-2 text-sm opacity-40">
-        <Settings size={24} />
-        <span>No URL configured</span>
-        <span className="text-[10px] opacity-50">Open Edit Layout and click the settings icon</span>
+      <div className="flex flex-col items-center justify-center h-full min-h-0 gap-1.5 text-sm opacity-40">
+        <Settings size={20} />
+        <span className="text-xs">No URL configured</span>
+        <span className="text-[9px] opacity-50">Open Edit Layout and click the settings icon</span>
       </div>
     );
   }
 
   return (
     <div className="absolute inset-0">
-      <webview
-        src={url}
-        className="w-full h-full"
-        style={{ border: "none" }}
-        partition="persist:widget"
-      />
+      <webview src={url} className="w-full h-full" style={{ border: "none" }} partition="persist:widget" />
     </div>
   );
 };

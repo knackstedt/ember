@@ -1,7 +1,26 @@
 import React, { useMemo } from "react";
 import { useGamesStore } from "../../../store/games.store";
-import { Game } from "../../../../shared/types";
-import { Star, Gamepad2 } from "lucide-react";
+import { Game, GamePlatform } from "../../../../shared/types";
+import { Star, Play, Gamepad2 } from "lucide-react";
+
+const PLATFORM_COLORS: Record<GamePlatform, string> = {
+  steam: "#1b2838", gog: "#86328a", lutris: "#ff9900", heroic: "#e0e0e0",
+  "dolphin-gc": "#5c2d91", "dolphin-wii": "#5c2d91", nes: "#c0392b", snes: "#8e44ad",
+  gb: "#27ae60", gba: "#2980b9", n64: "#f39c12", genesis: "#34495e",
+  sms: "#16a085", gamegear: "#2c3e50", pce: "#e67e22", psx: "#2c3e50",
+  ps2: "#3498db", ps3: "#9b59b6", psp: "#1abc9c", xbox360: "#27ae60",
+  nds: "#c0392b", dreamcast: "#e74c3c", flash: "#f1c40f", dos: "#95a5a6",
+  windows: "#3498db", desktop: "#7f8c8d", itch: "#fa5c5c", unknown: "#7f8c8d",
+};
+
+function formatPlayTime(minutes: number): string {
+  if (minutes < 60) return `${minutes}m`;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (h < 24) return `${h}h ${m}m`;
+  const d = Math.floor(h / 24);
+  return `${d}d ${h % 24}h`;
+}
 
 export const FavoriteGamesWidget: React.FC<{ title?: string; maxItems?: number }> = ({
   title,
@@ -25,14 +44,14 @@ export const FavoriteGamesWidget: React.FC<{ title?: string; maxItems?: number }
   };
 
   return (
-    <div className="flex flex-col h-full gap-2 overflow-hidden">
+    <div className="flex flex-col h-full min-h-0 gap-1.5 overflow-hidden">
       {title && (
-        <div className="flex items-center gap-1.5 text-xs font-medium opacity-60 uppercase tracking-wider">
-          <Star size={12} />
+        <div className="flex items-center gap-1 text-[10px] font-medium opacity-50 uppercase tracking-wider">
+          <Star size={10} />
           {title}
         </div>
       )}
-      <div className="flex-1 flex flex-col gap-1 overflow-y-auto" style={{ scrollbarWidth: "thin" }}>
+      <div className="flex-1 flex flex-col gap-1 overflow-y-auto min-h-0" style={{ scrollbarWidth: "thin" }}>
         {favorites.length === 0 && (
           <div className="flex-1 flex items-center justify-center text-sm opacity-40">
             No favorites yet
@@ -42,29 +61,43 @@ export const FavoriteGamesWidget: React.FC<{ title?: string; maxItems?: number }
           <button
             key={g.id}
             onClick={() => launch(g)}
-            className="flex items-center gap-2 px-2 py-1.5 rounded text-left text-sm transition-colors hover:opacity-80"
+            className="group flex items-center gap-2 px-1.5 py-1 rounded-xl text-left text-sm transition-all duration-200 hover:scale-[1.02]"
             style={{
               background: "var(--color-surface-raised)",
+              border: "1px solid transparent",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = "var(--color-border)";
+              e.currentTarget.style.boxShadow = "var(--shadow-card)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = "transparent";
+              e.currentTarget.style.boxShadow = "none";
             }}
           >
-            {g.coverUrl ? (
-              <img
-                src={g.coverUrl}
-                alt=""
-                className="w-8 h-10 object-cover rounded flex-shrink-0"
-                loading="lazy"
-              />
-            ) : (
-              <div
-                className="w-8 h-10 rounded flex items-center justify-center flex-shrink-0"
-                style={{ background: "var(--color-surface)" }}
-              >
-                <Gamepad2 size={14} className="opacity-40" />
+            <div className="relative flex-shrink-0">
+              {g.coverUrl ? (
+                <img src={g.coverUrl} alt="" className="w-8 h-10 object-cover rounded-lg" loading="lazy" />
+              ) : (
+                <div className="w-8 h-10 rounded-lg flex items-center justify-center" style={{ background: "var(--color-surface)" }}>
+                  <Gamepad2 size={14} className="opacity-40" />
+                </div>
+              )}
+              <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity" style={{ background: "var(--color-accent)" }}>
+                <Play size={7} style={{ color: "var(--color-bg)" }} />
               </div>
-            )}
-            <div className="flex-1 min-w-0">
-              <div className="truncate font-medium text-sm">{g.title}</div>
-              <div className="text-xs opacity-40 capitalize">{g.platform}</div>
+            </div>
+            <div className="flex-1 min-w-0 flex flex-col gap-0">
+              <div className="truncate font-medium text-xs">{g.title}</div>
+              <div className="flex items-center gap-1">
+                <span className="text-[8px] px-1 py-0.5 rounded font-medium uppercase" style={{ background: PLATFORM_COLORS[g.platform] ?? "#7f8c8d", color: "#fff" }}>
+                  {g.platform}
+                </span>
+                <Star size={8} style={{ color: "var(--color-accent)" }} className="opacity-60" />
+              </div>
+              {g.playTime && g.playTime > 0 && (
+                <span className="text-[9px] opacity-30">{formatPlayTime(g.playTime)} played</span>
+              )}
             </div>
           </button>
         ))}

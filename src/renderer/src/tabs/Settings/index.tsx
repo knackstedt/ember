@@ -12,6 +12,7 @@ import {
   Keyboard,
   Globe,
   Monitor,
+  Music,
 } from "lucide-react";
 import { AppearanceTab } from "./AppearanceTab";
 import { GeneralTab } from "./GeneralTab";
@@ -24,12 +25,14 @@ import { InputTab } from "./InputTab";
 import { DangerZoneTab } from "./DangerZoneTab";
 import { RemoteSourcesTab } from "./RemoteSourcesTab";
 import { SystemInfoTab } from "./SystemInfoTab";
+import { MusicLibraryTab } from "./MusicLibraryTab";
 
 const SUB_TABS = [
   { id: "general", label: "General", Icon: Settings },
   { id: "appearance", label: "Appearance", Icon: Palette },
   { id: "input", label: "Input", Icon: Keyboard },
   { id: "local-data", label: "Local Data", Icon: HardDrive },
+  { id: "music-library", label: "Music Library", Icon: Music },
   { id: "remote-sources", label: "Remote Sources", Icon: Globe },
   { id: "data-feed", label: "Data Feed", Icon: Radio },
   { id: "emulators", label: "Emulators", Icon: Gamepad2 },
@@ -46,6 +49,7 @@ const TAB_COMPONENTS: Record<SubTabId, React.FC> = {
   appearance: AppearanceTab,
   input: InputTab,
   "local-data": LocalDataTab,
+  "music-library": MusicLibraryTab,
   "remote-sources": RemoteSourcesTab,
   "data-feed": DataFeedTab,
   emulators: EmulatorsTab,

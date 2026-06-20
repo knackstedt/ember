@@ -134,6 +134,7 @@ async function runMigrations(db: Surreal): Promise<void> {
     DEFINE FIELD IF NOT EXISTS compressionFormat ON game TYPE option<string>;
     DEFINE FIELD IF NOT EXISTS sourceLocation ON game TYPE option<string>;
     DEFINE FIELD IF NOT EXISTS missing ON game TYPE option<bool>;
+    DEFINE FIELD IF NOT EXISTS source ON game TYPE option<string>;
 
     DEFINE TABLE IF NOT EXISTS movie SCHEMAFULL;
     DEFINE FIELD IF NOT EXISTS id ON movie TYPE string;
@@ -157,6 +158,7 @@ async function runMigrations(db: Surreal): Promise<void> {
     DEFINE FIELD IF NOT EXISTS hidden ON movie TYPE bool DEFAULT false;
     DEFINE FIELD IF NOT EXISTS sourceLocation ON movie TYPE option<string>;
     DEFINE FIELD IF NOT EXISTS missing ON movie TYPE option<bool>;
+    DEFINE FIELD IF NOT EXISTS corrupt ON movie TYPE option<bool>;
 
     DEFINE TABLE IF NOT EXISTS music_track SCHEMAFULL;
     DEFINE FIELD IF NOT EXISTS id ON music_track TYPE string;
@@ -188,6 +190,7 @@ async function runMigrations(db: Surreal): Promise<void> {
     DEFINE FIELD IF NOT EXISTS hidden ON music_track TYPE bool DEFAULT false;
     DEFINE FIELD IF NOT EXISTS sourceLocation ON music_track TYPE option<string>;
     DEFINE FIELD IF NOT EXISTS missing ON music_track TYPE option<bool>;
+    DEFINE FIELD IF NOT EXISTS corrupt ON music_track TYPE option<bool>;
 
     DEFINE TABLE IF NOT EXISTS tv_show SCHEMAFULL;
     DEFINE FIELD IF NOT EXISTS id ON tv_show TYPE string;
@@ -257,6 +260,16 @@ async function runMigrations(db: Surreal): Promise<void> {
     DEFINE FIELD IF NOT EXISTS addedAt ON collection_item TYPE int;
     DEFINE INDEX IF NOT EXISTS collection_item_lookup ON collection_item FIELDS collectionId, itemId;
 
+    DEFINE TABLE IF NOT EXISTS playlist SCHEMAFULL;
+    DEFINE FIELD IF NOT EXISTS id ON playlist TYPE string;
+    DEFINE FIELD IF NOT EXISTS name ON playlist TYPE string;
+    DEFINE FIELD IF NOT EXISTS description ON playlist TYPE option<string>;
+    DEFINE FIELD IF NOT EXISTS trackIds ON playlist TYPE option<array<string>> DEFAULT [];
+    DEFINE FIELD IF NOT EXISTS coverUrl ON playlist TYPE option<string>;
+    DEFINE FIELD IF NOT EXISTS createdAt ON playlist TYPE int;
+    DEFINE FIELD IF NOT EXISTS updatedAt ON playlist TYPE int;
+    DEFINE INDEX IF NOT EXISTS playlist_name ON playlist FIELDS name;
+
     DEFINE TABLE IF NOT EXISTS streaming_service SCHEMAFULL;
     DEFINE FIELD IF NOT EXISTS id ON streaming_service TYPE string;
     DEFINE FIELD IF NOT EXISTS name ON streaming_service TYPE string;
@@ -274,6 +287,7 @@ async function runMigrations(db: Surreal): Promise<void> {
     DEFINE FIELD IF NOT EXISTS frontpageEnabled ON streaming_service TYPE bool DEFAULT true;
     DEFINE FIELD IF NOT EXISTS playTime ON streaming_service TYPE int DEFAULT 0;
     DEFINE FIELD IF NOT EXISTS lastPlayed ON streaming_service TYPE option<int>;
+    DEFINE FIELD IF NOT EXISTS adapterConfig ON streaming_service TYPE option<string>;
 
     DEFINE TABLE IF NOT EXISTS streaming_frontpage_item SCHEMAFULL;
     DEFINE FIELD IF NOT EXISTS id ON streaming_frontpage_item TYPE string;

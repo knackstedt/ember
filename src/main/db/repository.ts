@@ -14,7 +14,9 @@ import {
   StreamingFrontpageItem,
   SessionHook,
   RemoteSource,
+  Playlist,
 } from "../../shared/types";
+import { SCAN_SOURCE_ID_PREFIXES, ScanSourceId } from "../../shared/scan-sources";
 
 export function escapeId(id: string): string {
   // SurrealDB record IDs must not contain angle brackets or backticks
@@ -175,6 +177,48 @@ export const GameRepo = {
     const rows = await db.query<[any[]]>(`DELETE FROM game WHERE missing = true`);
     return (rows[0] ?? []).length;
   },
+
+  async countBySource(source: ScanSourceId): Promise<number> {
+    const db = getDb();
+    const prefixes = SCAN_SOURCE_ID_PREFIXES[source];
+    const sourceCondition = `source = $source`;
+    const prefixConditions = prefixes?.map((p) => `string::starts_with(id, "game:⟨${p}")`) ?? [];
+    const where =
+      prefixConditions.length > 0
+        ? `(${sourceCondition}) OR (${prefixConditions.join(" OR ")})`
+        : sourceCondition;
+    const result = await db.query<[Game[]]>(`SELECT * FROM game WHERE ${where}`, { source });
+    return ((result[0] ?? []) as Game[]).length;
+  },
+
+  async deleteBySource(source: ScanSourceId): Promise<number> {
+    const db = getDb();
+    const prefixes = SCAN_SOURCE_ID_PREFIXES[source];
+    const sourceCondition = `source = $source`;
+    const prefixConditions = prefixes?.map((p) => `string::starts_with(id, "game:⟨${p}")`) ?? [];
+    const where =
+      prefixConditions.length > 0
+        ? `(${sourceCondition}) OR (${prefixConditions.join(" OR ")})`
+        : sourceCondition;
+    const rows = await db.query<[any[]]>(`DELETE FROM game WHERE ${where}`, { source });
+    return (rows[0] ?? []).length;
+  },
+
+  async listCorrupt(): Promise<Game[]> {
+    const db = getDb();
+    const result = await db.query<[Game[]]>("SELECT * FROM game WHERE corrupt = true ORDER BY title ASC");
+    const games = (result[0] ?? []) as Game[];
+    return games.map((g) => ({
+      ...g,
+      id: typeof g.id === "string" ? g.id : ((g.id as any)?.id ?? String(g.id)),
+    }));
+  },
+
+  async deleteCorrupt(): Promise<number> {
+    const db = getDb();
+    const rows = await db.query<[any[]]>(`DELETE FROM game WHERE corrupt = true`);
+    return (rows[0] ?? []).length;
+  },
 };
 
 /* ------------------------------------------------------------------ */
@@ -241,6 +285,11 @@ export const MovieRepo = {
     await db.query(`UPDATE movie:⟨${escapeId(id)}⟩ SET missing = $value`, { value });
   },
 
+  async setCorrupt(id: string, value: boolean): Promise<void> {
+    const db = getDb();
+    await db.query(`UPDATE movie:⟨${escapeId(id)}⟩ SET corrupt = $value`, { value });
+  },
+
   async delete(id: string): Promise<void> {
     const db = getDb();
     await db.query(`DELETE movie:⟨${escapeId(id)}⟩`);
@@ -249,6 +298,22 @@ export const MovieRepo = {
   async deleteMissing(): Promise<number> {
     const db = getDb();
     const rows = await db.query<[any[]]>(`DELETE FROM movie WHERE missing = true`);
+    return (rows[0] ?? []).length;
+  },
+
+  async listCorrupt(): Promise<Movie[]> {
+    const db = getDb();
+    const result = await db.query<[Movie[]]>("SELECT * FROM movie WHERE corrupt = true ORDER BY title ASC");
+    const movies = (result[0] ?? []) as Movie[];
+    for (const m of movies) {
+      m.id = extractRecordId(m.id);
+    }
+    return movies;
+  },
+
+  async deleteCorrupt(): Promise<number> {
+    const db = getDb();
+    const rows = await db.query<[any[]]>(`DELETE FROM movie WHERE corrupt = true`);
     return (rows[0] ?? []).length;
   },
 };
@@ -303,6 +368,11 @@ export const MusicRepo = {
     await db.query(`UPDATE music_track:⟨${escapeId(id)}⟩ SET missing = $value`, { value });
   },
 
+  async setCorrupt(id: string, value: boolean): Promise<void> {
+    const db = getDb();
+    await db.query(`UPDATE music_track:⟨${escapeId(id)}⟩ SET corrupt = $value`, { value });
+  },
+
   async delete(id: string): Promise<void> {
     const db = getDb();
     await db.query(`DELETE music_track:⟨${escapeId(id)}⟩`);
@@ -311,6 +381,22 @@ export const MusicRepo = {
   async deleteMissing(): Promise<number> {
     const db = getDb();
     const rows = await db.query<[any[]]>(`DELETE FROM music_track WHERE missing = true`);
+    return (rows[0] ?? []).length;
+  },
+
+  async listCorrupt(): Promise<MusicTrack[]> {
+    const db = getDb();
+    const result = await db.query<[MusicTrack[]]>("SELECT * FROM music_track WHERE corrupt = true ORDER BY title ASC");
+    const tracks = (result[0] ?? []) as MusicTrack[];
+    for (const t of tracks) {
+      t.id = extractRecordId(t.id);
+    }
+    return tracks;
+  },
+
+  async deleteCorrupt(): Promise<number> {
+    const db = getDb();
+    const rows = await db.query<[any[]]>(`DELETE FROM music_track WHERE corrupt = true`);
     return (rows[0] ?? []).length;
   },
 };
@@ -618,6 +704,92 @@ export const CollectionRepo = {
       if (typeof r.id === "string") return r.id;
       return (r.id as { id: string }).id ?? String(r.id);
     });
+  },
+};
+
+/* ------------------------------------------------------------------ */
+/*  Playlist Repository                                                */
+/* ------------------------------------------------------------------ */
+
+export const PlaylistRepo = {
+  async list(): Promise<Playlist[]> {
+    const db = getDb();
+    const result = await db.query<[Playlist[]]>("SELECT * FROM playlist ORDER BY name ASC");
+    const playlists = (result[0] ?? []) as Playlist[];
+    return playlists.map((p) => ({
+      ...p,
+      id: typeof p.id === "string" ? p.id : ((p.id as any)?.id ?? String(p.id)),
+      trackIds: p.trackIds ?? [],
+    }));
+  },
+
+  async get(id: string): Promise<Playlist | null> {
+    const db = getDb();
+    const rows = await db.query(`SELECT * FROM playlist:⟨${escapeId(id)}⟩`);
+    const row = ((rows as any[])[0] ?? [])[0];
+    if (!row) return null;
+    return {
+      ...row,
+      id: typeof row.id === "string" ? row.id : ((row.id as any)?.id ?? String(row.id)),
+      trackIds: row.trackIds ?? [],
+    };
+  },
+
+  async create(playlist: Playlist): Promise<void> {
+    const db = getDb();
+    const normalized: Record<string, unknown> = { ...playlist };
+    if (normalized.trackIds === undefined) normalized.trackIds = [];
+    await db.query(
+      `UPSERT playlist:⟨${escapeId(playlist.id)}⟩ CONTENT $playlist`,
+      { playlist: normalized },
+    );
+  },
+
+  async update(playlist: Playlist): Promise<void> {
+    const db = getDb();
+    const normalized: Record<string, unknown> = { ...playlist };
+    if (normalized.trackIds === undefined) normalized.trackIds = [];
+    await db.query(
+      `UPSERT playlist:⟨${escapeId(playlist.id)}⟩ CONTENT $playlist`,
+      { playlist: normalized },
+    );
+  },
+
+  async delete(id: string): Promise<void> {
+    const db = getDb();
+    await db.query(`DELETE playlist:⟨${escapeId(id)}⟩`);
+  },
+
+  async addTracks(id: string, trackIds: string[]): Promise<void> {
+    const db = getDb();
+    const existing = await this.get(id);
+    if (!existing) throw new Error(`Playlist not found: ${id}`);
+    const current = new Set(existing.trackIds ?? []);
+    for (const trackId of trackIds) current.add(trackId);
+    await db.query(
+      `UPDATE playlist:⟨${escapeId(id)}⟩ SET trackIds = $trackIds, updatedAt = $updatedAt`,
+      { trackIds: Array.from(current), updatedAt: Date.now() },
+    );
+  },
+
+  async removeTracks(id: string, trackIds: string[]): Promise<void> {
+    const db = getDb();
+    const existing = await this.get(id);
+    if (!existing) throw new Error(`Playlist not found: ${id}`);
+    const toRemove = new Set(trackIds);
+    const next = (existing.trackIds ?? []).filter((t) => !toRemove.has(t));
+    await db.query(
+      `UPDATE playlist:⟨${escapeId(id)}⟩ SET trackIds = $trackIds, updatedAt = $updatedAt`,
+      { trackIds: next, updatedAt: Date.now() },
+    );
+  },
+
+  async reorder(id: string, trackIds: string[]): Promise<void> {
+    const db = getDb();
+    await db.query(
+      `UPDATE playlist:⟨${escapeId(id)}⟩ SET trackIds = $trackIds, updatedAt = $updatedAt`,
+      { trackIds, updatedAt: Date.now() },
+    );
   },
 };
 

@@ -10,6 +10,7 @@ import { detectWineRunner } from "../services/wine-detection.service";
 const log = createLogger("info");
 
 function walkDir(dir: string, callback: (filePath: string) => void): void {
+  if (isSystemDir(dir)) return;
   let entries: string[];
   try {
     entries = readdirSync(dir);
@@ -42,7 +43,116 @@ const SKIP_NAMES = new Set([
   "redist",
   "vcredist",
   "dxsetup",
+  // Common DOS/Windows 3.x utility executables that are not the game
+  "runexit",
+  "autoexec",
+  "config",
+  "winhelp",
+  "winhlp32",
+  "freecell",
+  "mshearts",
+  "solitaire",
+  "calc",
+  "calendar",
+  "cardfile",
+  "charmap",
+  "clock",
+  "notepad",
+  "pbrush",
+  "mspaint",
+  "write",
+  "control",
+  "drwatson",
+  "drwatson32",
+  "expand",
+  "msd",
+  "pifedit",
+  "player",
+  "packager",
+  "clipsrv",
+  "clipbrd",
+  "mplayer",
+  "winfile",
+  "progman",
+  "taskman",
+  "readme",
+  "readmecom",
+  // Sound Blaster / driver utilities
+  "ctcd",
+  "ctconfig",
+  "ctmidi",
+  "ctmixer",
+  "ctwav",
+  "ctwave",
+  "remote",
+  "soundole",
+  "diagnose",
+  "mixer",
+  "mixerset",
+  "cqa",
+  // Installer stubs
+  "qtinstal",
+  "loadwing",
+  "wsetup",
+  "winsetup",
+  "win32s",
+  "_mssetup",
+  "_mstest",
 ]);
+
+const SYSTEM_DIR_NAMES = new Set([
+  "windows",
+  "winnt",
+  "win95",
+  "win98",
+  "winme",
+  "winxp",
+  "win32s",
+  "win32app",
+  "system",
+  "system32",
+  "syswow64",
+  "drivers",
+  "apps",
+  "common files",
+  "program files",
+  "program files (x86)",
+  "programdata",
+  "directx",
+  "directx9",
+  "redist",
+  "_commonredist",
+  "_redist",
+  "vcredist",
+  "dotnet",
+  "dotnetfx",
+  "install",
+  "setup",
+  "scummvm",
+  "openal",
+  "physx",
+  "nethood",
+  "print hood",
+  "recent",
+  "sendto",
+  "start menu",
+  "templates",
+  "sysbackup",
+]);
+
+function isSystemDir(dir: string): boolean {
+  return SYSTEM_DIR_NAMES.has(basename(dir).toLowerCase());
+}
+
+function isJunkName(base: string): boolean {
+  if (SKIP_NAMES.has(base)) return true;
+  for (const name of SKIP_NAMES) {
+    if (base.endsWith(` ${name}`) || base.endsWith(`_${name}`) || base.endsWith(`-${name}`)) {
+      return true;
+    }
+  }
+  return false;
+}
 
 function titleFromFilename(filename: string): string {
   return basename(filename, extname(filename))
@@ -62,14 +172,32 @@ function isUnityGame(exePath: string): boolean {
   }
 }
 
+const GENERIC_BAT_NAMES = new Set(["run", "play", "start", "game", "launch", "go"]);
+
+function titleForWindowsGame(fullPath: string): string {
+  const actualExt = extname(fullPath);
+  const ext = actualExt.toLowerCase();
+  const base = basename(fullPath, actualExt).toLowerCase();
+  if (ext === ".bat" && GENERIC_BAT_NAMES.has(base)) {
+    // Use the parent directory as the game title for generic launcher scripts
+    const parent = basename(dirname(fullPath));
+    if (parent && parent !== "/" && parent !== ".") return parent;
+  }
+  return titleFromFilename(basename(fullPath));
+}
+
 function hashId(prefix: string, fullPath: string): string {
   return `${prefix}_${createHash("sha256").update(fullPath).digest("hex").slice(0, 16)}`;
 }
 
-export function scanWindowsGames(): Game[] {
+const WIN_GAME_EXTS = new Set([".exe", ".bat", ".com"]);
+
+export function scanWindowsGames(gamePaths: string[] = [], romPaths: string[] = []): Game[] {
   const roots = [
     join(homedir(), "Games"),
     join(homedir(), "games"),
+    ...gamePaths,
+    ...romPaths,
   ].filter(existsSync);
 
   log.info("windows", `scanning roots: ${roots.join(", ")}`);
@@ -79,25 +207,26 @@ export function scanWindowsGames(): Game[] {
   for (const root of roots) {
     walkDir(root, (fullPath) => {
       const ext = extname(fullPath).toLowerCase();
-      if (ext !== ".exe") return;
+      if (!WIN_GAME_EXTS.has(ext)) return;
       if (seen.has(fullPath)) {
         log.debug("windows", `skip duplicate path: ${fullPath}`);
         return;
       }
 
-      const base = basename(fullPath, ".exe").toLowerCase();
-      if (SKIP_NAMES.has(base)) {
-        log.debug("windows", `skip junk exe: ${fullPath}`);
+      const actualExt = extname(fullPath);
+      const base = basename(fullPath, actualExt).toLowerCase();
+      if (isJunkName(base)) {
+        log.debug("windows", `skip junk ${ext} file: ${fullPath}`);
         return;
       }
-      if (base.endsWith("_data") || base.startsWith("unity")) {
+      if (ext === ".exe" && (base.endsWith("_data") || base.startsWith("unity"))) {
         log.debug("windows", `skip unity data exe: ${fullPath}`);
         return;
       }
 
       seen.add(fullPath);
-      const title = titleFromFilename(basename(fullPath));
-      const isUnity = isUnityGame(fullPath);
+      const title = titleForWindowsGame(fullPath);
+      const isUnity = ext === ".exe" && isUnityGame(fullPath);
       const id = hashId("win", fullPath);
       log.debug("windows", `found ${title} → ${id} unity: ${isUnity} path: ${fullPath}`);
 
@@ -109,6 +238,7 @@ export function scanWindowsGames(): Game[] {
         // execPath is set at launch time once the preferred runner is resolved
         tags: isUnity ? ["unity"] : [],
         sourceLocation: resolveSourceLocation(fullPath),
+        source: "windows",
       });
     });
   }

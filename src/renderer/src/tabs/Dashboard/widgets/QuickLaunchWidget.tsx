@@ -1,6 +1,17 @@
 import React, { useMemo } from "react";
 import { useGamesStore } from "../../../store/games.store";
-import { Gamepad2 } from "lucide-react";
+import { Game, GamePlatform } from "../../../../shared/types";
+import { Play, Gamepad2 } from "lucide-react";
+
+const PLATFORM_COLORS: Record<GamePlatform, string> = {
+  steam: "#1b2838", gog: "#86328a", lutris: "#ff9900", heroic: "#e0e0e0",
+  "dolphin-gc": "#5c2d91", "dolphin-wii": "#5c2d91", nes: "#c0392b", snes: "#8e44ad",
+  gb: "#27ae60", gba: "#2980b9", n64: "#f39c12", genesis: "#34495e",
+  sms: "#16a085", gamegear: "#2c3e50", pce: "#e67e22", psx: "#2c3e50",
+  ps2: "#3498db", ps3: "#9b59b6", psp: "#1abc9c", xbox360: "#27ae60",
+  nds: "#c0392b", dreamcast: "#e74c3c", flash: "#f1c40f", dos: "#95a5a6",
+  windows: "#3498db", desktop: "#7f8c8d", itch: "#fa5c5c", unknown: "#7f8c8d",
+};
 
 export const QuickLaunchWidget: React.FC<{ title?: string; maxItems?: number }> = ({
   title,
@@ -9,7 +20,6 @@ export const QuickLaunchWidget: React.FC<{ title?: string; maxItems?: number }> 
   const games = useGamesStore((s) => s.games);
 
   const quickList = useMemo(() => {
-    // Mix favorites and recently played for quick access
     const favs = games.filter((g) => g.isFavorite).slice(0, maxItems);
     if (favs.length >= maxItems) return favs;
     const recent = games
@@ -30,16 +40,16 @@ export const QuickLaunchWidget: React.FC<{ title?: string; maxItems?: number }> 
   };
 
   return (
-    <div className="flex flex-col h-full gap-2 overflow-hidden">
+    <div className="flex flex-col h-full min-h-0 gap-1.5 overflow-hidden">
       {title && (
-        <div className="flex items-center gap-1.5 text-xs font-medium opacity-60 uppercase tracking-wider">
-          <Gamepad2 size={12} />
+        <div className="flex items-center gap-1 text-[10px] font-medium opacity-50 uppercase tracking-wider">
+          <Play size={10} />
           {title}
         </div>
       )}
-      <div className="flex-1 flex flex-col gap-1 overflow-y-auto" style={{ scrollbarWidth: "thin" }}>
+      <div className="flex-1 grid grid-cols-3 gap-1.5 overflow-y-auto min-h-0" style={{ scrollbarWidth: "thin" }}>
         {quickList.length === 0 && (
-          <div className="flex-1 flex items-center justify-center text-sm opacity-40">
+          <div className="col-span-3 flex items-center justify-center text-sm opacity-40">
             No games available
           </div>
         )}
@@ -47,11 +57,25 @@ export const QuickLaunchWidget: React.FC<{ title?: string; maxItems?: number }> 
           <button
             key={g.id}
             onClick={() => launch(g.id)}
-            className="flex items-center gap-2 px-2 py-1 rounded text-left text-sm transition-colors hover:opacity-80"
+            className="group flex flex-col items-center gap-0.5 p-1 rounded-xl transition-all duration-200 hover:scale-[1.05]"
             style={{ background: "var(--color-surface-raised)" }}
           >
-            <Gamepad2 size={12} className="opacity-50 flex-shrink-0" />
-            <span className="truncate">{g.title}</span>
+            <div className="relative w-full aspect-[3/4] max-h-16">
+              {g.coverUrl ? (
+                <img src={g.coverUrl} alt="" className="w-full h-full object-cover rounded-lg" loading="lazy" />
+              ) : (
+                <div className="w-full h-full rounded-lg flex items-center justify-center" style={{ background: "var(--color-surface)" }}>
+                  <Gamepad2 size={14} className="opacity-40" />
+                </div>
+              )}
+              <div className="absolute inset-0 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }}>
+                <Play size={14} style={{ color: "#fff" }} />
+              </div>
+            </div>
+            <span className="text-[8px] truncate w-full text-center opacity-80">{g.title}</span>
+            <span className="text-[7px] px-1 py-0.5 rounded font-medium uppercase" style={{ background: PLATFORM_COLORS[g.platform] ?? "#7f8c8d", color: "#fff" }}>
+              {g.platform}
+            </span>
           </button>
         ))}
       </div>

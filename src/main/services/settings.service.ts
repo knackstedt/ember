@@ -1,4 +1,4 @@
-import { SettingsRepo } from "../db/repository";
+import { SettingsRepo, GameRepo, MovieRepo, MusicRepo } from "../db/repository";
 import { AppSettings } from "../../shared/types";
 
 const DEFAULTS: AppSettings = {
@@ -35,6 +35,8 @@ const DEFAULTS: AppSettings = {
       { i: "widget-system", x: 3, y: 4, w: 3, h: 2, minW: 2, minH: 2 },
     ],
   },
+  disabledScanSources: [],
+  corruptedFilesPolicy: "warn",
 };
 
 let cachedSettings: AppSettings | null = null;
@@ -73,4 +75,34 @@ export async function setSettings(
 ): Promise<void> {
   await SettingsRepo.setBatch(partial);
   invalidateSettingsCache();
+}
+
+export type CorruptItemType = "game" | "movie" | "music";
+
+/**
+ * Enforce the user's corrupted-files policy for a newly-detected corrupt item.
+ * warn: leave the item flagged but visible.
+ * hide: flag the item and set hidden=true.
+ * delete: permanently remove the library entry.
+ */
+export async function applyCorruptPolicy(
+  id: string,
+  type: CorruptItemType,
+): Promise<void> {
+  const settings = await getSettings();
+  const policy = settings.corruptedFilesPolicy ?? "warn";
+  if (policy === "warn") return;
+
+  if (policy === "hide") {
+    if (type === "game") await GameRepo.setHidden(id, true);
+    else if (type === "movie") await MovieRepo.setHidden(id, true);
+    else if (type === "music") await MusicRepo.setHidden(id, true);
+    return;
+  }
+
+  if (policy === "delete") {
+    if (type === "game") await GameRepo.delete(id);
+    else if (type === "movie") await MovieRepo.delete(id);
+    else if (type === "music") await MusicRepo.delete(id);
+  }
 }

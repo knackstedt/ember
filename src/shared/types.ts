@@ -1,3 +1,6 @@
+import type { ScanSourceId } from "./scan-sources";
+export type { ScanSourceId };
+
 export type ThemeName =
   | "dark-oled"
   | "glassmorphism"
@@ -17,7 +20,8 @@ export type TabId =
   | "streaming"
   | "store"
   | "settings"
-  | "controllers";
+  | "controllers"
+  | "dashboard";
 
 export type GalleryView =
   | "theme-default"
@@ -164,6 +168,8 @@ export interface Game {
   sourceLocation?: SourceLocation;
   /** Whether the remote file is missing */
   missing?: boolean;
+  /** The scanner source that discovered this game (e.g. steam, lutris, rom) */
+  source?: ScanSourceId;
 }
 
 export interface GameEmulatorConfig {
@@ -194,6 +200,8 @@ export interface Movie {
   sourceLocation?: SourceLocation;
   /** Whether the remote file is missing */
   missing?: boolean;
+  /** Whether the movie file is corrupt */
+  corrupt?: boolean;
 }
 
 export interface MusicTrack {
@@ -228,6 +236,34 @@ export interface MusicTrack {
   sourceLocation?: SourceLocation;
   /** Whether the remote file is missing */
   missing?: boolean;
+  /** Whether the music file is corrupt */
+  corrupt?: boolean;
+  /** Timestamp of last playback */
+  lastPlayed?: number;
+}
+
+export interface AudioTags {
+  title?: string;
+  artist?: string;
+  album?: string;
+  albumArtist?: string;
+  genre?: string;
+  year?: number;
+  trackNumber?: number;
+  discNumber?: number;
+  comment?: string;
+}
+
+export interface ReorganizeMove {
+  id: string;
+  oldPath: string;
+  newPath: string;
+  sidecars: { oldPath: string; newPath: string }[];
+}
+
+export interface ReorganizeResult {
+  moves: ReorganizeMove[];
+  errors: { id: string; error: string }[];
 }
 
 export interface TVShow {
@@ -454,6 +490,12 @@ export interface AppSettings {
   gamepadPollingRate?: number;
   /** Enable haptic feedback */
   hapticEnabled?: boolean;
+  /** Enable analytics */
+  enableAnalytics?: boolean;
+  /** Start app on system boot */
+  startOnBoot?: boolean;
+  /** Enable hardware acceleration */
+  hardwareAcceleration?: boolean;
   /** Keybind mappings: action → key string */
   keybinds?: Record<string, string>;
   /** Path overrides for emulator binaries */
@@ -534,6 +576,51 @@ export interface AppSettings {
   galleryView?: GalleryView;
   /** Max concurrent flash game thumbnail captures (1–10) */
   flashThumbnailConcurrency?: number;
+  /** Dashboard widget layout */
+  dashboardLayout?: DashboardLayout;
+  /** Scan sources (e.g. steam, lutris, heroic) that should be skipped during game scans */
+  disabledScanSources?: ScanSourceId[];
+  /** How to handle library entries detected as corrupt: warn, hide, or delete */
+  corruptedFilesPolicy?: "warn" | "hide" | "delete";
+  /** Flash game player settings */
+  flashSettings?: FlashSettings;
+}
+
+export type DashboardWidgetType =
+  | "recent-games"
+  | "favorite-games"
+  | "system-info"
+  | "clock"
+  | "weather"
+  | "news"
+  | "achievements"
+  | "recent-movies"
+  | "recent-music"
+  | "now-playing"
+  | "quick-launch"
+  | "webview"
+  | "stats";
+
+export interface DashboardWidget {
+  id: string;
+  type: DashboardWidgetType;
+  title?: string;
+  config?: Record<string, unknown>;
+}
+
+export interface DashboardLayout {
+  widgets: DashboardWidget[];
+  grid: DashboardGridItem[];
+}
+
+export interface DashboardGridItem {
+  i: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  minW?: number;
+  minH?: number;
 }
 
 export type RemoteSourceProtocol =
@@ -566,6 +653,12 @@ export interface ControllerBrowserSettings {
   enabled?: boolean;
   /** URL patterns to automatically show controller overlay in */
   urlPatterns?: string[];
+  snapToElement?: boolean;
+  snapDistance?: number;
+  snapSelectors?: string[];
+  mouseSpeed?: number;
+  swapRightStickAxes?: boolean;
+  buttonRemapping?: Record<string, string>;
 }
 
 export interface StreamingService {
@@ -620,6 +713,16 @@ export interface ExtensionInstallResult {
   success: boolean;
   error?: string;
   extension?: StreamingExtension;
+}
+
+export interface Playlist {
+  id: string;
+  name: string;
+  description?: string;
+  trackIds: string[];
+  coverUrl?: string;
+  createdAt: number;
+  updatedAt: number;
 }
 
 export interface Collection {
@@ -730,5 +833,29 @@ export interface DiscoveredPlugin {
   installed: boolean;
   installedVersion?: string;
   enabled: boolean;
+}
+
+export interface ManagedPackage {
+  id: string;
+  name: string;
+  displayName: string;
+  description?: string;
+  manager: string;
+  version?: string;
+  installedVersion?: string;
+  isInstalled: boolean;
+  isPinned: boolean;
+  autoUpdate: boolean;
+  category: string;
+  platforms?: string[];
+  sourceUrl?: string;
+}
+
+export interface PackageOperationProgress {
+  packageId: string;
+  operation: "install" | "uninstall" | "update";
+  status: "running" | "success" | "error";
+  message?: string;
+  percent?: number;
 }
 

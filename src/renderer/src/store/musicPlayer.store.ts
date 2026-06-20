@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { MusicTrack } from "../../../shared/types";
+import { MusicTrack, AudioTags } from "../../../shared/types";
 import { resolveMediaUrl } from "../../../shared/path-utils";
 
 export interface MusicPlayerStore {
@@ -24,15 +24,17 @@ export interface MusicPlayerStore {
   toggleShuffle(): void;
   toggleRepeat(): void;
   updateTrackCover(id: string, url: string): void;
+  updateTrackMetadata(id: string, tags: AudioTags): void;
+  updateTrackFilePath(id: string, filePath: string): void;
   setBladeCollapsed(collapsed: boolean): void;
   toggleBlade(): void;
 }
 
-const audio = new Audio();
+export const audio = new Audio();
 
 function loadAndPlay(track: MusicTrack, autoplay: boolean): void {
   const url = resolveMediaUrl(track.filePath);
-  audio.src = url ? encodeURIComponent(url) : "";
+  audio.src = url ?? "";
   audio.load();
   if (autoplay) void audio.play();
 }
@@ -41,7 +43,8 @@ export const useMusicPlayerStore = create<MusicPlayerStore>((set, get) => {
   audio.ontimeupdate = () => set({ position: audio.currentTime });
   audio.ondurationchange = () =>
     set({ duration: isFinite(audio.duration) ? audio.duration : 0 });
-  audio.onplay = () => set({ playing: true });
+  let errorCount = 0;
+  audio.onplay = () => { errorCount = 0; set({ playing: true }); };
   audio.onpause = () => set({ playing: false });
   audio.onended = () => {
     const { repeat } = get();
@@ -52,7 +55,15 @@ export const useMusicPlayerStore = create<MusicPlayerStore>((set, get) => {
       get().next();
     }
   };
-  audio.onerror = () => get().next();
+  audio.onerror = () => {
+    errorCount++;
+    if (errorCount >= 3) {
+      console.error("[musicPlayer] Stopped after 3 consecutive load errors");
+      set({ playing: false });
+      return;
+    }
+    get().next();
+  };
 
   return {
     queue: [],
@@ -72,7 +83,10 @@ export const useMusicPlayerStore = create<MusicPlayerStore>((set, get) => {
         position: 0,
         duration: 0,
       });
-      if (tracks.length > 0) loadAndPlay(tracks[startIndex], true);
+      if (tracks.length > 0) {
+        loadAndPlay(tracks[startIndex], true);
+        void window.htpc.music.setLastPlayed(tracks[startIndex].id, Date.now());
+      }
     },
 
     addToQueue(tracks) {
@@ -167,6 +181,32 @@ export const useMusicPlayerStore = create<MusicPlayerStore>((set, get) => {
         queue: s.queue.map((t) =>
           t.id === id ? { ...t, albumArtUrl: url } : t,
         ),
+      }));
+    },
+
+    updateTrackMetadata(id, tags) {
+      set((s) => ({
+        queue: s.queue.map((t) =>
+          t.id === id
+            ? {
+                ...t,
+                title: tags.title ?? t.title,
+                artist: tags.artist ?? t.artist,
+                album: tags.album ?? t.album,
+                albumArtist: tags.albumArtist ?? t.albumArtist,
+                genre: tags.genre ?? t.genre,
+                year: tags.year ?? t.year,
+                trackNumber: tags.trackNumber ?? t.trackNumber,
+                discNumber: tags.discNumber ?? t.discNumber,
+              }
+            : t,
+        ),
+      }));
+    },
+
+    updateTrackFilePath(id, filePath) {
+      set((s) => ({
+        queue: s.queue.map((t) => (t.id === id ? { ...t, filePath } : t)),
       }));
     },
 

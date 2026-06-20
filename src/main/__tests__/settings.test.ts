@@ -20,6 +20,7 @@ describe("settings defaults", () => {
       emulatorShaders: {},
       commandKeybinds: {},
       commandControllerMap: {},
+      disabledScanSources: [],
     };
 
     expect(defaults.theme).toBe("dark-oled");

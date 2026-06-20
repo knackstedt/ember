@@ -1,6 +1,6 @@
 import { join, dirname, resolve } from "path";
 import { readFileSync, rmSync, mkdirSync, readdirSync, existsSync, statSync } from "fs";
-import { BrowserWindow, ipcMain, app, dialog, shell, session } from "electron";
+import { BrowserWindow, ipcMain, app, dialog, shell, session, webContents } from "electron";
 import { spawn, ChildProcess } from "child_process";
 import { homedir } from "os";
 import { getMainWindow } from "..";
@@ -47,6 +47,7 @@ import {
   BrokenFlashRepo,
   CollectionRepo,
   RemoteSourceRepo,
+  PlaylistRepo,
   escapeId,
 } from "../db/repository";
 import { getProtonRating } from "../services/protondb.service";
@@ -77,7 +78,7 @@ import { getConnectedDevices, rescanDevice } from "../input/evdev";
 import { getXdgVideosDir, getXdgMusicDir } from "../scanners/xdg";
 import { getDefaultScanSources, getDefaultScanSourcesAsync } from "../scanners/defaults";
 import { isOllamaAvailable, naturalLanguageToFilter, aiGroupItems } from "../services/local-ai.service";
-import { AiGroup } from "../../shared/types";
+import { AiGroup, ScanSourceId } from "../../shared/types";
 import {
   getStreamingServices,
   getAllStreamingServices,
@@ -87,6 +88,23 @@ import {
   setServiceEnabled,
   detectDesktopApp,
 } from "../services/streaming.service";
+import {
+  initializeAdapter,
+  removeAdapter,
+  authenticateAdapter,
+  disconnectAdapter,
+  adapterSearch,
+  adapterPlay,
+  adapterPause,
+  adapterNext,
+  adapterPrevious,
+  adapterCurrentlyPlaying,
+  adapterGetDevices,
+  adapterGetTrack,
+  adapterGetAlbum,
+  adapterGetPlaylist,
+  hasDeepAdapter,
+} from "../services/streaming/streaming-player.service";
 import {
   StreamingServiceRepo,
   StreamingFrontpageItemRepo,
@@ -146,6 +164,7 @@ import {
   StreamingExtension,
   WineRunner,
   DiscoveredPlugin,
+  AudioTags,
 } from "../../shared/types";
 import { createLogger } from "../util/logger";
 import {
@@ -171,6 +190,11 @@ import {
   getToolAvailability,
   canCompress,
 } from "../services/compression.service";
+import { writeTags } from "../services/music-tag-writer.service";
+import {
+  previewReorganize,
+  executeReorganize,
+} from "../services/music-reorganize.service";
 const log = createLogger("info");
 
 /** Recursively search a directory for a file by exact name. */
@@ -843,6 +867,14 @@ export function registerIpcHandlers(window: BrowserWindow): void {
 
   ipcMain.handle("games:delete", async (_e, id: string) => {
     await GameRepo.delete(id);
+  });
+
+  ipcMain.handle("games:countBySource", async (_e, source: ScanSourceId) => {
+    return GameRepo.countBySource(source);
+  });
+
+  ipcMain.handle("games:deleteBySource", async (_e, source: ScanSourceId) => {
+    return GameRepo.deleteBySource(source);
   });
 
   ipcMain.handle("games:uninstall", async (_e, game: Game) => {
@@ -1567,6 +1599,10 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     await MusicRepo.setTags(id, tags);
   });
 
+  ipcMain.handle("music:writeTags", async (_e, filePath: string, tags: AudioTags) => {
+    return writeTags(filePath, tags);
+  });
+
   ipcMain.handle("music:hide", async (_e, id: string, value: boolean) => {
     await MusicRepo.setHidden(id, value);
   });
@@ -1666,6 +1702,29 @@ export function registerIpcHandlers(window: BrowserWindow): void {
       serialized[id] = result;
     }
     return serialized;
+  });
+
+  ipcMain.handle("music:lastPlayed", async (_e, id: string, timestamp: number) => {
+    await MusicRepo.setLastPlayed(id, timestamp);
+  });
+
+  ipcMain.handle("music:reorganizePreview", async (_e, pattern: string) => {
+    const settings = await getSettings();
+    const musicPaths = [getXdgMusicDir(), ...(settings.musicPaths ?? [])].filter(existsSync);
+    return previewReorganize(pattern, musicPaths);
+  });
+
+  ipcMain.handle("music:reorganize", async (_e, pattern: string) => {
+    const settings = await getSettings();
+    const musicPaths = [getXdgMusicDir(), ...(settings.musicPaths ?? [])].filter(existsSync);
+    const result = await executeReorganize(pattern, musicPaths);
+
+    // Notify renderer about moved files so it can update the music player queue
+    if (result.moves.length > 0) {
+      sendToWindow(window, "music:filesMoved", { moves: result.moves });
+    }
+
+    return result;
   });
 
   ipcMain.handle("tv:scan", async (_e, extraPaths?: string[]) => {
@@ -1948,6 +2007,26 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     return { games, movies, music };
   });
 
+  ipcMain.handle("db:list-corrupt", async () => {
+    const [games, movies, music] = await Promise.all([
+      GameRepo.listCorrupt(),
+      MovieRepo.listCorrupt(),
+      MusicRepo.listCorrupt(),
+    ]);
+    log.info("db:list-corrupt", `${games.length} games, ${movies.length} movies, ${music.length} tracks`);
+    return { games, movies, music };
+  });
+
+  ipcMain.handle("db:delete-corrupt", async () => {
+    const [games, movies, music] = await Promise.all([
+      GameRepo.deleteCorrupt(),
+      MovieRepo.deleteCorrupt(),
+      MusicRepo.deleteCorrupt(),
+    ]);
+    log.info("db:delete-corrupt", `deleted ${games} games, ${movies} movies, ${music} tracks`);
+    return { games, movies, music };
+  });
+
   ipcMain.handle("dialog:open-directory", async () => {
     const { canceled, filePaths } = await dialog.showOpenDialog({
       properties: ["openDirectory"],
@@ -2039,6 +2118,46 @@ export function registerIpcHandlers(window: BrowserWindow): void {
   });
 
   /* ------------------------------------------------------------------ */
+  /*  Playlists                                                          */
+  /* ------------------------------------------------------------------ */
+
+  ipcMain.handle("playlist:list", async () => {
+    return PlaylistRepo.list();
+  });
+
+  ipcMain.handle("playlist:create", async (_e, playlist: import("../../shared/types").Playlist) => {
+    await PlaylistRepo.create(playlist);
+    return playlist;
+  });
+
+  ipcMain.handle("playlist:update", async (_e, id: string, data: Partial<import("../../shared/types").Playlist>) => {
+    const existing = await PlaylistRepo.get(id);
+    if (!existing) throw new Error(`Playlist not found: ${id}`);
+    const updated = { ...existing, ...data, updatedAt: Date.now() };
+    await PlaylistRepo.update(updated);
+    return updated;
+  });
+
+  ipcMain.handle("playlist:delete", async (_e, id: string) => {
+    await PlaylistRepo.delete(id);
+  });
+
+  ipcMain.handle("playlist:addTracks", async (_e, id: string, trackIds: string[]) => {
+    await PlaylistRepo.addTracks(id, trackIds);
+    return PlaylistRepo.get(id);
+  });
+
+  ipcMain.handle("playlist:removeTracks", async (_e, id: string, trackIds: string[]) => {
+    await PlaylistRepo.removeTracks(id, trackIds);
+    return PlaylistRepo.get(id);
+  });
+
+  ipcMain.handle("playlist:reorder", async (_e, id: string, trackIds: string[]) => {
+    await PlaylistRepo.reorder(id, trackIds);
+    return PlaylistRepo.get(id);
+  });
+
+  /* ------------------------------------------------------------------ */
   /*  Streaming Services                                                 */
   /* ------------------------------------------------------------------ */
 
@@ -2118,6 +2237,77 @@ export function registerIpcHandlers(window: BrowserWindow): void {
   ipcMain.handle("streaming:usage:stop", async (_e, id: string, seconds: number) => {
     await StreamingServiceRepo.addPlayTime(id, seconds);
     return { success: true };
+  });
+
+  /* ------------------------------------------------------------------ */
+  /*  Streaming Adapter Framework (deep integration)                       */
+  /* ------------------------------------------------------------------ */
+
+  ipcMain.handle("streaming:adapter:authenticate", async (_e, serviceId: string) => {
+    return authenticateAdapter(serviceId);
+  });
+
+  ipcMain.handle("streaming:adapter:disconnect", async (_e, serviceId: string) => {
+    await disconnectAdapter(serviceId);
+    return { success: true };
+  });
+
+  ipcMain.handle("streaming:adapter:search", async (_e, serviceId: string, query: string, types?: ("track" | "album" | "artist" | "playlist")[]) => {
+    return adapterSearch(serviceId, query, types);
+  });
+
+  ipcMain.handle("streaming:adapter:play", async (_e, serviceId: string, uri?: string) => {
+    await adapterPlay(serviceId, uri);
+    return { success: true };
+  });
+
+  ipcMain.handle("streaming:adapter:pause", async (_e, serviceId: string) => {
+    await adapterPause(serviceId);
+    return { success: true };
+  });
+
+  ipcMain.handle("streaming:adapter:next", async (_e, serviceId: string) => {
+    await adapterNext(serviceId);
+    return { success: true };
+  });
+
+  ipcMain.handle("streaming:adapter:previous", async (_e, serviceId: string) => {
+    await adapterPrevious(serviceId);
+    return { success: true };
+  });
+
+  ipcMain.handle("streaming:adapter:currentlyPlaying", async (_e, serviceId: string) => {
+    return adapterCurrentlyPlaying(serviceId);
+  });
+
+  ipcMain.handle("streaming:adapter:getDevices", async (_e, serviceId: string) => {
+    return adapterGetDevices(serviceId);
+  });
+
+  ipcMain.handle("streaming:adapter:getTrack", async (_e, serviceId: string, id: string) => {
+    return adapterGetTrack(serviceId, id);
+  });
+
+  ipcMain.handle("streaming:adapter:getAlbum", async (_e, serviceId: string, id: string) => {
+    return adapterGetAlbum(serviceId, id);
+  });
+
+  ipcMain.handle("streaming:adapter:getPlaylist", async (_e, serviceId: string, id: string) => {
+    return adapterGetPlaylist(serviceId, id);
+  });
+
+  /* ------------------------------------------------------------------ */
+  /*  Streaming Media Key Injection (to active webview)                  */
+  /* ------------------------------------------------------------------ */
+
+  ipcMain.on("streaming:mediaKeys", (_e, action: "play" | "pause" | "next" | "previous") => {
+    // Send to all webview preloads. Each webview's preload dispatches the key
+    // event to its page. In the future we could target only the active webview.
+    for (const wc of webContents.getAllWebContents()) {
+      if (wc.getType() === "webview") {
+        wc.send("streaming:mediaKeys", action);
+      }
+    }
   });
 
   ipcMain.handle("app:getPreloadPath", async (_e, name: string) => {
