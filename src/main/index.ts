@@ -6,6 +6,7 @@ import { initDb } from "./db";
 import { registerIpcHandlers } from "./ipc";
 import { initInputSystem, destroyInputSystem, clearFailureCooldowns, triggerRescan } from "./input/evdev";
 import { getSettings, setSetting } from "./services/settings.service";
+import type { TabId } from "../shared/types";
 import { setFlashThumbnailConcurrency } from "./services/flash-thumbnail.service";
 import { getWindowState, saveWindowState } from "./services/window-state.service";
 import { createLogger } from "./util/logger";
@@ -201,13 +202,13 @@ async function createWindow(): Promise<void> {
 
   // Migration: rename tv-shows tab to streaming in user settings
   try {
-    if (settings.defaultTab === "tv-shows") {
+    if ((settings.defaultTab as string) === "tv-shows") {
       await setSetting("defaultTab", "streaming");
     }
-    if (settings.disabledTabs?.includes("tv-shows")) {
+    if ((settings.disabledTabs as string[] | undefined)?.includes("tv-shows")) {
       await setSetting(
         "disabledTabs",
-        settings.disabledTabs.map((t) => (t === "tv-shows" ? "streaming" : t)),
+        (settings.disabledTabs as string[]).map((t) => (t === "tv-shows" ? "streaming" : t)) as TabId[],
       );
     }
   } catch (err) {
@@ -389,6 +390,7 @@ app.whenReady().then(async () => {
 
   protocol.handle("ember", async (request) => {
     const url = new URL(request.url);
+    let filePath: string;
 
     // Remote source proxy: ember://remote/<sourceId>/<path...>
     if (url.hostname === "remote") {
@@ -528,6 +530,7 @@ app.whenReady().then(async () => {
               "Content-Length": String(length),
               "Accept-Ranges": "bytes",
               "Content-Range": `bytes ${start}-${end}/${stats.size}`,
+              "Cache-Control": "no-store, must-revalidate",
             },
           });
         }
@@ -539,11 +542,11 @@ app.whenReady().then(async () => {
           "Content-Type": contentType,
           "Content-Length": String(stats.size),
           "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
         },
       });
     }
 
-    let filePath: string;
     if (url.hostname === "media") {
       filePath = decodeURIComponent(url.pathname.slice(1));
     } else if (url.hostname === "thumbnails" || url.hostname === "covers") {
@@ -604,6 +607,7 @@ app.whenReady().then(async () => {
             "Content-Length": String(length),
             "Content-Range": `bytes ${start}-${end}/${stats.size}`,
             "Accept-Ranges": "bytes",
+            "Cache-Control": "no-store, must-revalidate",
           },
         });
       }
@@ -616,6 +620,7 @@ app.whenReady().then(async () => {
         "Content-Type": contentType,
         "Content-Length": String(stats.size),
         "Accept-Ranges": "bytes",
+        "Cache-Control": "no-store, must-revalidate",
       },
     });
   });

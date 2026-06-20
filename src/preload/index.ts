@@ -565,6 +565,8 @@ const htpc = {
       ipcRenderer.invoke("music:pickCoverImage", track),
     loadThumbnail: (track: MusicTrack): Promise<string | null> =>
       ipcRenderer.invoke("music:loadThumbnail", track),
+    regenerateThumbnail: (track: MusicTrack): Promise<string | null> =>
+      ipcRenderer.invoke("music:regenerateThumbnail", track),
     artistThumbnail: (artist: string): Promise<string | null> =>
       ipcRenderer.invoke("music:artistThumbnail", artist),
     hide: (id: string, value: boolean): Promise<void> =>

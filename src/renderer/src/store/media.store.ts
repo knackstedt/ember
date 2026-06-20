@@ -266,6 +266,7 @@ interface MusicState {
   searchCoverArt: (id: string) => Promise<void>;
   pickCoverImage: (id: string) => Promise<void>;
   loadThumbnail: (id: string) => Promise<void>;
+  regenerateThumbnail: (id: string) => Promise<void>;
   loadArtistThumbnail: (artist: string) => Promise<void>;
   hide: (id: string) => Promise<void>;
   delete: (id: string) => Promise<void>;
@@ -372,6 +373,22 @@ export const useMusicStore = create<MusicState>((set, get) => ({
     if (!url) return;
     useCoverCacheStore.getState().setUrl(id, url);
     useMusicPlayerStore.getState().updateTrackCover(id, url);
+  },
+
+  regenerateThumbnail: async (id) => {
+    const track = get().tracks.find((t) => t.id === id);
+    if (!track) return;
+    const url = await window.htpc.music.regenerateThumbnail(track);
+    if (url) {
+      const busted = `${url}#t=${Date.now()}`;
+      set((s) => ({
+        tracks: s.tracks.map((t) =>
+          t.id === id ? { ...t, albumArtUrl: busted } : t,
+        ),
+      }));
+      useCoverCacheStore.getState().setUrl(id, busted);
+      useMusicPlayerStore.getState().updateTrackCover(id, busted);
+    }
   },
 
   loadArtistThumbnail: async (artist) => {

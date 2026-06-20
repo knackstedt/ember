@@ -7,6 +7,7 @@ import {
   openSync,
   closeSync,
   readSync,
+  unlinkSync,
 } from "fs";
 import { join, extname, dirname, basename } from "path";
 import { app, dialog } from "electron";
@@ -79,6 +80,56 @@ function bytePct(b: number, min: number, max: number): number {
   return min + (b / 255) * (max - min);
 }
 
+type ShapeType = "circle" | "triangle" | "rect" | "hexagon";
+
+function pickShape(byte: number): ShapeType {
+  const shapes: ShapeType[] = ["circle", "triangle", "rect", "hexagon"];
+  return shapes[byte % shapes.length];
+}
+
+function buildShape(
+  type: ShapeType,
+  x: number,
+  y: number,
+  size: number,
+  rot: number,
+  fill: string,
+  opacity: string,
+): string {
+  const cx = x + size / 2;
+  const cy = y + size / 2;
+  const transform = `rotate(${rot}, ${cx}, ${cy})`;
+
+  switch (type) {
+    case "circle": {
+      const r = Math.round(size / 2);
+      return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${fill}" opacity="${opacity}" transform="${transform}"/>`;
+    }
+    case "triangle": {
+      const half = size / 2;
+      const points = `${cx},${cy - half} ${cx - half},${cy + half} ${cx + half},${cy + half}`;
+      return `<polygon points="${points}" fill="${fill}" opacity="${opacity}" transform="${transform}"/>`;
+    }
+    case "hexagon": {
+      const r = size / 2;
+      const pts: string[] = [];
+      for (let i = 0; i < 6; i++) {
+        const angle = (Math.PI / 3) * i - Math.PI / 2;
+        pts.push(`${cx + r * Math.cos(angle)},${cy + r * Math.sin(angle)}`);
+      }
+      return `<polygon points="${pts.join(" ")}" fill="${fill}" opacity="${opacity}" transform="${transform}"/>`;
+    }
+    case "rect":
+    default: {
+      const rw = Math.round(size * 0.9);
+      const rh = Math.round(size * 0.65);
+      const rx = Math.round(cx - rw / 2);
+      const ry = Math.round(cy - rh / 2);
+      return `<rect x="${rx}" y="${ry}" width="${rw}" height="${rh}" rx="3" fill="${fill}" opacity="${opacity}" transform="${transform}"/>`;
+    }
+  }
+}
+
 function buildProceduralSVG(hash: Buffer): string {
   const bytes = Array.from(hash);
   const w = 512;
@@ -86,9 +137,9 @@ function buildProceduralSVG(hash: Buffer): string {
 
   const hueBg1 = byteHue(bytes[0]);
   const hueBg2 = byteHue(bytes[1]);
-  const sat = Math.round(bytePct(bytes[2], 40, 70));
-  const light1 = Math.round(bytePct(bytes[3], 10, 18));
-  const light2 = Math.round(bytePct(bytes[4], 14, 24));
+  const sat = Math.round(bytePct(bytes[2], 55, 95));
+  const light1 = Math.round(bytePct(bytes[3], 8, 28));
+  const light2 = Math.round(bytePct(bytes[4], 12, 35));
 
   const hueAccent = byteHue(bytes[5]);
 
@@ -97,41 +148,50 @@ function buildProceduralSVG(hash: Buffer): string {
   const bg2 = `hsl(${hueBg2}, ${sat}%, ${light2}%)`;
 
   // Low-contrast editorial block behind everything
-  const blockHue = (hueBg1 + 160 + Math.floor(bytes[6] / 4)) % 360;
-  const blockSat = Math.round(bytePct(bytes[7], 30, 55));
-  const blockLight = Math.round(bytePct(bytes[8], 28, 48));
+  const blockHue = (hueBg1 + 30 + bytes[6]) % 360;
+  const blockSat = Math.round(bytePct(bytes[7], 40, 75));
+  const blockLight = Math.round(bytePct(bytes[8], 25, 55));
   const blockW = Math.round(bytePct(bytes[9], 200, 380));
   const blockH = h;
   const blockX = bytePct(bytes[10], 0, 1) < 0.5 ? 0 : w - blockW;
   const blockColor = `hsl(${blockHue}, ${blockSat}%, ${blockLight}%)`;
 
-  // Construct overlapping rectangles (replaces vinyl rings)
-  let rects = "";
-  for (let i = 0; i < 3; i++) {
-    const rw = Math.round(
-      bytePct(bytes[(11 + i * 6) % bytes.length], 160, 360),
+  // Construct overlapping shapes (circles, triangles, rectangles, hexagons)
+  let shapes = "";
+  for (let i = 0; i < 4; i++) {
+    const shapeType = pickShape(bytes[(11 + i * 7) % bytes.length]);
+    const size = Math.round(
+      bytePct(bytes[(12 + i * 7) % bytes.length], 140, 320),
     );
-    const rh = Math.round(
-      bytePct(bytes[(12 + i * 6) % bytes.length], 120, 300),
+    const sx = Math.round(
+      bytePct(bytes[(13 + i * 7) % bytes.length], 40, w - size - 40),
     );
-    const rx = Math.round(
-      bytePct(bytes[(13 + i * 6) % bytes.length], 40, w - rw - 40),
-    );
-    const ry = Math.round(
-      bytePct(bytes[(14 + i * 6) % bytes.length], 40, h - rh - 40),
+    const sy = Math.round(
+      bytePct(bytes[(14 + i * 7) % bytes.length], 40, h - size - 40),
     );
     const rot = Math.round(
-      bytePct(bytes[(15 + i * 6) % bytes.length], -10, 10),
+      bytePct(bytes[(15 + i * 7) % bytes.length], -25, 25),
     );
     const rHue =
-      (hueBg1 + Math.floor(bytes[(16 + i * 6) % bytes.length] / 8)) % 360;
+      (hueBg1 + bytes[(16 + i * 7) % bytes.length]) % 360;
     const rSat = Math.round(
-      bytePct(bytes[(17 + i * 6) % bytes.length], 20, 40),
+      bytePct(bytes[(17 + i * 7) % bytes.length], 35, 70),
     );
-    const rOp = bytePct(bytes[(18 + i * 6) % bytes.length], 0.04, 0.14).toFixed(
+    const rLight = Math.round(
+      bytePct(bytes[(18 + i * 7) % bytes.length], 45, 70),
+    );
+    const rOp = bytePct(bytes[(19 + i * 7) % bytes.length], 0.08, 0.35).toFixed(
       2,
     );
-    rects += `<rect x="${rx}" y="${ry}" width="${rw}" height="${rh}" rx="2" fill="hsl(${rHue},${rSat}%,55%)" opacity="${rOp}" transform="rotate(${rot}, ${rx + rw / 2}, ${ry + rh / 2})"/>`;
+    shapes += buildShape(
+      shapeType,
+      sx,
+      sy,
+      size,
+      rot,
+      `hsl(${rHue},${rSat}%,${rLight}%)`,
+      rOp,
+    );
   }
 
   // Waveform bars (bottom area) — single solid color, low contrast
@@ -141,14 +201,14 @@ function buildProceduralSVG(hash: Buffer): string {
   const barGap = 4;
   const barStartX = (w - barCount * (barW + barGap)) / 2 + barGap / 2;
   const barBaseY = 430;
-  const barColor = `hsl(${hueAccent}, ${Math.max(10, sat - 10)}%, ${light1 + 22}%)`;
+  const barColor = `hsl(${(hueAccent + bytes[25]) % 360}, ${Math.max(15, sat - 15)}%, ${light1 + 30}%)`;
 
   let bars = "";
   for (let i = 0; i < barCount; i++) {
-    const bh = Math.round(bytePct(bytes[(19 + i) % bytes.length], 8, barMaxH));
+    const bh = Math.round(bytePct(bytes[(26 + i) % bytes.length], 8, barMaxH));
     const bx = Math.round(barStartX + i * (barW + barGap));
     const by = barBaseY - bh;
-    const opacity = bytePct(bytes[(23 + i) % bytes.length], 0.25, 0.55).toFixed(
+    const opacity = bytePct(bytes[(30 + i) % bytes.length], 0.3, 0.65).toFixed(
       2,
     );
     bars += `<rect x="${bx}" y="${by}" width="${barW}" height="${bh}" rx="3" fill="${barColor}" opacity="${opacity}"/>`;
@@ -156,7 +216,7 @@ function buildProceduralSVG(hash: Buffer): string {
 
   // Thin accent line
   const lineY = Math.round(bytePct(bytes[24], 200, 380));
-  const lineHue = (hueAccent + 120) % 360;
+  const lineHue = (hueAccent + 60 + bytes[23]) % 360;
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">
@@ -175,11 +235,11 @@ function buildProceduralSVG(hash: Buffer): string {
   </defs>
   <rect width="${w}" height="${h}" fill="url(#bgGrad)"/>
   <!-- Editorial block -->
-  <rect x="${blockX}" y="0" width="${blockW}" height="${blockH}" fill="${blockColor}" opacity="0.18"/>
-  <!-- Construct rectangles -->
-  <g>${rects}</g>
+  <rect x="${blockX}" y="0" width="${blockW}" height="${blockH}" fill="${blockColor}" opacity="0.22"/>
+  <!-- Construct shapes -->
+  <g>${shapes}</g>
   <!-- Accent line -->
-  <line x1="80" y1="${lineY}" x2="432" y2="${lineY}" stroke="hsl(${lineHue},20%,50%)" stroke-width="0.5" opacity="0.25"/>
+  <line x1="80" y1="${lineY}" x2="432" y2="${lineY}" stroke="hsl(${lineHue},30%,55%)" stroke-width="0.5" opacity="0.35"/>
   <!-- Waveform -->
   <g>${bars}</g>
 </svg>`;
@@ -309,6 +369,34 @@ export async function loadThumbnail(
   } finally {
     inFlight.delete(id);
   }
+}
+
+export async function regenerateThumbnail(
+  track: MusicTrack,
+): Promise<string | null> {
+  const id = normalizeId(track.id);
+
+  // Delete cached/generated files
+  const jpgPath = join(coverCache, `${id}.jpg`);
+  const svgPath = join(generatedCache, `${id}.svg`);
+  try {
+    if (existsSync(jpgPath)) unlinkSync(jpgPath);
+  } catch { /* ignore */ }
+  try {
+    if (existsSync(svgPath)) unlinkSync(svgPath);
+  } catch { /* ignore */ }
+
+  // Clear albumArtUrl in DB
+  try {
+    const db = getDb();
+    await db.query(`UPDATE music_track:⟨${id}⟩ SET albumArtUrl = NONE`);
+  } catch (err) {
+    log.error("regenerateThumbnail", `DB clear failed: ${err}`);
+  }
+
+  // Re-generate thumbnail
+  const url = await loadThumbnail(track);
+  return url ?? null;
 }
 
 /* ------------------------------------------------------------------ */

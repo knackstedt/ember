@@ -29,6 +29,7 @@ import {
   pickCoverImage,
   loadThumbnail,
   fetchArtistThumbnail,
+  regenerateThumbnail as regenerateMusicThumbnail,
 } from "../services/music-cover.service";
 import {
   scanMovieFiles,
@@ -1634,6 +1635,11 @@ export function registerIpcHandlers(window: BrowserWindow): void {
 
   ipcMain.handle("music:loadThumbnail", async (_e, track: MusicTrack) => {
     const url = await loadThumbnail(track);
+    return url ?? null;
+  });
+
+  ipcMain.handle("music:regenerateThumbnail", async (_e, track: MusicTrack) => {
+    const url = await regenerateMusicThumbnail(track);
     return url ?? null;
   });
 
