@@ -260,16 +260,53 @@ async function createWindow(): Promise<void> {
   mainWindow.on("move", persistBounds);
   mainWindow.on("close", persistBounds);
 
+  const tryOpenDevTools = (source: string) => {
+    if (!isDev) {
+      log.info("devtools", `skipping (${source}): isDev=false (isPackaged=${app.isPackaged}, NODE_ENV=${process.env.NODE_ENV ?? "undefined"})`);
+      return;
+    }
+    if (!mainWindow) {
+      log.warn("devtools", `skipped (${source}): mainWindow is null`);
+      return;
+    }
+    if (mainWindow.webContents.isDevToolsOpened()) {
+      log.info("devtools", `already open (${source})`);
+      return;
+    }
+    try {
+      mainWindow.webContents.openDevTools();
+      log.info("devtools", `opened via ${source}`);
+    } catch (err) {
+      log.warn("devtools", `openDevTools failed (${source}): ${err}`);
+    }
+  };
+
   mainWindow.on("ready-to-show", () => {
     mainWindow?.show();
     if (winState.maximized && mainWindow && !mainWindow.isMaximized()) {
       mainWindow.maximize();
     }
+    tryOpenDevTools("ready-to-show");
+  });
+
+  mainWindow.webContents.on("dom-ready", () => {
+    tryOpenDevTools("dom-ready");
   });
 
   mainWindow.webContents.on("did-finish-load", () => {
-    if (isDev) mainWindow?.webContents.openDevTools();
+    setTimeout(() => tryOpenDevTools("did-finish-load"), 500);
   });
+
+  // Retry a few times in case earlier attempts raced with renderer init
+  let devToolsRetries = 0;
+  const devToolsInterval = setInterval(() => {
+    if (!mainWindow || mainWindow.webContents.isDevToolsOpened() || devToolsRetries >= 10) {
+      clearInterval(devToolsInterval);
+      return;
+    }
+    devToolsRetries++;
+    tryOpenDevTools(`retry-${devToolsRetries}`);
+  }, 300);
 
   mainWindow.webContents.on("did-fail-load", (_event, errorCode, errorDescription) => {
     log.error("renderer", `did-fail-load: ${errorCode} — ${errorDescription}`);
