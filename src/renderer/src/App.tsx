@@ -246,7 +246,9 @@ export default function App(): React.ReactElement {
   useGamepadApi(!anyEmulatorOpen && !gameRunning && inputDevices.length === 0 && !evdevGamepadActive, activeTab);
 
   useEffect(() => {
-    load();
+    load().then(() => {
+      useMusicPlayerStore.getState().loadPersisted();
+    });
 
     useGamesStore.getState().load();
     useMoviesStore.getState().load();

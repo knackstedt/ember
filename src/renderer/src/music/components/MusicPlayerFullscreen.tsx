@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useMusicPlayerStore } from "../../store/musicPlayer.store";
 import { useFocusZoneStore } from "../../store/focusZone.store";
+import { getTrackDisplayName } from "../lib/track-title";
 
 function fmt(s: number): string {
   if (!isFinite(s) || isNaN(s) || s < 0) return "0:00";
@@ -351,8 +352,8 @@ export const MusicPlayerFullscreen: React.FC<MusicPlayerFullscreenProps> = React
       >
         {/* Track info */}
         <div className="text-center">
-          <div className="text-xl font-bold truncate" style={{ color: "#fff" }} title={track.title}>
-            {track.title}
+          <div className="text-xl font-bold truncate" style={{ color: "#fff" }} title={getTrackDisplayName(track)}>
+            {getTrackDisplayName(track)}
           </div>
           <div className="text-sm truncate" style={{ color: "rgba(255,255,255,0.7)" }}>
             {track.artist} {track.album ? `· ${track.album}` : ""}

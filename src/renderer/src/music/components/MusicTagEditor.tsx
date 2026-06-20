@@ -4,6 +4,7 @@ import { Save, X, Tag } from "lucide-react";
 import { MusicTrack, AudioTags } from "../../../../shared/types";
 import { OskInput } from "../../components/OnScreenKeyboard/OnScreenKeyboard";
 import { useToastStore } from "../../store/toast.store";
+import { getTrackDisplayName } from "../lib/track-title";
 
 interface FieldDef {
   key: keyof AudioTags;
@@ -149,7 +150,7 @@ export const MusicTagEditor: React.FC<MusicTagEditorProps> = React.memo(({
     if (result.success) {
       useToastStore.getState().push({
         type: "success",
-        message: `Tags saved for "${track.title}"`,
+        message: `Tags saved for "${getTrackDisplayName(track)}"`,
       });
       onClose();
     } else {
@@ -204,7 +205,7 @@ export const MusicTagEditor: React.FC<MusicTagEditorProps> = React.memo(({
               Edit Tags
             </h2>
             <span className="ml-auto text-xs truncate" style={{ color: "var(--color-text-dim)" }}>
-              {track.title}
+              {getTrackDisplayName(track)}
             </span>
           </div>
 

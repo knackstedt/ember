@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useMusicPlayerStore } from "../../store/musicPlayer.store";
 import { useFocusZoneStore } from "../../store/focusZone.store";
+import { getTrackDisplayName } from "../lib/track-title";
 
 function fmt(s: number): string {
   if (!isFinite(s) || isNaN(s) || s < 0) return "0:00";
@@ -277,7 +278,7 @@ export const MusicPlayerOverlay: React.FC<MusicPlayerOverlayProps> = React.memo(
             style={{ background: "var(--color-surface-raised)" }}
           >
             {track.albumArtUrl ? (
-              <img src={track.albumArtUrl} alt={track.title} className="w-full h-full object-cover" />
+              <img src={track.albumArtUrl} alt={getTrackDisplayName(track)} className="w-full h-full object-cover" />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-6xl select-none" style={{ color: "var(--color-text-dim)" }}>
                 ♪
@@ -285,8 +286,8 @@ export const MusicPlayerOverlay: React.FC<MusicPlayerOverlayProps> = React.memo(
             )}
           </div>
           <div className="text-center max-w-md">
-            <div className="text-lg font-semibold truncate" style={{ color: "var(--color-text)" }} title={track.title}>
-              {track.title}
+            <div className="text-lg font-semibold truncate" style={{ color: "var(--color-text)" }} title={getTrackDisplayName(track)}>
+              {getTrackDisplayName(track)}
             </div>
             <div className="text-sm truncate" style={{ color: "var(--color-text-dim)" }} title={track.artist ?? track.album}>
               {track.artist ?? track.album ?? ""}
@@ -511,7 +512,7 @@ export const MusicPlayerOverlay: React.FC<MusicPlayerOverlayProps> = React.memo(
                   style={{ background: "var(--color-surface)" }}
                 >
                   {t.albumArtUrl ? (
-                    <img src={t.albumArtUrl} alt={t.title} className="w-full h-full object-cover" />
+                    <img src={t.albumArtUrl} alt={getTrackDisplayName(t)} className="w-full h-full object-cover" />
                   ) : (
                     <span style={{ color: "var(--color-text-dim)" }}>♪</span>
                   )}
@@ -523,9 +524,9 @@ export const MusicPlayerOverlay: React.FC<MusicPlayerOverlayProps> = React.memo(
                       color: idx === currentIndex ? "var(--color-accent)" : "var(--color-text)",
                       fontWeight: idx === currentIndex ? 600 : 400,
                     }}
-                    title={t.title}
+                    title={getTrackDisplayName(t)}
                   >
-                    {t.title}
+                    {getTrackDisplayName(t)}
                   </div>
                   <div className="text-xs truncate" style={{ color: "var(--color-text-dim)" }}>
                     {t.artist}

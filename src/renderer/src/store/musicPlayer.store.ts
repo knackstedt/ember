@@ -1,6 +1,9 @@
 import { create } from "zustand";
 import { MusicTrack, AudioTags } from "../../../shared/types";
 import { resolveMediaUrl } from "../../../shared/path-utils";
+import { useSettingsStore } from "./settings.store";
+
+const STORAGE_KEY = "ember:music-player";
 
 export interface MusicPlayerStore {
   queue: MusicTrack[];
@@ -28,6 +31,7 @@ export interface MusicPlayerStore {
   updateTrackFilePath(id: string, filePath: string): void;
   setBladeCollapsed(collapsed: boolean): void;
   toggleBlade(): void;
+  loadPersisted(): void;
 }
 
 export const audio = new Audio();
@@ -39,7 +43,43 @@ function loadAndPlay(track: MusicTrack, autoplay: boolean): void {
   if (autoplay) void audio.play();
 }
 
+function loadTrack(track: MusicTrack): void {
+  const url = resolveMediaUrl(track.filePath);
+  audio.src = url ?? "";
+  audio.load();
+}
+
+interface PersistedQueue {
+  queue: MusicTrack[];
+  currentIndex: number;
+  shuffle: boolean;
+  repeat: "none" | "one" | "all";
+  bladeCollapsed: boolean;
+}
+
+function saveQueueState(state: PersistedQueue): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    // ignore
+  }
+}
+
+function loadQueueState(): PersistedQueue | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as PersistedQueue;
+      if (Array.isArray(parsed.queue)) return parsed;
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
 export const useMusicPlayerStore = create<MusicPlayerStore>((set, get) => {
+
   audio.ontimeupdate = () => set({ position: audio.currentTime });
   audio.ondurationchange = () =>
     set({ duration: isFinite(audio.duration) ? audio.duration : 0 });
@@ -83,6 +123,13 @@ export const useMusicPlayerStore = create<MusicPlayerStore>((set, get) => {
         position: 0,
         duration: 0,
       });
+      saveQueueState({
+        queue: tracks,
+        currentIndex: startIndex,
+        shuffle: get().shuffle,
+        repeat: get().repeat,
+        bladeCollapsed: get().bladeCollapsed,
+      });
       if (tracks.length > 0) {
         loadAndPlay(tracks[startIndex], true);
         void window.htpc.music.setLastPlayed(tracks[startIndex].id, Date.now());
@@ -95,7 +142,15 @@ export const useMusicPlayerStore = create<MusicPlayerStore>((set, get) => {
         get().play(tracks, 0);
         return;
       }
-      set({ queue: [...queue, ...tracks] });
+      const next = [...queue, ...tracks];
+      set({ queue: next });
+      saveQueueState({
+        queue: next,
+        currentIndex: get().currentIndex,
+        shuffle: get().shuffle,
+        repeat: get().repeat,
+        bladeCollapsed: get().bladeCollapsed,
+      });
     },
 
     queueNext(tracks) {
@@ -111,6 +166,13 @@ export const useMusicPlayerStore = create<MusicPlayerStore>((set, get) => {
         ...queue.slice(insertAt),
       ];
       set({ queue: newQueue });
+      saveQueueState({
+        queue: newQueue,
+        currentIndex: get().currentIndex,
+        shuffle: get().shuffle,
+        repeat: get().repeat,
+        bladeCollapsed: get().bladeCollapsed,
+      });
     },
 
     pause() {
@@ -145,6 +207,13 @@ export const useMusicPlayerStore = create<MusicPlayerStore>((set, get) => {
         }
       }
       set({ currentIndex: nextIndex, position: 0, duration: 0 });
+      saveQueueState({
+        queue: get().queue,
+        currentIndex: nextIndex,
+        shuffle: get().shuffle,
+        repeat: get().repeat,
+        bladeCollapsed: get().bladeCollapsed,
+      });
       loadAndPlay(queue[nextIndex], true);
     },
 
@@ -157,16 +226,32 @@ export const useMusicPlayerStore = create<MusicPlayerStore>((set, get) => {
       }
       const prevIndex = currentIndex > 0 ? currentIndex - 1 : queue.length - 1;
       set({ currentIndex: prevIndex, position: 0, duration: 0 });
+      saveQueueState({
+        queue: get().queue,
+        currentIndex: prevIndex,
+        shuffle: get().shuffle,
+        repeat: get().repeat,
+        bladeCollapsed: get().bladeCollapsed,
+      });
       loadAndPlay(queue[prevIndex], true);
     },
 
     setVolume(v) {
       audio.volume = v;
       set({ volume: v });
+      void useSettingsStore.getState().update({ volume: v });
     },
 
     toggleShuffle() {
       set((s) => ({ shuffle: !s.shuffle }));
+      const state = get();
+      saveQueueState({
+        queue: state.queue,
+        currentIndex: state.currentIndex,
+        shuffle: state.shuffle,
+        repeat: state.repeat,
+        bladeCollapsed: state.bladeCollapsed,
+      });
     },
 
     toggleRepeat() {
@@ -174,6 +259,14 @@ export const useMusicPlayerStore = create<MusicPlayerStore>((set, get) => {
         repeat:
           s.repeat === "none" ? "all" : s.repeat === "all" ? "one" : "none",
       }));
+      const state = get();
+      saveQueueState({
+        queue: state.queue,
+        currentIndex: state.currentIndex,
+        shuffle: state.shuffle,
+        repeat: state.repeat,
+        bladeCollapsed: state.bladeCollapsed,
+      });
     },
 
     updateTrackCover(id, url) {
@@ -182,6 +275,14 @@ export const useMusicPlayerStore = create<MusicPlayerStore>((set, get) => {
           t.id === id ? { ...t, albumArtUrl: url } : t,
         ),
       }));
+      const state = get();
+      saveQueueState({
+        queue: state.queue,
+        currentIndex: state.currentIndex,
+        shuffle: state.shuffle,
+        repeat: state.repeat,
+        bladeCollapsed: state.bladeCollapsed,
+      });
     },
 
     updateTrackMetadata(id, tags) {
@@ -202,20 +303,74 @@ export const useMusicPlayerStore = create<MusicPlayerStore>((set, get) => {
             : t,
         ),
       }));
+      const state = get();
+      saveQueueState({
+        queue: state.queue,
+        currentIndex: state.currentIndex,
+        shuffle: state.shuffle,
+        repeat: state.repeat,
+        bladeCollapsed: state.bladeCollapsed,
+      });
     },
 
     updateTrackFilePath(id, filePath) {
       set((s) => ({
         queue: s.queue.map((t) => (t.id === id ? { ...t, filePath } : t)),
       }));
+      const state = get();
+      saveQueueState({
+        queue: state.queue,
+        currentIndex: state.currentIndex,
+        shuffle: state.shuffle,
+        repeat: state.repeat,
+        bladeCollapsed: state.bladeCollapsed,
+      });
     },
 
     setBladeCollapsed(collapsed) {
       set({ bladeCollapsed: collapsed });
+      const state = get();
+      saveQueueState({
+        queue: state.queue,
+        currentIndex: state.currentIndex,
+        shuffle: state.shuffle,
+        repeat: state.repeat,
+        bladeCollapsed: state.bladeCollapsed,
+      });
     },
 
     toggleBlade() {
       set((s) => ({ bladeCollapsed: !s.bladeCollapsed }));
+      const state = get();
+      saveQueueState({
+        queue: state.queue,
+        currentIndex: state.currentIndex,
+        shuffle: state.shuffle,
+        repeat: state.repeat,
+        bladeCollapsed: state.bladeCollapsed,
+      });
+    },
+
+    loadPersisted() {
+      const savedVolume = useSettingsStore.getState().settings?.volume ?? 1;
+      audio.volume = savedVolume;
+
+      const saved = loadQueueState();
+      if (saved) {
+        set({
+          queue: saved.queue,
+          currentIndex: saved.currentIndex,
+          shuffle: saved.shuffle,
+          repeat: saved.repeat,
+          bladeCollapsed: saved.bladeCollapsed,
+          volume: savedVolume,
+        });
+        if (saved.queue.length > 0 && saved.currentIndex >= 0 && saved.currentIndex < saved.queue.length) {
+          loadTrack(saved.queue[saved.currentIndex]);
+        }
+      } else {
+        set({ volume: savedVolume });
+      }
     },
   };
 });

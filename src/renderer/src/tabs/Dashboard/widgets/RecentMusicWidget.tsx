@@ -3,6 +3,7 @@ import { useMusicStore } from "../../../store/media.store";
 import { useMusicPlayerStore } from "../../../store/musicPlayer.store";
 import { MusicTrack } from "../../../../shared/types";
 import { Disc, Music, Play } from "lucide-react";
+import { getTrackDisplayName } from "../../../music/lib/track-title";
 
 function timeAgo(ts: number): string {
   const diff = Date.now() - ts;
@@ -78,7 +79,7 @@ export const RecentMusicWidget: React.FC<{ title?: string; maxItems?: number }> 
               </div>
             </div>
             <div className="flex-1 min-w-0 flex flex-col gap-0">
-              <div className="truncate font-medium text-xs">{t.title}</div>
+              <div className="truncate font-medium text-xs">{getTrackDisplayName(t)}</div>
               <div className="flex items-center gap-1">
                 <span className="text-[9px] opacity-40 truncate">{t.artist ?? "Unknown"}</span>
                 <span className="text-[9px] opacity-30">{timeAgo(t.lastPlayed!)}</span>

@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useMusicPlayerStore } from "../../store/musicPlayer.store";
 import { useFocusZoneStore } from "../../store/focusZone.store";
+import { getTrackDisplayName } from "../lib/track-title";
 
 const MINI_HEIGHT = 56;
 
@@ -136,7 +137,7 @@ export const MusicPlayerBar: React.FC<MusicPlayerBarProps> = React.memo(({ onExp
         style={{ background: "var(--color-surface)" }}
       >
         {track.albumArtUrl ? (
-          <img src={track.albumArtUrl} alt={track.title} className="w-full h-full object-cover" />
+          <img src={track.albumArtUrl} alt={getTrackDisplayName(track)} className="w-full h-full object-cover" />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-sm select-none" style={{ color: "var(--color-text-dim)" }}>
             ♪
@@ -146,8 +147,8 @@ export const MusicPlayerBar: React.FC<MusicPlayerBarProps> = React.memo(({ onExp
 
       {/* Track info */}
       <div className="flex flex-col min-w-0 w-32 flex-shrink-0">
-        <span className="text-sm font-medium truncate leading-tight" style={{ color: "var(--color-text)" }} title={track.title}>
-          {track.title}
+        <span className="text-sm font-medium truncate leading-tight" style={{ color: "var(--color-text)" }} title={getTrackDisplayName(track)}>
+          {getTrackDisplayName(track)}
         </span>
         <span className="text-xs truncate leading-tight" style={{ color: "var(--color-text-dim)" }} title={track.artist ?? track.album}>
           {track.artist ?? track.album ?? ""}

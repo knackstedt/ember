@@ -1,6 +1,7 @@
 import React from "react";
 import { useMusicPlayerStore } from "../../../store/musicPlayer.store";
 import { Music, Pause, Play, SkipBack, SkipForward, Volume2 } from "lucide-react";
+import { getTrackDisplayName } from "../../../music/lib/track-title";
 
 export const NowPlayingWidget: React.FC<{ title?: string }> = ({ title }) => {
   const queue = useMusicPlayerStore((s) => s.queue);
@@ -57,7 +58,7 @@ export const NowPlayingWidget: React.FC<{ title?: string }> = ({ title }) => {
         </div>
 
         <div className="text-center min-w-0 px-1">
-          <div className="font-medium text-xs truncate">{current.title}</div>
+          <div className="font-medium text-xs truncate">{getTrackDisplayName(current)}</div>
           <div className="text-[10px] opacity-50 truncate">{current.artist ?? "Unknown artist"}</div>
           {current.album && <div className="text-[9px] opacity-30 truncate">{current.album}</div>}
         </div>

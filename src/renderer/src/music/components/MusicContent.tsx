@@ -11,6 +11,7 @@ import type { MusicViewMode, MusicNavItem } from "../types";
 import { useCoverCacheStore } from "../../store/coverCache.store";
 import { useMusicStore } from "../../store/media.store";
 import { getSourceBadge } from "../../lib/source-badge";
+import { getTrackDisplayName } from "../lib/track-title";
 
 interface MusicContentProps {
   items: MusicTrack[];
@@ -22,6 +23,7 @@ interface MusicContentProps {
   activeNav: MusicNavItem;
   onColumnCountChange?: (count: number) => void;
   scrollRef?: React.RefObject<HTMLElement>;
+  bindItem?: (item: MusicTrack, index: number) => React.HTMLAttributes<HTMLElement>;
 }
 
 const LazyMusicCard: React.FC<{
@@ -35,6 +37,7 @@ const LazyMusicCard: React.FC<{
   const cachedUrl = useCoverCacheStore((s) => s.urls[track.id]);
   const coverUrl = track.albumArtUrl ?? cachedUrl;
   const source = getSourceBadge(track.sourceLocation);
+  const title = getTrackDisplayName(track);
 
   React.useEffect(() => {
     if (!coverUrl) {
@@ -45,7 +48,7 @@ const LazyMusicCard: React.FC<{
   return (
     <MediaCard
       id={track.id}
-      title={track.title}
+      title={title}
       subtitle={track.artist ?? track.album}
       coverUrl={coverUrl}
       badge={source.badge}
@@ -71,6 +74,7 @@ const MusicListItem: React.FC<{
   const cachedUrl = useCoverCacheStore((s) => s.urls[track.id]);
   const coverUrl = track.albumArtUrl ?? cachedUrl;
   const isFocused = index === focusedIndex;
+  const title = getTrackDisplayName(track);
 
   React.useEffect(() => {
     if (!coverUrl) {
@@ -105,7 +109,7 @@ const MusicListItem: React.FC<{
           className="font-medium truncate text-sm"
           style={{ color: isFocused ? "var(--color-accent)" : "var(--color-text)" }}
         >
-          {track.title}
+          {title}
         </div>
         <div className="text-xs truncate" style={{ color: "var(--color-text-dim)" }}>
           {track.artist}
@@ -140,6 +144,7 @@ export const MusicContent: React.FC<MusicContentProps> = React.memo(({
   activeNav,
   onColumnCountChange,
   scrollRef,
+  bindItem,
 }) => {
   const gridRef = useRef<VirtualGridHandle>(null);
 
@@ -152,7 +157,7 @@ export const MusicContent: React.FC<MusicContentProps> = React.memo(({
 
   const renderGridItem = useCallback(
     (track: MusicTrack, index: number) => (
-      <div className="p-1.5 w-full h-full flex flex-col min-w-0">
+      <div className="p-1.5 w-full h-full flex flex-col min-w-0" {...(bindItem ? bindItem(track, index) : {})}>
         <LazyMusicCard
           track={track}
           index={index}
@@ -162,20 +167,22 @@ export const MusicContent: React.FC<MusicContentProps> = React.memo(({
         />
       </div>
     ),
-    [focusedIndex, onSelect, onFavorite]
+    [focusedIndex, onSelect, onFavorite, bindItem]
   );
 
   const renderListItem = useCallback(
     (track: MusicTrack, index: number) => (
-      <MusicListItem
-        track={track}
-        index={index}
-        focusedIndex={focusedIndex}
-        onSelect={() => onSelect(track, index)}
-        onFavorite={() => onFavorite(track)}
-      />
+      <div {...(bindItem ? bindItem(track, index) : {})}>
+        <MusicListItem
+          track={track}
+          index={index}
+          focusedIndex={focusedIndex}
+          onSelect={() => onSelect(track, index)}
+          onFavorite={() => onFavorite(track)}
+        />
+      </div>
     ),
-    [focusedIndex, onSelect, onFavorite]
+    [focusedIndex, onSelect, onFavorite, bindItem]
   );
 
   const skeletonItems = useMemo(() => Array.from({ length: 6 }), []);

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, X, Link2, Unlink } from "lucide-react";
+import { ArrowLeft, X, Link2, Unlink, Star, StarOff, EyeOff, Tag, FolderOpen, Trash2, RotateCw } from "lucide-react";
 import { useMusicStore } from "../store/media.store";
 import { useMusicPlayerStore } from "../store/musicPlayer.store";
 import { usePlaylistsStore } from "../store/playlists.store";
@@ -17,6 +17,10 @@ import { MusicGroupContent, MusicGroup } from "./components/MusicGroupContent";
 import { MusicTagEditor } from "./components/MusicTagEditor";
 import { OnScreenKeyboard } from "../components/OnScreenKeyboard/OnScreenKeyboard";
 import { StreamingWebview } from "../components/StreamingWebview/StreamingWebview";
+import { getTrackDisplayName } from "./lib/track-title";
+import { useContextMenu } from "../hooks/useContextMenu";
+import { ContextMenuOption } from "../components/ContextMenu/ContextMenu";
+import { ConfirmDialog } from "../components/ConfirmDialog/ConfirmDialog";
 
 const NAV_ITEMS: MusicNavItem[] = [
   "all",
@@ -29,6 +33,13 @@ const NAV_ITEMS: MusicNavItem[] = [
 ];
 
 const GROUP_NAVS: MusicNavItem[] = ["genre", "artists", "albums", "folders"];
+
+let devToolsOpen = false;
+window.htpc.devtools
+  ?.isOpen?.()
+  .then((open) => { devToolsOpen = open; })
+  .catch(() => { /* ignore */ });
+window.htpc.devtools?.onChange?.((open) => { devToolsOpen = open; });
 
 function getFolderName(filePath: string): string {
   const normalized = filePath.replace(/\\/g, "/");
@@ -129,6 +140,9 @@ export const MusicTab: React.FC = () => {
   const loading = useMusicStore((s) => s.loading);
   const load = useMusicStore((s) => s.load);
   const toggleFavorite = useMusicStore((s) => s.toggleFavorite);
+  const hideTrack = useMusicStore((s) => s.hide);
+  const deleteTrack = useMusicStore((s) => s.delete);
+  const regenerateThumbnail = useMusicStore((s) => s.regenerateThumbnail);
   const writeTags = useMusicStore((s) => s.writeTags);
   const setSearch = useMusicStore((s) => s.setSearch);
   const searchQuery = useMusicStore((s) => s.searchQuery);
@@ -156,6 +170,12 @@ export const MusicTab: React.FC = () => {
   const [showSearchOsk, setShowSearchOsk] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
   const [editingTrack, setEditingTrack] = useState<MusicTrack | null>(null);
+
+  // Confirm dialog state
+  const [confirmDelete, setConfirmDelete] = useState<{ open: boolean; track: MusicTrack | null }>({
+    open: false,
+    track: null,
+  });
 
   // Streaming state
   const [streamingServices, setStreamingServices] = useState<StreamingService[]>([]);
@@ -236,7 +256,7 @@ export const MusicTab: React.FC = () => {
         const q = searchQuery.toLowerCase();
         source = source.filter(
           (t) =>
-            t.title.toLowerCase().includes(q) ||
+            getTrackDisplayName(t).toLowerCase().includes(q) ||
             t.artist?.toLowerCase().includes(q) ||
             t.album?.toLowerCase().includes(q)
         );
@@ -258,7 +278,7 @@ export const MusicTab: React.FC = () => {
       const q = searchQuery.toLowerCase();
       source = source.filter(
         (t) =>
-          t.title.toLowerCase().includes(q) ||
+          getTrackDisplayName(t).toLowerCase().includes(q) ||
           t.artist?.toLowerCase().includes(q) ||
           t.album?.toLowerCase().includes(q)
       );
@@ -327,7 +347,7 @@ export const MusicTab: React.FC = () => {
       const q = searchQuery.toLowerCase();
       filtered = filtered.filter(
         (t) =>
-          t.title.toLowerCase().includes(q) ||
+          getTrackDisplayName(t).toLowerCase().includes(q) ||
           t.artist?.toLowerCase().includes(q) ||
           t.album?.toLowerCase().includes(q)
       );
@@ -403,7 +423,7 @@ export const MusicTab: React.FC = () => {
       filtered.sort((a, b) => {
         switch (sortBy) {
           case "title":
-            return a.title.localeCompare(b.title);
+            return getTrackDisplayName(a).localeCompare(getTrackDisplayName(b));
           case "artist":
             return (a.artist ?? "").localeCompare(b.artist ?? "");
           case "album":
@@ -411,7 +431,7 @@ export const MusicTab: React.FC = () => {
           case "year":
             return (b.year ?? 0) - (a.year ?? 0);
           default:
-            return a.title.localeCompare(b.title);
+            return getTrackDisplayName(a).localeCompare(getTrackDisplayName(b));
         }
       });
     }
@@ -556,6 +576,60 @@ export const MusicTab: React.FC = () => {
     if (!name || !name.trim()) return;
     await createPlaylist(name.trim());
   }, [createPlaylist]);
+
+  const { menu, bindItem } = useContextMenu({
+    items: trackItems,
+    focusedIndex: contentIndex,
+    getOptions: (track): ContextMenuOption[] => {
+      const isLocal =
+        (!track.sourceLocation || track.sourceLocation === "local") &&
+        track.filePath &&
+        (track.filePath.startsWith("/") || track.filePath.startsWith("file://"));
+      const opts: ContextMenuOption[] = [
+        {
+          id: "favorite",
+          label: track.isFavorite ? "Unfavorite" : "Favorite",
+          icon: track.isFavorite ? <Star size={16} /> : <StarOff size={16} />,
+        },
+        { id: "hide", label: "Hide", icon: <EyeOff size={16} />, destructive: true },
+        { id: "tags", label: "Update metadata / tags", icon: <Tag size={16} />, disabled: !isLocal },
+        { id: "folder", label: "Open file location", icon: <FolderOpen size={16} />, disabled: !isLocal },
+        { id: "delete", label: "Delete file", icon: <Trash2 size={16} />, destructive: true },
+      ];
+      if (devToolsOpen) {
+        opts.push({ id: "regenerate", label: "Regenerate thumbnail", icon: <RotateCw size={16} /> });
+      }
+      return opts;
+    },
+    onAction: (track, optionId) => {
+      switch (optionId) {
+        case "favorite":
+          void toggleFavorite(track.id);
+          break;
+        case "hide":
+          void hideTrack(track.id);
+          break;
+        case "tags": {
+          const isLocal =
+            (!track.sourceLocation || track.sourceLocation === "local") &&
+            track.filePath &&
+            (track.filePath.startsWith("/") || track.filePath.startsWith("file://"));
+          if (isLocal) setEditingTrack(track);
+          break;
+        }
+        case "folder":
+          if (track.filePath) void window.htpc.shell.showItemInFolder(track.filePath);
+          break;
+        case "delete":
+          setConfirmDelete({ open: true, track });
+          break;
+        case "regenerate":
+          void regenerateThumbnail(track.id);
+          break;
+      }
+    },
+    enabled: !showingGroups && !isStreamingNav,
+  });
 
   // Streaming overlay management
   const openStreamingOverlay = useCallback((svc: StreamingService) => {
@@ -783,6 +857,7 @@ export const MusicTab: React.FC = () => {
                 activeNav={activeNav}
                 onColumnCountChange={setColumnCount}
                 scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
+                bindItem={bindItem}
               />
             )}
 
@@ -922,6 +997,27 @@ export const MusicTab: React.FC = () => {
           if (!editingTrack) return { success: false, error: "No track selected" };
           return writeTags(editingTrack.id, tags);
         }}
+      />
+
+      {menu}
+
+      <ConfirmDialog
+        isOpen={confirmDelete.open}
+        title="Delete File"
+        message={
+          confirmDelete.track
+            ? `Are you sure you want to delete "${getTrackDisplayName(confirmDelete.track)}"? This cannot be undone.`
+            : ""
+        }
+        confirmLabel="Delete"
+        destructive
+        onConfirm={() => {
+          if (confirmDelete.track) {
+            void deleteTrack(confirmDelete.track.id);
+          }
+          setConfirmDelete({ open: false, track: null });
+        }}
+        onCancel={() => setConfirmDelete({ open: false, track: null })}
       />
     </div>
   );
