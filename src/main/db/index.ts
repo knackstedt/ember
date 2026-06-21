@@ -1,11 +1,11 @@
 import { app } from "electron";
 import { join } from "path";
-import { mkdirSync } from "fs";
+import { Worker } from "worker_threads";
 import { createLogger } from "../util/logger";
 
 const log = createLogger("info");
 
-interface Surreal {
+export interface Surreal {
   connect(url: string): Promise<unknown>;
   use(opts: { namespace: string; database: string }): Promise<unknown>;
   query<T = unknown>(
@@ -13,7 +13,81 @@ interface Surreal {
     params?: Record<string, unknown>,
   ): Promise<T>;
 }
+
+interface DbResponse {
+  id: number;
+  type: string;
+  result?: unknown;
+  error?: string;
+}
+
+class WorkerSurreal implements Surreal {
+  private worker: Worker;
+  private reqId = 0;
+  private pending = new Map<
+    number,
+    { resolve: (v: unknown) => void; reject: (e: Error) => void }
+  >();
+  private initPromise: Promise<unknown> | null = null;
+
+  constructor(worker: Worker) {
+    this.worker = worker;
+    this.worker.on("message", (msg: DbResponse) => {
+      const pending = this.pending.get(msg.id);
+      if (!pending) return;
+      this.pending.delete(msg.id);
+      if (msg.error) {
+        pending.reject(new Error(msg.error));
+      } else {
+        pending.resolve(msg.result);
+      }
+    });
+    this.worker.on("error", (err) => {
+      log.error("db", "DB worker error:", err);
+      for (const pending of this.pending.values()) {
+        pending.reject(err);
+      }
+      this.pending.clear();
+    });
+    this.worker.on("exit", (code) => {
+      if (code !== 0) {
+        log.error("db", `DB worker exited with code ${code}`);
+        for (const pending of this.pending.values()) {
+          pending.reject(new Error(`DB worker exited with code ${code}`));
+        }
+        this.pending.clear();
+      }
+    });
+  }
+
+  connect(url: string): Promise<unknown> {
+    if (this.initPromise) return this.initPromise;
+    const dataDir = url.replace(/^surrealkv:\/\//, "");
+    this.initPromise = this.send("init", { dataDir });
+    return this.initPromise;
+  }
+
+  use(opts: { namespace: string; database: string }): Promise<unknown> {
+    // Namespace/database are already set during worker init.
+    void opts;
+    return Promise.resolve(true);
+  }
+
+  query<T>(sql: string, params?: Record<string, unknown>): Promise<T> {
+    return this.send("query", { sql, params }) as Promise<T>;
+  }
+
+  private send(type: string, payload: Record<string, unknown>): Promise<unknown> {
+    return new Promise((resolve, reject) => {
+      const id = ++this.reqId;
+      this.pending.set(id, { resolve, reject });
+      this.worker.postMessage({ id, type, ...payload });
+    });
+  }
+}
+
 let db: Surreal | null = null;
+let worker: Worker | null = null;
 
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return Promise.race([
@@ -55,16 +129,18 @@ async function connectWithRetry(
 export async function initDb(): Promise<Surreal> {
   if (db) return db;
 
-  let dataDir;
-try { dataDir = join(app.getPath("userData"), "db"); } catch { dataDir = join(process.cwd(), "db"); }
-  mkdirSync(dataDir, { recursive: true });
+  let dataDir: string;
+  try {
+    dataDir = join(app.getPath("userData"), "db");
+  } catch {
+    dataDir = join(process.cwd(), "db");
+  }
 
-  const [{ Surreal }, { createNodeEngines }] = await Promise.all([
-    import("surrealdb"),
-    import("@surrealdb/node"),
-  ]);
-  db = new Surreal({ engines: createNodeEngines() });
-  await connectWithRetry(db, `surrealkv://${join(dataDir, "htpc.db")}`, 1);
+  const workerPath = join(__dirname, "workers/db.worker.js");
+  worker = new Worker(workerPath);
+  db = new WorkerSurreal(worker);
+
+  await connectWithRetry(db, `surrealkv://${dataDir}`, 1);
   await withTimeout(db.use({ namespace: "htpc", database: "main" }), 5000);
 
   await withTimeout(runMigrations(db), 8000);
@@ -321,7 +397,7 @@ async function runMigrations(db: Surreal): Promise<void> {
   // Migrate old raw local coverUrl paths → ember://media protocol
   try {
     const [absPaths] = await db.query<[{ id: string; coverUrl: string }[]]>(
-      `SELECT id, coverUrl FROM game WHERE string::starts_with(coverUrl, "/")`,
+      `SELECT id, coverUrl FROM game WHERE coverUrl AND string::starts_with(coverUrl, "/")`,
     );
     for (const row of absPaths ?? []) {
       await db.query(`UPDATE ${row.id} SET coverUrl = $url`, {
@@ -330,7 +406,7 @@ async function runMigrations(db: Surreal): Promise<void> {
     }
 
     const [fileUrls] = await db.query<[{ id: string; coverUrl: string }[]]>(
-      `SELECT id, coverUrl FROM game WHERE string::starts_with(coverUrl, "file://")`,
+      `SELECT id, coverUrl FROM game WHERE coverUrl AND string::starts_with(coverUrl, "file://")`,
     );
     for (const row of fileUrls ?? []) {
       await db.query(`UPDATE ${row.id} SET coverUrl = $url`, {

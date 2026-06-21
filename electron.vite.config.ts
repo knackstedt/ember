@@ -209,6 +209,7 @@ export default defineConfig({
           "workers/game-scan.worker": resolve(
             "src/main/workers/game-scan.worker.ts",
           ),
+          "workers/db.worker": resolve("src/main/workers/db.worker.ts"),
           "libretro-worker": resolve("src/main/libretro-worker.ts"),
           "mpv-worker": resolve("src/main/mpv-worker.ts"),
         },

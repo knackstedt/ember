@@ -27,22 +27,29 @@ export function escapeId(id: string): string {
   return id;
 }
 
+function stripSurround(id: string): string {
+  if (id.startsWith("⟨") && id.endsWith("⟩")) {
+    return id.slice(1, -1);
+  }
+  return id;
+}
+
 function extractRecordId(raw: unknown): string {
   if (typeof raw === "string") {
     const colonIdx = raw.indexOf(":");
-    return colonIdx >= 0 ? raw.slice(colonIdx + 1) : raw;
+    return stripSurround(colonIdx >= 0 ? raw.slice(colonIdx + 1) : raw);
   }
   if (raw && typeof raw === "object") {
     const obj = raw as Record<string, unknown>;
-    if (typeof obj.id === "string") return obj.id;
+    if (typeof obj.id === "string") return stripSurround(obj.id);
     if (typeof obj.id === "object" && obj.id !== null) {
       return extractRecordId(obj.id);
     }
     const str = String(raw);
     const colonIdx = str.indexOf(":");
-    return colonIdx >= 0 ? str.slice(colonIdx + 1) : str;
+    return stripSurround(colonIdx >= 0 ? str.slice(colonIdx + 1) : str);
   }
-  return String(raw);
+  return stripSurround(String(raw));
 }
 
 /* ------------------------------------------------------------------ */
@@ -56,7 +63,7 @@ export const GameRepo = {
     const games = (result[0] ?? []) as Game[];
     return games.map((g) => ({
       ...g,
-      id: typeof g.id === "string" ? g.id : ((g.id as any)?.id ?? String(g.id)),
+      id: extractRecordId(g.id),
     }));
   },
 
@@ -210,7 +217,7 @@ export const GameRepo = {
     const games = (result[0] ?? []) as Game[];
     return games.map((g) => ({
       ...g,
-      id: typeof g.id === "string" ? g.id : ((g.id as any)?.id ?? String(g.id)),
+      id: extractRecordId(g.id),
     }));
   },
 
