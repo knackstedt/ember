@@ -365,6 +365,15 @@ export function DashboardTab(): React.ReactElement {
     persist(nextWidgets, gridLayoutRef.current);
   }
 
+  const handleWidgetConfigChange = useCallback(
+    (id: string, patch: Record<string, unknown>) => {
+      const widget = widgetsRef.current.find((w) => w.id === id);
+      if (!widget) return;
+      updateWidgetConfig(id, { config: { ...(widget.config ?? {}), ...patch } });
+    },
+    [updateWidgetConfig],
+  );
+
   function handleLayoutChange(newLayout: Layout[]) {
     setGridLayout(newLayout);
     gridLayoutRef.current = newLayout;
@@ -468,7 +477,7 @@ export function DashboardTab(): React.ReactElement {
 
                 {/* Widget content */}
                 <div className={`h-full relative ${editMode ? "pt-7" : ""} ${widget.type === "webview" ? "" : "p-3"}`}>
-                  <WidgetRenderer widget={widget} />
+                  <WidgetRenderer widget={widget} editMode={editMode} onConfigChange={handleWidgetConfigChange} />
                 </div>
               </div>
             );

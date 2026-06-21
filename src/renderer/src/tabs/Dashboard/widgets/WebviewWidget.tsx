@@ -1,10 +1,58 @@
-import React from "react";
-import { Globe, Settings } from "lucide-react";
+import React, { useEffect, useRef } from "react";
+import { Settings } from "lucide-react";
 
 export const WebviewWidget: React.FC<{
   title?: string;
   config?: Record<string, unknown>;
-}> = ({ title, config }) => {
+  editMode?: boolean;
+  onConfigChange?: (patch: Record<string, unknown>) => void;
+}> = ({ title, config, editMode, onConfigChange }) => {
+  const webviewRef = useRef<Electron.WebviewTag | null>(null);
+  const savedUrlRef = useRef<string>("");
+  const editModeRef = useRef(editMode);
+  const onConfigChangeRef = useRef(onConfigChange);
+
+  editModeRef.current = editMode;
+  onConfigChangeRef.current = onConfigChange;
+
+  // Sync the webview src when the configured URL is changed externally.
+  useEffect(() => {
+    const configUrl = (config?.url as string) || "";
+    if (configUrl && configUrl !== savedUrlRef.current) {
+      savedUrlRef.current = configUrl;
+      const wv = webviewRef.current;
+      if (wv) {
+        wv.src = configUrl;
+      }
+    }
+  }, [config?.url]);
+
+  // Persist the current URL whenever the webview navigates while in edit mode.
+  useEffect(() => {
+    const wv = webviewRef.current;
+    if (!wv) return;
+
+    const handleNavigate = () => {
+      try {
+        const url = wv.getURL();
+        if (url && url !== savedUrlRef.current && editModeRef.current) {
+          savedUrlRef.current = url;
+          onConfigChangeRef.current?.({ url });
+        }
+      } catch {
+        // Ignore cross-origin or destroyed webview errors.
+      }
+    };
+
+    wv.addEventListener("did-navigate", handleNavigate);
+    wv.addEventListener("did-navigate-in-page", handleNavigate);
+
+    return () => {
+      wv.removeEventListener("did-navigate", handleNavigate);
+      wv.removeEventListener("did-navigate-in-page", handleNavigate);
+    };
+  }, []);
+
   const url = (config?.url as string) || "";
 
   if (!url) {
@@ -19,7 +67,14 @@ export const WebviewWidget: React.FC<{
 
   return (
     <div className="absolute inset-0">
-      <webview src={url} className="w-full h-full" style={{ border: "none" }} partition="persist:widget" />
+      <webview
+        ref={(el) => {
+          webviewRef.current = el as any;
+        }}
+        className="w-full h-full"
+        style={{ border: "none" }}
+        partition="persist:widget"
+      />
     </div>
   );
 };

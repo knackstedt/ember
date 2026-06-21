@@ -16,7 +16,11 @@ import {
   QuickLaunchWidget,
 } from "./widgets";
 
-export const WidgetRenderer: React.FC<{ widget: DashboardWidget }> = ({ widget }) => {
+export const WidgetRenderer: React.FC<{
+  widget: DashboardWidget;
+  editMode?: boolean;
+  onConfigChange?: (id: string, patch: Record<string, unknown>) => void;
+}> = ({ widget, editMode, onConfigChange }) => {
   switch (widget.type) {
     case "clock":
       return <ClockWidget title={widget.title} format={(widget.config?.format as "12h" | "24h") ?? "24h"} showDate={widget.config?.showDate !== false} />;
@@ -31,7 +35,14 @@ export const WidgetRenderer: React.FC<{ widget: DashboardWidget }> = ({ widget }
     case "now-playing":
       return <NowPlayingWidget title={widget.title} />;
     case "webview":
-      return <WebviewWidget title={widget.title} config={widget.config} />;
+      return (
+        <WebviewWidget
+          title={widget.title}
+          config={widget.config}
+          editMode={editMode}
+          onConfigChange={(patch) => onConfigChange?.(widget.id, patch)}
+        />
+      );
     case "weather":
       return <WeatherWidget title={widget.title} config={widget.config} />;
     case "achievements":
