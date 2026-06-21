@@ -27,6 +27,7 @@ interface DiagnosticsData {
   videoDecoders: { name: string; available: boolean; path?: string }[];
   libmpvVersion: string;
   hwaccels: string[];
+  ffmpegCodecs?: string[];
 }
 
 function formatBytes(bytes: number): string {
@@ -56,9 +57,65 @@ function getGpuVendor(dev: any): string {
   return "Unknown";
 }
 
+/** Best-effort fallback names for common PCI device IDs. */
+function pciDeviceName(vendorId: number, deviceId: number): string | undefined {
+  const key = `${vendorId.toString(16).padStart(4, "0")}:${deviceId.toString(16).padStart(4, "0")}`;
+  const common: Record<string, string> = {
+    "10de:2204": "NVIDIA GeForce RTX 3090",
+    "10de:2206": "NVIDIA GeForce RTX 3090 Ti",
+    "10de:2208": "NVIDIA RTX A6000",
+    "10de:2484": "NVIDIA GeForce RTX 3070",
+    "10de:2486": "NVIDIA GeForce RTX 3070 Ti",
+    "10de:2488": "NVIDIA GeForce RTX 3070 Ti Laptop",
+    "10de:2503": "NVIDIA GeForce RTX 3060",
+    "10de:2684": "NVIDIA GeForce RTX 4090",
+    "10de:2704": "NVIDIA GeForce RTX 4090 Laptop",
+    "10de:2782": "NVIDIA GeForce RTX 4080",
+    "10de:2786": "NVIDIA GeForce RTX 4080 Laptop",
+    "10de:2803": "NVIDIA GeForce RTX 4070 Ti",
+    "10de:2878": "NVIDIA GeForce RTX 4070",
+    "10de:28a0": "NVIDIA GeForce RTX 4060 Ti",
+    "10de:28a1": "NVIDIA GeForce RTX 4060",
+    "8086:5912": "Intel HD Graphics 630",
+    "8086:3e9b": "Intel UHD Graphics 630",
+    "8086:9bc5": "Intel UHD Graphics 630",
+    "8086:a780": "Intel UHD Graphics 770",
+    "8086:4680": "Intel UHD Graphics 770",
+    "8086:7d55": "Intel Arc Graphics",
+    "1002:73bf": "AMD Radeon RX 6900 XT",
+    "1002:73c5": "AMD Radeon RX 6800",
+    "1002:73df": "AMD Radeon RX 6800 XT",
+    "1002:73ff": "AMD Radeon RX 6700 XT",
+    "1002:744c": "AMD Radeon RX 7900 XTX",
+    "1002:744b": "AMD Radeon RX 7900 XT",
+    "1002:7550": "AMD Radeon RX 7600",
+    "1002:13c0": "AMD Granite Ridge [Radeon Graphics]",
+    "1002:15bf": "AMD Phoenix [Radeon 780M / 760M / 740M]",
+    "1002:15c8": "AMD Phoenix [Radeon 740M]",
+    "1002:163f": "AMD Rembrandt [Radeon 660M]",
+    "1002:164d": "AMD Rembrandt [Radeon 680M]",
+    "1002:1681": "AMD Rembrandt [Radeon Graphics]",
+    "1002:1435": "AMD Raphael [Radeon 610M]",
+    "1002:164e": "AMD Yellow Carp [Radeon Graphics]",
+  };
+  return common[key];
+}
+
+function isGenericGpuName(name: string): boolean {
+  return /^\s*(device|unknown|unidentified)\s*$/i.test(name);
+}
+
 function getGpuModel(dev: any): string {
-  if (dev.deviceString && dev.deviceString.length > 1) return dev.deviceString;
-  if (dev.deviceDesc && dev.deviceDesc.length > 1) return dev.deviceDesc;
+  if (dev.deviceString && dev.deviceString.length > 1 && !isGenericGpuName(dev.deviceString)) {
+    return dev.deviceString;
+  }
+  if (dev.deviceDesc && dev.deviceDesc.length > 1 && !isGenericGpuName(dev.deviceDesc)) {
+    return dev.deviceDesc;
+  }
+  const fallback = dev.vendorId && dev.deviceId
+    ? pciDeviceName(dev.vendorId, dev.deviceId)
+    : undefined;
+  if (fallback) return fallback;
   return `GPU ${dev.deviceId ? "0x" + dev.deviceId.toString(16).padStart(4, "0") : ""}`;
 }
 

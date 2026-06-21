@@ -735,6 +735,108 @@ export function registerIpcHandlers(window: BrowserWindow): void {
   });
 
   // ---------------------------------------------------------------------------
+  // GPU / video decoder diagnostic helpers
+  // ---------------------------------------------------------------------------
+
+  interface PciGpuInfo {
+    vendorId: number;
+    deviceId: number;
+    name: string;
+  }
+
+  /** lspci returns NVIDIA names like "GA102 [GeForce RTX 3090]". Prefer the
+   * bracketed marketing name so the UI shows something users recognize. */
+  function cleanLspciGpuName(raw: string): string {
+    const bracketed = raw.match(/\[([^\]]+)\]\s*$/);
+    if (bracketed) return bracketed[1].trim();
+    return raw.trim();
+  }
+
+  function getLspciGpuInfo(): PciGpuInfo[] {
+    const devices: PciGpuInfo[] = [];
+    try {
+      const { execSync } = require("child_process");
+      const output = execSync("lspci -nn -mm 2>/dev/null || echo ''", {
+        encoding: "utf8",
+        timeout: 5000,
+      });
+      const lines = output.split("\n");
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        const fields = line.match(/"((?:[^"\\]|\\.)*)"/g) ?? [];
+        if (fields.length < 3) continue;
+        const cls = fields[0].slice(1, -1);
+        if (!cls.includes("VGA") && !cls.includes("3D") && !cls.includes("Display")) {
+          continue;
+        }
+        const vendorField = fields[1].slice(1, -1);
+        const deviceField = fields[2].slice(1, -1);
+        const vendorMatch = vendorField.match(/\[([0-9a-fA-F]{4})\]\s*$/);
+        const deviceMatch = deviceField.match(/\[([0-9a-fA-F]{4})\]\s*$/);
+        if (!vendorMatch || !deviceMatch) continue;
+        const vendorId = parseInt(vendorMatch[1], 16);
+        const deviceId = parseInt(deviceMatch[1], 16);
+        const name = deviceField.replace(/\s*\[[0-9a-fA-F]{4}\]\s*$/, "").trim();
+        if (!Number.isNaN(vendorId) && !Number.isNaN(deviceId) && name) {
+          devices.push({ vendorId, deviceId, name });
+        }
+      }
+    } catch { /* lspci unavailable or failed */ }
+    return devices;
+  }
+
+  function getMpvVersion(): string | undefined {
+    try {
+      const { execSync } = require("child_process");
+      const output = execSync("pkg-config --modversion mpv 2>/dev/null || echo ''", {
+        encoding: "utf8",
+        timeout: 3000,
+      }).trim();
+      if (output) return output;
+    } catch { /* ignore */ }
+    try {
+      const { execSync } = require("child_process");
+      const output = execSync("mpv --version 2>/dev/null || echo ''", {
+        encoding: "utf8",
+        timeout: 3000,
+      });
+      const match = output.match(/mpv\s+v?([\d.]+)/i);
+      return match?.[1];
+    } catch { /* ignore */ }
+    return undefined;
+  }
+
+  function findLibMpv(): string | undefined {
+    try {
+      const { execSync } = require("child_process");
+      const output = execSync("ldconfig -p 2>/dev/null || echo ''", {
+        encoding: "utf8",
+        timeout: 3000,
+      });
+      const line = output.split("\n").find((l: string) => /\blibmpv\.so\b/.test(l));
+      const match = line?.match(/=>\s*(.+)$/);
+      if (match) {
+        const p = match[1].trim();
+        if (require("fs").existsSync(p)) return p;
+      }
+    } catch { /* ignore */ }
+    const fs = require("fs");
+    const candidates = [
+      "/usr/lib/libmpv.so.2",
+      "/usr/lib64/libmpv.so.2",
+      "/usr/lib/x86_64-linux-gnu/libmpv.so.2",
+      "/usr/lib/aarch64-linux-gnu/libmpv.so.2",
+      "/usr/local/lib/libmpv.so.2",
+      "/usr/lib/libmpv.so.1",
+      "/usr/lib64/libmpv.so.1",
+    ];
+    for (const p of candidates) {
+      if (fs.existsSync(p)) return p;
+    }
+    return undefined;
+  }
+
+  // ---------------------------------------------------------------------------
   // System diagnostics — hardware, software versions, installed components
   // ---------------------------------------------------------------------------
   ipcMain.handle("system:getDiagnostics", async () => {
@@ -754,33 +856,31 @@ export function registerIpcHandlers(window: BrowserWindow): void {
       dependencies = getDependencyVersions(pkg);
     } catch { /* ignore */ }
 
-    // Gather video decoder backend availability
+    // Gather video decoder backend availability. The native decoder is
+    // mpv-based; the stale ffmpeg/gstreamer addon names are no longer built.
     const videoDecoders: { name: string; available: boolean; path?: string }[] = [];
     const arch = process.arch === "arm64" ? "arm64" : "x64";
-    const decoderAddons = [
-      `video-decoder-ffmpeg.linux-${arch}-gnu.node`,
-      `video-decoder-gstreamer.linux-${arch}-gnu.node`,
+    const addonName = `video-decoder.linux-${arch}-gnu.node`;
+    const decoderCandidates = [
+      path.join(process.resourcesPath, addonName),
+      path.join(__dirname, "..", "..", "resources", addonName),
     ];
-    for (const name of decoderAddons) {
-      const candidates = [
-        path.join(process.resourcesPath, name),
-        path.join(__dirname, "..", "..", "resources", name),
-      ];
-      let found = false;
-      let foundPath: string | undefined;
-      for (const p of candidates) {
-        if (fs.existsSync(p)) {
-          found = true;
-          foundPath = p;
-          break;
-        }
+    let decoderFound = false;
+    let decoderPath: string | undefined;
+    for (const p of decoderCandidates) {
+      if (fs.existsSync(p)) {
+        decoderFound = true;
+        decoderPath = p;
+        break;
       }
-      videoDecoders.push({
-        name: name.replace(/\.linux-.*$/, ""),
-        available: found,
-        path: foundPath,
-      });
     }
+    const libmpvPath = findLibMpv();
+    const libmpvFound = !!libmpvPath;
+    videoDecoders.push(
+      { name: "mpv native decoder", available: decoderFound, path: decoderPath },
+      { name: "libmpv", available: libmpvFound, path: libmpvPath }
+    );
+    const libmpvVersion = getMpvVersion();
 
     // Check FFmpeg codecs (if ffmpeg CLI available)
     let ffmpegCodecs: string[] = [];
@@ -811,6 +911,21 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     try {
       gpuInfo = await electron.app.getGPUInfo("complete");
     } catch { /* ignore */ }
+
+    // Electron's GPU info sometimes omits the human-readable model name on
+    // Linux (deviceString/deviceDesc can be empty). Fall back to lspci names.
+    if (gpuInfo?.gpuDevice?.length) {
+      const lspciDevices = getLspciGpuInfo();
+      for (const dev of gpuInfo.gpuDevice) {
+        if (dev.deviceString && dev.deviceString.length > 1) continue;
+        const match = lspciDevices.find(
+          (d) => d.vendorId === dev.vendorId && d.deviceId === dev.deviceId
+        );
+        if (match && !/^\s*(device|unknown|unidentified)\s*$/i.test(match.name)) {
+          dev.deviceDesc = cleanLspciGpuName(match.name);
+        }
+      }
+    }
 
     // Display info
     const displays = electron.screen.getAllDisplays().map((d: any) => ({
@@ -855,6 +970,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
       videoDecoders,
       ffmpegCodecs,
       hwaccels,
+      libmpvVersion,
     };
   });
 
@@ -1815,8 +1931,8 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     return coverUrl ?? null;
   });
 
-  ipcMain.handle("input:devices", () => {
-    return getConnectedDevices();
+  ipcMain.handle("input:devices", async () => {
+    return await getConnectedDevices();
   });
 
   ipcMain.handle("input:mappings:get", async (_e, deviceId: string) => {
