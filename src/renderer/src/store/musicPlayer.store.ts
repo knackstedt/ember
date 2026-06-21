@@ -32,6 +32,7 @@ export interface MusicPlayerStore {
   setBladeCollapsed(collapsed: boolean): void;
   toggleBlade(): void;
   loadPersisted(): void;
+  loadCover(track: MusicTrack): Promise<void>;
 }
 
 export const audio = new Audio();
@@ -370,6 +371,14 @@ export const useMusicPlayerStore = create<MusicPlayerStore>((set, get) => {
         }
       } else {
         set({ volume: savedVolume });
+      }
+    },
+
+    async loadCover(track) {
+      if (track.albumArtUrl) return;
+      const url = await window.htpc.music.loadThumbnail(track);
+      if (url) {
+        get().updateTrackCover(track.id, url);
       }
     },
   };

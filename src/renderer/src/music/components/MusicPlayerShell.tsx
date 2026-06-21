@@ -4,14 +4,20 @@ import { useMusicPlayerStore, audio as musicAudio } from "../../store/musicPlaye
 import { useFocusZoneStore } from "../../store/focusZone.store";
 import type { PlayerView } from "../types";
 import { MusicPlayerBar } from "./MusicPlayerBar";
-import { MusicPlayerOverlay } from "./MusicPlayerOverlay";
-import { MusicPlayerFullscreen } from "./MusicPlayerFullscreen";
+import { MusicPlayerFull } from "./MusicPlayerFull";
 
 export const MusicPlayerShell: React.FC = React.memo(() => {
   const hasPlayer = useMusicPlayerStore((s) => s.queue.length > 0);
+  const currentTrack = useMusicPlayerStore((s) => s.queue[s.currentIndex]);
+  const loadCover = useMusicPlayerStore((s) => s.loadCover);
   const setZone = useFocusZoneStore((s) => s.setZone);
 
   const [playerView, setPlayerView] = useState<PlayerView>("mini");
+
+  useEffect(() => {
+    if (!currentTrack || currentTrack.albumArtUrl) return;
+    void loadCover(currentTrack);
+  }, [currentTrack?.id, currentTrack?.albumArtUrl, loadCover]);
 
   // Sync player view with global focus zone
   useEffect(() => {
@@ -19,32 +25,22 @@ export const MusicPlayerShell: React.FC = React.memo(() => {
       if (state.activeZone === "tab" && playerView !== "mini") {
         setPlayerView("mini");
       } else if (state.activeZone === "player" && playerView === "mini") {
-        setPlayerView("overlay");
+        setPlayerView("full");
       }
     });
     return unsub;
   }, [playerView]);
 
-  const expandOverlay = useCallback(() => {
+  const expandFull = useCallback(() => {
     if (hasPlayer) {
-      setPlayerView("overlay");
+      setPlayerView("full");
       setZone("player");
     }
   }, [hasPlayer, setZone]);
 
-  const closeOverlay = useCallback(() => {
+  const closeFull = useCallback(() => {
     setPlayerView("mini");
     setZone("tab");
-  }, [setZone]);
-
-  const goFullscreen = useCallback(() => {
-    setPlayerView("fullscreen");
-    setZone("player");
-  }, [setZone]);
-
-  const exitFullscreen = useCallback(() => {
-    setPlayerView("overlay");
-    setZone("player");
   }, [setZone]);
 
   if (!hasPlayer) return null;
@@ -52,18 +48,12 @@ export const MusicPlayerShell: React.FC = React.memo(() => {
   return (
     <>
       <AnimatePresence>
-        {playerView === "mini" && <MusicPlayerBar onExpand={expandOverlay} />}
+        {playerView === "mini" && <MusicPlayerBar onExpand={expandFull} />}
       </AnimatePresence>
 
       <AnimatePresence>
-        {playerView === "overlay" && (
-          <MusicPlayerOverlay onClose={closeOverlay} onFullscreen={goFullscreen} />
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {playerView === "fullscreen" && (
-          <MusicPlayerFullscreen audioElement={musicAudio} onExit={exitFullscreen} />
+        {playerView === "full" && (
+          <MusicPlayerFull audioElement={musicAudio} onClose={closeFull} />
         )}
       </AnimatePresence>
     </>

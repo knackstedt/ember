@@ -1079,7 +1079,7 @@ export default function App(): React.ReactElement {
           </ErrorBoundary>
         </div>
 
-        {/* Music player shell (mini bar / overlay / fullscreen) */}
+        {/* Music player shell (mini bar / full player) */}
         <MusicPlayerShell />
       </div>
 

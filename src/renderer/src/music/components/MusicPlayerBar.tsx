@@ -160,9 +160,18 @@ export const MusicPlayerBar: React.FC<MusicPlayerBarProps> = React.memo(({ onExp
         <span className="text-[10px] tabular-nums flex-shrink-0" style={{ color: "var(--color-text-dim)" }}>
           {fmt(position)}
         </span>
-        <div className="flex-1 h-1 rounded-full overflow-hidden" style={{ background: "var(--color-surface)" }}>
+        <div
+          className="flex-1 h-3 flex items-center rounded-full overflow-hidden cursor-pointer"
+          style={{ background: "var(--color-surface)" }}
+          onClick={(e) => {
+            if (!duration) return;
+            const rect = e.currentTarget.getBoundingClientRect();
+            const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+            seek(pct * duration);
+          }}
+        >
           <motion.div
-            className="h-full rounded-full"
+            className="h-1 rounded-full"
             style={{ background: "var(--color-accent)", width: `${duration ? (position / duration) * 100 : 0}%` }}
           />
         </div>

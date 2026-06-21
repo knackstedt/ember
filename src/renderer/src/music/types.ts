@@ -20,7 +20,7 @@ export type MusicSortOption =
 export type MusicFocusZone = "nav" | "toolbar" | "content";
 
 /** Player display states */
-export type PlayerView = "mini" | "overlay" | "fullscreen";
+export type PlayerView = "mini" | "full";
 
 export interface MusicFolderItem {
   name: string;
