@@ -1,0 +1,2 @@
+[test]
+pathIgnorePatterns = ["out/**", "node_modules/**", "website/node_modules/**"]

@@ -168,6 +168,7 @@ import {
   AudioTags,
 } from "../../shared/types";
 import { createLogger } from "../util/logger";
+import { getDependencyVersions } from "../util/dependencies";
 import {
   listAvailablePackages,
   searchPackages,
@@ -743,12 +744,14 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     const { execSync } = await import("child_process");
     const electron = await import("electron");
 
-    // App version from package.json
+    // App version and production dependencies from package.json
     let appVersion = "unknown";
+    let dependencies: { name: string; version: string }[] = [];
     try {
       const pkgPath = path.join(__dirname, "..", "..", "package.json");
       const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
       appVersion = pkg.version ?? "unknown";
+      dependencies = getDependencyVersions(pkg);
     } catch { /* ignore */ }
 
     // Gather video decoder backend availability
@@ -830,6 +833,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
         chrome: process.versions.chrome,
         v8: process.versions.v8,
       },
+      dependencies,
       os: {
         platform: os.platform(),
         release: os.release(),
