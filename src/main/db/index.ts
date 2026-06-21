@@ -191,6 +191,7 @@ async function runMigrations(db: Surreal): Promise<void> {
     DEFINE FIELD IF NOT EXISTS sourceLocation ON music_track TYPE option<string>;
     DEFINE FIELD IF NOT EXISTS missing ON music_track TYPE option<bool>;
     DEFINE FIELD IF NOT EXISTS corrupt ON music_track TYPE option<bool>;
+    DEFINE FIELD IF NOT EXISTS lastPlayed ON music_track TYPE option<int>;
 
     DEFINE TABLE IF NOT EXISTS tv_show SCHEMAFULL;
     DEFINE FIELD IF NOT EXISTS id ON tv_show TYPE string;
@@ -211,6 +212,7 @@ async function runMigrations(db: Surreal): Promise<void> {
     DEFINE FIELD IF NOT EXISTS tags ON tv_show TYPE array<string> DEFAULT [];
     DEFINE FIELD IF NOT EXISTS rating ON tv_show TYPE option<float>;
     DEFINE FIELD IF NOT EXISTS hidden ON tv_show TYPE bool DEFAULT false;
+    DEFINE FIELD IF NOT EXISTS lastPlayed ON tv_show TYPE option<int>;
     DEFINE FIELD IF NOT EXISTS sourceLocation ON tv_show TYPE option<string>;
 
     DEFINE TABLE IF NOT EXISTS controller_mapping SCHEMAFULL;

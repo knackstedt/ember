@@ -94,6 +94,7 @@ function sendGameLaunchFailed(gameId: string, reason: string): void {
   if (win && !win.isDestroyed() && !win.webContents.isDestroyed()) {
     win.webContents.send("game:launch-failed", { gameId, reason });
   }
+  restoreAndFocusWindow();
 }
 
 function minimizeWindow(): void {
@@ -426,10 +427,12 @@ export async function launchGame(game: Game): Promise<void> {
         void runSessionHooks(game, "after-start");
         const foundWindow = await waitForGameWindow(gamePid, 10000);
         if (!foundWindow) {
-          log.warn("launcher", `Window for Steam game ${game.steamAppId} not detected; minimizing after timeout`);
+          log.warn("launcher", `Window for Steam game ${game.steamAppId} not detected; restoring focus`);
+          sendGameLaunchFailed(game.id, `Steam game started but no window was detected.`);
+        } else {
+          sendGameStarted(game.id);
+          minimizeWindow();
         }
-        sendGameStarted(game.id);
-        minimizeWindow();
 
         try {
           await pollProcUntilGone(gamePid, 2000);
@@ -583,6 +586,7 @@ export async function launchGame(game: Game): Promise<void> {
       settled = true;
       activeProcesses.delete(game.id);
       log.error("launcher", `Spawn error for "${game.title}": ${err}`);
+      restoreAndFocusWindow();
       reject(err);
     });
 
@@ -602,10 +606,13 @@ export async function launchGame(game: Game): Promise<void> {
         resolve();
         void windowPromise.then((found) => {
           if (!found) {
-            log.warn("launcher", `Window for "${game.title}" not detected; minimizing after timeout`);
+            log.warn("launcher", `Window for "${game.title}" not detected; restoring focus`);
+            sendGameLaunchFailed(game.id, `Game started but no window was detected.`);
+            restoreAndFocusWindow();
+          } else {
+            sendGameStarted(game.id);
+            minimizeWindow();
           }
-          sendGameStarted(game.id);
-          minimizeWindow();
         });
       }, 1500);
     });
@@ -632,6 +639,7 @@ export async function launchGame(game: Game): Promise<void> {
           ? `Process was killed by signal ${signal}. ${stderrTail}`
           : `Process exited immediately with code ${code}. ${stderrTail}`;
         log.error("launcher", `"${game.title}" failed: ${reason}`);
+        restoreAndFocusWindow();
         reject(new Error(reason));
       }
     });
