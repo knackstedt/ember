@@ -37,6 +37,8 @@ export const PRESET_DESCRIPTIONS: Record<string, string> = {
   // "Preset Name": "Description here",
 };
 
+export const DEFAULT_PRESET_NAME = "Rovastar + Loadus + Geiss - FractalDrop (Triple Mix)";
+
 export const PRESETS = Object.entries(butterchurnPresets.getPresets()).map(([name, preset]) => ({
   name,
   preset,
@@ -54,20 +56,13 @@ export const MusicVisualizer: React.FC<MusicVisualizerProps> = React.memo(({
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const visualizerRef = useRef<ReturnType<typeof butterchurn.createVisualizer> | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
   const animRef = useRef<number>(0);
   const lastFrameTimeRef = useRef<number>(0);
-  const [activePresetName, setActivePresetName] = useState<string>(PRESETS[0]?.name ?? "");
-
-  // Wire up the audio analyser.
-  useEffect(() => {
-    if (!audioElement) return;
-    const analyser = getAudioGraph(audioElement);
-    analyserRef.current = analyser;
-    return () => {
-      cancelAnimationFrame(animRef.current);
-    };
-  }, [audioElement]);
+  const [activePresetName, setActivePresetName] = useState<string>(
+    PRESETS.find((p) => p.name === DEFAULT_PRESET_NAME)?.name ?? PRESETS[0]?.name ?? "",
+  );
+  const activePresetNameRef = useRef(activePresetName);
+  activePresetNameRef.current = activePresetName;
 
   // Resume audio context on first interaction.
   useEffect(() => {
@@ -86,12 +81,13 @@ export const MusicVisualizer: React.FC<MusicVisualizerProps> = React.memo(({
     };
   }, []);
 
-  // Create the Butterchurn visualizer and render loop.
+  // Create the audio graph, the Butterchurn visualizer, and load the initial preset
+  // before starting the render loop so the first frame is never the blank default.
   useEffect(() => {
     const canvas = canvasRef.current;
-    const analyser = analyserRef.current;
-    if (!canvas || !analyser) return;
+    if (!audioElement || !canvas) return;
 
+    const analyser = getAudioGraph(audioElement);
     const visualizer = butterchurn.createVisualizer(analyser.context as AudioContext, canvas, {
       width: canvas.clientWidth,
       height: canvas.clientHeight,
@@ -100,6 +96,13 @@ export const MusicVisualizer: React.FC<MusicVisualizerProps> = React.memo(({
     });
     visualizerRef.current = visualizer;
     visualizer.connectAudio(analyser);
+
+    const targetName = presetName ?? activePresetNameRef.current;
+    const preset = PRESETS.find((p) => p.name === targetName)?.preset ?? PRESETS[0]?.preset;
+    if (preset) {
+      visualizer.loadPreset(preset, 0.5);
+      setActivePresetName(PRESETS.find((p) => p.preset === preset)?.name ?? "");
+    }
 
     const resize = () => {
       const rect = canvas.getBoundingClientRect();
@@ -125,20 +128,18 @@ export const MusicVisualizer: React.FC<MusicVisualizerProps> = React.memo(({
       cancelAnimationFrame(animRef.current);
       resizeObserver.disconnect();
     };
-  }, []);
+  }, [audioElement]);
 
-  // Load the requested (or a random) preset.
+  // Load a new preset when the prop changes.
   useEffect(() => {
     const visualizer = visualizerRef.current;
     if (!visualizer) return;
 
-    let targetName = presetName;
-    if (!targetName || !PRESETS.some((p) => p.name === targetName)) {
-      targetName = activePresetName || PRESETS[0]?.name || "";
-    }
+    const targetName = presetName;
+    if (!targetName || targetName === activePresetName) return;
 
     const preset = PRESETS.find((p) => p.name === targetName)?.preset;
-    if (preset && targetName !== activePresetName) {
+    if (preset) {
       visualizer.loadPreset(preset, 0.5);
       setActivePresetName(targetName);
     }

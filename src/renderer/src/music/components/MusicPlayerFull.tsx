@@ -20,7 +20,7 @@ import {
 import { useMusicPlayerStore } from "../../store/musicPlayer.store";
 import { useFocusZoneStore } from "../../store/focusZone.store";
 import { getTrackDisplayName } from "../lib/track-title";
-import { MusicVisualizer, PRESETS } from "./MusicVisualizer";
+import { MusicVisualizer, PRESETS, DEFAULT_PRESET_NAME } from "./MusicVisualizer";
 
 function fmt(s: number): string {
   if (!isFinite(s) || isNaN(s) || s < 0) return "0:00";
@@ -104,7 +104,10 @@ export const MusicPlayerFull: React.FC<MusicPlayerFullProps> = React.memo(({
   const [tabBarFocused, setTabBarFocused] = useState(true);
   const [focusedControl, setFocusedControl] = useState<OverviewButton>("play");
   const [focusedQueueIndex, setFocusedQueueIndex] = useState(currentIndex);
-  const [presetIndex, setPresetIndex] = useState(0);
+  const [presetIndex, setPresetIndex] = useState(() => {
+    const idx = PRESETS.findIndex((p) => p.name === DEFAULT_PRESET_NAME);
+    return idx >= 0 ? idx : 0;
+  });
   const [queueContainerHeight, setQueueContainerHeight] = useState(0);
   const [queueScrollTop, setQueueScrollTop] = useState(0);
 
