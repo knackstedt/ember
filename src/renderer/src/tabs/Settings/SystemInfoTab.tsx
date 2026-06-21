@@ -7,6 +7,7 @@ import {
   Terminal,
   Layers,
   Film,
+  Package,
   Info,
   CheckCircle2,
   XCircle,
@@ -17,6 +18,7 @@ import {
 interface DiagnosticsData {
   app: { name: string; version: string };
   runtime: { electron: string; node: string; chrome: string; v8: string };
+  dependencies: { name: string; version: string }[];
   os: { platform: string; release: string; arch: string; hostname: string; type: string };
   cpu: { model: string; cores: number; speed: number };
   memory: { total: number; free: number };
@@ -190,6 +192,15 @@ export const SystemInfoTab: React.FC = () => {
           <KeyValueRow label="V8" value={data.runtime.v8} />
         </SectionCard>
       </div>
+
+      {/* Dependencies */}
+      <SectionCard icon={Package} title="Dependencies">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-1">
+          {data.dependencies.map((dep) => (
+            <KeyValueRow key={dep.name} label={dep.name} value={dep.version} />
+          ))}
+        </div>
+      </SectionCard>
 
       {/* OS & CPU */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

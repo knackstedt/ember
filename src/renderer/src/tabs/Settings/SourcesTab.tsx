@@ -1,7 +1,31 @@
 import React, { useState, useEffect } from "react";
-import { motion } from "framer-motion";
-import { Globe, Trash2, Play, Square, RefreshCw, Shield, KeyRound, Timer, Wifi, Lock, FolderCheck, AlertTriangle, Film, Music, Gamepad2 } from "lucide-react";
-import { RemoteSource, CredentialMode } from "../../../shared/types";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Trash2,
+  Globe,
+  Play,
+  Square,
+  RefreshCw,
+  Shield,
+  KeyRound,
+  Timer,
+  Wifi,
+  Lock,
+  FolderCheck,
+  AlertTriangle,
+  Film,
+  Music,
+  Gamepad2,
+  Link,
+  X,
+} from "lucide-react";
+import { useSettingsStore } from "../../store/settings.store";
+import { PathList, Toggle, Field } from "./shared";
+import {
+  SCAN_SOURCE_LABELS,
+  ScanSourceId,
+} from "../../../../shared/scan-sources";
+import { RemoteSource, CredentialMode, StreamingService } from "../../../shared/types";
 
 const MODE_ICONS: Record<CredentialMode, typeof Shield> = {
   "auto-key": Shield,
@@ -26,38 +50,148 @@ const PROTOCOL_LABELS: Record<string, string> = {
   onedrive: "OneDrive",
 };
 
-export const RemoteSourcesTab: React.FC = () => {
-  const [sources, setSources] = useState<RemoteSource[]>([]);
-  const [loading, setLoading] = useState(true);
+export const SourcesTab: React.FC = () => {
+  const { settings, update } = useSettingsStore();
+
+  /* ── Local Data state ── */
+  const [xdgDefaults, setXdgDefaults] = useState<{
+    videosDir: string;
+    musicDir: string;
+    roms: string[];
+    steam: string[];
+    heroic: string[];
+    lutris: string[];
+    desktop: string[];
+    retroarch: string[];
+    bottles: string[];
+    itch: string[];
+    kodi: string[];
+    jellyfin: string[];
+    plex: string[];
+    mounts: string[];
+  } | null>(null);
+  const [sourceCounts, setSourceCounts] = useState<Record<ScanSourceId, number>>({
+    steam: 0,
+    heroic: 0,
+    lutris: 0,
+    desktop: 0,
+    dolphin: 0,
+    rom: 0,
+    flash: 0,
+    v86: 0,
+    windows: 0,
+    itch: 0,
+  });
+  const [clearing, setClearing] = useState<Record<ScanSourceId, boolean>>({
+    steam: false,
+    heroic: false,
+    lutris: false,
+    desktop: false,
+    dolphin: false,
+    rom: false,
+    flash: false,
+    v86: false,
+    windows: false,
+    itch: false,
+  });
+
+  /* ── Remote Sources state ── */
+  const [remoteSources, setRemoteSources] = useState<RemoteSource[]>([]);
+  const [remoteLoading, setRemoteLoading] = useState(true);
   const [discovering, setDiscovering] = useState(false);
-  const [showAddModal, setShowAddModal] = useState(false);
+  const [showAddRemote, setShowAddRemote] = useState(false);
   const [servingIds, setServingIds] = useState<Set<string>>(new Set());
   const [checkingMissing, setCheckingMissing] = useState(false);
   const [deletingMissing, setDeletingMissing] = useState<Record<string, boolean>>({});
 
-  const load = async () => {
-    setLoading(true);
+  /* ── Data Feed state ── */
+  const [streamingServices, setStreamingServices] = useState<StreamingService[]>([]);
+  const [showAddService, setShowAddService] = useState(false);
+  const [newService, setNewService] = useState({
+    name: "",
+    url: "",
+    category: "music" as "music" | "video",
+    color: "#1DB954",
+    textColor: "#ffffff",
+    icon: "",
+  });
+
+  /* ── Local Data effects ── */
+  useEffect(() => {
+    window.htpc.app
+      .getXdgDefaults()
+      .then((data) => setXdgDefaults(data))
+      .catch((err) => console.error("Failed to get xdgDefaults:", err));
+  }, []);
+
+  const loadSourceCounts = async () => {
+    const disabled = settings?.disabledScanSources ?? [];
+    const next: Record<ScanSourceId, number> = { ...sourceCounts };
+    await Promise.all(
+      disabled.map(async (source) => {
+        try {
+          next[source] = await window.htpc.games.countBySource(source);
+        } catch (err) {
+          console.error(`Failed to count games for ${source}:`, err);
+          next[source] = 0;
+        }
+      })
+    );
+    setSourceCounts(next);
+  };
+
+  useEffect(() => {
+    if (!settings) return;
+    void loadSourceCounts();
+  }, [settings?.disabledScanSources?.join(",")]);
+
+  const toggleSource = (source: ScanSourceId, enabled: boolean) => {
+    const current = new Set(settings?.disabledScanSources ?? []);
+    if (enabled) {
+      current.delete(source);
+    } else {
+      current.add(source);
+    }
+    update({ disabledScanSources: Array.from(current) as ScanSourceId[] });
+  };
+
+  const handleClearSource = async (source: ScanSourceId) => {
+    setClearing((prev) => ({ ...prev, [source]: true }));
+    try {
+      const count = await window.htpc.games.deleteBySource(source);
+      setSourceCounts((prev) => ({ ...prev, [source]: 0 }));
+      alert(`Cleared ${count} games from ${SCAN_SOURCE_LABELS[source]}.`);
+    } catch (err) {
+      console.error(`Failed to clear games for ${source}:`, err);
+      alert(`Failed to clear games from ${SCAN_SOURCE_LABELS[source]}.`);
+    } finally {
+      setClearing((prev) => ({ ...prev, [source]: false }));
+    }
+  };
+
+  /* ── Remote Sources effects ── */
+  const loadRemoteSources = async () => {
+    setRemoteLoading(true);
     try {
       const list = await window.htpc.rclone.list();
-      setSources(list);
-      // Refresh serve status
+      setRemoteSources(list);
       const ports = await window.htpc.rclone.getAllServePorts();
       setServingIds(new Set(Object.keys(ports)));
     } catch (err) {
       console.error("Failed to load remotes:", err);
     } finally {
-      setLoading(false);
+      setRemoteLoading(false);
     }
   };
 
   useEffect(() => {
-    load();
+    loadRemoteSources();
   }, []);
 
-  const handleRemove = async (id: string) => {
+  const handleRemoveRemote = async (id: string) => {
     try {
       await window.htpc.rclone.remove(id);
-      await load();
+      await loadRemoteSources();
     } catch (err) {
       console.error("Failed to remove remote:", err);
     }
@@ -86,11 +220,10 @@ export const RemoteSourcesTab: React.FC = () => {
     setDiscovering(true);
     try {
       const devices = await window.htpc.network.discover();
-      console.log("Discovered devices:", devices);
       if (devices.length === 0) {
         alert("No devices discovered on the network.");
       } else {
-        setShowAddModal(true);
+        setShowAddRemote(true);
       }
     } catch (err) {
       console.error("Discovery failed:", err);
@@ -126,8 +259,218 @@ export const RemoteSourcesTab: React.FC = () => {
     }
   };
 
+  /* ── Data Feed effects ── */
+  useEffect(() => {
+    window.htpc.streaming.list()
+      .then(setStreamingServices)
+      .catch(() => {});
+  }, []);
+
+  const refreshServices = () => {
+    window.htpc.streaming.list()
+      .then(setStreamingServices)
+      .catch(() => {});
+  };
+
+  const toggleServiceEnabled = async (id: string, enabled: boolean) => {
+    await window.htpc.streaming.setEnabled(id, enabled);
+    refreshServices();
+  };
+
+  const handleAddService = async () => {
+    if (!newService.name.trim() || !newService.url.trim()) return;
+    await window.htpc.streaming.add({
+      id: `custom_${Date.now()}`,
+      name: newService.name.trim(),
+      category: newService.category,
+      url: newService.url.trim(),
+      color: newService.color,
+      textColor: newService.textColor,
+      icon: newService.icon,
+      enabled: true,
+    });
+    setNewService({
+      name: "",
+      url: "",
+      category: "music",
+      color: "#1DB954",
+      textColor: "#ffffff",
+      icon: "",
+    });
+    setShowAddService(false);
+    refreshServices();
+  };
+
+  const handleDeleteService = async (id: string) => {
+    await window.htpc.streaming.delete(id);
+    refreshServices();
+  };
+
+  if (!settings) return null;
+
+  const allSources = Object.keys(SCAN_SOURCE_LABELS) as ScanSourceId[];
+  const disabledSet = new Set(settings.disabledScanSources ?? []);
+
   return (
     <div className="flex flex-col gap-8">
+      {/* ── Media Directories ── */}
+      <section className="flex flex-col gap-4">
+        <h2 className="text-lg font-semibold" style={{ color: "var(--color-text)" }}>
+          Media Directories
+        </h2>
+        <PathList
+          label="Movie Paths"
+          paths={settings.moviePaths}
+          onChange={(p) => update({ moviePaths: p })}
+          placeholder={xdgDefaults?.videosDir}
+          hint={xdgDefaults?.videosDir}
+        />
+        <PathList
+          label="Music Paths"
+          paths={settings.musicPaths}
+          onChange={(p) => update({ musicPaths: p })}
+          placeholder={xdgDefaults?.musicDir}
+          hint={xdgDefaults?.musicDir}
+        />
+        <PathList
+          label="ROM Paths"
+          paths={settings.romPaths}
+          onChange={(p) => update({ romPaths: p })}
+        />
+        <PathList
+          label="Game Paths"
+          paths={settings.gamePaths}
+          onChange={(p) => update({ gamePaths: p })}
+        />
+        {xdgDefaults && (
+          <div className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+            <strong className="block mb-1">Auto-discovered game sources</strong>
+            <div className="flex flex-col gap-2 mt-2">
+              {xdgDefaults.steam.length > 0 && (
+                <div>
+                  <strong className="block">Steam</strong>
+                  {xdgDefaults.steam.join(", ")}
+                </div>
+              )}
+              {xdgDefaults.heroic.length > 0 && (
+                <div>
+                  <strong className="block">Heroic</strong>
+                  {xdgDefaults.heroic.join(", ")}
+                </div>
+              )}
+              {xdgDefaults.lutris.length > 0 && (
+                <div>
+                  <strong className="block">Lutris</strong>
+                  {xdgDefaults.lutris.join(", ")}
+                </div>
+              )}
+              {xdgDefaults.desktop.length > 0 && (
+                <div>
+                  <strong className="block">Desktop</strong>
+                  {xdgDefaults.desktop.join(", ")}
+                </div>
+              )}
+              {xdgDefaults.bottles.length > 0 && (
+                <div>
+                  <strong className="block">Bottles</strong>
+                  {xdgDefaults.bottles.join(", ")}
+                </div>
+              )}
+              {xdgDefaults.itch.length > 0 && (
+                <div>
+                  <strong className="block">Itch.io</strong>
+                  {xdgDefaults.itch.join(", ")}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+        {xdgDefaults && (
+          <div className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+            <strong className="block mb-1">Media Servers</strong>
+            <div className="flex flex-col gap-2 mt-2">
+              {xdgDefaults.kodi.length > 0 && (
+                <div>
+                  <strong className="block">Kodi</strong>
+                  {xdgDefaults.kodi.join(", ")}
+                </div>
+              )}
+              {xdgDefaults.jellyfin.length > 0 && (
+                <div>
+                  <strong className="block">Jellyfin</strong>
+                  {xdgDefaults.jellyfin.join(", ")}
+                </div>
+              )}
+              {xdgDefaults.plex.length > 0 && (
+                <div>
+                  <strong className="block">Plex</strong>
+                  {xdgDefaults.plex.join(", ")}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+        {xdgDefaults?.mounts && xdgDefaults.mounts.length > 0 && (
+          <div className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+            <strong className="block mb-1">Mounts</strong>
+            {xdgDefaults.mounts.join(", ")}
+          </div>
+        )}
+      </section>
+
+      {/* ── Scan Sources ── */}
+      <section className="flex flex-col gap-4">
+        <h2 className="text-lg font-semibold" style={{ color: "var(--color-text)" }}>
+          Scan Sources
+        </h2>
+        <p className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+          Disable sources you don't want to include in game scans. Disabling a source leaves existing games in the library until you clear them.
+        </p>
+        <div className="flex flex-col gap-3 pl-1">
+          {allSources.map((source) => {
+            const enabled = !disabledSet.has(source);
+            const count = sourceCounts[source];
+            return (
+              <div key={source} className="flex flex-col gap-1">
+                <Toggle
+                  label={SCAN_SOURCE_LABELS[source]}
+                  value={enabled}
+                  onChange={(v) => toggleSource(source, v)}
+                />
+                {!enabled && count > 0 && (
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-xs" style={{ color: "var(--color-text-dim)" }}>
+                      {count} game{count === 1 ? "" : "s"} previously scanned
+                    </span>
+                    <motion.button
+                      className="px-3 py-1.5 rounded-[var(--radius-card)] text-xs font-medium flex items-center gap-1.5 flex-shrink-0"
+                      style={{
+                        background: "#ff444420",
+                        color: "#ff4444",
+                        border: "1px solid #ff444430",
+                      }}
+                      onClick={() => handleClearSource(source)}
+                      whileTap={{ scale: 0.96 }}
+                      disabled={clearing[source]}
+                    >
+                      {clearing[source] ? (
+                        <span>Clearing…</span>
+                      ) : (
+                        <>
+                          <Trash2 size={14} />
+                          Clear {count} game{count === 1 ? "" : "s"}
+                        </>
+                      )}
+                    </motion.button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* ── Remote Sources ── */}
       <section className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold" style={{ color: "var(--color-text)" }}>
@@ -154,7 +497,7 @@ export const RemoteSourcesTab: React.FC = () => {
                 background: "var(--color-accent)",
                 color: "var(--color-bg)",
               }}
-              onClick={() => setShowAddModal(true)}
+              onClick={() => setShowAddRemote(true)}
               whileTap={{ scale: 0.96 }}
             >
               + Add Source
@@ -162,11 +505,11 @@ export const RemoteSourcesTab: React.FC = () => {
           </div>
         </div>
 
-        {loading ? (
+        {remoteLoading ? (
           <div className="text-sm" style={{ color: "var(--color-text-dim)" }}>
             Loading remote sources…
           </div>
-        ) : sources.length === 0 ? (
+        ) : remoteSources.length === 0 ? (
           <div
             className="flex flex-col items-center justify-center gap-4 py-8"
             style={{ color: "var(--color-text-dim)" }}
@@ -179,7 +522,7 @@ export const RemoteSourcesTab: React.FC = () => {
                 background: "var(--color-accent)",
                 color: "var(--color-bg)",
               }}
-              onClick={() => setShowAddModal(true)}
+              onClick={() => setShowAddRemote(true)}
               whileTap={{ scale: 0.96 }}
             >
               Add your first remote source
@@ -187,7 +530,7 @@ export const RemoteSourcesTab: React.FC = () => {
           </div>
         ) : (
           <div className="flex flex-col gap-3">
-            {sources.map((source) => {
+            {remoteSources.map((source) => {
               const ModeIcon = MODE_ICONS[source.credentialMode];
               const isServing = servingIds.has(source.id);
               return (
@@ -261,7 +604,7 @@ export const RemoteSourcesTab: React.FC = () => {
                         background: "var(--color-surface)",
                         color: "var(--color-text-dim)",
                       }}
-                      onClick={() => handleRemove(source.id)}
+                      onClick={() => handleRemoveRemote(source.id)}
                       whileTap={{ scale: 0.9 }}
                       title="Remove"
                     >
@@ -275,6 +618,7 @@ export const RemoteSourcesTab: React.FC = () => {
         )}
       </section>
 
+      {/* ── Remote File Availability ── */}
       <section className="flex flex-col gap-4">
         <h2 className="text-lg font-semibold" style={{ color: "var(--color-text)" }}>
           Remote File Availability
@@ -328,8 +672,205 @@ export const RemoteSourcesTab: React.FC = () => {
         </div>
       </section>
 
-      {showAddModal && (
-        <AddRemoteSourceModal onClose={() => setShowAddModal(false)} onAdded={load} />
+      {/* ── API Keys ── */}
+      <section className="flex flex-col gap-4">
+        <h2 className="text-lg font-semibold" style={{ color: "var(--color-text)" }}>
+          API Keys
+        </h2>
+        <p className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+          Optional. Improves metadata quality and rate limits.
+        </p>
+        <Field
+          label="TMDB API Key"
+          value={settings.tmdbApiKey ?? ""}
+          onChange={(v) => update({ tmdbApiKey: v })}
+          placeholder="eyJ…"
+          type="password"
+        />
+        <Field
+          label="RAWG API Key"
+          value={settings.rawgApiKey ?? ""}
+          onChange={(v) => update({ rawgApiKey: v })}
+          placeholder="Optional"
+          type="password"
+        />
+        <Field
+          label="AcoustID API Key"
+          value={settings.acoustidApiKey ?? ""}
+          onChange={(v) => update({ acoustidApiKey: v })}
+          placeholder="Optional"
+          type="password"
+        />
+        <Field
+          label="TheAudioDB API Key"
+          value={settings.theaudiodbApiKey ?? ""}
+          onChange={(v) => update({ theaudiodbApiKey: v })}
+          placeholder="Optional (uses free tier by default)"
+          type="password"
+        />
+      </section>
+
+      {/* ── Streaming Services ── */}
+      <section className="flex flex-col gap-4">
+        <h2 className="text-lg font-semibold" style={{ color: "var(--color-text)" }}>
+          Streaming Services
+        </h2>
+        <p className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+          Manage which streaming services appear in the Music and Movies tabs.
+        </p>
+
+        <div className="flex flex-col gap-2">
+          {streamingServices.map((svc) => (
+            <div
+              key={svc.id}
+              className="flex items-center gap-3 px-3 py-2 rounded"
+              style={{
+                background: "var(--color-surface-raised)",
+                border: "1px solid var(--color-border)",
+              }}
+            >
+              {svc.icon ? <span className="text-lg">{svc.icon}</span> : <Link size={20} />}
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium truncate" style={{ color: "var(--color-text)" }}>
+                  {svc.name}
+                </div>
+                <div className="text-xs truncate" style={{ color: "var(--color-text-dim)" }}>
+                  {svc.category} · {svc.url}
+                </div>
+              </div>
+              <button
+                onClick={() => toggleServiceEnabled(svc.id, !svc.enabled)}
+                className="w-11 h-6 rounded-full transition-colors relative flex-shrink-0"
+                style={{
+                  background: svc.enabled
+                    ? "var(--color-accent)"
+                    : "var(--color-surface)",
+                  border: "1px solid var(--color-border)",
+                }}
+              >
+                <span
+                  className="absolute top-0.5 w-5 h-5 rounded-full transition-transform"
+                  style={{
+                    background: "white",
+                    left: svc.enabled ? "1.25rem" : "0.125rem",
+                  }}
+                />
+              </button>
+              {svc.id.startsWith("custom_") && (
+                <button
+                  onClick={() => handleDeleteService(svc.id)}
+                  className="px-2 py-1 text-xs rounded flex-shrink-0"
+                  style={{
+                    background: "#ff444420",
+                    color: "#ff4444",
+                    border: "1px solid #ff444430",
+                  }}
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <AnimatePresence>
+          {showAddService && (
+            <motion.div
+              className="flex flex-col gap-3 p-4 rounded"
+              style={{
+                background: "var(--color-surface-raised)",
+                border: "1px solid var(--color-border)",
+              }}
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+            >
+              <h3 className="text-sm font-semibold" style={{ color: "var(--color-text)" }}>
+                Add Custom Service
+              </h3>
+              <Field
+                label="Name"
+                value={newService.name}
+                onChange={(v) => setNewService((s) => ({ ...s, name: v }))}
+                placeholder="My Service"
+              />
+              <Field
+                label="URL"
+                value={newService.url}
+                onChange={(v) => setNewService((s) => ({ ...s, url: v }))}
+                placeholder="https://..."
+              />
+              <div>
+                <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--color-text-dim)" }}>
+                  Category
+                </label>
+                <select
+                  value={newService.category}
+                  onChange={(e) =>
+                    setNewService((s) => ({
+                      ...s,
+                      category: e.target.value as "music" | "video",
+                    }))
+                  }
+                  className="w-full text-sm px-2 py-1.5 rounded"
+                  style={{
+                    background: "var(--color-surface)",
+                    border: "1px solid var(--color-border)",
+                    color: "var(--color-text)",
+                    outline: "none",
+                  }}
+                >
+                  <option value="music">Music</option>
+                  <option value="video">Video</option>
+                </select>
+              </div>
+              <div className="flex gap-2">
+                <motion.button
+                  className="px-4 py-2 rounded text-sm"
+                  style={{
+                    background: "var(--color-accent)",
+                    color: "var(--color-bg)",
+                  }}
+                  onClick={handleAddService}
+                  whileTap={{ scale: 0.96 }}
+                >
+                  Add
+                </motion.button>
+                <motion.button
+                  className="px-4 py-2 rounded text-sm"
+                  style={{
+                    background: "var(--color-surface)",
+                    color: "var(--color-text)",
+                    border: "1px solid var(--color-border)",
+                  }}
+                  onClick={() => setShowAddService(false)}
+                  whileTap={{ scale: 0.96 }}
+                >
+                  Cancel
+                </motion.button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {!showAddService && (
+          <motion.button
+            className="self-start px-4 py-2 rounded-[var(--radius-card)] text-sm"
+            style={{
+              background: "var(--color-surface-raised)",
+              color: "var(--color-text)",
+              border: "1px solid var(--color-border)",
+            }}
+            onClick={() => setShowAddService(true)}
+            whileTap={{ scale: 0.96 }}
+          >
+            + Add Custom Service
+          </motion.button>
+        )}
+      </section>
+
+      {showAddRemote && (
+        <AddRemoteSourceModal onClose={() => setShowAddRemote(false)} onAdded={loadRemoteSources} />
       )}
     </div>
   );
@@ -427,7 +968,6 @@ const AddRemoteSourceModal: React.FC<AddRemoteSourceModalProps> = ({ onClose, on
       );
       onAdded();
       onClose();
-      // Trigger background scans for the source's media types
       for (const type of mediaTypes) {
         if (type === "movie") void window.htpc.movies.scan();
         if (type === "music") void window.htpc.music.scan();
@@ -444,7 +984,6 @@ const AddRemoteSourceModal: React.FC<AddRemoteSourceModalProps> = ({ onClose, on
     setTesting(type);
     try {
       const source = buildSource();
-      // For credential tests, pass credentials explicitly
       if (type === "credentials" || type === "path") {
         await window.htpc.rclone.update(source, { user, password });
       }
@@ -491,7 +1030,6 @@ const AddRemoteSourceModal: React.FC<AddRemoteSourceModalProps> = ({ onClose, on
           Add Remote Source
         </h3>
 
-        {/* Stepper */}
         <div className="flex items-center gap-2">
           {steps.map((s) => (
             <div
@@ -662,7 +1200,6 @@ const AddRemoteSourceModal: React.FC<AddRemoteSourceModalProps> = ({ onClose, on
               ))}
             </div>
 
-            {/* Test buttons */}
             <div className="flex flex-col gap-2 mt-2">
               <span className="text-xs font-medium" style={{ color: "var(--color-text-dim)" }}>
                 Verify Setup
@@ -765,7 +1302,7 @@ const AddRemoteSourceModal: React.FC<AddRemoteSourceModalProps> = ({ onClose, on
 };
 
 /* ------------------------------------------------------------------ */
-/*  Delete Missing Button Component                                     */
+/*  Helper Components                                                  */
 /* ------------------------------------------------------------------ */
 
 interface DeleteMissingButtonProps {
@@ -794,10 +1331,6 @@ const DeleteMissingButton: React.FC<DeleteMissingButtonProps> = ({ label, icon, 
     </motion.button>
   );
 };
-
-/* ------------------------------------------------------------------ */
-/*  Test Button Component                                               */
-/* ------------------------------------------------------------------ */
 
 interface TestButtonProps {
   label: string;

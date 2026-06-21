@@ -3,27 +3,23 @@ import { motion } from "framer-motion";
 import {
   Palette,
   HardDrive,
-  Radio,
   Gamepad2,
   Plug,
   Package,
   AlertTriangle,
   Settings,
   Keyboard,
-  Globe,
   Monitor,
   Music,
 } from "lucide-react";
 import { AppearanceTab } from "./AppearanceTab";
 import { GeneralTab } from "./GeneralTab";
-import { LocalDataTab } from "./LocalDataTab";
-import { DataFeedTab } from "./DataFeedTab";
+import { SourcesTab } from "./SourcesTab";
 import { EmulatorsTab } from "./EmulatorsTab";
 import { PluginsTab } from "./PluginsTab";
 import { DependenciesTab } from "./DependenciesTab";
 import { InputTab } from "./InputTab";
 import { DangerZoneTab } from "./DangerZoneTab";
-import { RemoteSourcesTab } from "./RemoteSourcesTab";
 import { SystemInfoTab } from "./SystemInfoTab";
 import { MusicLibraryTab } from "./MusicLibraryTab";
 
@@ -31,10 +27,8 @@ const SUB_TABS = [
   { id: "general", label: "General", Icon: Settings },
   { id: "appearance", label: "Appearance", Icon: Palette },
   { id: "input", label: "Input", Icon: Keyboard },
-  { id: "local-data", label: "Local Data", Icon: HardDrive },
+  { id: "sources", label: "Sources", Icon: HardDrive },
   { id: "music-library", label: "Music Library", Icon: Music },
-  { id: "remote-sources", label: "Remote Sources", Icon: Globe },
-  { id: "data-feed", label: "Data Feed", Icon: Radio },
   { id: "emulators", label: "Emulators", Icon: Gamepad2 },
   { id: "plugins", label: "Plugins", Icon: Plug },
   { id: "dependencies", label: "Dependencies", Icon: Package },
@@ -48,10 +42,8 @@ const TAB_COMPONENTS: Record<SubTabId, React.FC> = {
   general: GeneralTab,
   appearance: AppearanceTab,
   input: InputTab,
-  "local-data": LocalDataTab,
+  sources: SourcesTab,
   "music-library": MusicLibraryTab,
-  "remote-sources": RemoteSourcesTab,
-  "data-feed": DataFeedTab,
   emulators: EmulatorsTab,
   plugins: PluginsTab,
   dependencies: DependenciesTab,
