@@ -1,13 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, X, Link2, Unlink, Star, StarOff, EyeOff, Tag, FolderOpen, Trash2, RotateCw } from "lucide-react";
+import { ArrowLeft, X, Star, StarOff, EyeOff, Tag, FolderOpen, Trash2, RotateCw } from "lucide-react";
 import { useMusicStore } from "../store/media.store";
 import { useMusicPlayerStore } from "../store/musicPlayer.store";
 import { usePlaylistsStore } from "../store/playlists.store";
 import { useFocusZoneStore } from "../store/focusZone.store";
 import { useToastStore } from "../store/toast.store";
-import { useSettingsStore } from "../store/settings.store";
-import { MusicTrack, Playlist, AudioTags, StreamingService, StreamingExtension } from "../../../shared/types";
+import { MusicTrack, Playlist, AudioTags } from "../../../shared/types";
 import type { MusicNavItem, MusicViewMode, MusicSortOption } from "./types";
 import { useMusicFocus } from "./hooks/useMusicFocus";
 import { MusicNavRail } from "./components/MusicNavRail";
@@ -16,7 +15,6 @@ import { MusicContent } from "./components/MusicContent";
 import { MusicGroupContent, MusicGroup } from "./components/MusicGroupContent";
 import { MusicTagEditor } from "./components/MusicTagEditor";
 import { OnScreenKeyboard } from "../components/OnScreenKeyboard/OnScreenKeyboard";
-import { StreamingWebview } from "../components/StreamingWebview/StreamingWebview";
 import { getTrackDisplayName } from "./lib/track-title";
 import { useContextMenu } from "../hooks/useContextMenu";
 import { ContextMenuOption } from "../components/ContextMenu/ContextMenu";
@@ -29,7 +27,6 @@ const NAV_ITEMS: MusicNavItem[] = [
   "albums",
   "folders",
   "playlists",
-  "streaming",
 ];
 
 const GROUP_NAVS: MusicNavItem[] = ["genre", "artists", "albums", "folders"];
@@ -160,9 +157,6 @@ export const MusicTab: React.FC = () => {
   const globalZone = useFocusZoneStore((s) => s.activeZone);
   const setZone = useFocusZoneStore((s) => s.setZone);
 
-  const settings = useSettingsStore((s) => s.settings);
-  const updateSettings = useSettingsStore((s) => s.update);
-
   const [activeNav, setActiveNav] = useState<MusicNavItem>("all");
   const [viewMode, setViewMode] = useState<MusicViewMode>("grid");
   const [sortBy, setSortBy] = useState<MusicSortOption>("title");
@@ -177,13 +171,6 @@ export const MusicTab: React.FC = () => {
     track: null,
   });
 
-  // Streaming state
-  const [streamingServices, setStreamingServices] = useState<StreamingService[]>([]);
-  const [streamingLoading, setStreamingLoading] = useState(false);
-  const [activeStreamingService, setActiveStreamingService] = useState<StreamingService | null>(null);
-  const [showStreamingOverlay, setShowStreamingOverlay] = useState(false);
-  const [connectedAdapters, setConnectedAdapters] = useState<Set<string>>(new Set());
-
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Load tracks and playlists on mount
@@ -192,42 +179,10 @@ export const MusicTab: React.FC = () => {
     loadPlaylists();
   }, [load, loadPlaylists]);
 
-  // Load streaming services when nav is streaming
-  useEffect(() => {
-    if (activeNav === "streaming") {
-      setStreamingLoading(true);
-      window.htpc.streaming.list("music")
-        .then((list) => {
-          setStreamingServices(list.filter((s) => s.enabled !== false));
-        })
-        .catch(() => setStreamingServices([]))
-        .finally(() => setStreamingLoading(false));
-    }
-  }, [activeNav]);
-
   // Clear selected group when changing nav
   useEffect(() => {
     setSelectedGroup(null);
   }, [activeNav, searchQuery]);
-
-  // Media key injection listener
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (!showStreamingOverlay || !activeStreamingService) return;
-      if (e.key === "MediaPlayPause" || e.code === "MediaPlayPause") {
-        e.preventDefault();
-        window.htpc.streaming.mediaKeys("play");
-      } else if (e.key === "MediaTrackNext" || e.code === "MediaTrackNext") {
-        e.preventDefault();
-        window.htpc.streaming.mediaKeys("next");
-      } else if (e.key === "MediaTrackPrevious" || e.code === "MediaTrackPrevious") {
-        e.preventDefault();
-        window.htpc.streaming.mediaKeys("previous");
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [showStreamingOverlay, activeStreamingService]);
 
   // Build groups for artist/album/genre/playlist views
   const groups = useMemo<MusicGroup[]>(() => {
@@ -356,9 +311,6 @@ export const MusicTab: React.FC = () => {
     switch (activeNav) {
       case "all":
         break;
-      case "streaming":
-        filtered = filtered.filter((t) => t.sourceLocation && t.sourceLocation !== "local");
-        break;
       case "artists":
         if (selectedGroup) {
           filtered = filtered.filter((t) => t.artist?.toLowerCase() === selectedGroup.toLowerCase());
@@ -445,8 +397,7 @@ export const MusicTab: React.FC = () => {
       ? folderHasSubdirs(tracks.filter((t) => !t.hidden), selectedGroup, roots)
       : true
     : (GROUP_NAVS.includes(activeNav) || activeNav === "playlists") && !selectedGroup;
-  const isStreamingNav = activeNav === "streaming";
-  const canEditTags = !showingGroups && !isStreamingNav && trackItems.length > 0;
+  const canEditTags = !showingGroups && trackItems.length > 0;
   const toolbarItemCount = (activeNav === "playlists" ? 4 : 3) + (canEditTags ? 1 : 0);
 
   // Focus management — only enabled when global zone is 'tab'
@@ -461,15 +412,11 @@ export const MusicTab: React.FC = () => {
     isToolbarFocused,
     isContentFocused,
   } = useMusicFocus({
-    enabled: globalZone === "tab" && !showStreamingOverlay,
+    enabled: globalZone === "tab",
     navItemCount: NAV_ITEMS.length,
     toolbarItemCount,
     contentColumnCount: viewMode === "grid" ? columnCount : 1,
-    contentItemCount: isStreamingNav
-      ? streamingServices.length
-      : showingGroups
-        ? groups.length
-        : trackItems.length,
+    contentItemCount: showingGroups ? groups.length : trackItems.length,
     onNavSelect: (index) => {
       setActiveNav(NAV_ITEMS[index]);
       setSelectedGroup(null);
@@ -510,9 +457,6 @@ export const MusicTab: React.FC = () => {
           setSelectedGroup(group.id);
           setContentIndex(0);
         }
-      } else if (isStreamingNav) {
-        const svc = streamingServices[index];
-        if (svc) openStreamingOverlay(svc);
       } else {
         const track = trackItems[index];
         if (track) {
@@ -628,55 +572,8 @@ export const MusicTab: React.FC = () => {
           break;
       }
     },
-    enabled: !showingGroups && !isStreamingNav,
+    enabled: !showingGroups,
   });
-
-  // Streaming overlay management
-  const openStreamingOverlay = useCallback((svc: StreamingService) => {
-    setActiveStreamingService(svc);
-    setShowStreamingOverlay(true);
-    setMusicZone("content");
-  }, [setMusicZone]);
-
-  const closeStreamingOverlay = useCallback(() => {
-    setShowStreamingOverlay(false);
-  }, []);
-
-  const handleStreamingServiceClick = useCallback((svc: StreamingService) => {
-    openStreamingOverlay(svc);
-  }, [openStreamingOverlay]);
-
-  const handleAdapterConnect = useCallback(async (svc: StreamingService, e: React.MouseEvent) => {
-    e.stopPropagation();
-    try {
-      await window.htpc.streaming.adapter.authenticate(svc.id);
-      setConnectedAdapters((prev) => new Set(prev).add(svc.id));
-      useToastStore.getState().push({ type: "success", message: `Connected to ${svc.name}` });
-    } catch (err) {
-      useToastStore.getState().push({
-        type: "error",
-        message: err instanceof Error ? err.message : `Failed to connect to ${svc.name}`,
-      });
-    }
-  }, []);
-
-  const handleAdapterDisconnect = useCallback(async (svc: StreamingService, e: React.MouseEvent) => {
-    e.stopPropagation();
-    await window.htpc.streaming.adapter.disconnect(svc.id);
-    setConnectedAdapters((prev) => {
-      const next = new Set(prev);
-      next.delete(svc.id);
-      return next;
-    });
-    useToastStore.getState().push({ type: "info", message: `Disconnected from ${svc.name}` });
-  }, []);
-
-  const hasDeepAdapter = useCallback((svc: StreamingService) => {
-    return svc.id === "spotify";
-  }, []);
-
-  const extensions: StreamingExtension[] = settings?.streamingExtensions ?? [];
-  const partition = activeStreamingService ? `persist:streaming-music-${activeStreamingService.id}` : "";
 
   return (
     <div className="flex flex-col h-full relative">
@@ -769,7 +666,7 @@ export const MusicTab: React.FC = () => {
           )}
 
           <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-auto relative">
-            {loading || (activeNav === "playlists" && playlistsLoading) || (isStreamingNav && streamingLoading) ? (
+            {loading || (activeNav === "playlists" && playlistsLoading) ? (
               <div className="flex items-center justify-center h-full">
                 <div className="w-8 h-8 rounded-full border-[3px] border-white/30 border-t-white animate-spin" />
               </div>
@@ -783,67 +680,6 @@ export const MusicTab: React.FC = () => {
                 onColumnCountChange={setColumnCount}
                 scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
               />
-            ) : isStreamingNav ? (
-              <div className="p-4">
-                <div
-                  className="grid gap-4"
-                  style={{
-                    gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))`,
-                  }}
-                >
-                  {streamingServices.map((svc, index) => (
-                    <motion.button
-                      key={svc.id}
-                      className="relative flex flex-col justify-between rounded-[var(--radius-card)] overflow-hidden p-4 text-left"
-                      style={{
-                        background: svc.color || "var(--color-surface-raised)",
-                        color: svc.textColor || "var(--color-text)",
-                        aspectRatio: "16/10",
-                        boxShadow: "var(--shadow-card)",
-                        border: isContentFocused(index)
-                          ? "2px solid var(--color-accent)"
-                          : "2px solid transparent",
-                      }}
-                      whileHover={{ scale: 1.03 }}
-                      whileTap={{ scale: 0.97 }}
-                      onClick={() => handleStreamingServiceClick(svc)}
-                    >
-                      <div className="flex items-start justify-between">
-                        <span className="text-4xl leading-none select-none" aria-hidden>
-                          {svc.icon}
-                        </span>
-                        {hasDeepAdapter(svc) && (
-                          <span
-                            className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium"
-                            style={{
-                              background: "rgba(0,0,0,0.25)",
-                              color: "#fff",
-                            }}
-                            onClick={
-                              connectedAdapters.has(svc.id)
-                                ? (e) => handleAdapterDisconnect(svc, e as unknown as React.MouseEvent)
-                                : (e) => handleAdapterConnect(svc, e as unknown as React.MouseEvent)
-                            }
-                          >
-                            {connectedAdapters.has(svc.id) ? (
-                              <>
-                                <Unlink size={12} /> Disconnect
-                              </>
-                            ) : (
-                              <>
-                                <Link2 size={12} /> Connect
-                              </>
-                            )}
-                          </span>
-                        )}
-                      </div>
-                      <span className="text-sm font-bold leading-tight">
-                        {svc.name}
-                      </span>
-                    </motion.button>
-                  ))}
-                </div>
-              </div>
             ) : (
               <MusicContent
                 items={trackItems}
@@ -860,109 +696,6 @@ export const MusicTab: React.FC = () => {
                 bindItem={bindItem}
               />
             )}
-
-            {/* Streaming webview overlay (keep-alive: hidden when closed, not unmounted) */}
-            <AnimatePresence>
-              {activeStreamingService && (
-                <motion.div
-                  className="absolute inset-0 z-20 flex flex-col"
-                  style={{
-                    background: "var(--color-surface)",
-                    display: showStreamingOverlay ? "flex" : "none",
-                  }}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: showStreamingOverlay ? 1 : 0 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  {/* Overlay header */}
-                  <div
-                    className="flex items-center gap-3 px-4 py-2 flex-shrink-0"
-                    style={{
-                      background: "var(--color-surface-raised)",
-                      borderBottom: "1px solid var(--color-border)",
-                    }}
-                  >
-                    <motion.button
-                      className="flex items-center gap-1 px-2.5 py-1.5 rounded text-xs font-medium"
-                      style={{
-                        background: "var(--color-surface)",
-                        color: "var(--color-text)",
-                        border: "1px solid var(--color-border)",
-                      }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={closeStreamingOverlay}
-                    >
-                      <ArrowLeft size={14} /> Back
-                    </motion.button>
-                    <span className="text-sm font-semibold" style={{ color: "var(--color-text)" }}>
-                      {activeStreamingService.name}
-                    </span>
-                    <div className="flex-1" />
-                    {/* Media key controls */}
-                    <div className="flex items-center gap-2">
-                      <motion.button
-                        className="px-2 py-1 rounded text-xs font-medium"
-                        style={{
-                          background: "var(--color-surface)",
-                          color: "var(--color-text)",
-                          border: "1px solid var(--color-border)",
-                        }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={() => window.htpc.streaming.mediaKeys("previous")}
-                      >
-                        Prev
-                      </motion.button>
-                      <motion.button
-                        className="px-2 py-1 rounded text-xs font-medium"
-                        style={{
-                          background: "var(--color-surface)",
-                          color: "var(--color-text)",
-                          border: "1px solid var(--color-border)",
-                        }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={() => window.htpc.streaming.mediaKeys("play")}
-                      >
-                        Play/Pause
-                      </motion.button>
-                      <motion.button
-                        className="px-2 py-1 rounded text-xs font-medium"
-                        style={{
-                          background: "var(--color-surface)",
-                          color: "var(--color-text)",
-                          border: "1px solid var(--color-border)",
-                        }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={() => window.htpc.streaming.mediaKeys("next")}
-                      >
-                        Next
-                      </motion.button>
-                    </div>
-                    <motion.button
-                      className="flex items-center gap-1 px-2.5 py-1.5 rounded text-xs font-medium"
-                      style={{
-                        background: "var(--color-surface)",
-                        color: "var(--color-text)",
-                        border: "1px solid var(--color-border)",
-                      }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={closeStreamingOverlay}
-                    >
-                      <X size={14} />
-                    </motion.button>
-                  </div>
-
-                  {/* Webview */}
-                  <div className="flex-1 min-h-0 relative overflow-hidden">
-                    <StreamingWebview
-                      service={activeStreamingService}
-                      partition={partition}
-                      extensions={extensions}
-                    />
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
           </div>
         </div>
       </div>

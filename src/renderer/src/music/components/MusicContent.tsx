@@ -193,11 +193,7 @@ export const MusicContent: React.FC<MusicContentProps> = React.memo(({
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center">
           <div className="text-4xl mb-2 opacity-30">♪</div>
-          <div style={{ color: "var(--color-text-dim)" }}>
-            {activeNav === "streaming"
-              ? "No streaming services configured"
-              : "No music found"}
-          </div>
+          <div style={{ color: "var(--color-text-dim)" }}>No music found</div>
         </div>
       </div>
     );

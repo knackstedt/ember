@@ -4,8 +4,7 @@ export type MusicNavItem =
   | "artists"
   | "albums"
   | "folders"
-  | "playlists"
-  | "streaming";
+  | "playlists";
 
 export type MusicViewMode = "grid" | "list";
 

@@ -282,12 +282,12 @@ async function runMigrations(db: Surreal): Promise<void> {
     DEFINE FIELD IF NOT EXISTS icon ON streaming_service TYPE string;
     DEFINE FIELD IF NOT EXISTS desktopApp ON streaming_service TYPE option<string>;
     DEFINE FIELD IF NOT EXISTS desktopAppArgs ON streaming_service TYPE option<array<string>>;
-    DEFINE FIELD IF NOT EXISTS enabled ON streaming_service TYPE bool DEFAULT true;
-    DEFINE FIELD IF NOT EXISTS isBuiltin ON streaming_service TYPE bool DEFAULT false;
-    DEFINE FIELD IF NOT EXISTS sortOrder ON streaming_service TYPE int DEFAULT 0;
+    DEFINE FIELD IF NOT EXISTS enabled ON streaming_service TYPE option<bool> DEFAULT true;
+    DEFINE FIELD IF NOT EXISTS isBuiltin ON streaming_service TYPE option<bool> DEFAULT false;
+    DEFINE FIELD IF NOT EXISTS sortOrder ON streaming_service TYPE option<int> DEFAULT 0;
     DEFINE FIELD IF NOT EXISTS embed ON streaming_service TYPE option<bool>;
-    DEFINE FIELD IF NOT EXISTS frontpageEnabled ON streaming_service TYPE bool DEFAULT true;
-    DEFINE FIELD IF NOT EXISTS playTime ON streaming_service TYPE int DEFAULT 0;
+    DEFINE FIELD IF NOT EXISTS frontpageEnabled ON streaming_service TYPE option<bool> DEFAULT true;
+    DEFINE FIELD IF NOT EXISTS playTime ON streaming_service TYPE option<int> DEFAULT 0;
     DEFINE FIELD IF NOT EXISTS lastPlayed ON streaming_service TYPE option<int>;
     DEFINE FIELD IF NOT EXISTS adapterConfig ON streaming_service TYPE option<string>;
 
@@ -339,5 +339,28 @@ async function runMigrations(db: Surreal): Promise<void> {
     }
   } catch (err) {
     log.warn("db", `raw coverUrl migration failed: ${err}`);
+  }
+
+  // Fix legacy streaming_service records where schema fields were non-optional but stored as NONE
+  try {
+    await db.query(`
+      REMOVE FIELD IF EXISTS enabled ON streaming_service;
+      REMOVE FIELD IF EXISTS isBuiltin ON streaming_service;
+      REMOVE FIELD IF EXISTS sortOrder ON streaming_service;
+      REMOVE FIELD IF EXISTS frontpageEnabled ON streaming_service;
+      REMOVE FIELD IF EXISTS playTime ON streaming_service;
+      DEFINE FIELD IF NOT EXISTS enabled ON streaming_service TYPE option<bool> DEFAULT true;
+      DEFINE FIELD IF NOT EXISTS isBuiltin ON streaming_service TYPE option<bool> DEFAULT false;
+      DEFINE FIELD IF NOT EXISTS sortOrder ON streaming_service TYPE option<int> DEFAULT 0;
+      DEFINE FIELD IF NOT EXISTS frontpageEnabled ON streaming_service TYPE option<bool> DEFAULT true;
+      DEFINE FIELD IF NOT EXISTS playTime ON streaming_service TYPE option<int> DEFAULT 0;
+      UPDATE streaming_service SET enabled = true WHERE enabled IS NONE;
+      UPDATE streaming_service SET isBuiltin = false WHERE isBuiltin IS NONE;
+      UPDATE streaming_service SET sortOrder = 0 WHERE sortOrder IS NONE;
+      UPDATE streaming_service SET frontpageEnabled = true WHERE frontpageEnabled IS NONE;
+      UPDATE streaming_service SET playTime = 0 WHERE playTime IS NONE;
+    `);
+  } catch (err) {
+    log.warn("db", `streaming_service schema migration failed: ${err}`);
   }
 }

@@ -7,7 +7,6 @@ import {
   Disc3,
   FolderOpen,
   ListMusic,
-  Radio,
 } from "lucide-react";
 import type { MusicNavItem } from "../types";
 
@@ -18,7 +17,6 @@ const NAV_ITEMS: { id: MusicNavItem; label: string; Icon: React.ComponentType<{ 
   { id: "albums", label: "Albums", Icon: Disc3 },
   { id: "folders", label: "Folders", Icon: FolderOpen },
   { id: "playlists", label: "Playlists", Icon: ListMusic },
-  { id: "streaming", label: "Streaming", Icon: Radio },
 ];
 
 interface MusicNavRailProps {

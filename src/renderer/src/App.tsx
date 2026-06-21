@@ -242,6 +242,17 @@ export default function App(): React.ReactElement {
   );
   executeCommandRef.current = executeCommand;
 
+  // Global command dispatch: any component can request command execution via event
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { id: string };
+      const cmd = COMMAND_DEFINITIONS.find((c) => c.id === detail.id);
+      if (cmd) executeCommand(cmd);
+    };
+    window.addEventListener("htpc:execute-command", handler);
+    return () => window.removeEventListener("htpc:execute-command", handler);
+  }, [executeCommand]);
+
   // Fallback gamepad input via browser Gamepad API (works without evdev permissions)
   useGamepadApi(!anyEmulatorOpen && !gameRunning && inputDevices.length === 0 && !evdevGamepadActive, activeTab);
 

@@ -716,7 +716,7 @@ export const SourcesTab: React.FC = () => {
           Streaming Services
         </h2>
         <p className="text-sm" style={{ color: "var(--color-text-dim)" }}>
-          Manage which streaming services appear in the Music and Movies tabs.
+          Manage which streaming services appear in the Streaming tab. Services are grouped into Music and Videos sections.
         </p>
 
         <div className="flex flex-col gap-2">
