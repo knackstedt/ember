@@ -148,12 +148,13 @@ export const MusicContent: React.FC<MusicContentProps> = React.memo(({
 }) => {
   const gridRef = useRef<VirtualGridHandle>(null);
 
-  // Scroll focused item into view
+  // Scroll focused item into view (also on viewMode change to force the virtualizer
+  // to sync its scroll offset and render the correct visible range immediately).
   useEffect(() => {
     if (focusedIndex >= 0 && focusedIndex < items.length) {
       gridRef.current?.scrollToItem(focusedIndex);
     }
-  }, [focusedIndex, items.length]);
+  }, [focusedIndex, items.length, viewMode]);
 
   const renderGridItem = useCallback(
     (track: MusicTrack, index: number) => (
