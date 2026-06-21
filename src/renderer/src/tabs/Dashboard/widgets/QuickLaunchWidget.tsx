@@ -47,7 +47,7 @@ export const QuickLaunchWidget: React.FC<{ title?: string; maxItems?: number }> 
           {title}
         </div>
       )}
-      <div className="flex-1 grid grid-cols-3 gap-1.5 overflow-y-auto min-h-0" style={{ scrollbarWidth: "thin" }}>
+      <div className="flex-1 grid grid-cols-3 gap-1.5 overflow-y-auto min-h-0">
         {quickList.length === 0 && (
           <div className="col-span-3 flex items-center justify-center text-sm opacity-40">
             No games available

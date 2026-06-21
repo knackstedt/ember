@@ -45,7 +45,7 @@ export const AchievementsWidget: React.FC<{ title?: string }> = ({ title }) => {
         </div>
       )}
 
-      <div className="flex-1 flex flex-col gap-1 overflow-y-auto min-h-0" style={{ scrollbarWidth: "thin" }}>
+      <div className="flex-1 flex flex-col gap-1 overflow-y-auto min-h-0">
         {achievements.map((a) => (
           <div
             key={a.id}

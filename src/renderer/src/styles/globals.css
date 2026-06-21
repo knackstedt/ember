@@ -316,12 +316,27 @@ section {
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+::-webkit-scrollbar-track-piece {
+  background: transparent;
+}
 ::-webkit-scrollbar-thumb {
   background: var(--color-border);
   border-radius: 2px;
 }
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-accent-dim);
+}
+::-webkit-scrollbar-thumb:active {
+  background: var(--color-accent);
+}
+::-webkit-scrollbar-button {
+  display: none;
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+::-webkit-resizer {
+  background: transparent;
 }
 
 /* Ruffle player fills and stretches its container */

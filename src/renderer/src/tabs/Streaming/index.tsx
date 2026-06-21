@@ -309,9 +309,7 @@ export const StreamingTab: React.FC = () => {
                       ref={(el) => { rowRefs.current[rowIndex] = el; }}
                       className="flex flex-col gap-2"
                     >
-                      <div className="flex items-center gap-3 overflow-x-auto pb-1"
-                        style={{ scrollbarWidth: "thin", scrollbarColor: "var(--color-border) transparent" }}
-                      >
+                      <div className="flex items-center gap-3 overflow-x-auto pb-1">
                         {/* Service tile */}
                         <ServiceTile
                           service={service}
@@ -342,9 +340,7 @@ export const StreamingTab: React.FC = () => {
                   >
                     Video Services
                   </h2>
-                  <div className="flex gap-3 overflow-x-auto pb-1"
-                    style={{ scrollbarWidth: "thin", scrollbarColor: "var(--color-border) transparent" }}
-                  >
+                  <div className="flex gap-3 overflow-x-auto pb-1">
                     {displayServices.map((svc) => (
                       <ServiceTile
                         key={svc.id}

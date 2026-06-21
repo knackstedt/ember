@@ -1636,7 +1636,6 @@ export const GamingTab: React.FC = () => {
                     </div>
                     <div
                       className="flex gap-2 overflow-x-auto pb-1"
-                      style={{ scrollbarWidth: "thin" }}
                     >
                       {screenshotUrls.map((url, i) => (
                         <img

@@ -22,10 +22,6 @@ export const StreamingTile: React.FC<Props> = ({ services, onLaunch }) => {
     <div className="flex flex-col gap-2 flex-shrink-0">
       <div
         className="flex gap-3 overflow-x-auto pb-1"
-        style={{
-          scrollbarWidth: "thin",
-          scrollbarColor: "var(--color-border) transparent",
-        }}
       >
         {services.map((svc) => (
           <motion.button

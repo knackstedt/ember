@@ -48,7 +48,7 @@ export const NewsWidget: React.FC<{ title?: string }> = ({ title }) => {
           {title}
         </div>
       )}
-      <div className="flex-1 flex flex-col gap-1 overflow-y-auto min-h-0" style={{ scrollbarWidth: "thin" }}>
+      <div className="flex-1 flex flex-col gap-1 overflow-y-auto min-h-0">
         {MOCK_NEWS.map((item) => (
           <button
             key={item.id}
