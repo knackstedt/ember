@@ -27,3 +27,14 @@ export function resolveMediaUrl(filePath: string | undefined): string | undefine
   if (filePath.startsWith("ember://")) return filePath;
   return `ember://media/${filePath}`;
 }
+
+/**
+ * Ensure a web URL has a protocol. If none is provided, default to https://.
+ * Keeps explicit http://, https://, ember://, and file:// URLs unchanged.
+ */
+export function normalizeWebUrl(url: string | undefined): string | undefined {
+  if (!url) return url;
+  if (/^(https?:|ember:|file:)\/\//i.test(url)) return url;
+  if (url.startsWith("//")) return `https:${url}`;
+  return `https://${url}`;
+}

@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from "react";
-import { DashboardWidget, DashboardWidgetType } from "../../../shared/types";
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { DashboardWidget } from "../../../shared/types";
+import { normalizeWebUrl } from "../../../../shared/path-utils";
 import { X, Globe, Hash, Type } from "lucide-react";
 
 interface WidgetConfigDialogProps {
@@ -9,9 +10,14 @@ interface WidgetConfigDialogProps {
   onSave: (id: string, updates: Partial<DashboardWidget>) => void;
 }
 
-export const WidgetConfigDialog: React.FC<WidgetConfigDialogProps> = ({
+interface WidgetConfigDialogContentProps {
+  widget: DashboardWidget;
+  onClose: () => void;
+  onSave: (id: string, updates: Partial<DashboardWidget>) => void;
+}
+
+const WidgetConfigDialogContent: React.FC<WidgetConfigDialogContentProps> = ({
   widget,
-  open,
   onClose,
   onSave,
 }) => {
@@ -21,22 +27,19 @@ export const WidgetConfigDialog: React.FC<WidgetConfigDialogProps> = ({
   const [location, setLocation] = useState("");
 
   useEffect(() => {
-    if (widget) {
-      setTitle(widget.title ?? "");
-      setUrl((widget.config?.url as string) ?? "");
-      setMaxItems((widget.config?.maxItems as number) ?? 5);
-      setLocation((widget.config?.location as string) ?? "");
-    }
+    setTitle(widget.title ?? "");
+    setUrl((widget.config?.url as string) ?? "");
+    setMaxItems((widget.config?.maxItems as number) ?? 5);
+    setLocation((widget.config?.location as string) ?? "");
   }, [widget]);
 
-  if (!open || !widget) return null;
-
-  const handleSave = () => {
+  const handleSave = useCallback(() => {
     const updates: Partial<DashboardWidget> = { title: title || undefined };
     const config: Record<string, unknown> = { ...(widget.config ?? {}) };
 
     if (widget.type === "webview") {
-      if (url) config.url = url;
+      const normalizedUrl = normalizeWebUrl(url.trim());
+      if (normalizedUrl) config.url = normalizedUrl;
       else delete config.url;
     }
 
@@ -57,7 +60,43 @@ export const WidgetConfigDialog: React.FC<WidgetConfigDialogProps> = ({
 
     onSave(widget.id, updates);
     onClose();
-  };
+  }, [widget, title, url, maxItems, location, onSave, onClose]);
+
+  // Submit on Enter / controller A (confirm) and cancel on Escape / controller B
+  const handleSaveRef = useRef(handleSave);
+  const onCloseRef = useRef(onClose);
+  handleSaveRef.current = handleSave;
+  onCloseRef.current = onClose;
+
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        e.stopPropagation();
+        handleSaveRef.current();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        onCloseRef.current();
+      }
+    };
+    const handleNav = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { action?: string };
+      if (detail?.action === "confirm") {
+        e.stopImmediatePropagation();
+        handleSaveRef.current();
+      } else if (detail?.action === "cancel") {
+        e.stopImmediatePropagation();
+        onCloseRef.current();
+      }
+    };
+    window.addEventListener("keydown", handleKey, true);
+    window.addEventListener("htpc:nav", handleNav, true);
+    return () => {
+      window.removeEventListener("keydown", handleKey, true);
+      window.removeEventListener("htpc:nav", handleNav, true);
+    };
+  }, []);
 
   return (
     <div
@@ -187,4 +226,14 @@ export const WidgetConfigDialog: React.FC<WidgetConfigDialogProps> = ({
       </div>
     </div>
   );
+};
+
+export const WidgetConfigDialog: React.FC<WidgetConfigDialogProps> = ({
+  widget,
+  open,
+  onClose,
+  onSave,
+}) => {
+  if (!open || !widget) return null;
+  return <WidgetConfigDialogContent widget={widget} onClose={onClose} onSave={onSave} />;
 };

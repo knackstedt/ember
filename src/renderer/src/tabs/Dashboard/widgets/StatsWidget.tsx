@@ -61,9 +61,31 @@ export const StatsWidget: React.FC<{ title?: string }> = ({ title }) => {
   const tv = useTvStore((s) => s.shows);
 
   const totalPlaytime = useMemo(() => {
-    const minutes = games.reduce((sum, g) => sum + (g.playTime ?? 0), 0);
-    return Math.floor(minutes / 60);
+    const seconds = games.reduce((sum, g) => sum + (g.playTime ?? 0), 0);
+    return Math.floor(seconds / 3600);
   }, [games]);
+
+  const gamesPlayed = useMemo(
+    () => games.filter((g) => g.lastPlayed != null || (g.playTime ?? 0) > 0).length,
+    [games],
+  );
+
+  const mediaHours = useMemo(() => {
+    const movieSeconds = movies.reduce((sum, m) => sum + (m.runtime ?? 0), 0);
+    const musicSeconds = music.reduce((sum, t) => sum + (t.duration ?? 0), 0);
+    const tvSeconds = tv.reduce((sum, show) => {
+      return (
+        sum +
+        (show.seasons?.reduce((seasonSum, season) => {
+          return (
+            seasonSum +
+            (season.episodes?.reduce((epSum, ep) => epSum + (ep.duration ?? 0), 0) ?? 0)
+          );
+        }, 0) ?? 0)
+      );
+    }, 0);
+    return Math.floor((movieSeconds + musicSeconds + tvSeconds) / 3600);
+  }, [movies, music, tv]);
 
   const total = games.length + movies.length + music.length + tv.length;
   const completionRate = games.length > 0 ? Math.round((games.filter((g) => g.status === "completed").length / games.length) * 100) : 0;
@@ -82,7 +104,9 @@ export const StatsWidget: React.FC<{ title?: string }> = ({ title }) => {
         <RingStat value={tv.length} pct={total > 0 ? (tv.length / total) * 100 : 0} label="Shows" icon={Tv} color="#c4b5fd" />
       </div>
       <div className="flex items-center justify-between gap-2 pt-1 border-t text-[10px] opacity-50" style={{ borderColor: "var(--color-border)" }}>
-        <span className="truncate">{totalPlaytime}h played</span>
+        <span className="truncate">{gamesPlayed} played</span>
+        <span className="truncate">{totalPlaytime}h gaming</span>
+        <span className="truncate">{mediaHours}h music/video</span>
         {games.length > 0 && (
           <span className="truncate">{completionRate}% done</span>
         )}

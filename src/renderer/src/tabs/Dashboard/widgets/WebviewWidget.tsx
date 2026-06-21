@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from "react";
 import { Settings } from "lucide-react";
+import { normalizeWebUrl } from "../../../../../shared/path-utils";
 
 export const WebviewWidget: React.FC<{
   title?: string;
@@ -17,7 +18,7 @@ export const WebviewWidget: React.FC<{
 
   // Sync the webview src when the configured URL is changed externally.
   useEffect(() => {
-    const configUrl = (config?.url as string) || "";
+    const configUrl = normalizeWebUrl((config?.url as string) || "");
     if (configUrl && configUrl !== savedUrlRef.current) {
       savedUrlRef.current = configUrl;
       const wv = webviewRef.current;
