@@ -494,14 +494,15 @@ async function createWindow(): Promise<void> {
     await mainWindow.loadFile(join(__dirname, "../renderer/index.html"));
   }
 
-  try {
-    await initInputSystem(mainWindow);
-  } catch (err) {
+  // Initialise the input system in the background so the renderer can become
+  // interactive immediately. The scan itself is now async/yielding so it does
+  // not block the main process event loop.
+  initInputSystem(mainWindow).catch((err) => {
     log.warn(
       "input",
       `evdev init failed (user may not be in input group): ${err}`
     );
-  }
+  });
 }
 
 protocol.registerSchemesAsPrivileged([

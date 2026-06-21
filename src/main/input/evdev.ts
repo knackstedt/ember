@@ -11,7 +11,7 @@
  *   __s32 value;               // 4 bytes
  *   Total: 24 bytes
  */
-import { readdirSync, existsSync, readFileSync, createReadStream } from "fs";
+import { readdirSync, existsSync, readFileSync, createReadStream, promises as fsPromises } from "fs";
 import { join } from "path";
 import { BrowserWindow } from "electron";
 import {
@@ -64,15 +64,18 @@ function freeControllerIdx(idx: number): void {
 
 /* ─── Connection & sysfs helpers ─── */
 
-function readSysfsText(path: string): string | null {
+async function readSysfsText(path: string): Promise<string | null> {
   try {
-    if (existsSync(path)) return readFileSync(path, "utf-8").trim();
+    if (existsSync(path)) {
+      const data = await fsPromises.readFile(path, "utf-8");
+      return data.trim();
+    }
   } catch { /* ignore */ }
   return null;
 }
 
-function readSysfsInt(path: string): number | undefined {
-  const text = readSysfsText(path);
+async function readSysfsInt(path: string): Promise<number | undefined> {
+  const text = await readSysfsText(path);
   if (text === null) return undefined;
   const n = parseInt(text, 10);
   return Number.isNaN(n) ? undefined : n;
@@ -115,37 +118,37 @@ function detectConnectionType(
 }
 
 /** Walk up the sysfs tree looking for a bluetooth device RSSI. */
-function findBluetoothRssi(inputSysPath: string): number | undefined {
+async function findBluetoothRssi(inputSysPath: string): Promise<number | undefined> {
   try {
-    const { realpathSync } = require("fs");
-    let cur = realpathSync(inputSysPath);
+    let cur = await fsPromises.realpath(inputSysPath);
     for (let depth = 0; depth < 6; depth++) {
       const rssiPath = join(cur, "rssi");
-      const rssi = readSysfsInt(rssiPath);
+      const rssi = await readSysfsInt(rssiPath);
       if (rssi !== undefined) {
         // RSSI is negative dBm; map typical gamepad range (-90..-30) to 0..100
         const clamped = Math.max(-90, Math.min(-30, rssi));
         return Math.round(((clamped + 90) / 60) * 100);
       }
       const parent = join(cur, "..");
-      cur = realpathSync(parent);
+      cur = await fsPromises.realpath(parent);
     }
   } catch { /* ignore */ }
   return undefined;
 }
 
 /** Try to find a battery capacity for a bluetooth MAC-matched power_supply. */
-function findBatteryLevel(macHint: string | null): number | undefined {
+async function findBatteryLevel(macHint: string | null): Promise<number | undefined> {
   if (!macHint) return undefined;
   try {
     const psDir = "/sys/class/power_supply";
     if (!existsSync(psDir)) return undefined;
-    for (const entry of readdirSync(psDir)) {
+    const entries = await fsPromises.readdir(psDir);
+    for (const entry of entries) {
       const macPath = join(psDir, entry, "mac");
       if (existsSync(macPath)) {
-        const mac = readFileSync(macPath, "utf-8").trim().toLowerCase();
+        const mac = (await fsPromises.readFile(macPath, "utf-8")).trim().toLowerCase();
         if (mac === macHint.toLowerCase()) {
-          return readSysfsInt(join(psDir, entry, "capacity"));
+          return await readSysfsInt(join(psDir, entry, "capacity"));
         }
       }
     }
@@ -153,11 +156,10 @@ function findBatteryLevel(macHint: string | null): number | undefined {
   return undefined;
 }
 
-function getDeviceDriver(inputSysPath: string): string | undefined {
+async function getDeviceDriver(inputSysPath: string): Promise<string | undefined> {
   try {
-    const { realpathSync } = require("fs");
-    const driverLink = join(realpathSync(inputSysPath), "driver");
-    const resolved = realpathSync(driverLink);
+    const driverLink = join(await fsPromises.realpath(inputSysPath), "driver");
+    const resolved = await fsPromises.realpath(driverLink);
     return resolved.split("/").pop();
   } catch { /* ignore */ }
   return undefined;
@@ -171,25 +173,25 @@ interface ExtraDeviceInfo {
   batteryPercent?: number;
 }
 
-function getExtraDeviceInfo(
+async function getExtraDeviceInfo(
   eventPath: string,
   vendorId: number,
   productId: number,
-): ExtraDeviceInfo {
+): Promise<ExtraDeviceInfo> {
   const deviceNum = eventPath.replace("/dev/input/event", "");
   const sysPath = `/sys/class/input/event${deviceNum}/device`;
-  const phys = readSysfsText(join(sysPath, "phys"));
+  const phys = await readSysfsText(join(sysPath, "phys"));
   const connectionType = detectConnectionType(phys, vendorId, productId);
-  const driverName = getDeviceDriver(sysPath);
+  const driverName = await getDeviceDriver(sysPath);
 
   let signalStrengthPercent: number | undefined;
   let batteryPercent: number | undefined;
 
   if (connectionType === "bluetooth") {
-    signalStrengthPercent = findBluetoothRssi(sysPath);
+    signalStrengthPercent = await findBluetoothRssi(sysPath);
     // phys for bluetooth is usually the MAC address
     if (phys && MAC_RE.test(phys)) {
-      batteryPercent = findBatteryLevel(phys);
+      batteryPercent = await findBatteryLevel(phys);
     }
   }
 
@@ -412,7 +414,7 @@ function isTouchpadDevice(name: string): boolean {
   return lower.includes("touchpad") || lower.includes("trackpad");
 }
 
-function hasControllerCapabilities(eventPath: string, name?: string): boolean {
+async function hasControllerCapabilities(eventPath: string, name?: string): Promise<boolean> {
   try {
     if (name && isMotionSensorDevice(name)) return false;
     if (name && nameLooksLikeController(name)) return true;
@@ -420,7 +422,7 @@ function hasControllerCapabilities(eventPath: string, name?: string): boolean {
     const deviceNum = eventPath.replace("/dev/input/event", "");
     const capPath = `/sys/class/input/event${deviceNum}/device/capabilities/ev`;
     if (!existsSync(capPath)) return false;
-    const evCap = parseInt(readFileSync(capPath, "utf-8").trim(), 16);
+    const evCap = parseInt((await fsPromises.readFile(capPath, "utf-8")).trim(), 16);
     // Controllers/joysticks expose absolute axes (EV_ABS). Keyboards, mice,
     // power buttons, and HDMI audio devices do not.
     return (evCap & (1 << EV_ABS)) !== 0;
@@ -429,9 +431,9 @@ function hasControllerCapabilities(eventPath: string, name?: string): boolean {
   }
 }
 
-function getDeviceInfo(
+async function getDeviceInfo(
   eventPath: string,
-): { name: string; vendorId: number; productId: number } | null {
+): Promise<{ name: string; vendorId: number; productId: number } | null> {
   try {
     const deviceNum = eventPath.replace("/dev/input/event", "");
     const sysPath = `/sys/class/input/event${deviceNum}/device`;
@@ -441,13 +443,13 @@ function getDeviceInfo(
     const idPath = join(sysPath, "id");
 
     const name = existsSync(namePath)
-      ? readFileSync(namePath, "utf-8").trim()
+      ? (await fsPromises.readFile(namePath, "utf-8")).trim()
       : "Unknown";
     const vendorHex = existsSync(join(idPath, "vendor"))
-      ? readFileSync(join(idPath, "vendor"), "utf-8").trim()
+      ? (await fsPromises.readFile(join(idPath, "vendor"), "utf-8")).trim()
       : "0000";
     const productHex = existsSync(join(idPath, "product"))
-      ? readFileSync(join(idPath, "product"), "utf-8").trim()
+      ? (await fsPromises.readFile(join(idPath, "product"), "utf-8")).trim()
       : "0000";
 
     return {
@@ -485,7 +487,7 @@ function findParentControllerIdx(vendorId: number, productId: number, physHint?:
 
 /** Try to read the ABS max value for a given axis code from sysfs.
  *  Falls back to a sensible default if sysfs doesn't expose it. */
-function readAbsMax(eventPath: string, code: number): number {
+async function readAbsMax(eventPath: string, code: number): Promise<number> {
   try {
     const deviceNum = eventPath.replace("/dev/input/event", "");
     const paths = [
@@ -494,7 +496,7 @@ function readAbsMax(eventPath: string, code: number): number {
     ];
     for (const p of paths) {
       if (existsSync(p)) {
-        const text = readFileSync(p, "utf-8").trim();
+        const text = (await fsPromises.readFile(p, "utf-8")).trim();
         const parts = text.split(/\s+/);
         if (parts.length >= 3) {
           const max = parseInt(parts[2], 10);
@@ -531,7 +533,7 @@ async function openDevice(
     }
   }
 
-  const extra = getExtraDeviceInfo(eventPath, info.vendorId, info.productId);
+  const extra = await getExtraDeviceInfo(eventPath, info.vendorId, info.productId);
   const now = Date.now();
   const deviceInfo: ControllerDevice = {
     id: deviceId,
@@ -557,10 +559,10 @@ async function openDevice(
   // Pre-read touchpad abs ranges so we can normalise to 0..1
   const touchpadAbsMax: Record<number, number> = {};
   if (isTouchpad) {
-    touchpadAbsMax[0] = readAbsMax(eventPath, 0);
-    touchpadAbsMax[1] = readAbsMax(eventPath, 1);
-    touchpadAbsMax[53] = readAbsMax(eventPath, 53);
-    touchpadAbsMax[54] = readAbsMax(eventPath, 54);
+    touchpadAbsMax[0] = await readAbsMax(eventPath, 0);
+    touchpadAbsMax[1] = await readAbsMax(eventPath, 1);
+    touchpadAbsMax[53] = await readAbsMax(eventPath, 53);
+    touchpadAbsMax[54] = await readAbsMax(eventPath, 54);
   }
 
   // Pure Node.js binary reader — struct input_event is 24 bytes on 64-bit Linux
@@ -743,9 +745,9 @@ async function scanDevices(): Promise<void> {
     const lastFail = recentFailures.get(device);
     if (lastFail && Date.now() - lastFail < FAILURE_COOLDOWN_MS) continue;
 
-    const info = getDeviceInfo(device);
+    const info = await getDeviceInfo(device);
     if (!info) continue;
-    if (!hasControllerCapabilities(device, info.name)) continue;
+    if (!(await hasControllerCapabilities(device, info.name))) continue;
     if (isTouchpadDevice(info.name)) {
       touchpadCandidates.push({ device, info });
       continue;
@@ -772,7 +774,7 @@ async function scanDevices(): Promise<void> {
   // Second pass: open touchpads, associating them with their parent controller
   for (const { device, info } of touchpadCandidates) {
     if (activeDevices.has(device)) continue;
-    const extra = getExtraDeviceInfo(device, info.vendorId, info.productId);
+    const extra = await getExtraDeviceInfo(device, info.vendorId, info.productId);
     const parentIdx = findParentControllerIdx(info.vendorId, info.productId, extra.physPath);
     if (parentIdx < 0) {
       // Parent not yet opened — retry on next scan
@@ -884,10 +886,10 @@ export function rescanDevice(deviceId: string): void {
   }
 }
 
-export function getConnectedDevices(): ControllerDevice[] {
-  return Array.from(activeDevices.values())
-    .filter((h) => !h.isTouchpad)
-    .map((h) => {
+export async function getConnectedDevices(): Promise<ControllerDevice[]> {
+  const entries = Array.from(activeDevices.values()).filter((h) => !h.isTouchpad);
+  const results: ControllerDevice[] = [];
+  for (const h of entries) {
     const info = { ...h.info };
     // Refresh dynamic fields
     const avgLatency =
@@ -900,11 +902,12 @@ export function getConnectedDevices(): ControllerDevice[] {
     if (info.connectionType === "bluetooth" && info.physPath) {
       const deviceNum = info.id.replace("/dev/input/event", "");
       const sysPath = `/sys/class/input/event${deviceNum}/device`;
-      info.signalStrengthPercent = findBluetoothRssi(sysPath);
+      info.signalStrengthPercent = await findBluetoothRssi(sysPath);
       if (MAC_RE.test(info.physPath)) {
-        info.batteryPercent = findBatteryLevel(info.physPath);
+        info.batteryPercent = await findBatteryLevel(info.physPath);
       }
     }
-    return info;
-  });
+    results.push(info);
+  }
+  return results;
 }
