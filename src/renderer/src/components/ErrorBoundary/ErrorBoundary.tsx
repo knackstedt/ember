@@ -67,6 +67,8 @@ function FullscreenFallback({ error }: { error?: Error }) {
           background: "#1a1a1a",
           borderRadius: "8px",
           fontSize: "0.85rem",
+          userSelect: "text",
+          WebkitUserSelect: "text",
         }}
       >
         {error?.message}
@@ -114,6 +116,8 @@ function SectionFallback({ error }: { error?: Error }) {
             background: "#1a1a1a",
             overflow: "auto",
             fontFamily: "monospace",
+            userSelect: "text",
+            WebkitUserSelect: "text",
           }}
         >
           {error?.message}
