@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import butterchurn from "butterchurn";
 import butterchurnPresets from "butterchurn-presets";
+import { FLAME_PRESET, FLAME_PRESET_NAME } from "@renderer/music/presets/emberFlame";
 
 interface AudioGraph {
   ctx: AudioContext;
@@ -34,16 +35,19 @@ function getAudioGraph(audioElement: HTMLAudioElement): AnalyserNode {
 
 // Short descriptions for each Butterchurn preset. Fill these in as desired.
 export const PRESET_DESCRIPTIONS: Record<string, string> = {
-  // "Preset Name": "Description here",
+  [FLAME_PRESET_NAME]: FLAME_PRESET.description,
 };
 
-export const DEFAULT_PRESET_NAME = "Rovastar + Loadus + Geiss - FractalDrop (Triple Mix)";
+export const DEFAULT_PRESET_NAME = FLAME_PRESET_NAME;
 
-export const PRESETS = Object.entries(butterchurnPresets.getPresets()).map(([name, preset]) => ({
-  name,
-  preset,
-  description: PRESET_DESCRIPTIONS[name] ?? "",
-}));
+export const PRESETS = [
+  ...Object.entries(butterchurnPresets.getPresets()).map(([name, preset]) => ({
+    name,
+    preset,
+    description: PRESET_DESCRIPTIONS[name] ?? "",
+  })),
+  FLAME_PRESET,
+];
 
 export interface MusicVisualizerProps {
   audioElement: HTMLAudioElement | null;
