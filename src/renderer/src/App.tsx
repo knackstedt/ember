@@ -948,22 +948,10 @@ export default function App(): React.ReactElement {
         className="h-screen w-screen flex items-center justify-center"
         style={{ background: "#000", color: "#fff" }}
       >
-        <div className="flex flex-col items-center gap-3">
-          <div
-            className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin"
-            style={{
-              borderColor: "var(--color-accent)",
-              borderTopColor: "transparent",
-            }}
-          />
-          <span className="text-sm opacity-50">Loading HTPC…</span>
-        </div>
+        {/* <CampfireLoader text="Loading Ember…" /> */}
       </div>
     );
   }
-
-  const ActiveComponent =
-    TABS.find((t) => t.id === activeTab)?.component ?? GamingTab;
 
   return (
     <div
@@ -1067,21 +1055,17 @@ export default function App(): React.ReactElement {
         </nav>
 
         {/* Main area: tab content */}
+        {/* Render the active tab directly. Wrapping it in AnimatePresence with
+            mode="wait" made the new tab start invisible and left the container
+            empty during the transition, causing the recurring blank-tab bug. */}
         <div className="flex-1 min-h-0 relative overflow-hidden">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeTab}
-              className="absolute inset-0"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.15, ease: "easeOut" }}
-            >
-              <ErrorBoundary variant="section">
-                <ActiveComponent />
-              </ErrorBoundary>
-            </motion.div>
-          </AnimatePresence>
+          <ErrorBoundary variant="section">
+            {(() => {
+              const Component =
+                TABS.find((t) => t.id === activeTab)?.component ?? GamingTab;
+              return <Component />;
+            })()}
+          </ErrorBoundary>
         </div>
 
         {/* Music player shell (mini bar / overlay / fullscreen) */}
