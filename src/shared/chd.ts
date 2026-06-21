@@ -1,4 +1,4 @@
-import { openSync, readSync, closeSync } from "fs";
+import { open, read, close } from "fs/promises";
 import { GamePlatform } from "./types";
 
 /**
@@ -12,17 +12,17 @@ import { GamePlatform } from "./types";
  *   DVD  → ps2 (DVD-ROM; PS2 is the primary DVD-based console we support)
  *   CHCD / CHTR / CHT2 → psx or ps2 (CD-ROM; defaults to psx, uses path heuristics for ps2)
  */
-export function detectChdPlatform(filePath: string): GamePlatform | null {
-  let fd: number;
+export async function detectChdPlatform(filePath: string): Promise<GamePlatform | null> {
+  let fd: number | null = null;
   try {
-    fd = openSync(filePath, "r");
+    fd = await open(filePath, "r");
   } catch {
     return null;
   }
 
   try {
     const header = Buffer.alloc(124);
-    const bytesRead = readSync(fd, header, 0, 124, 0);
+    const { bytesRead } = await fd.read(header, 0, 124, 0);
     if (bytesRead < 44) return null;
 
     const signature = header.toString("ascii", 0, 8);
@@ -44,7 +44,7 @@ export function detectChdPlatform(filePath: string): GamePlatform | null {
     if (!metaoffset || metaoffset === 0) return null;
 
     const metaBuf = Buffer.alloc(4);
-    const metaBytes = readSync(fd, metaBuf, 0, 4, metaoffset);
+    const { bytesRead: metaBytes } = await fd.read(metaBuf, 0, 4, metaoffset);
     if (metaBytes < 4) return null;
 
     const tag = metaBuf.toString("ascii", 0, 4);
@@ -79,10 +79,12 @@ export function detectChdPlatform(filePath: string): GamePlatform | null {
   } catch {
     return null;
   } finally {
-    try {
-      closeSync(fd);
-    } catch {
-      /* ignore */
+    if (fd) {
+      try {
+        await close(fd);
+      } catch {
+        /* ignore */
+      }
     }
   }
 }

@@ -65,7 +65,12 @@ let mpvAvailable: boolean | null = null;
 function isMpvAvailable(): boolean {
   if (mpvAvailable !== null) return mpvAvailable;
   try {
+    const start = performance.now();
     mpvAvailable = ipcRenderer.sendSync("mpv:available");
+    const elapsed = performance.now() - start;
+    if (elapsed > 20) {
+      console.warn(`[preload] mpv:available sendSync took ${elapsed.toFixed(1)}ms`);
+    }
   } catch {
     mpvAvailable = false;
   }
@@ -533,8 +538,14 @@ const htpc = {
       ipcRenderer.invoke("movies:tag", id, tags),
     setProgress: (id: string, progress: number | null): Promise<void> =>
       ipcRenderer.invoke("movies:progress:set", id, progress),
-    setProgressSync: (id: string, progress: number | null): void =>
-      ipcRenderer.sendSync("movies:progress:set:sync", id, progress),
+    setProgressSync: (id: string, progress: number | null): void => {
+      const start = performance.now();
+      ipcRenderer.sendSync("movies:progress:set:sync", id, progress);
+      const elapsed = performance.now() - start;
+      if (elapsed > 20) {
+        console.warn(`[preload] movies:progress:set:sync sendSync took ${elapsed.toFixed(1)}ms`);
+      }
+    },
     fetchMetadata: (title: string): Promise<unknown> =>
       ipcRenderer.invoke("movies:metadata", title),
     hide: (id: string, value: boolean): Promise<void> =>

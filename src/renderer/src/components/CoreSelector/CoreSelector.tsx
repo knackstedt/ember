@@ -28,7 +28,7 @@ export const CoreSelector: React.FC<CoreSelectorProps> = ({ game, onSelectCore }
         if (cancelled) return;
 
         // Use detectAllCores to get all compatible cores sorted by priority (best first)
-        const detectedCores = window.htpc.libretro.detectAllCores(game.romPath ?? "");
+        const detectedCores = await window.htpc.libretro.detectAllCores(game.romPath ?? "");
         if (detectedCores.length > 0) {
           const compatible = detectedCores.map((d) => {
             const core = allCores.find((c) => c.path === d.corePath);

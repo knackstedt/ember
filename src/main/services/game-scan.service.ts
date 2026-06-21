@@ -270,25 +270,25 @@ async function scanInMainThread(
   const dolphinExtra = [...gamePaths, ...romPaths];
   const isEnabled = (source: ScanSourceId) => !disabledSources.has(source);
 
-  const reportAndScan = <T>(
+  const reportAndScan = async <T>(
     scanner: ScanSourceId,
-    fn: () => T[],
-  ): T[] => {
+    fn: () => T[] | Promise<T[]>,
+  ): Promise<T[]> => {
     report(scanner, 0, 0, "scanning");
-    const result = fn();
+    const result = await fn();
     report(scanner, result.length, result.length, "done");
     return result;
   };
 
-  const steam = isEnabled("steam") ? reportAndScan("steam", scanSteamGames) : [];
+  const steam = isEnabled("steam") ? await reportAndScan("steam", scanSteamGames) : [];
   const dolphin = isEnabled("dolphin")
-    ? reportAndScan("dolphin", () => scanDolphinGames(dolphinExtra))
+    ? await reportAndScan("dolphin", () => scanDolphinGames(dolphinExtra))
     : [];
   const heroic = isEnabled("heroic") ? scanHeroicGames() : [];
   const lutris = isEnabled("lutris") ? scanLutrisGames() : [];
   const desktop = isEnabled("desktop") ? scanDesktopGames() : [];
   const flash = isEnabled("flash") ? scanFlashGames() : [];
-  const roms = isEnabled("rom") ? scanRomGames(romPaths) : [];
+  const roms = isEnabled("rom") ? await scanRomGames(romPaths) : [];
   const v86 = isEnabled("v86") ? scanV86Games(romPaths, gamePaths) : [];
   const windows = isEnabled("windows") ? scanWindowsGames(gamePaths, romPaths) : [];
   const itch = isEnabled("itch") ? scanItchGames() : [];

@@ -9,7 +9,7 @@ import { scanV86Games } from "../scanners/v86.scanner";
 import { scanWindowsGames } from "../scanners/windows.scanner";
 import { listInstalledItchGames as scanItchGames } from "../services/itch.service";
 
-parentPort?.once("message", ({
+parentPort?.once("message", async ({
   extraPaths,
   romPaths,
   gamePaths,
@@ -25,7 +25,7 @@ parentPort?.once("message", ({
     const disabled = new Set(disabledScanSources ?? []);
     const isEnabled = (source: string) => !disabled.has(source);
 
-    const scanAndReport = (scanner: string, fn: () => any[]): any[] => {
+    const scanAndReport = async (scanner: string, fn: () => any[] | Promise<any[]>): Promise<any[]> => {
       parentPort?.postMessage({
         type: "progress",
         scanner,
@@ -33,7 +33,7 @@ parentPort?.once("message", ({
         total: 0,
         status: "scanning",
       });
-      const result = fn();
+      const result = await fn();
       parentPort?.postMessage({
         type: "progress",
         scanner,
@@ -44,15 +44,15 @@ parentPort?.once("message", ({
       return result;
     };
 
-    const steam = isEnabled("steam") ? scanAndReport("steam", scanSteamGames) : [];
+    const steam = isEnabled("steam") ? await scanAndReport("steam", scanSteamGames) : [];
     const dolphin = isEnabled("dolphin")
-      ? scanAndReport("dolphin", () => scanDolphinGames(dolphinExtra))
+      ? await scanAndReport("dolphin", () => scanDolphinGames(dolphinExtra))
       : [];
     const heroic = isEnabled("heroic") ? scanHeroicGames() : [];
     const lutris = isEnabled("lutris") ? scanLutrisGames() : [];
     const desktop = isEnabled("desktop") ? scanDesktopGames() : [];
     const flash = isEnabled("flash") ? scanFlashGames() : [];
-    const roms = isEnabled("rom") ? scanRomGames(romPaths) : [];
+    const roms = isEnabled("rom") ? await scanRomGames(romPaths) : [];
     const v86 = isEnabled("v86") ? scanV86Games(romPaths, gamePaths) : [];
     const windows = isEnabled("windows") ? scanWindowsGames(gamePaths, romPaths) : [];
     const itch = isEnabled("itch") ? scanItchGames() : [];

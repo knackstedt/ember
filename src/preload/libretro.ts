@@ -1,5 +1,6 @@
 import { join } from "path";
-import { existsSync, readdirSync, statSync } from "fs";
+import { existsSync } from "fs";
+import { readdir as readdirAsync, stat as statAsync } from "fs/promises";
 import { ipcRenderer } from "electron";
 import { detectChdPlatform } from "@shared/chd";
 
@@ -74,17 +75,17 @@ const PLATFORM_EXTS: Record<string, string> = {
   ".wad": "doom",
 };
 
-function findCoresInPath(searchPath: string): CoreInfo[] {
+async function findCoresInPath(searchPath: string): Promise<CoreInfo[]> {
   const cores: CoreInfo[] = [];
   try {
-    const entries = readdirSync(searchPath);
+    const entries = await readdirAsync(searchPath);
     for (const entry of entries) {
       if (!entry.endsWith(".so") && !entry.endsWith(".dll") && !entry.endsWith(".dylib")) {
         continue;
       }
       const fullPath = join(searchPath, entry);
-      const stat = statSync(fullPath);
-      if (!stat.isFile()) continue;
+      const st = await statAsync(fullPath);
+      if (!st.isFile()) continue;
 
       const baseName = entry.replace(/\.so$/, "").replace(/\.dll$/, "").replace(/\.dylib$/, "");
       const coreName = baseName
@@ -109,7 +110,7 @@ function findCoresInPath(searchPath: string): CoreInfo[] {
   return cores;
 }
 
-export function scanForCores(): CoreInfo[] {
+export async function scanForCores(): Promise<CoreInfo[]> {
   const searchPaths: string[] = [];
   const home = process.env.HOME || "/home/user";
 
@@ -133,7 +134,7 @@ export function scanForCores(): CoreInfo[] {
   const seenPaths = new Set<string>();
 
   for (const searchPath of searchPaths) {
-    const found = findCoresInPath(searchPath);
+    const found = await findCoresInPath(searchPath);
     for (const core of found) {
       if (seenPaths.has(core.path)) continue;
       seenPaths.add(core.path);
@@ -162,16 +163,16 @@ const CORE_PRIORITY: Record<string, string[]> = {
   pce: ["beetle_pce", "beetle_pce_fast"],
 };
 
-export function detectCoreForRom(romPath: string, availableCores: CoreInfo[]): DetectedCore | null {
-  const all = detectAllCoresForRom(romPath, availableCores);
+export async function detectCoreForRom(romPath: string, availableCores: CoreInfo[]): Promise<DetectedCore | null> {
+  const all = await detectAllCoresForRom(romPath, availableCores);
   return all[0] ?? null;
 }
 
-export function detectAllCoresForRom(romPath: string, availableCores: CoreInfo[]): DetectedCore[] {
+export async function detectAllCoresForRom(romPath: string, availableCores: CoreInfo[]): Promise<DetectedCore[]> {
   const ext = (romPath.match(/\.[^.]+$/)?.[0] ?? "").toLowerCase();
   let platform = PLATFORM_EXTS[ext];
   if (!platform && ext === ".chd") {
-    platform = detectChdPlatform(romPath) ?? undefined;
+    platform = (await detectChdPlatform(romPath)) ?? undefined;
   }
   if (!platform) return [];
 
@@ -203,28 +204,28 @@ export function detectAllCoresForRom(romPath: string, availableCores: CoreInfo[]
   return compatible;
 }
 
-let cachedCores: CoreInfo[] | null = null;
+let cachedCoresPromise: Promise<CoreInfo[]> | null = null;
 
 export const libretroApi = {
-  listCores: (): CoreInfo[] => {
-    if (!cachedCores) {
-      cachedCores = scanForCores();
+  listCores: async (): Promise<CoreInfo[]> => {
+    if (!cachedCoresPromise) {
+      cachedCoresPromise = scanForCores();
     }
-    return cachedCores;
+    return cachedCoresPromise;
   },
 
-  detectCore: (romPath: string): DetectedCore | null => {
-    const cores = libretroApi.listCores();
+  detectCore: async (romPath: string): Promise<DetectedCore | null> => {
+    const cores = await libretroApi.listCores();
     return detectCoreForRom(romPath, cores);
   },
 
-  detectAllCores: (romPath: string): DetectedCore[] => {
-    const cores = libretroApi.listCores();
+  detectAllCores: async (romPath: string): Promise<DetectedCore[]> => {
+    const cores = await libretroApi.listCores();
     return detectAllCoresForRom(romPath, cores);
   },
 
   invalidateCoreCache: (): void => {
-    cachedCores = null;
+    cachedCoresPromise = null;
   },
 
   // ---------------------------------------------------------------------------

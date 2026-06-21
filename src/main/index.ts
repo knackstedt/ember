@@ -567,11 +567,17 @@ app.whenReady().then(async () => {
           forwarded.push(`${key}: ${value}`);
         }
         log.debug("ember:protocol", `forwarding headers: ${forwarded.join(", ")}`);
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 30000);
+        if (request.signal) {
+          request.signal.addEventListener("abort", () => controller.abort(), { once: true });
+        }
         const response = await fetch(proxyUrl, {
           method: request.method,
           headers,
-          signal: AbortSignal.timeout(30000),
+          signal: controller.signal,
         });
+        clearTimeout(timeout);
         const respHeaders = new Headers(response.headers);
         const respHeaderLog: string[] = [];
         response.headers.forEach((v, k) => respHeaderLog.push(`${k}: ${v}`));
@@ -605,6 +611,7 @@ app.whenReady().then(async () => {
           headers: respHeaders,
         });
       } catch (err) {
+        clearTimeout(timeout);
         log.error("ember:protocol", `proxy fetch failed for ${proxyUrl}: ${err}`);
         return new Response("Remote unavailable", { status: 504 });
       }

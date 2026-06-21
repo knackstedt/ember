@@ -133,10 +133,11 @@ const PROTON_COLORS: Record<string, string> = {
   borked: "#ff4444",
 };
 
-function getMissingCoreTooltip(game: Game): string | undefined {
+async function getMissingCoreTooltip(game: Game): Promise<string | undefined> {
   if (!LIBRETRO_PLATFORMS.includes(game.platform)) return undefined;
   if (!game.romPath) return undefined;
-  if (window.htpc.libretro.detectCore(game.romPath) !== null) return undefined;
+  const detected = await window.htpc.libretro.detectCore(game.romPath);
+  if (detected !== null) return undefined;
   const platformLabel = PLATFORM_FILTERS.find((f) => f.id === game.platform)?.label ?? game.platform;
   return `No ${platformLabel} emulator cores are installed. Install it in settings.`;
 }
@@ -158,6 +159,7 @@ const LazyGameCard: React.FC<{
     (s) => s.pendingThumbnailIds.has(game.id) || s.regeneratingIds.has(game.id)
   );
   const coreVersion = useGamesStore((s) => s.coreVersion);
+  const [missingCoreTooltip, setMissingCoreTooltip] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     const isLibretro = LIBRETRO_THUMB_PLATFORMS.has(game.platform);
@@ -166,7 +168,17 @@ const LazyGameCard: React.FC<{
     }
   }, [game.id, game.platform, game.coverUrl, loadThumbnail]);
 
-  const missingCoreTooltip = useMemo(() => getMissingCoreTooltip(game), [game, coreVersion]);
+  useEffect(() => {
+    let cancelled = false;
+    getMissingCoreTooltip(game)
+      .then((tooltip) => {
+        if (!cancelled) setMissingCoreTooltip(tooltip);
+      })
+      .catch(() => {
+        if (!cancelled) setMissingCoreTooltip(undefined);
+      });
+    return () => { cancelled = true; };
+  }, [game, coreVersion]);
 
   const b = gameBadge(game);
   return (
@@ -260,6 +272,7 @@ export const GamingTab: React.FC = () => {
   const regeneratingIds = useGamesStore((s) => s.regeneratingIds);
   useGamesStore((s) => s.coreVersion); // forces re-render when cores change
   const [selected, setSelected] = useState<Game | null>(null);
+  const [selectedMissingCoreTooltip, setSelectedMissingCoreTooltip] = useState<string | undefined>(undefined);
   const [columnCount, setColumnCount] = useState(6);
   const [viewColumnCount, setViewColumnCount] = useState(6);
   const [selectedEmulatorConfig, setSelectedEmulatorConfig] = useState<GameEmulatorConfig>({});
@@ -308,6 +321,7 @@ export const GamingTab: React.FC = () => {
   useEffect(() => {
     if (!selected) {
       setSelectedEmulatorConfig({});
+      setSelectedMissingCoreTooltip(undefined);
       return;
     }
     const emulatorPlatforms: GamePlatform[] = ["nes", "snes", "gb", "gba", "n64", "genesis", "sms", "gamegear", "pce", "psx", "nds", "dreamcast"];
@@ -316,6 +330,15 @@ export const GamingTab: React.FC = () => {
     } else {
       setSelectedEmulatorConfig({});
     }
+    let cancelled = false;
+    getMissingCoreTooltip(selected)
+      .then((tooltip) => {
+        if (!cancelled) setSelectedMissingCoreTooltip(tooltip);
+      })
+      .catch(() => {
+        if (!cancelled) setSelectedMissingCoreTooltip(undefined);
+      });
+    return () => { cancelled = true; };
   }, [selected, getEmulatorConfig]);
 
   useEffect(() => {
@@ -1034,7 +1057,7 @@ export const GamingTab: React.FC = () => {
   useDetailController({
     enabled: !!selected,
     onConfirm: () => {
-      if (selected && !getMissingCoreTooltip(selected)) {
+      if (selected && !selectedMissingCoreTooltip) {
         void launch(selected);
         setSelected(null);
       }
@@ -1063,9 +1086,11 @@ export const GamingTab: React.FC = () => {
               coverUrl: g.coverUrl,
               subtitle: g.developer,
             }))}
-            onLaunch={(id) => {
+            onLaunch={async (id) => {
               const game = games.find((g) => g.id === id);
-              if (game && !getMissingCoreTooltip(game)) launch(game);
+              if (!game) return;
+              const tooltip = await getMissingCoreTooltip(game);
+              if (!tooltip) launch(game);
             }}
           />
 
@@ -1517,20 +1542,20 @@ export const GamingTab: React.FC = () => {
         actions={
           selected && (
             <>
-              <Tooltip content={getMissingCoreTooltip(selected) ?? ""}>
+              <Tooltip content={selectedMissingCoreTooltip ?? ""}>
                 <motion.button
                   className="px-5 py-2.5 rounded-[var(--radius-card)] font-semibold text-sm flex items-center gap-2 whitespace-nowrap"
                   style={{
-                    background: getMissingCoreTooltip(selected) ? "var(--color-surface-raised)" : "var(--color-accent)",
-                    color: getMissingCoreTooltip(selected) ? "var(--color-text-dim)" : "var(--color-bg)",
-                    cursor: getMissingCoreTooltip(selected) ? "not-allowed" : "pointer",
+                    background: selectedMissingCoreTooltip ? "var(--color-surface-raised)" : "var(--color-accent)",
+                    color: selectedMissingCoreTooltip ? "var(--color-text-dim)" : "var(--color-bg)",
+                    cursor: selectedMissingCoreTooltip ? "not-allowed" : "pointer",
                   }}
                   onClick={() => {
-                    if (getMissingCoreTooltip(selected)) return;
+                    if (selectedMissingCoreTooltip) return;
                     launch(selected);
                     setSelected(null);
                   }}
-                  whileTap={{ scale: getMissingCoreTooltip(selected) ? 1 : 0.96 }}
+                  whileTap={{ scale: selectedMissingCoreTooltip ? 1 : 0.96 }}
                 >
                   <Play size={14} /> Launch
                 </motion.button>

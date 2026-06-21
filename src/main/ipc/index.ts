@@ -460,7 +460,13 @@ export function registerIpcHandlers(window: BrowserWindow): void {
 
   // Synchronous check used by preload to decide backend.
   ipcMain.on("mpv:available", (event) => {
-    event.returnValue = mpvWorkerAvailable();
+    const start = performance.now();
+    const value = mpvWorkerAvailable();
+    const elapsed = performance.now() - start;
+    if (elapsed > 20) {
+      log.warn("ipc", `mpv:available handler took ${elapsed.toFixed(1)}ms`);
+    }
+    event.returnValue = value;
   });
 
   ipcMain.handle("settings:get", async () => {
@@ -1611,6 +1617,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
 
   // Synchronous variant used in renderer beforeunload to guarantee delivery
   ipcMain.on("movies:progress:set:sync", (event, id: string, progress: number | null) => {
+    const start = performance.now();
     const idStr = typeof id === "string" ? id : String(id);
     const db = getDb();
     if (progress === null) {
@@ -1621,6 +1628,10 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     // Update lastPlayed too
     db.query(`UPDATE movie:⟨${escapeId(idStr)}⟩ SET lastPlayed = $now`, { now: Date.now() }).catch(() => {});
     event.returnValue = true;
+    const elapsed = performance.now() - start;
+    if (elapsed > 20) {
+      log.warn("ipc", `movies:progress:set:sync handler took ${elapsed.toFixed(1)}ms`);
+    }
   });
 
   ipcMain.handle("movies:metadata", async (_e, title: string) => {

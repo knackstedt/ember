@@ -26,7 +26,7 @@ function shouldExcludeDosPc(fullPath: string): boolean {
   return DOS_PC_EXCLUSION_PATTERNS.some((p) => p.test(lower));
 }
 
-function walkDir(dir: string, callback: (filePath: string) => void): void {
+async function walkDir(dir: string, callback: (filePath: string) => Promise<void>): Promise<void> {
   let entries: string[];
   try {
     entries = readdirSync(dir);
@@ -38,9 +38,9 @@ function walkDir(dir: string, callback: (filePath: string) => void): void {
     try {
       const stat = statSync(fullPath);
       if (stat.isDirectory()) {
-        walkDir(fullPath, callback);
+        await walkDir(fullPath, callback);
       } else if (stat.isFile()) {
-        callback(fullPath);
+        await callback(fullPath);
       }
     } catch {
       // ignore permission errors etc.
@@ -174,7 +174,7 @@ function getRetroarchContentDir(): string | null {
   return null;
 }
 
-export function scanRomGames(romPaths: string[] = []): Game[] {
+export async function scanRomGames(romPaths: string[] = []): Promise<Game[]> {
   const roots = [
     join(homedir(), "Roms"),
     join(homedir(), "ROMs"),
@@ -194,7 +194,7 @@ export function scanRomGames(romPaths: string[] = []): Game[] {
   const seen = new Set<string>();
 
   for (const root of roots) {
-    walkDir(root, (fullPath) => {
+    await walkDir(root, async (fullPath) => {
       // Skip files in DOS/Windows directories - these are handled by v86 scanner
       if (shouldExcludeDosPc(fullPath)) {
         // log.info("rom", `skip DOS/PC path: ${fullPath}`);
@@ -226,7 +226,7 @@ export function scanRomGames(romPaths: string[] = []): Game[] {
 
       // For CHD files, detect the platform from CHD header metadata
       if (!platform && ext === ".chd") {
-        platform = detectChdPlatform(fullPath);
+        platform = await detectChdPlatform(fullPath);
         if (!platform) {
           log.debug("rom", `skip unknown CHD platform: ${fullPath}`);
           return;
