@@ -20,7 +20,7 @@ import {
 import { useMusicPlayerStore } from "../../store/musicPlayer.store";
 import { useFocusZoneStore } from "../../store/focusZone.store";
 import { getTrackDisplayName } from "../lib/track-title";
-import { MusicVisualizer } from "./MusicVisualizer";
+import { MusicVisualizer, PRESETS } from "./MusicVisualizer";
 
 function fmt(s: number): string {
   if (!isFinite(s) || isNaN(s) || s < 0) return "0:00";
@@ -104,7 +104,7 @@ export const MusicPlayerFull: React.FC<MusicPlayerFullProps> = React.memo(({
   const [tabBarFocused, setTabBarFocused] = useState(true);
   const [focusedControl, setFocusedControl] = useState<OverviewButton>("play");
   const [focusedQueueIndex, setFocusedQueueIndex] = useState(currentIndex);
-  const [visualizerMode, setVisualizerMode] = useState<"spectrum" | "waveform" | "particles">("spectrum");
+  const [presetIndex, setPresetIndex] = useState(0);
   const [queueContainerHeight, setQueueContainerHeight] = useState(0);
   const [queueScrollTop, setQueueScrollTop] = useState(0);
 
@@ -127,13 +127,13 @@ export const MusicPlayerFull: React.FC<MusicPlayerFullProps> = React.memo(({
       setFocusedControl("play");
       setFocusedQueueIndex(currentIndex);
     }
-  }, [activeZone, currentIndex]);
-
-  const queueListRef = useRef<HTMLDivElement>(null);
+  }, [activeZone]);
 
   useEffect(() => {
     setFocusedQueueIndex(currentIndex);
   }, [currentIndex]);
+
+  const queueListRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (activeTab !== "queue") return;
@@ -585,23 +585,25 @@ export const MusicPlayerFull: React.FC<MusicPlayerFullProps> = React.memo(({
         {activeTab === "visualizer" && (
           <div className="h-full flex flex-col">
             <div className="flex items-center justify-end px-4 py-2 flex-shrink-0 gap-2">
-              {(["spectrum", "waveform", "particles"] as const).map((m) => (
-                <button
-                  key={m}
-                  onClick={() => setVisualizerMode(m)}
-                  className="px-2.5 py-1 text-xs font-medium rounded transition-colors"
-                  style={{
-                    color: visualizerMode === m ? "var(--color-bg)" : "var(--color-text-dim)",
-                    background: visualizerMode === m ? "var(--color-accent)" : "var(--color-surface-raised)",
-                    textTransform: "capitalize",
-                  }}
-                >
-                  {m}
-                </button>
-              ))}
+              <select
+                value={presetIndex}
+                onChange={(e) => setPresetIndex(Number(e.target.value))}
+                className="min-w-0 px-2 py-1 text-xs font-medium rounded border-none outline-none cursor-pointer transition-colors"
+                style={{
+                  color: "var(--color-text)",
+                  background: "var(--color-surface-raised)",
+                }}
+                aria-label="Visualizer preset"
+              >
+                {PRESETS.map((p, i) => (
+                  <option key={p.name} value={i} style={{ background: "var(--color-surface-raised)" }}>
+                    {p.name}{p.description ? ` — ${p.description}` : ""}
+                  </option>
+                ))}
+              </select>
             </div>
             <div className="flex-1 min-h-0">
-              <MusicVisualizer audioElement={audioElement} mode={visualizerMode} />
+              <MusicVisualizer audioElement={audioElement} presetName={PRESETS[presetIndex]?.name} />
             </div>
           </div>
         )}
