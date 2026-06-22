@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 
 interface DiagnosticsData {
-  app: { name: string; version: string };
+  app: { name: string; version: string; installMechanism: string };
   runtime: { electron: string; node: string; chrome: string; v8: string };
   dependencies: { name: string; version: string }[];
   os: { platform: string; release: string; arch: string; hostname: string; type: string };
@@ -240,6 +240,7 @@ export const SystemInfoTab: React.FC = () => {
         <SectionCard icon={Info} title="Application">
           <KeyValueRow label="Name" value={data.app.name} />
           <KeyValueRow label="Version" value={data.app.version} />
+          <KeyValueRow label="Install Mechanism" value={data.app.installMechanism} />
         </SectionCard>
 
         <SectionCard icon={Terminal} title="Runtime">

@@ -847,6 +847,10 @@ export function registerIpcHandlers(window: BrowserWindow): void {
   // ---------------------------------------------------------------------------
 
   function detectInstallMechanism(): string {
+    // Development (unpackaged)
+    if (!app.isPackaged) {
+      return "Development";
+    }
     // Flatpak
     if (process.env.FLATPAK_ID || existsSync("/.flatpak-info")) {
       return "Flatpak";
