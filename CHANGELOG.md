@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.4.0](https://github.com/knackstedt/ember/compare/v0.3.0...v0.4.0) (2026-06-22)
+
+
+### Features
+
+* **build:** move plugin packaging from predist to separate workflow step ([0caa24d](https://github.com/knackstedt/ember/commit/0caa24d2dc33dbff29cc7fcb403da234ff7e3941))
+* cleanup CSS Vars & add Ember theme ([2734715](https://github.com/knackstedt/ember/commit/2734715b27efd51c66489f9bed666b6b690b5eea))
+* **db:** add OData query service with generic database querying and install mechanism detection ([a7d1eb8](https://github.com/knackstedt/ember/commit/a7d1eb8c32ae2116ec0c32a667df0f8e48473d7a))
+* **db:** centralize transaction conflict retry logic in WorkerSurreal query method ([c4f9fc6](https://github.com/knackstedt/ember/commit/c4f9fc68b4d9dfafdca8f74aff3af9f49ea1582e))
+* **settings:** add install mechanism detection to system info diagnostics ([3d4121b](https://github.com/knackstedt/ember/commit/3d4121b3576b14c9a068ec2663099ab1b70b5793))
+* **themes:** add five new theme plugins - Dark OLED, Deep Ocean, Glassmorphism, Monokai, and Neon Cyberpunk ([d79d590](https://github.com/knackstedt/ember/commit/d79d5904f48d54a2157f230137509b30b5b5686d)), closes [#000000](https://github.com/knackstedt/ember/issues/000000) [#e2e2e2](https://github.com/knackstedt/ember/issues/e2e2e2) [#001219](https://github.com/knackstedt/ember/issues/001219) [#00f5d4](https://github.com/knackstedt/ember/issues/00f5d4) [#7dd3](https://github.com/knackstedt/ember/issues/7dd3)
+* **updater:** add auto-update system with GitHub releases integration and rollback support ([b6078ba](https://github.com/knackstedt/ember/commit/b6078ba48245bd570a051ef45174193bad374bae))
+
 ## [0.3.0](https://github.com/knackstedt/ember/compare/v0.2.1...v0.3.0) (2026-06-22)
 
 
