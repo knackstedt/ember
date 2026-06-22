@@ -2,10 +2,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { motion } from "framer-motion";
 import { useGamesStore } from "../../store/games.store";
 import {
-  ChipFilters,
-  ChipFilter,
-} from "../../components/ChipFilters/ChipFilters";
-import {
   VirtualGrid,
   VirtualGridHandle,
 } from "../../components/VirtualGrid/VirtualGrid";
@@ -23,10 +19,7 @@ import {
 import { GameCard } from "../../components/GameCard/GameCard";
 import { DetailPanel } from "../../components/DetailPanel/DetailPanel";
 import { ImageLightbox } from "../../components/ImageLightbox/ImageLightbox";
-import { OskInput } from "../../components/OnScreenKeyboard/OnScreenKeyboard";
-import { RecentlyPlayedRow } from "../../components/RecentlyPlayedRow/RecentlyPlayedRow";
 import { CoreSelector } from "../../components/CoreSelector/CoreSelector";
-import { Dropdown } from "../../components/Dropdown/Dropdown";
 import { Game, GamePlatform, GameEmulatorConfig, WineRunner } from "../../../../shared/types";
 import { useGridFocus, NavAction } from "../../hooks/useGridFocus";
 import { useDetailController } from "../../hooks/useDetailController";
@@ -58,7 +51,6 @@ import {
   Trash2,
   Folder,
   Loader,
-  Sparkles,
   Play,
   X,
   Archive,
@@ -66,9 +58,11 @@ import {
   Plus,
   Globe,
 } from "lucide-react";
-import { AiGroup } from "../../../../shared/types";
 import { DynamicFacetFilters, FacetField } from "../../components/DynamicFacetFilters/DynamicFacetFilters";
 import type { GameVideo } from "../../../../shared/metadata";
+import { GamingNavRail } from "./components/GamingNavRail";
+import { GamingToolbar } from "./components/GamingToolbar";
+import type { GamingNavItem } from "./types";
 
 // Extended game type that includes lazy-loaded metadata properties
 type GameWithMetadata = Game & Partial<{
@@ -251,15 +245,23 @@ export const GamingTab: React.FC = () => {
   const loading = useGamesStore((s) => s.loading);
   const scanning = useGamesStore((s) => s.scanning);
   const remoteScanning = useGamesStore((s) => s.remoteScanning);
-  const activeFilter = useGamesStore((s) => s.activeFilter);
-  const consoleFilter = useGamesStore((s) => s.consoleFilter);
+  const activeNav = useGamesStore((s) => s.activeNav);
+  const setActiveNav = useGamesStore((s) => s.setActiveNav);
   const searchQuery = useGamesStore((s) => s.searchQuery);
   const load = useGamesStore((s) => s.load);
   const scan = useGamesStore((s) => s.scan);
-  const setFilter = useGamesStore((s) => s.setFilter);
-  const setConsoleFilter = useGamesStore((s) => s.setConsoleFilter);
   const setSearch = useGamesStore((s) => s.setSearch);
   const filtered = useGamesStore((s) => s.filtered);
+  const libraryFilter = useGamesStore((s) => s.libraryFilter);
+  const setLibraryFilter = useGamesStore((s) => s.setLibraryFilter);
+  const playerCountFilter = useGamesStore((s) => s.playerCountFilter);
+  const setPlayerCountFilter = useGamesStore((s) => s.setPlayerCountFilter);
+  const multiplayerTypeFilter = useGamesStore((s) => s.multiplayerTypeFilter);
+  const setMultiplayerTypeFilter = useGamesStore((s) => s.setMultiplayerTypeFilter);
+  const playStatusFilter = useGamesStore((s) => s.playStatusFilter);
+  const setPlayStatusFilter = useGamesStore((s) => s.setPlayStatusFilter);
+  const completionFilter = useGamesStore((s) => s.completionFilter);
+  const setCompletionFilter = useGamesStore((s) => s.setCompletionFilter);
   const toggleFavorite = useGamesStore((s) => s.toggleFavorite);
   const setTags = useGamesStore((s) => s.setTags);
   const hide = useGamesStore((s) => s.hide);
@@ -287,21 +289,10 @@ export const GamingTab: React.FC = () => {
   const galleryView = useGalleryView();
   const isNeonGrid = useIsNeonGrid();
 
-  type ViewMode = "all" | "ai-groups";
-  const [viewMode, setViewMode] = useState<ViewMode>("ai-groups");
-  const [aiGroups, setAiGroups] = useState<AiGroup[]>([]);
-  const [aiGroupsLoading, setAiGroupsLoading] = useState(false);
-  const [selectedAiGroupId, setSelectedAiGroupId] = useState<string | null>(null);
-  const aiGroupTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   const [facetFilters, setFacetFilters] = useState<Record<string, string | null>>({});
   const applyFacetFilter = (field: string, value: string | null) => {
     setFacetFilters((prev) => ({ ...prev, [field]: value }));
   };
-  const [filtersExpanded, setFiltersExpanded] = useState(false);
-
-  const [topBarFocused, setTopBarFocused] = useState(false);
-  const [dropdownOpen, setDropdownOpen] = useState(false);
   const [confirmUninstall, setConfirmUninstall] = useState<{ open: boolean; game: Game | null }>({
     open: false,
     game: null,
@@ -364,17 +355,12 @@ export const GamingTab: React.FC = () => {
     }
   }, [activeCollectionId, collections, games]);
 
+  /* Clear selected when escape is pressed */
   useEffect(() => {
     const handler = () => setSelected(null);
     window.addEventListener("htpc:escape", handler);
     return () => window.removeEventListener("htpc:escape", handler);
   }, []);
-
-  useEffect(() => {
-    if (selected) {
-      setTopBarFocused(false);
-    }
-  }, [selected]);
 
   /* Fetch locally-captured screenshots when a game is selected */
   useEffect(() => {
@@ -404,86 +390,6 @@ export const GamingTab: React.FC = () => {
     );
   }, [selected?.id]);
 
-  /* Listen for view-mode commands from command palette */
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const detail = (e as CustomEvent).detail as string;
-      if (["all", "ai-groups"].includes(detail)) {
-        setViewMode(detail as ViewMode);
-      }
-    };
-    window.addEventListener("htpc:gaming-view", handler);
-    return () => window.removeEventListener("htpc:gaming-view", handler);
-  }, []);
-
-  /* Controller navigation for top bar */
-  useEffect(() => {
-    if (!topBarFocused) return;
-    const handler = (e: Event) => {
-      if (dropdownOpen) return; // dropdown handles its own nav when open
-      const detail = (e as CustomEvent).detail as { action: string };
-      if (detail?.action === "down" || detail?.action === "cancel") {
-        e.stopImmediatePropagation?.();
-        setTopBarFocused(false);
-      } else if (detail?.action === "confirm") {
-        e.stopImmediatePropagation?.();
-        setDropdownOpen(true);
-      }
-    };
-    window.addEventListener("htpc:nav", handler);
-    return () => window.removeEventListener("htpc:nav", handler);
-  }, [topBarFocused, dropdownOpen]);
-
-  /* Auto-generate AI groups when viewMode switches to ai-groups and games are loaded */
-  useEffect(() => {
-    if (viewMode !== "ai-groups" || games.length === 0) return;
-    if (aiGroups.length > 0) return; // already computed
-
-    // Guard: AI grouping is synchronous and CPU-intensive on the main thread.
-    // With >150 items the renderer freezes (or appears to crash). Fall back to All view.
-    if (games.length > 150) {
-      setViewMode("all");
-      return;
-    }
-
-    setAiGroupsLoading(true);
-    if (aiGroupTimeoutRef.current) clearTimeout(aiGroupTimeoutRef.current);
-
-    window.htpc.localAi
-      .groupItems(
-        games.map((g) => ({
-          id: g.id,
-          title: g.title,
-          genres: g.genres,
-          tags: g.tags,
-          description: g.description,
-          platform: g.platform,
-        })),
-        Math.min(6, Math.max(2, Math.floor(games.length / 8))),
-      )
-      .then((groups) => {
-        // Add generated IDs to groups since the AI service doesn't provide them
-        setAiGroups(groups.map((g, i) => ({ ...g, id: `ai-group-${i}-${Date.now()}` })));
-        setAiGroupsLoading(false);
-      })
-      .catch(() => {
-        setAiGroupsLoading(false);
-        setViewMode("all");
-      });
-
-    // Fallback: if AI takes too long, switch to All view
-    aiGroupTimeoutRef.current = setTimeout(() => {
-      if (aiGroupsLoading) {
-        setAiGroupsLoading(false);
-        setViewMode("all");
-      }
-    }, 15000);
-
-    return () => {
-      if (aiGroupTimeoutRef.current) clearTimeout(aiGroupTimeoutRef.current);
-    };
-  }, [viewMode, games]);
-
   const activeCollection = useMemo(
     () => collections.find((c) => c.id === activeCollectionId),
     [collections, activeCollectionId],
@@ -494,17 +400,9 @@ export const GamingTab: React.FC = () => {
     if (!activeCollectionId) return base;
     const result = base.filter((g) => collectionItemIds.has(g.id));
     return sortByCollection<Game>(result, activeCollection);
-  }, [filtered, games, activeFilter, consoleFilter, searchQuery, activeCollectionId, collectionItemIds, activeCollection]);
+  }, [filtered, games, activeNav, searchQuery, libraryFilter, playerCountFilter, multiplayerTypeFilter, playStatusFilter, completionFilter, activeCollectionId, collectionItemIds, activeCollection]);
 
-  const displayItems = useMemo(() => {
-    if (viewMode !== "ai-groups" || !selectedAiGroupId) return items;
-    const group = aiGroups.find((g) => g.id === selectedAiGroupId);
-    if (!group) return items;
-    const ids = new Set(group.itemIds);
-    return items.filter((g) => ids.has(g.id));
-  }, [items, viewMode, aiGroups, selectedAiGroupId]);
-
-  const facetSourceItems = displayItems;
+  const facetSourceItems = items;
 
   const gridItems = useMemo(() => {
     let r = facetSourceItems;
@@ -523,19 +421,9 @@ export const GamingTab: React.FC = () => {
   const gameFacetFields: FacetField[] = useMemo(() => [
     { key: "genres", label: "Genre", accessor: (g) => (g as Record<string, unknown>).genres as string[] | undefined, sort: "count", maxValues: 8 },
     { key: "tags", label: "Tag", accessor: (g) => (g as Record<string, unknown>).tags as string[] | undefined, sort: "count", maxValues: 6 },
-    { key: "platform", label: "Platform", accessor: (g) => (g as Record<string, unknown>).platform as string | undefined, sort: "count", maxValues: 10 },
     { key: "releaseYear", label: "Year", accessor: (g) => String((g as Record<string, unknown>).releaseYear ?? ""), maxValues: 8 },
     { key: "developer", label: "Developer", accessor: (g) => (g as Record<string, unknown>).developer as string | undefined, maxValues: 6 },
   ], []);
-
-  const handleGridEdge = useCallback(
-    (direction: "up" | "down" | "left" | "right") => {
-      if (direction === "up") {
-        setTopBarFocused(true);
-      }
-    },
-    [],
-  );
 
   const isRowBasedView = galleryView === "bookshelf" || galleryView === "spread-deck";
   const { focusedIndex, setFocusedIndex } = useGridFocus({
@@ -543,8 +431,7 @@ export const GamingTab: React.FC = () => {
     columnCount: isRowBasedView ? viewColumnCount : columnCount,
     gridRef,
     onConfirm: (game) => setSelected(game),
-    enabled: !selected && !topBarFocused,
-    onEdge: handleGridEdge,
+    enabled: !selected,
     getNextIndex: galleryView === "hex-grid"
       ? (current, action) => {
           const handle = gridRef.current as unknown as { getNextIndex?(i: number, a: NavAction): number | null } | null;
@@ -1049,11 +936,6 @@ export const GamingTab: React.FC = () => {
     }
   };
 
-  const recentlyPlayed = [...games]
-    .filter((g) => g.lastPlayed && g.lastPlayed > 0)
-    .sort((a, b) => (b.lastPlayed ?? 0) - (a.lastPlayed ?? 0))
-    .slice(0, 8);
-
   useDetailController({
     enabled: !!selected,
     onConfirm: () => {
@@ -1075,422 +957,223 @@ export const GamingTab: React.FC = () => {
   }, [localScreenshots, detailGameData]);
 
   return (
-    <div className="flex flex-col h-full">
-      <div style={{ padding: 16, paddingBottom: 0 }}>
-        {/* Collapsible content — scrolls out of view */}
-        <div className="flex flex-col gap-3 mb-3">
-          <RecentlyPlayedRow
-            items={recentlyPlayed.map((g) => ({
-              id: g.id,
-              title: g.title,
-              coverUrl: g.coverUrl,
-              subtitle: g.developer,
-            }))}
-            onLaunch={async (id) => {
-              const game = games.find((g) => g.id === id);
-              if (!game) return;
-              const tooltip = await getMissingCoreTooltip(game);
-              if (!tooltip) launch(game);
-            }}
+    <div className="flex flex-col h-full relative">
+      <div className="flex-1 min-h-0 flex overflow-hidden">
+        <GamingNavRail
+          activeItem={activeNav}
+          onSelect={(item) => {
+            setActiveNav(item);
+            setActiveCollectionId(null);
+          }}
+        />
+        <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
+          <GamingToolbar
+            searchQuery={searchQuery}
+            onSearchChange={setSearch}
+            onClearSearch={() => setSearch("")}
+            activeNav={activeNav}
+            libraryFilter={libraryFilter}
+            onLibraryFilterChange={setLibraryFilter}
+            playerCountFilter={playerCountFilter}
+            onPlayerCountFilterChange={setPlayerCountFilter}
+            multiplayerTypeFilter={multiplayerTypeFilter}
+            onMultiplayerTypeFilterChange={setMultiplayerTypeFilter}
+            playStatusFilter={playStatusFilter}
+            onPlayStatusFilterChange={setPlayStatusFilter}
+            completionFilter={completionFilter}
+            onCompletionFilterChange={setCompletionFilter}
+            gameCount={gridItems.length}
+            scanning={scanning}
+            onScan={scan}
           />
-
-          <CollectionsBar
-            itemType="game"
-            activeCollectionId={activeCollectionId}
-            onSelect={setActiveCollectionId}
-            onManage={() => setShowCollectionManager(true)}
-            className="flex-shrink-0"
-          />
-
-        </div>
-
-        {/* Compact bar — search + active filter summary */}
-        <div
-          className="flex items-center gap-2 pb-3 flex-wrap"
-        >
-          <OskInput
-            value={searchQuery}
-            onChange={setSearch}
-            placeholder="Search games…"
-            className="text-sm"
-            style={{ maxWidth: 220 } as React.CSSProperties}
-          />
-          <motion.button
-            className="px-3 py-1.5 rounded-[var(--radius-card)] text-xs font-medium"
-            style={{
-              background: "var(--color-surface-raised)",
-              color: "var(--color-text)",
-              border: "1px solid var(--color-border)",
-            }}
-            onClick={scan}
-            whileTap={{ scale: 0.96 }}
-            disabled={scanning}
+          <div
+            ref={scrollContainerRef}
+            className="flex-1 min-h-0 overflow-auto relative"
+            style={{ padding: 16 }}
           >
-            {scanning ? <><Loader size={14} className="animate-spin" /> Scanning…</> : <><RotateCw size={14} /> Scan</>}
-          </motion.button>
-          <motion.button
-            className="px-3 py-1.5 rounded-[var(--radius-card)] text-xs font-medium flex items-center gap-1"
-            style={{
-              background: "var(--color-surface-raised)",
-              color: "var(--color-text)",
-              border: "1px solid var(--color-border)",
-            }}
-            onClick={() => {
-              window.dispatchEvent(new CustomEvent("htpc:switch-tab", { detail: { tab: "settings" } }));
-            }}
-            whileTap={{ scale: 0.96 }}
-          >
-            <Globe size={14} /> Remote
-          </motion.button>
-          <span className="text-xs" style={{ color: "var(--color-text-dim)" }}>
-            {items.length} games
-          </span>
-          {/* Active filter summary chips */}
-          <span
-            className="px-2.5 py-0.5 rounded-full text-xs font-medium"
-            style={{
-              backgroundColor: "var(--color-accent)",
-              color: "var(--color-bg)",
-            }}
-          >
-            {viewMode === "all" ? "All" : <><Sparkles size={12} /> Groups</>}
-          </span>
-          {viewMode === "ai-groups" && selectedAiGroupId && (() => {
-            const group = aiGroups.find((g) => g.id === selectedAiGroupId);
-            return group ? (
-              <motion.button
-                className="px-2.5 py-0.5 rounded-full text-xs font-medium"
-                style={{
-                  backgroundColor: "var(--color-accent)",
-                  color: "var(--color-bg)",
-                }}
-                onClick={() => setSelectedAiGroupId(null)}
-                whileTap={{ scale: 0.95 }}
-                title="Clear group filter"
-              >
-                Group: {group.label} <X size={12} />
-              </motion.button>
-            ) : null;
-          })()}
-          {consoleFilter !== "all" && (
-            <motion.button
-              className="px-2.5 py-0.5 rounded-full text-xs font-medium"
-              style={{
-                backgroundColor: "var(--color-accent)",
-                color: "var(--color-bg)",
-              }}
-              onClick={() => setConsoleFilter("all")}
-              whileTap={{ scale: 0.95 }}
-              title="Clear platform filter"
-            >
-              {PLATFORM_FILTERS.find((f) => f.id === consoleFilter)?.label ?? consoleFilter} <X size={12} />
-            </motion.button>
-          )}
-          {Object.entries(facetFilters).map(([key, value]) =>
-            value ? (
-              <motion.button
-                key={key}
-                className="px-2.5 py-0.5 rounded-full text-xs font-medium"
-                style={{
-                  backgroundColor: "var(--color-accent)",
-                  color: "var(--color-bg)",
-                }}
-                onClick={() => applyFacetFilter(key, null)}
-                whileTap={{ scale: 0.95 }}
-                title={`Clear ${key} filter`}
-              >
-                {gameFacetFields.find((f) => f.key === key)?.label ?? key}: {value} <X size={12} />
-              </motion.button>
-            ) : null,
-          )}
-          <motion.button
-            className="px-2.5 py-0.5 rounded-full text-xs font-medium"
-            style={{
-              background: "var(--color-surface-raised)",
-              color: "var(--color-text)",
-              border: "1px solid var(--color-border)",
-            }}
-            onClick={() => setFiltersExpanded((v) => !v)}
-            whileTap={{ scale: 0.95 }}
-          >
-            {filtersExpanded ? "▲ Filters" : "▼ Filters"}
-          </motion.button>
-
-          {/* Platform selector — top right */}
-          <div className="ml-auto">
-            <Dropdown
-              value={consoleFilter}
-              options={[
-                { value: "all", label: "All Platforms" },
-                ...PLATFORM_FILTERS
-                  .filter((f): f is ChipFilter<GamePlatform> =>
-                    f.id !== "all" && f.id !== "favorites" && f.id !== "couch-coop"
-                  )
-                  .map((f) => ({ value: f.id, label: String(f.label) })),
-              ]}
-              onChange={(value) => {
-                setConsoleFilter(value as GamePlatform | "all");
-                setActiveCollectionId(null);
-              }}
-              placeholder="Platform"
-              className="w-40"
-              open={dropdownOpen}
-              onOpenChange={setDropdownOpen}
-              focused={topBarFocused}
-            />
-          </div>
-        </div>
-
-        {/* Expanded filters — render below sticky bar so they stay visible */}
-        {filtersExpanded && (
-          <div className="flex flex-col gap-3 pb-3">
-            {/* View-mode sub-tabs */}
-            <div className="flex gap-2 flex-shrink-0 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
-              {(["all", "ai-groups"] as ViewMode[]).map((m) => (
-                <motion.button
-                  key={m}
-                  onClick={() => {
-                    setViewMode(m);
-                    setSelectedAiGroupId(null);
-                  }}
-                  className="relative flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-colors focus:outline-none"
-                  style={{
-                    backgroundColor: viewMode === m
-                      ? "var(--color-accent)"
-                      : "var(--color-surface-raised)",
-                    color: viewMode === m ? "var(--color-bg)" : "var(--color-text-dim)",
-                    border: `1px solid ${viewMode === m ? "var(--color-accent)" : "var(--color-border)"}`,
-                    boxShadow: viewMode === m ? "var(--shadow-glow)" : "none",
-                  }}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  {m === "all" ? "All" : "✨ Groups"}
-                </motion.button>
-              ))}
-            </div>
-
-            {/* AI group chips */}
-            {viewMode === "ai-groups" && aiGroups.length > 0 && (
-              <div className="flex gap-2 flex-shrink-0 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
-                <motion.button
-                  onClick={() => setSelectedAiGroupId(null)}
-                  className="relative flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors focus:outline-none"
-                  style={{
-                    backgroundColor: !selectedAiGroupId
-                      ? "var(--color-accent)"
-                      : "var(--color-surface-raised)",
-                    color: !selectedAiGroupId ? "var(--color-bg)" : "var(--color-text-dim)",
-                    border: `1px solid ${!selectedAiGroupId ? "var(--color-accent)" : "var(--color-border)"}`,
-                  }}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  All Groups
-                </motion.button>
-                {aiGroups.map((g) => (
-                  <motion.button
-                    key={g.id}
-                    onClick={() => setSelectedAiGroupId(g.id)}
-                    className="relative flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors focus:outline-none"
-                    style={{
-                      backgroundColor: selectedAiGroupId === g.id
-                        ? "var(--color-accent)"
-                        : "var(--color-surface-raised)",
-                      color: selectedAiGroupId === g.id ? "var(--color-bg)" : "var(--color-text-dim)",
-                      border: `1px solid ${selectedAiGroupId === g.id ? "var(--color-accent)" : "var(--color-border)"}`,
-                    }}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    {g.label} ({g.itemIds.length})
-                  </motion.button>
-                ))}
-              </div>
-            )}
-
-            {viewMode === "ai-groups" && aiGroupsLoading && (
-              <div className="flex items-center gap-2 flex-shrink-0" style={{ color: "var(--color-text-dim)" }}>
-                <div className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "var(--color-accent)", borderTopColor: "transparent" }} />
-                <span className="text-xs">Generating smart groups…</span>
-              </div>
-            )}
-
-            {/* Dynamic metadata facets based on currently visible items */}
-            {gridItems.length > 0 && (
-              <DynamicFacetFilters
-                items={facetSourceItems}
-                fields={gameFacetFields}
-                activeFilters={facetFilters}
-                onFilter={applyFacetFilter}
+            {/* Collections */}
+            <div className="mb-3">
+              <CollectionsBar
+                itemType="game"
+                activeCollectionId={activeCollectionId}
+                onSelect={setActiveCollectionId}
+                onManage={() => setShowCollectionManager(true)}
                 className="flex-shrink-0"
               />
+            </div>
+
+            {/* Dynamic metadata facets */}
+            {gridItems.length > 0 && (
+              <div className="mb-3">
+                <DynamicFacetFilters
+                  items={facetSourceItems}
+                  fields={gameFacetFields}
+                  activeFilters={facetFilters}
+                  onFilter={applyFacetFilter}
+                  className="flex-shrink-0"
+                />
+              </div>
+            )}
+
+            {/* Grid content */}
+            {loading || (items.length === 0 && (scanning || remoteScanning)) ? (
+              (() => {
+                switch (galleryView) {
+                  case "list":
+                    return (
+                      <ListView
+                        items={Array.from({ length: 6 })}
+                        renderItem={renderSkeletonListItem}
+                        rowHeight={80}
+                      />
+                    );
+                  case "hex-grid":
+                    return (
+                      <HexGridView
+                        ref={gridRef}
+                        items={Array.from({ length: columnCount * 2 - 1 })}
+                        minItemWidth={200}
+                        onColumnCountChange={setColumnCount}
+                        renderHex={renderSkeletonHex}
+                      />
+                    );
+                  case "bookshelf":
+                    return (
+                      <BookshelfView
+                        ref={gridRef}
+                        items={Array.from({ length: viewColumnCount * 2 })}
+                        renderSpine={renderSkeletonSpine}
+                        onItemsPerRowChange={(count) => setViewColumnCount(count)}
+                      />
+                    );
+                  case "spread-deck":
+                    return (
+                      <SpreadDeckView
+                        ref={gridRef}
+                        items={Array.from({ length: viewColumnCount * 2 })}
+                        renderCard={renderSkeletonDeckCard}
+                        onItemsPerRowChange={(count) => setViewColumnCount(count)}
+                      />
+                    );
+                  default:
+                    if (isNeonGrid) {
+                      return (
+                        <NeonGridView
+                          ref={gridRef}
+                          items={Array.from({ length: columnCount * 2 })}
+                          minItemWidth={200}
+                          onColumnCountChange={setColumnCount}
+                          rowHeight={260}
+                          renderItem={renderSkeletonNeonCard}
+                        />
+                      );
+                    }
+                    return (
+                      <VirtualGrid
+                        ref={gridRef}
+                        items={Array.from({ length: columnCount * 2 })}
+                        minItemWidth={200}
+                        onColumnCountChange={setColumnCount}
+                        rowHeight={260}
+                        renderItem={renderSkeletonItem}
+                      />
+                    );
+                }
+              })()
+            ) : items.length === 0 ? (
+              <div
+                className="flex flex-col items-center justify-center gap-4"
+                style={{ color: "var(--color-text-dim)", minHeight: 200 }}
+              >
+                <p>No games found.</p>
+                <motion.button
+                  className="px-6 py-2.5 rounded-[var(--radius-card)] font-medium"
+                  style={{
+                    background: "var(--color-accent)",
+                    color: "var(--color-bg)",
+                  }}
+                  onClick={scan}
+                  whileTap={{ scale: 0.96 }}
+                >
+                  Scan for games
+                </motion.button>
+              </div>
+            ) : (
+              (() => {
+                switch (galleryView) {
+                  case "list":
+                    return (
+                      <ListView
+                        ref={gridRef}
+                        items={gridItems}
+                        renderItem={renderListItem}
+                        rowHeight={80}
+                      />
+                    );
+                  case "hex-grid":
+                    return (
+                      <HexGridView
+                        ref={gridRef}
+                        items={gridItems}
+                        minItemWidth={200}
+                        onColumnCountChange={setColumnCount}
+                        renderHex={renderHex}
+                        focusedIndex={focusedIndex}
+                        bindItem={bindItem}
+                      />
+                    );
+                  case "bookshelf":
+                    return (
+                      <BookshelfView
+                        ref={gridRef}
+                        items={gridItems}
+                        renderSpine={renderSpine}
+                        focusedIndex={focusedIndex}
+                        onItemsPerRowChange={(count) => setViewColumnCount(count)}
+                        onItemClick={(game, index) => { setFocusedIndex(index); setSelected(game); }}
+                        bindItem={bindItem}
+                      />
+                    );
+                  case "spread-deck":
+                    return (
+                      <SpreadDeckView
+                        ref={gridRef}
+                        items={gridItems}
+                        renderCard={renderDeckCard}
+                        focusedIndex={focusedIndex}
+                        onItemsPerRowChange={(count) => setViewColumnCount(count)}
+                        onItemClick={(game, index) => { setFocusedIndex(index); setSelected(game); }}
+                        bindItem={bindItem}
+                      />
+                    );
+                  default:
+                    if (isNeonGrid) {
+                      return (
+                        <NeonGridView
+                          ref={gridRef}
+                          items={gridItems}
+                          minItemWidth={200}
+                          onColumnCountChange={setColumnCount}
+                          rowHeight={260}
+                          renderItem={renderNeonCard}
+                        />
+                      );
+                    }
+                    return (
+                      <VirtualGrid
+                        ref={gridRef}
+                        items={gridItems}
+                        minItemWidth={200}
+                        onColumnCountChange={setColumnCount}
+                        rowHeight={260}
+                        renderItem={renderItem}
+                      />
+                    );
+                }
+              })()
             )}
           </div>
-        )}
-      </div>
-      <div
-        ref={scrollContainerRef}
-        className="flex-1 min-h-0 gpu-scroll"
-        style={{ padding: 16 }}
-      >
-        {/* Grid content */}
-        {loading || (items.length === 0 && (scanning || remoteScanning)) ? (
-          (() => {
-            switch (galleryView) {
-              case "list":
-                return (
-                  <ListView
-                    items={Array.from({ length: 6 })}
-                    renderItem={renderSkeletonListItem}
-                    rowHeight={80}
-                  />
-                );
-              case "hex-grid":
-                return (
-                  <HexGridView
-                    ref={gridRef}
-                    items={Array.from({ length: columnCount * 2 - 1 })}
-                    minItemWidth={200}
-                    onColumnCountChange={setColumnCount}
-                    renderHex={renderSkeletonHex}
-                  />
-                );
-              case "bookshelf":
-                return (
-                  <BookshelfView
-                    ref={gridRef}
-                    items={Array.from({ length: viewColumnCount * 2 })}
-                    renderSpine={renderSkeletonSpine}
-                    onItemsPerRowChange={(count) => setViewColumnCount(count)}
-                  />
-                );
-              case "spread-deck":
-                return (
-                  <SpreadDeckView
-                    ref={gridRef}
-                    items={Array.from({ length: viewColumnCount * 2 })}
-                    renderCard={renderSkeletonDeckCard}
-                    onItemsPerRowChange={(count) => setViewColumnCount(count)}
-                  />
-                );
-              default:
-                if (isNeonGrid) {
-                  return (
-                    <NeonGridView
-                      ref={gridRef}
-                      items={Array.from({ length: columnCount * 2 })}
-                      minItemWidth={200}
-                      onColumnCountChange={setColumnCount}
-                      rowHeight={260}
-                      renderItem={renderSkeletonNeonCard}
-                    />
-                  );
-                }
-                return (
-                  <VirtualGrid
-                    ref={gridRef}
-                    items={Array.from({ length: columnCount * 2 })}
-                    minItemWidth={200}
-                    onColumnCountChange={setColumnCount}
-                    rowHeight={260}
-                    renderItem={renderSkeletonItem}
-                  />
-                );
-            }
-          })()
-        ) : items.length === 0 ? (
-          <div
-            className="flex flex-col items-center justify-center gap-4"
-            style={{ color: "var(--color-text-dim)", minHeight: 200 }}
-          >
-            <p>No games found.</p>
-            <motion.button
-              className="px-6 py-2.5 rounded-[var(--radius-card)] font-medium"
-              style={{
-                background: "var(--color-accent)",
-                color: "var(--color-bg)",
-              }}
-              onClick={scan}
-              whileTap={{ scale: 0.96 }}
-            >
-              Scan for games
-            </motion.button>
-          </div>
-        ) : (
-          (() => {
-            switch (galleryView) {
-              case "list":
-                return (
-                  <ListView
-                    ref={gridRef}
-                    items={gridItems}
-                    renderItem={renderListItem}
-                    rowHeight={80}
-                  />
-                );
-              case "hex-grid":
-                return (
-                  <HexGridView
-                    ref={gridRef}
-                    items={gridItems}
-                    minItemWidth={200}
-                    onColumnCountChange={setColumnCount}
-                    renderHex={renderHex}
-                    focusedIndex={focusedIndex}
-                    bindItem={bindItem}
-                  />
-                );
-              case "bookshelf":
-                return (
-                  <BookshelfView
-                    ref={gridRef}
-                    items={gridItems}
-                    renderSpine={renderSpine}
-                    focusedIndex={focusedIndex}
-                    onItemsPerRowChange={(count) => setViewColumnCount(count)}
-                    onItemClick={(game, index) => { setFocusedIndex(index); setSelected(game); }}
-                    bindItem={bindItem}
-                  />
-                );
-              case "spread-deck":
-                return (
-                  <SpreadDeckView
-                    ref={gridRef}
-                    items={gridItems}
-                    renderCard={renderDeckCard}
-                    focusedIndex={focusedIndex}
-                    onItemsPerRowChange={(count) => setViewColumnCount(count)}
-                    onItemClick={(game, index) => { setFocusedIndex(index); setSelected(game); }}
-                    bindItem={bindItem}
-                  />
-                );
-              default:
-                if (isNeonGrid) {
-                  return (
-                    <NeonGridView
-                      ref={gridRef}
-                      items={gridItems}
-                      minItemWidth={200}
-                      onColumnCountChange={setColumnCount}
-                      rowHeight={260}
-                      renderItem={renderNeonCard}
-                    />
-                  );
-                }
-                return (
-                  <VirtualGrid
-                    ref={gridRef}
-                    items={gridItems}
-                    minItemWidth={200}
-                    onColumnCountChange={setColumnCount}
-                    rowHeight={260}
-                    renderItem={renderItem}
-                  />
-                );
-            }
-          })()
-        )}
+        </div>
       </div>
 
       <DetailPanel

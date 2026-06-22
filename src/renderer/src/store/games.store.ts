@@ -1,23 +1,44 @@
 import { create } from "zustand";
 import { Game, GamePlatform, GameEmulatorConfig, WineRunner } from "../../../shared/types";
+import {
+  type GamingNavItem,
+  type GamingLibraryFilter,
+  type GamingPlayerCountFilter,
+  type GamingMultiplayerTypeFilter,
+  type GamingPlayStatusFilter,
+  type GamingCompletionFilter,
+  NAV_PLATFORM_GROUPS,
+} from "../tabs/Gaming/types";
 
 interface GamesState {
   games: Game[];
   loading: boolean;
   scanning: boolean;
   remoteScanning: boolean;
+  activeNav: GamingNavItem;
   activeFilter: GamePlatform | "all" | "couch-coop" | "favorites";
   consoleFilter: GamePlatform | "all";
   searchQuery: string;
+  libraryFilter: GamingLibraryFilter;
+  playerCountFilter: GamingPlayerCountFilter;
+  multiplayerTypeFilter: GamingMultiplayerTypeFilter;
+  playStatusFilter: GamingPlayStatusFilter;
+  completionFilter: GamingCompletionFilter;
   regeneratingIds: Set<string>;
   pendingThumbnailIds: Set<string>;
   coreVersion: number;
   load: () => Promise<void>;
   scan: () => Promise<void>;
   refreshCores: () => void;
+  setActiveNav: (nav: GamingNavItem) => void;
   setFilter: (filter: GamesState["activeFilter"]) => void;
   setConsoleFilter: (filter: GamesState["consoleFilter"]) => void;
   setSearch: (q: string) => void;
+  setLibraryFilter: (filter: GamingLibraryFilter) => void;
+  setPlayerCountFilter: (filter: GamingPlayerCountFilter) => void;
+  setMultiplayerTypeFilter: (filter: GamingMultiplayerTypeFilter) => void;
+  setPlayStatusFilter: (filter: GamingPlayStatusFilter) => void;
+  setCompletionFilter: (filter: GamingCompletionFilter) => void;
   toggleFavorite: (id: string) => Promise<void>;
   setTags: (id: string, tags: string[]) => Promise<void>;
   hide: (id: string) => Promise<void>;
@@ -40,6 +61,45 @@ interface GamesState {
   updateLastPlayed: (id: string, timestamp?: number) => void;
   filtered: () => Game[];
 }
+
+const ACTIVE_FILTER_TO_NAV: Partial<Record<GamesState["activeFilter"], GamingNavItem>> = {
+  all: "all",
+  favorites: "favorites",
+  "couch-coop": "couch-coop",
+  steam: "steam",
+  gog: "gog",
+  heroic: "epic",
+  lutris: "lutris",
+  itch: "itch",
+  windows: "windows",
+  desktop: "other",
+};
+
+const PLATFORM_TO_NAV: Partial<Record<GamePlatform, GamingNavItem>> = {
+  steam: "steam",
+  gog: "gog",
+  heroic: "epic",
+  lutris: "lutris",
+  itch: "itch",
+  "dolphin-gc": "nintendo",
+  "dolphin-wii": "nintendo",
+  nes: "nintendo",
+  snes: "nintendo",
+  gb: "nintendo",
+  gba: "nintendo",
+  n64: "nintendo",
+  nds: "nintendo",
+  psx: "playstation",
+  genesis: "retro",
+  sms: "retro",
+  gamegear: "retro",
+  dreamcast: "retro",
+  pce: "retro",
+  dos: "retro",
+  flash: "retro",
+  windows: "windows",
+  desktop: "other",
+};
 
 function shallowEqualGame(a: Game, b: Game): boolean {
   const keys = Object.keys(a) as (keyof Game)[];
@@ -79,9 +139,15 @@ export const useGamesStore = create<GamesState>((set, get) => ({
   loading: false,
   scanning: false,
   remoteScanning: false,
+  activeNav: "all",
   activeFilter: "all",
   consoleFilter: "all",
   searchQuery: "",
+  libraryFilter: "all",
+  playerCountFilter: "all",
+  multiplayerTypeFilter: "all",
+  playStatusFilter: "all",
+  completionFilter: "all",
   regeneratingIds: new Set(),
   pendingThumbnailIds: new Set(),
   coreVersion: 0,
@@ -114,9 +180,21 @@ export const useGamesStore = create<GamesState>((set, get) => ({
 
   refreshCores: () => set((s) => ({ coreVersion: s.coreVersion + 1 })),
 
-  setFilter: (filter) => set({ activeFilter: filter }),
-  setConsoleFilter: (filter) => set({ consoleFilter: filter }),
+  setActiveNav: (nav) => set({ activeNav: nav, consoleFilter: "all" }),
+  setFilter: (filter) => {
+    const nav = ACTIVE_FILTER_TO_NAV[filter] ?? "all";
+    set({ activeFilter: filter, activeNav: nav, consoleFilter: "all" });
+  },
+  setConsoleFilter: (filter) => {
+    const nav = filter === "all" ? get().activeNav : (PLATFORM_TO_NAV[filter] ?? get().activeNav);
+    set({ consoleFilter: filter, activeNav: nav });
+  },
   setSearch: (searchQuery) => set({ searchQuery }),
+  setLibraryFilter: (filter) => set({ libraryFilter: filter }),
+  setPlayerCountFilter: (filter) => set({ playerCountFilter: filter }),
+  setMultiplayerTypeFilter: (filter) => set({ multiplayerTypeFilter: filter }),
+  setPlayStatusFilter: (filter) => set({ playStatusFilter: filter }),
+  setCompletionFilter: (filter) => set({ completionFilter: filter }),
 
   toggleFavorite: async (id) => {
     const game = get().games.find((g) => g.id === id);
@@ -276,10 +354,22 @@ export const useGamesStore = create<GamesState>((set, get) => ({
   },
 
   filtered: () => {
-    const { games, activeFilter, consoleFilter, searchQuery } = get();
+    const {
+      games,
+      activeNav,
+      activeFilter,
+      consoleFilter,
+      searchQuery,
+      libraryFilter,
+      playerCountFilter,
+      multiplayerTypeFilter,
+      playStatusFilter,
+      completionFilter,
+    } = get();
     let result = games.filter((g) => !g.hidden);
 
-    switch (activeFilter) {
+    // Nav/platform filtering
+    switch (activeNav) {
       case "all":
         break;
       case "favorites":
@@ -288,14 +378,21 @@ export const useGamesStore = create<GamesState>((set, get) => ({
       case "couch-coop":
         result = result.filter((g) => g.playerCount && g.playerCount.max >= 2);
         break;
-      default:
-        result = result.filter((g) => g.platform === activeFilter);
+      default: {
+        const platforms = NAV_PLATFORM_GROUPS[activeNav];
+        if (platforms.length > 0) {
+          result = result.filter((g) => platforms.includes(g.platform));
+        }
+        break;
+      }
     }
 
+    // Legacy consoleFilter support
     if (consoleFilter !== "all") {
       result = result.filter((g) => g.platform === consoleFilter);
     }
 
+    // Search
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       result = result.filter(
@@ -304,6 +401,66 @@ export const useGamesStore = create<GamesState>((set, get) => ({
           g.developer?.toLowerCase().includes(q) ||
           g.tags?.some((t) => t.toLowerCase().includes(q)),
       );
+    }
+
+    // Library filter (installed vs uninstalled) for online platforms
+    if (libraryFilter !== "all") {
+      result = result.filter((g) => {
+        const hasPath = !!(g.execPath || g.romPath);
+        const isMissing = g.missing === true;
+        if (libraryFilter === "installed") {
+          return hasPath && !isMissing;
+        }
+        return !hasPath || isMissing;
+      });
+    }
+
+    // Player count filter
+    if (playerCountFilter !== "all") {
+      result = result.filter((g) => {
+        const max = g.playerCount?.max;
+        if (max === undefined) return false;
+        switch (playerCountFilter) {
+          case "1":
+            return max === 1;
+          case "2":
+            return max === 2;
+          case "4":
+            return max === 4;
+          case "4+":
+            return max >= 4;
+        }
+        return true;
+      });
+    }
+
+    // Multiplayer type filter
+    if (multiplayerTypeFilter !== "all") {
+      result = result.filter((g) => {
+        const max = g.playerCount?.max ?? 1;
+        if (multiplayerTypeFilter === "single") {
+          return max === 1;
+        }
+        return max >= 2;
+      });
+    }
+
+    // Play status filter
+    if (playStatusFilter !== "all") {
+      result = result.filter((g) => {
+        const hasPlayed = !!g.lastPlayed && g.lastPlayed > 0;
+        return playStatusFilter === "played" ? hasPlayed : !hasPlayed;
+      });
+    }
+
+    // Completion filter (no-op until backend tracks earned achievements)
+    if (completionFilter !== "all") {
+      // TODO: implement when earnedAchievements field is available
+      // For now, treat "completed" as games with substantial playtime (>2h)
+      result = result.filter((g) => {
+        const substantial = (g.playTime ?? 0) > 120;
+        return completionFilter === "completed" ? substantial : !substantial;
+      });
     }
 
     return result;
