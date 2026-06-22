@@ -1,7 +1,8 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { motion } from "framer-motion";
 import { Gamepad2, Film, Music, Tv } from "lucide-react";
 import { useSettingsStore } from "../../store/settings.store";
+import { useThemesStore } from "../../store/themes.store";
 import {
   TabId,
   BackgroundType,
@@ -10,7 +11,7 @@ import {
   DailyBackgroundSource,
   GalleryView,
 } from "../../../../shared/types";
-import { THEMES, Toggle, Field } from "./shared";
+import { Toggle, Field } from "./shared";
 
 const BG_TYPE_LABELS: Record<BackgroundType, string> = {
   theme: "Theme Default",
@@ -51,6 +52,12 @@ const GALLERY_VIEW_LABELS: Record<GalleryView, string> = {
 
 export const AppearanceTab: React.FC = () => {
   const { settings, update } = useSettingsStore();
+  const { themes, load } = useThemesStore();
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
   if (!settings) return null;
 
   const bg = settings.background ?? { type: "theme" as BackgroundType };
@@ -75,7 +82,7 @@ export const AppearanceTab: React.FC = () => {
             Theme
           </label>
           <div className="grid grid-cols-5 gap-3">
-            {THEMES.map((t) => (
+            {themes.map((t) => (
               <motion.button
                 key={t.id}
                 className="flex flex-col items-center gap-2 p-2 rounded-[var(--radius-card)]"
@@ -89,15 +96,24 @@ export const AppearanceTab: React.FC = () => {
                 whileHover={{ scale: 1.04 }}
                 whileTap={{ scale: 0.97 }}
               >
-                <div
-                  className="w-full h-12 rounded"
-                  style={{ background: t.preview }}
-                />
+                {t.thumbnailUrl ? (
+                  <img
+                    src={t.thumbnailUrl}
+                    alt={t.name}
+                    className="w-full h-12 rounded object-cover"
+                    loading="lazy"
+                  />
+                ) : (
+                  <div
+                    className="w-full h-12 rounded"
+                    style={{ background: t.preview ?? "var(--surface-2)" }}
+                  />
+                )}
                 <span
                   className="text-xs text-center"
                   style={{ color: "var(--text-secondary)" }}
                 >
-                  {t.label}
+                  {t.name}
                 </span>
               </motion.button>
             ))}

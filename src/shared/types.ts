@@ -1,16 +1,7 @@
 import type { ScanSourceId } from "./scan-sources";
 export type { ScanSourceId };
 
-export type ThemeName =
-  | "ember"
-  | "dark-oled"
-  | "glassmorphism"
-  | "neon-cyberpunk"
-  | "terminal-tui"
-  | "synthwave-sunset"
-  | "deep-ocean"
-  | "monokai"
-  | "warm-paper";
+export type ThemeName = string;
 
 export type TabId =
   | "gaming"
@@ -798,6 +789,8 @@ export interface VideoDecoderMetadata {
   frameRate: number;
 }
 
+export type PluginType = "theme" | "emulator" | "generic";
+
 export interface PluginManifest {
   id: string;
   name: string;
@@ -810,6 +803,28 @@ export interface PluginManifest {
   assetsPath?: string;
   hooks?: PluginHookName[];
   platforms?: string[];
+  type?: PluginType;
+}
+
+export interface ThemeConfigOption {
+  key: string;
+  label: string;
+  type: "color" | "number" | "string" | "select";
+  default?: string | number;
+  options?: { label: string; value: string }[];
+  min?: number;
+  max?: number;
+}
+
+export interface ThemeRegistration {
+  id: string;
+  name: string;
+  pluginId: string;
+  cssUrl: string;
+  preview?: string;
+  thumbnailUrl?: string;
+  configSchema?: ThemeConfigOption[];
+  config?: Record<string, string | number>;
 }
 
 export type PluginHookName =

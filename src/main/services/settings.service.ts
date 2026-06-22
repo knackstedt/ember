@@ -2,7 +2,7 @@ import { SettingsRepo, GameRepo, MovieRepo, MusicRepo } from "../db/repository";
 import { AppSettings } from "../../shared/types";
 
 const DEFAULTS: AppSettings = {
-  theme: "dark-oled",
+  theme: "ember",
   fullscreen: false,
   defaultTab: "gaming",
   moviePaths: [],

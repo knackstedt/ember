@@ -17,6 +17,7 @@ import {
   setPluginInactive,
   clearRegistry,
 } from "./plugin-registry";
+import { clearThemes } from "./theme-registry";
 import { createLogger } from "../util/logger";
 
 const log = createLogger("info");
@@ -232,6 +233,7 @@ export async function reloadPlugins(): Promise<RegisteredPlugin[]> {
   }
   registeredPlugins.length = 0;
   clearRegistry();
+  clearThemes();
 
   if (!existsSync(PLUGINS_DIR)) return [];
 

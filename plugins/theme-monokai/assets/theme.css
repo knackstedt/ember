@@ -1,0 +1,53 @@
+[data-theme="monokai"] {
+  --surface-base: #1e1e1e;
+  --surface-0: #272727;
+  --surface-1: #323232;
+  --surface-2: rgba(39, 39, 39, 0.98);
+
+  --border-subtle: rgba(255, 216, 102, 0.08);
+  --border-default: rgba(255, 216, 102, 0.2);
+  --border-strong: rgba(255, 216, 102, 0.35);
+
+  --accent-dim: #3a3010;
+  --accent-muted: #fc9867;
+  --accent: #ffd866;
+  --accent-hover: #ffe088;
+  --accent-active: #ffeaab;
+  --accent-bright: #fff4cc;
+
+  --text-primary: #f8f8f2;
+  --text-secondary: #727072;
+  --text-muted: #505050;
+  --text-ghost: #383838;
+  --text-on-accent: #1e1e1e;
+
+  --state-hover: rgba(255, 216, 102, 0.05);
+  --state-selected: rgba(255, 216, 102, 0.12);
+  --state-active: rgba(255, 216, 102, 0.08);
+  --focus-ring: #ffd866;
+
+  --success-bg: #0a1a0a;
+  --success-border: #1a3a1a;
+  --success-fg: #66cc66;
+  --warning-bg: #1a1a0a;
+  --warning-border: #3a3a1a;
+  --warning-fg: #cccc66;
+  --error-bg: #1a0a0a;
+  --error-border: #3a1a1a;
+  --error-fg: #cc6666;
+  --info-bg: #0a0a1a;
+  --info-border: #1a1a3a;
+  --info-fg: #6666cc;
+
+  --scrim: rgba(0, 0, 0, 0.72);
+  --divider: rgba(255, 216, 102, 0.07);
+  --skeleton-base: #272727;
+  --skeleton-shimmer: #323232;
+
+  --font-sans: 'SF Pro Display', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --radius-card: 6px;
+  --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.8);
+  --shadow-glow: 0 0 20px rgba(255, 216, 102, 0.25);
+  --blur-panel: 0px;
+}

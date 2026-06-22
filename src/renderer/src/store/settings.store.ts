@@ -89,6 +89,26 @@ const defaults: AppSettings = {
   updateAutoInstall: false,
 };
 
+async function injectThemeCss(themeId: string) {
+  const styleId = "theme-plugin-css";
+  let styleTag = document.getElementById(styleId) as HTMLStyleElement | null;
+  if (themeId === "ember") {
+    if (styleTag) styleTag.textContent = "";
+    return;
+  }
+  const css = await window.htpc.themes.getCss(themeId);
+  if (!css) {
+    if (styleTag) styleTag.textContent = "";
+    return;
+  }
+  if (!styleTag) {
+    styleTag = document.createElement("style");
+    styleTag.id = styleId;
+    document.head.appendChild(styleTag);
+  }
+  styleTag.textContent = css;
+}
+
 export const useSettingsStore = create<SettingsState>((set, get) => ({
   settings: null,
   loading: true,
@@ -98,9 +118,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       const s = await window.htpc.settings.get();
       const merged = { ...defaults, ...s };
       document.documentElement.setAttribute("data-theme", merged.theme);
+      await injectThemeCss(merged.theme);
       set({ settings: merged, loading: false });
     } catch {
       document.documentElement.setAttribute("data-theme", defaults.theme);
+      await injectThemeCss(defaults.theme);
       set({ settings: defaults, loading: false });
     }
   },
@@ -111,12 +133,14 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     await window.htpc.settings.set(partial);
     if (partial.theme) {
       document.documentElement.setAttribute("data-theme", partial.theme);
+      await injectThemeCss(partial.theme);
     }
     set({ settings: next });
   },
 
-  setTheme: (theme) => {
+  setTheme: async (theme) => {
     document.documentElement.setAttribute("data-theme", theme);
+    await injectThemeCss(theme);
     get().update({ theme });
   },
 }));

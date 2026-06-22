@@ -1,0 +1,7 @@
+{
+  "id": "theme-glassmorphism",
+  "name": "Glassmorphism",
+  "version": "1.0.0",
+  "type": "theme",
+  "entryPoint": "index.ts"
+}

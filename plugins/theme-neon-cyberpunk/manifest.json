@@ -1,0 +1,7 @@
+{
+  "id": "theme-neon-cyberpunk",
+  "name": "Neon Cyberpunk",
+  "version": "1.0.0",
+  "type": "theme",
+  "entryPoint": "index.ts"
+}

@@ -19,18 +19,7 @@ import { useJsnesPlayerStore } from "../store/jsnesPlayer.store";
 import { usePluginPlayerStore } from "../store/pluginPlayer.store";
 import { useLibretroPlayerStore } from "../store/libretroPlayer.store";
 import { useFocusZoneStore } from "../store/focusZone.store";
-
-const THEME_CYCLE: ThemeName[] = [
-  "ember",
-  "dark-oled",
-  "glassmorphism",
-  "neon-cyberpunk",
-  "terminal-tui",
-  "synthwave-sunset",
-  "deep-ocean",
-  "monokai",
-  "warm-paper",
-];
+import { useThemesStore } from "../store/themes.store";
 
 export interface CommandContext {
   activeTab: TabId;
@@ -96,6 +85,7 @@ export function useCommands(
   const settings = useSettingsStore((s) => s.settings);
   const setTheme = useSettingsStore((s) => s.setTheme);
   const updateSettings = useSettingsStore((s) => s.update);
+  const themes = useThemesStore((s) => s.themes);
 
   /* ── context flags ── */
   const hasPlayer = useMusicPlayerStore((s) => s.queue.length > 0);
@@ -458,9 +448,10 @@ export function useCommands(
           setActiveTab("settings");
           break;
         case "settings.theme.next": {
-          const current = settings?.theme ?? "dark-oled";
-          const idx = THEME_CYCLE.indexOf(current as ThemeName);
-          const next = THEME_CYCLE[(idx + 1) % THEME_CYCLE.length];
+          const current = settings?.theme ?? "ember";
+          const themeIds = themes.map((t) => t.id);
+          const idx = themeIds.indexOf(current);
+          const next = themeIds[(idx + 1) % themeIds.length] ?? themeIds[0] ?? "ember";
           setTheme(next);
           break;
         }
@@ -513,6 +504,7 @@ export function useCommands(
       settings,
       setTheme,
       updateSettings,
+      themes,
     ],
   );
 

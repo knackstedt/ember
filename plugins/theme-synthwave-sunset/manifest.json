@@ -1,0 +1,7 @@
+{
+  "id": "theme-synthwave-sunset",
+  "name": "Synthwave Sunset",
+  "version": "1.0.0",
+  "type": "theme",
+  "entryPoint": "index.ts"
+}

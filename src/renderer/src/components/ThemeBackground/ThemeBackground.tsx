@@ -819,7 +819,7 @@ function BaseBackground({ background }: { background: BackgroundSettings }) {
 }
 
 export const ThemeBackground: React.FC = () => {
-  const theme = useSettingsStore((s) => s.settings?.theme ?? "dark-oled");
+  const theme = useSettingsStore((s) => s.settings?.theme ?? "ember");
   const background = useSettingsStore(
     (s) => s.settings?.background ?? { type: "theme" as const },
   );

@@ -688,6 +688,11 @@ const htpc = {
       ipcRenderer.invoke("plugins:launch-game", game),
   },
 
+  themes: {
+    list: (): Promise<import("../shared/types").ThemeRegistration[]> => ipcRenderer.invoke("themes:list"),
+    getCss: (themeId: string): Promise<string | null> => ipcRenderer.invoke("themes:getCss", themeId),
+  },
+
   db: {
     clear: (): Promise<boolean> => ipcRenderer.invoke("db:clear"),
     clearAll: (): Promise<boolean> => ipcRenderer.invoke("db:clear-all"),

@@ -1,0 +1,7 @@
+{
+  "id": "theme-deep-ocean",
+  "name": "Deep Ocean",
+  "version": "1.0.0",
+  "type": "theme",
+  "entryPoint": "index.ts"
+}

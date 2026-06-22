@@ -1,5 +1,6 @@
-import { PluginManifest, Game } from "../../shared/types";
+import { PluginManifest, Game, ThemeRegistration } from "../../shared/types";
 import { createLogger } from "../util/logger";
+import { registerTheme as doRegisterTheme } from "./theme-registry";
 
 const log = createLogger("info");
 
@@ -55,6 +56,7 @@ export interface PluginApi {
   registerTab(id: string, label: string, component: unknown): void;
   registerSettingsPanel(id: string, label: string, component: unknown): void;
   registerScanner(id: string, fn: () => Promise<unknown[]>): void;
+  registerTheme(theme: ThemeRegistration): void;
   addChipFilter(
     tab: string,
     filter: {
@@ -91,6 +93,10 @@ export function createPluginApi(manifest: PluginManifest): PluginApi {
     },
     registerScanner(id, fn) {
       log.info(`plugin:${manifest.id}`, `Register scanner: ${id}`);
+    },
+    registerTheme(theme) {
+      log.info(`plugin:${manifest.id}`, `Register theme: ${theme.id} (${theme.name})`);
+      doRegisterTheme({ ...theme, pluginId: manifest.id });
     },
     addChipFilter(tab, filter) {
       log.info(

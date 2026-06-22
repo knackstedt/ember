@@ -1,0 +1,53 @@
+[data-theme="dark-oled"] {
+  --surface-base: #000000;
+  --surface-0: #0a0a0a;
+  --surface-1: #141414;
+  --surface-2: rgba(20, 20, 20, 0.95);
+
+  --border-subtle: rgba(255, 255, 255, 0.04);
+  --border-default: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.14);
+
+  --accent-dim: #333333;
+  --accent-muted: #666666;
+  --accent: #e2e2e2;
+  --accent-hover: #f0f0f0;
+  --accent-active: #ffffff;
+  --accent-bright: #ffffff;
+
+  --text-primary: #f0f0f0;
+  --text-secondary: #888888;
+  --text-muted: #555555;
+  --text-ghost: #333333;
+  --text-on-accent: #000000;
+
+  --state-hover: rgba(255, 255, 255, 0.05);
+  --state-selected: rgba(255, 255, 255, 0.10);
+  --state-active: rgba(255, 255, 255, 0.08);
+  --focus-ring: #e2e2e2;
+
+  --success-bg: #0a1a0a;
+  --success-border: #1a3a1a;
+  --success-fg: #66aa66;
+  --warning-bg: #1a1a0a;
+  --warning-border: #3a3a1a;
+  --warning-fg: #aaaa66;
+  --error-bg: #1a0a0a;
+  --error-border: #3a1a1a;
+  --error-fg: #aa6666;
+  --info-bg: #0a0a1a;
+  --info-border: #1a1a3a;
+  --info-fg: #6666aa;
+
+  --scrim: rgba(0, 0, 0, 0.72);
+  --divider: rgba(255, 255, 255, 0.05);
+  --skeleton-base: #141414;
+  --skeleton-shimmer: #1a1a1a;
+
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --radius-card: 12px;
+  --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.8);
+  --shadow-glow: 0 0 20px rgba(226, 226, 226, 0.15);
+  --blur-panel: 0px;
+}

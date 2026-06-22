@@ -86,6 +86,7 @@ import {
   setPluginEnabled,
   listManagedPlugins,
 } from "../services/plugin-manager.service";
+import { listThemes, getTheme } from "../plugins/theme-registry";
 import { getConnectedDevices, rescanDevice } from "../input/evdev";
 import { getXdgVideosDir, getXdgMusicDir } from "../scanners/xdg";
 import { getDefaultScanSources, getDefaultScanSourcesAsync } from "../scanners/defaults";
@@ -2069,6 +2070,43 @@ export function registerIpcHandlers(window: BrowserWindow): void {
   ipcMain.handle("plugins:launch-game", async (_e, game: Game) => {
     const result = await callPluginHook<{ type: string; url?: string; pluginId: string }>("onGameStart", game);
     return result ?? null;
+  });
+
+  ipcMain.handle("themes:list", async () => {
+    const pluginThemes = listThemes();
+    const builtIn: import("../../shared/types").ThemeRegistration = {
+      id: "ember",
+      name: "Ember",
+      pluginId: "builtin",
+      cssUrl: "",
+      preview: "linear-gradient(135deg,#121110,#d95f0a)",
+    };
+    return [builtIn, ...pluginThemes];
+  });
+
+  ipcMain.handle("themes:getCss", async (_e, themeId: string) => {
+    const theme = getTheme(themeId);
+    if (!theme) return null;
+    try {
+      const path = theme.cssUrl.replace(/^ember:\/\/plugin\//, "").replace(/^\/plugin\//, "");
+      const segments = path.split("/");
+      const pluginId = segments[0];
+      const assetPath = segments.slice(1).join("/");
+      const { join } = await import("path");
+      const { readFileSync } = await import("fs");
+      const pluginDir = join(
+        app.getPath("home") || process.cwd(),
+        ".config",
+        "htpc",
+        "plugins",
+        pluginId,
+      );
+      const filePath = join(pluginDir, "assets", assetPath);
+      if (filePath.includes("..")) return null;
+      return readFileSync(filePath, "utf-8");
+    } catch {
+      return null;
+    }
   });
 
   ipcMain.handle("app:xdg-defaults", async () => {

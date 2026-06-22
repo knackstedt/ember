@@ -1,0 +1,64 @@
+[data-theme="terminal-tui"] {
+  --surface-base: #0c0c0c;
+  --surface-0: #121212;
+  --surface-1: #1a1a1a;
+  --surface-2: rgba(12, 12, 12, 0.98);
+
+  --border-subtle: rgba(0, 255, 65, 0.08);
+  --border-default: rgba(0, 255, 65, 0.2);
+  --border-strong: rgba(0, 255, 65, 0.35);
+
+  --accent-dim: #003300;
+  --accent-muted: #00aa2b;
+  --accent: #00ff41;
+  --accent-hover: #33ff66;
+  --accent-active: #66ff88;
+  --accent-bright: #99ffaa;
+
+  --text-primary: #ccffcc;
+  --text-secondary: #557755;
+  --text-muted: #335533;
+  --text-ghost: #224422;
+  --text-on-accent: #000000;
+
+  --state-hover: rgba(0, 255, 65, 0.05);
+  --state-selected: rgba(0, 255, 65, 0.12);
+  --state-active: rgba(0, 255, 65, 0.08);
+  --focus-ring: #00ff41;
+
+  --success-bg: #0a1a0a;
+  --success-border: #1a3a1a;
+  --success-fg: #00ff41;
+  --warning-bg: #1a1a0a;
+  --warning-border: #3a3a1a;
+  --warning-fg: #aaff00;
+  --error-bg: #1a0a0a;
+  --error-border: #3a1a1a;
+  --error-fg: #ff3333;
+  --info-bg: #0a0a1a;
+  --info-border: #1a1a3a;
+  --info-fg: #0088ff;
+
+  --scrim: rgba(0, 0, 0, 0.72);
+  --divider: rgba(0, 255, 65, 0.07);
+  --skeleton-base: #121212;
+  --skeleton-shimmer: #1a1a1a;
+
+  --font-sans: 'VT323', 'Courier New', monospace;
+  --font-mono: 'VT323', 'Courier New', monospace;
+  --radius-card: 0px;
+  --shadow-card: 0 0 0 1px rgba(0, 255, 65, 0.3);
+  --shadow-glow: 0 0 15px rgba(0, 255, 65, 0.5);
+  --blur-panel: 0px;
+}
+
+/* Terminal cursor blink */
+[data-theme="terminal-tui"] .cursor::after {
+  content: '█';
+  animation: blink 1s step-end infinite;
+  color: var(--accent);
+}
+
+@keyframes blink {
+  50% { opacity: 0; }
+}

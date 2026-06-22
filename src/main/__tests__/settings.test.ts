@@ -3,7 +3,7 @@ import { describe, it, expect } from "bun:test";
 describe("settings defaults", () => {
   it("has expected default shape", () => {
     const defaults = {
-      theme: "dark-oled",
+      theme: "ember",
       fullscreen: false,
       defaultTab: "gaming",
       moviePaths: [],
@@ -23,7 +23,7 @@ describe("settings defaults", () => {
       disabledScanSources: [],
     };
 
-    expect(defaults.theme).toBe("dark-oled");
+    expect(defaults.theme).toBe("ember");
     expect(Array.isArray(defaults.moviePaths)).toBe(true);
     expect(Array.isArray(defaults.disabledTabs)).toBe(true);
     expect(typeof defaults.dailyBackground).toBe("object");

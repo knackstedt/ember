@@ -2,10 +2,6 @@ import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { X } from "lucide-react";
 import {
-  ThemeName,
-  FlashAspectRatio,
-  FlashCanvasSize,
-  FlashUpscaleStyle,
   FlashSettings,
 } from "../../../../shared/types";
 
@@ -41,46 +37,6 @@ export const DEFAULT_FLASH_SETTINGS: FlashSettings = {
 export function getFlashSettings(settings?: Partial<FlashSettings>): FlashSettings {
   return { ...DEFAULT_FLASH_SETTINGS, ...settings };
 }
-
-export const THEMES: { id: ThemeName; label: string; preview: string }[] = [
-  { id: "ember", label: "Ember", preview: "linear-gradient(135deg,#121110,#d95f0a)" },
-  { id: "dark-oled", label: "Dark OLED", preview: "#000" },
-  {
-    id: "glassmorphism",
-    label: "Glassmorphism",
-    preview: "linear-gradient(135deg,#0d1117,#1e3a5f)",
-  },
-  {
-    id: "neon-cyberpunk",
-    label: "Neon Cyberpunk",
-    preview: "linear-gradient(135deg,#07070f,#ff2d78)",
-  },
-  {
-    id: "terminal-tui",
-    label: "Terminal TUI",
-    preview: "linear-gradient(135deg,#0c0c0c,#004400)",
-  },
-  {
-    id: "synthwave-sunset",
-    label: "Synthwave",
-    preview: "linear-gradient(135deg,#0d0418,#2d1b4e)",
-  },
-  {
-    id: "deep-ocean",
-    label: "Deep Ocean",
-    preview: "linear-gradient(135deg,#001219,#003d4d)",
-  },
-  {
-    id: "monokai",
-    label: "Monokai",
-    preview: "linear-gradient(135deg,#1e1e1e,#ffd866)",
-  },
-  {
-    id: "warm-paper",
-    label: "Warm Paper",
-    preview: "linear-gradient(135deg,#f4ecd8,#e3dcc6)",
-  },
-];
 
 export function PathList({
   label,

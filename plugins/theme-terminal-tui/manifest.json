@@ -1,0 +1,7 @@
+{
+  "id": "theme-terminal-tui",
+  "name": "Terminal TUI",
+  "version": "1.0.0",
+  "type": "theme",
+  "entryPoint": "index.ts"
+}
