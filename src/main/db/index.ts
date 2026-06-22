@@ -73,8 +73,25 @@ class WorkerSurreal implements Surreal {
     return Promise.resolve(true);
   }
 
-  query<T>(sql: string, params?: Record<string, unknown>): Promise<T> {
-    return this.send("query", { sql, params }) as Promise<T>;
+  async query<T>(sql: string, params?: Record<string, unknown>): Promise<T> {
+    const maxRetries = 3;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        return await this.send("query", { sql, params }) as Promise<T>;
+      } catch (err: any) {
+        const msg = err?.message ?? String(err);
+        const isRetryable =
+          msg.includes("Transaction conflict") ||
+          msg.includes("write conflict") ||
+          msg.includes("This transaction can be retried");
+        if (isRetryable && attempt < maxRetries) {
+          await new Promise((r) => setTimeout(r, 50 * attempt));
+          continue;
+        }
+        throw err;
+      }
+    }
+    throw new Error("Unreachable");
   }
 
   private send(type: string, payload: Record<string, unknown>): Promise<unknown> {

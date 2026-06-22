@@ -246,23 +246,10 @@ export async function ensureDefaultExtensions(): Promise<void> {
   }
 
   if (changed) {
-    // Retry on transaction conflicts since startup may have concurrent DB writes
-    for (let attempt = 0; attempt < 5; attempt++) {
-      try {
-        await setSettings({ streamingExtensions: next });
-        return;
-      } catch (err: any) {
-        const msg = String(err?.message ?? err);
-        if (
-          (msg.includes("Transaction conflict") || msg.includes("write conflict")) &&
-          attempt < 4
-        ) {
-          await new Promise((r) => setTimeout(r, 200 * (attempt + 1)));
-          continue;
-        }
-        log.warn("extension:ensureDefaults", `Failed to save defaults: ${msg}`);
-        return;
-      }
+    try {
+      await setSettings({ streamingExtensions: next });
+    } catch (err: any) {
+      log.warn("extension:ensureDefaults", `Failed to save defaults: ${String(err?.message ?? err)}`);
     }
   }
 }

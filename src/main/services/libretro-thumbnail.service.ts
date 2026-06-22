@@ -686,30 +686,18 @@ function generateBrokenThumbnail(
 
 async function updateGameCover(id: string, url: string, source?: string): Promise<void> {
   const broken = source === "broken";
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    try {
-      const db = getDb();
-      if (source) {
-        await db.query(`UPDATE game:⟨${id}⟩ SET coverUrl = $url, coverSource = $source, corrupt = $broken`, { url, source, broken });
-      } else {
-        await db.query(`UPDATE game:⟨${id}⟩ SET coverUrl = $url, corrupt = $broken`, { url, broken });
-      }
-      if (broken) {
-        await applyCorruptPolicy(id, "game");
-      }
-      return;
-    } catch (err: any) {
-      const isConflict =
-        err?.kind === "Query" &&
-        (err?.message?.includes("Transaction conflict") ||
-          err?.message?.includes("write conflict"));
-      if (isConflict && attempt < 3) {
-        await new Promise((r) => setTimeout(r, 50 * attempt));
-        continue;
-      }
-      log.error("libretro:updateGameCover", `DB update failed: ${err}`);
-      return;
+  try {
+    const db = getDb();
+    if (source) {
+      await db.query(`UPDATE game:⟨${id}⟩ SET coverUrl = $url, coverSource = $source, corrupt = $broken`, { url, source, broken });
+    } else {
+      await db.query(`UPDATE game:⟨${id}⟩ SET coverUrl = $url, corrupt = $broken`, { url, broken });
     }
+    if (broken) {
+      await applyCorruptPolicy(id, "game");
+    }
+  } catch (err: any) {
+    log.error("libretro:updateGameCover", `DB update failed: ${err}`);
   }
 }
 

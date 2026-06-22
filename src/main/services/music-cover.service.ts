@@ -319,30 +319,11 @@ function normalizeId(raw: unknown): string {
   return String(raw);
 }
 
-async function updateTrackCoverWithRetry(
-  id: string,
-  url: string,
-  retries = 3,
-): Promise<void> {
-  for (let attempt = 1; attempt <= retries; attempt++) {
-    try {
-      const db = getDb();
-      await db.query(`UPDATE music_track:⟨${id}⟩ SET albumArtUrl = $url`, {
-        url,
-      });
-      return;
-    } catch (err: any) {
-      const isConflict =
-        err?.kind === "Query" &&
-        (err?.message?.includes("Transaction conflict") ||
-          err?.message?.includes("write conflict"));
-      if (isConflict && attempt < retries) {
-        await new Promise((r) => setTimeout(r, 50 * attempt));
-        continue;
-      }
-      throw err;
-    }
-  }
+async function updateTrackCover(id: string, url: string): Promise<void> {
+  const db = getDb();
+  await db.query(`UPDATE music_track:⟨${id}⟩ SET albumArtUrl = $url`, {
+    url,
+  });
 }
 
 export async function loadThumbnail(
@@ -360,7 +341,7 @@ export async function loadThumbnail(
       (await generateProceduralCover(filePath, id));
     if (url) {
       try {
-        await updateTrackCoverWithRetry(id, url);
+        await updateTrackCover(id, url);
       } catch (err) {
         log.error("loadThumbnail", `DB update failed: ${err}`);
       }
