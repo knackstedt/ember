@@ -80,6 +80,7 @@ interface MoviesState {
   showFavoritesOnly: boolean;
   regeneratingIds: Set<string>;
   load: () => Promise<void>;
+  query: (odataQuery: string) => Promise<{ results: Movie[]; count?: number }>;
   scan: () => Promise<void>;
   toggleFavorite: (id: string) => Promise<void>;
   setTags: (id: string, tags: string[]) => Promise<void>;
@@ -109,9 +110,11 @@ export const useMoviesStore = create<MoviesState>((set, get) => ({
   load: async () => {
     set({ loading: true });
     try {
-      const movies = await window.htpc.movies.list().catch(() => []);
+      const odata =
+        "$select=id,title,filePath,coverUrl,backdropUrl,description,genres,releaseYear,director,runtime,resolution,codec,tmdbId,isFavorite,tags,lastPlayed,rating,watchProgress,hidden,sourceLocation,missing,corrupt&$orderby=title asc";
+      const result = await window.htpc.db.query<Movie>("movie", odata);
       set((state) => ({
-        movies: mergeMovies(state.movies, movies),
+        movies: mergeMovies(state.movies, result.results),
         loading: false,
       }));
     } catch {
@@ -119,11 +122,23 @@ export const useMoviesStore = create<MoviesState>((set, get) => ({
     }
   },
 
+  query: async (odataQuery: string) => {
+    set({ loading: true });
+    try {
+      const result = await window.htpc.db.query<Movie>("movie", odataQuery);
+      set({ loading: false });
+      return result;
+    } catch {
+      set({ loading: false });
+      return { results: [] as Movie[], count: undefined };
+    }
+  },
+
   scan: async () => {
     if (get().scanning) return;
     set({ scanning: true });
     try {
-      await window.htpc.movies.scan().catch(() => []);
+      await window.htpc.movies.scan().catch(() => {});
       await get().load();
     } catch {
       /* scan errors already logged in main */
@@ -255,6 +270,7 @@ interface MusicState {
   artistThumbnailsLoading: Record<string, boolean>;
   artistThumbnailsFailed: Record<string, number>;
   load: () => Promise<void>;
+  query: (odataQuery: string) => Promise<{ results: MusicTrack[]; count?: number }>;
   scan: () => Promise<void>;
   toggleFavorite: (id: string) => Promise<void>;
   setTags: (id: string, tags: string[]) => Promise<void>;
@@ -292,9 +308,11 @@ export const useMusicStore = create<MusicState>((set, get) => ({
   load: async () => {
     set({ loading: true });
     try {
-      const tracks = await window.htpc.music.list().catch(() => []);
+      const odata =
+        "$select=id,title,filePath,artist,album,albumArtUrl,genre,year,trackNumber,duration,mbid,artistMbid,releaseMbid,releaseGroupMbid,label,albumArtist,discNumber,totalTracks,biography,mood,style,country,tadbArtistId,tadbAlbumId,isFavorite,tags,lastPlayed,rating,hidden,sourceLocation,missing,corrupt&$orderby=artist,album,trackNumber asc";
+      const result = await window.htpc.db.query<MusicTrack>("music_track", odata);
       set((state) => ({
-        tracks: mergeTracks(state.tracks, tracks),
+        tracks: mergeTracks(state.tracks, result.results),
         loading: false,
       }));
     } catch {
@@ -302,11 +320,23 @@ export const useMusicStore = create<MusicState>((set, get) => ({
     }
   },
 
+  query: async (odataQuery: string) => {
+    set({ loading: true });
+    try {
+      const result = await window.htpc.db.query<MusicTrack>("music_track", odataQuery);
+      set({ loading: false });
+      return result;
+    } catch {
+      set({ loading: false });
+      return { results: [] as MusicTrack[], count: undefined };
+    }
+  },
+
   scan: async () => {
     if (get().scanning) return;
     set({ scanning: true });
     try {
-      await window.htpc.music.scan().catch(() => []);
+      await window.htpc.music.scan().catch(() => {});
       await get().load();
     } catch {
       /* scan errors already logged in main */
@@ -493,6 +523,7 @@ interface TvState {
   searchQuery: string;
   regeneratingIds: Set<string>;
   load: () => Promise<void>;
+  query: (odataQuery: string) => Promise<{ results: TVShow[]; count?: number }>;
   scan: () => Promise<void>;
   toggleFavorite: (id: string) => Promise<void>;
   setTags: (id: string, tags: string[]) => Promise<void>;
@@ -511,15 +542,32 @@ export const useTvStore = create<TvState>((set, get) => ({
 
   load: async () => {
     set({ loading: true });
-    const shows = await window.htpc.tv.list().catch(() => []);
-    set({ shows, loading: false });
+    try {
+      const odata = "$select=id,title,dirPath,coverUrl,backdropUrl,description,genres,firstAirYear,creator,seasons,tmdbId,isFavorite,tags,rating,hidden,sourceLocation&$orderby=title asc";
+      const result = await window.htpc.db.query<TVShow>("tv_show", odata);
+      set({ shows: result.results, loading: false });
+    } catch {
+      set({ loading: false });
+    }
+  },
+
+  query: async (odataQuery: string) => {
+    set({ loading: true });
+    try {
+      const result = await window.htpc.db.query<TVShow>("tv_show", odataQuery);
+      set({ loading: false });
+      return result;
+    } catch {
+      set({ loading: false });
+      return { results: [] as TVShow[], count: undefined };
+    }
   },
 
   scan: async () => {
     if (get().scanning) return;
     set({ scanning: true });
     try {
-      await window.htpc.tv.scan().catch(() => []);
+      await window.htpc.tv.scan().catch(() => {});
       await get().load();
     } catch {
       /* scan errors already logged in main */

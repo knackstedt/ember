@@ -261,11 +261,7 @@ export default function App(): React.ReactElement {
       useMusicPlayerStore.getState().loadPersisted();
     });
 
-    useGamesStore.getState().load();
-    useMoviesStore.getState().load();
-    useMusicStore.getState().load();
-    useTvStore.getState().load();
-
+    // Scan operations are now fire-and-forget; each tab loads its own data on demand
     useGamesStore.getState().scan();
     useMoviesStore.getState().scan();
     useMusicStore.getState().scan();

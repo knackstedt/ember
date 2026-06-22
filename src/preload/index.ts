@@ -376,7 +376,7 @@ const htpc = {
   },
 
   games: {
-    scan: (extraPaths?: string[]): Promise<Game[]> =>
+    scan: (extraPaths?: string[]): Promise<void> =>
       ipcRenderer.invoke("games:scan", extraPaths),
     list: (): Promise<Game[]> => ipcRenderer.invoke("games:list"),
     launch: (game: Game): Promise<void> =>
@@ -527,7 +527,7 @@ const htpc = {
   },
 
   movies: {
-    scan: (extraPaths?: string[]): Promise<Movie[]> =>
+    scan: (extraPaths?: string[]): Promise<void> =>
       ipcRenderer.invoke("movies:scan", extraPaths),
     list: (): Promise<Movie[]> => ipcRenderer.invoke("movies:list"),
     launch: (movie: Movie): Promise<void> =>
@@ -559,7 +559,7 @@ const htpc = {
   },
 
   music: {
-    scan: (extraPaths?: string[]): Promise<MusicTrack[]> =>
+    scan: (extraPaths?: string[]): Promise<void> =>
       ipcRenderer.invoke("music:scan", extraPaths),
     list: (): Promise<MusicTrack[]> => ipcRenderer.invoke("music:list"),
     launch: (track: MusicTrack): Promise<void> =>
@@ -607,7 +607,7 @@ const htpc = {
   },
 
   tv: {
-    scan: (extraPaths?: string[]): Promise<TVShow[]> =>
+    scan: (extraPaths?: string[]): Promise<void> =>
       ipcRenderer.invoke("tv:scan", extraPaths),
     list: (): Promise<TVShow[]> => ipcRenderer.invoke("tv:list"),
     launch: (filePath: string): Promise<void> =>
@@ -997,6 +997,11 @@ const htpc = {
     const handler = (_: Electron.IpcRendererEvent, gameId: string) => cb(gameId);
     ipcRenderer.on("game:stopped", handler);
     return () => ipcRenderer.removeListener("game:stopped", handler);
+  },
+
+  db: {
+    query: <T = any>(table: string, odataQuery: string): Promise<{ results: T[]; count?: number }> =>
+      ipcRenderer.invoke("db:query", table, odataQuery),
   },
 
   devtools: {

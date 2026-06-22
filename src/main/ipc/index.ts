@@ -1,7 +1,7 @@
 import { join, dirname, resolve } from "path";
 import { readFileSync, rmSync, mkdirSync, readdirSync, existsSync, statSync } from "fs";
 import { BrowserWindow, ipcMain, app, dialog, shell, session, webContents } from "electron";
-import { spawn, ChildProcess } from "child_process";
+import { spawn, ChildProcess, execSync } from "child_process";
 import { homedir } from "os";
 import { getMainWindow } from "..";
 import {
@@ -53,6 +53,7 @@ import {
 } from "../db/repository";
 import { getProtonRating } from "../services/protondb.service";
 import { performGameScan } from "../services/game-scan.service";
+import { executeODataQuery } from "../services/query.service";
 import { loadFlashThumbnail, clearInFlight, setFlashThumbnailConcurrency } from "../services/flash-thumbnail.service";
 import { loadLibretroThumbnail, isLibretroPlatform, listLocalScreenshots } from "../services/libretro-thumbnail.service";
 import { searchGame } from "../services/rawg.service";
@@ -511,11 +512,10 @@ export function registerIpcHandlers(window: BrowserWindow): void {
   });
 
   ipcMain.handle("games:scan", async (_e, extraPaths?: string[]) => {
-    const result = await performGameScan(window, extraPaths);
+    await performGameScan(window, extraPaths);
     // Also scan remote sources configured for ROMs
     void scanAllRemoteSources("rom", sendRemoteProgress);
     sendToWindow(window, "scan:background:complete", { type: "games" });
-    return result;
   });
 
   ipcMain.handle("games:list", async () => {
@@ -845,11 +845,48 @@ export function registerIpcHandlers(window: BrowserWindow): void {
   // ---------------------------------------------------------------------------
   // System diagnostics — hardware, software versions, installed components
   // ---------------------------------------------------------------------------
+
+  function detectInstallMechanism(): string {
+    // Flatpak
+    if (process.env.FLATPAK_ID || existsSync("/.flatpak-info")) {
+      return "Flatpak";
+    }
+    // AppImage
+    if (process.env.APPIMAGE) {
+      return "AppImage";
+    }
+    // Snap
+    if (process.env.SNAP) {
+      return "Snap";
+    }
+
+    const exePath = process.execPath;
+
+    // deb
+    try {
+      execSync(`dpkg -S "${exePath}"`, { stdio: "pipe", timeout: 5000 });
+      return "deb";
+    } catch { /* not deb */ }
+
+    // rpm
+    try {
+      execSync(`rpm -qf "${exePath}"`, { stdio: "pipe", timeout: 5000 });
+      return "rpm";
+    } catch { /* not rpm */ }
+
+    // System install in /usr or /opt without package manager tracking
+    if (exePath.startsWith("/usr/") || exePath.startsWith("/opt/")) {
+      return "System Install";
+    }
+
+    // Default to tar.gz / manual
+    return "tar.gz";
+  }
+
   ipcMain.handle("system:getDiagnostics", async () => {
     const os = await import("os");
     const fs = await import("fs");
     const path = await import("path");
-    const { execSync } = await import("child_process");
     const electron = await import("electron");
 
     // App version and production dependencies from package.json
@@ -947,6 +984,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
       app: {
         name: "Ember",
         version: appVersion,
+        installMechanism: detectInstallMechanism(),
       },
       runtime: {
         electron: process.versions.electron,
@@ -1445,7 +1483,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
   });
 
   ipcMain.handle("movies:scan", async (_e, extraPaths?: string[]) => {
-    if (scanLocks.movies) return [];
+    if (scanLocks.movies) return;
     scanLocks.movies = true;
     sendToWindow(window, "scan:progress", {
       scanner: "movies",
@@ -1553,7 +1591,6 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     // Also scan remote sources configured for movies
     void scanAllRemoteSources("movie", sendRemoteProgress);
     sendToWindow(window, "scan:background:complete", { type: "movies" });
-    return movies;
   });
 
   ipcMain.handle("movies:list", async () => {
@@ -1661,7 +1698,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
   });
 
   ipcMain.handle("music:scan", async (_e, extraPaths?: string[]) => {
-    if (scanLocks.music) return [];
+    if (scanLocks.music) return;
     scanLocks.music = true;
     sendToWindow(window, "scan:progress", {
       scanner: "music",
@@ -1694,7 +1731,6 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     // Also scan remote sources configured for music
     void scanAllRemoteSources("music", sendRemoteProgress);
     sendToWindow(window, "scan:background:complete", { type: "music" });
-    return tracks;
   });
 
   ipcMain.handle("music:list", async () => {
@@ -1865,7 +1901,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
   });
 
   ipcMain.handle("tv:scan", async (_e, extraPaths?: string[]) => {
-    if (scanLocks.tv) return [];
+    if (scanLocks.tv) return;
     scanLocks.tv = true;
     sendToWindow(window, "scan:progress", {
       scanner: "tv",
@@ -1885,7 +1921,6 @@ export function registerIpcHandlers(window: BrowserWindow): void {
       total: shows.length,
       status: "done",
     });
-    return shows;
   });
 
   ipcMain.handle("tv:list", async () => {
@@ -2783,5 +2818,13 @@ export function registerIpcHandlers(window: BrowserWindow): void {
 
   ipcMain.handle("credentials:needsSessionReauth", async (_e, sources: import("../../shared/types").RemoteSource[]) => {
     return needsSessionReauth(sources);
+  });
+
+  /* ------------------------------------------------------------------ */
+  /*  Generic OData query                                               */
+  /* ------------------------------------------------------------------ */
+
+  ipcMain.handle("db:query", async (_e, table: string, odataQuery: string) => {
+    return executeODataQuery(table, odataQuery);
   });
 }

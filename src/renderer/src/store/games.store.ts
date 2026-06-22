@@ -28,6 +28,7 @@ interface GamesState {
   pendingThumbnailIds: Set<string>;
   coreVersion: number;
   load: () => Promise<void>;
+  query: (odataQuery: string) => Promise<{ results: Game[]; count?: number }>;
   scan: () => Promise<void>;
   refreshCores: () => void;
   setActiveNav: (nav: GamingNavItem) => void;
@@ -155,13 +156,27 @@ export const useGamesStore = create<GamesState>((set, get) => ({
   load: async () => {
     set({ loading: true });
     try {
-      const games = await window.htpc.games.list();
+      const odata =
+        "$select=id,title,platform,execPath,romPath,wineRunner,coverUrl,bannerUrl,description,genres,releaseYear,developer,publisher,playerCount,protonRating,steamAppId,rawgSlug,isFavorite,tags,lastPlayed,playTime,rating,hidden,sourceLocation,missing,source,launchCommand,launchArgs,launchWorkingDir,launchEnv,sessionHooks,compressedRomPath,compressionFormat&$orderby=title asc";
+      const result = await window.htpc.db.query<Game>("game", odata);
       set((state) => ({
-        games: mergeGames(state.games, games),
+        games: mergeGames(state.games, result.results),
         loading: false,
       }));
     } catch {
       set({ loading: false });
+    }
+  },
+
+  query: async (odataQuery: string) => {
+    set({ loading: true });
+    try {
+      const result = await window.htpc.db.query<Game>("game", odataQuery);
+      set({ loading: false });
+      return result;
+    } catch {
+      set({ loading: false });
+      return { results: [] as Game[], count: undefined };
     }
   },
 
