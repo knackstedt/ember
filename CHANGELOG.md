@@ -2,6 +2,47 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.3.0](https://github.com/knackstedt/ember/compare/v0.2.1...v0.3.0) (2026-06-22)
+
+
+### Features
+
+* **App:** remove tab transition animations to fix recurring blank-tab bug ([bfc3c93](https://github.com/knackstedt/ember/commit/bfc3c93ec08543647931d3c46d6af3a62bbff4d5))
+* **ConfirmDialog:** add keyboard/controller navigation with focus management and loading state handling ([a858dda](https://github.com/knackstedt/ember/commit/a858dda299ef72b27284e5eaf5f3d4dd6593cb8c))
+* **dashboard:** add customizable dashboard tab with drag-and-drop widget grid and controller navigation ([4618859](https://github.com/knackstedt/ember/commit/4618859dc2a5dabfc9985820ab26f036af71a013))
+* **Dashboard:** add keyboard/controller shortcuts and URL normalization to widget config dialog ([7df1740](https://github.com/knackstedt/ember/commit/7df17409b8b4e344540145c694d10f2a03c4e3b8))
+* **Dashboard:** add webview URL persistence and edit mode navigation tracking ([89f18ad](https://github.com/knackstedt/ember/commit/89f18ad417f26ba37a29417f272961b74b4f1097))
+* **database:** add playlist support, corrupt file tracking, scan source filtering, and streaming adapter infrastructure ([e3e99cb](https://github.com/knackstedt/ember/commit/e3e99cb8c302cbefe8bc13fbd34a864d456ef14c))
+* **db:** move SurrealDB operations to worker thread to prevent main process blocking ([2423b0f](https://github.com/knackstedt/ember/commit/2423b0fc342099546198f41cba4cb4afafe19401))
+* **ErrorBoundary:** add text selection support to error message displays ([ab8d4a0](https://github.com/knackstedt/ember/commit/ab8d4a0f72426a935a43357ff217c0440f5bc7cc))
+* fix webkit scrollbar visuals ([1d80001](https://github.com/knackstedt/ember/commit/1d800014afb8872bdf520bb43e446e66f84964a0))
+* **gallery:** add BookshelfSpine component and click/context-menu support to BookshelfView and SpreadDeckView ([a33a6e6](https://github.com/knackstedt/ember/commit/a33a6e671f566aae986ef36e28ae5f63cfc37b3d))
+* **gaming:** add navigation rail with platform groups and advanced filtering to games tab ([84ab9c8](https://github.com/knackstedt/ember/commit/84ab9c8dfbd4d02eaa186d747baf80b216289ed7))
+* **input:** make evdev device scanning async to prevent blocking main process initialization ([30e35d4](https://github.com/knackstedt/ember/commit/30e35d4aecda54a5033f4c490415eb45cde4c6aa))
+* **launcher:** add game launch overlay with window detection, launch state tracking, and failure notifications ([96a7438](https://github.com/knackstedt/ember/commit/96a74381c271388cbf89be23842424c4cd08a0c1))
+* **launcher:** add lastPlayed tracking to music/tv and improve window focus handling on game launch failures ([2baf594](https://github.com/knackstedt/ember/commit/2baf5949a47a8c78d64ad9deb0bb415c123ef082))
+* **main:** add error dialog for uncaught exceptions and unhandled rejections with copy-to-clipboard support ([e00809a](https://github.com/knackstedt/ember/commit/e00809adacd3e0765cf9d14024abea946068043f))
+* **media:** add missing file tracking with background scans, auto-refresh, and batch deletion ([851f0c1](https://github.com/knackstedt/ember/commit/851f0c15a7bd6adbb60d9e83639b000a1adc7b55))
+* **music:** add custom Ember Flame visualizer preset with flame-shaped spectrum and treble sparks ([4cf90e0](https://github.com/knackstedt/ember/commit/4cf90e07957eacee45a8d0fb254b1cdfb204100f))
+* **music:** add full-screen music player with tabs, keyboard navigation, and seekable progress bar ([95a26e7](https://github.com/knackstedt/ember/commit/95a26e7f1b8039c1d3a270749ebc7c22c8ca11ff))
+* **music:** add regenerate thumbnail with improved procedural cover generation and cache-busting ([0214929](https://github.com/knackstedt/ember/commit/0214929f4f86a3bf04a199e44c3f86ba315c8a98))
+* **music:** add track context menu with favorite/hide/delete/regenerate actions and persisted player state ([afdbef9](https://github.com/knackstedt/ember/commit/afdbef9cdc5c291e5683f6dd2cffece3a09986bd))
+* **music:** add viewMode to scroll effect dependencies to fix virtualizer sync on view changes ([8b19e4b](https://github.com/knackstedt/ember/commit/8b19e4b043b15dff9550f7cfc77b0fcb3abbd554))
+* **music:** initialize visualizer with default preset before first render to prevent blank frame ([fbce174](https://github.com/knackstedt/ember/commit/fbce174bcd2333a6c1340b634a31e85dfcadd9ec))
+* **music:** remove streaming services integration from music tab ([8158ac9](https://github.com/knackstedt/ember/commit/8158ac997c81a34c79429558d017c1b46d894c41))
+* **music:** replace custom visualizers with Butterchurn Milkdrop presets ([b3603b1](https://github.com/knackstedt/ember/commit/b3603b14e52441f9c40968324a1f5d09139e390f))
+* **performance:** add async operations and performance monitoring to prevent main thread blocking ([4073f18](https://github.com/knackstedt/ember/commit/4073f18e685abbba2a5a8ebce7803606cecdb3a3))
+* **scanners:** add source field to all game scanners and implement scan source filtering with corrupted files policy ([2c1edee](https://github.com/knackstedt/ember/commit/2c1edeebb43eb00e54283e8d136fe66aaf82534b))
+* **Settings:** consolidate DataFeed and LocalData tabs into single IntegrationsTab ([3295166](https://github.com/knackstedt/ember/commit/3295166d39666d05da5ad6e4f44011dfc8935833))
+* **system-info:** add GPU name fallbacks and mpv/libmpv detection to diagnostics ([ef265d0](https://github.com/knackstedt/ember/commit/ef265d0af3aa5e15d89981cf5e79399c9a50be98))
+* **system-info:** add production dependencies list to system info with sorted name/version pairs ([9f87fb7](https://github.com/knackstedt/ember/commit/9f87fb7e7b2ba5f2730d2792baecf3d12769e1ab))
+* **uninstall:** add platform-aware uninstall support for games, movies, and music with trash/delete fallback ([4ccaeb5](https://github.com/knackstedt/ember/commit/4ccaeb52fb3266e5c75c798a4b5bce151da7154d))
+
+
+### Bug Fixes
+
+* correct devtools opening ([e45d942](https://github.com/knackstedt/ember/commit/e45d942907d58ddf7be80985026db513cd0b54fb))
+
 ### [0.2.1](https://github.com/knackstedt/ember/compare/v0.2.0...v0.2.1) (2026-06-17)
 
 
