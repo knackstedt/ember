@@ -46,8 +46,8 @@ const RecentCard: React.FC<{
 
   return (
     <motion.div
-      className="w-32 flex-shrink-0 flex flex-col cursor-pointer rounded-[var(--radius-card)] overflow-hidden ring-1 ring-[var(--color-border)] hover:ring-2 hover:ring-[var(--color-accent)] hover:shadow-[var(--shadow-glow)] transition-all duration-150"
-      style={{ backgroundColor: "var(--color-surface)" }}
+      className="w-32 flex-shrink-0 flex flex-col cursor-pointer rounded-[var(--radius-card)] overflow-hidden ring-1 ring-[var(--border-default)] hover:ring-2 hover:ring-[var(--accent)] hover:shadow-[var(--shadow-glow)] transition-all duration-150"
+      style={{ backgroundColor: "var(--surface-0)" }}
       whileHover={{ scale: 1.05, y: -2 }}
       whileTap={{ scale: 0.97 }}
       onClick={() => onLaunch(item.id)}
@@ -93,7 +93,7 @@ export const RecentlyPlayedRow: React.FC<RecentlyPlayedRowProps> = ({
     <div className="flex-shrink-0">
       <div
         className="text-xs font-semibold uppercase tracking-widest mb-2"
-        style={{ color: "var(--color-text-dim)" }}
+        style={{ color: "var(--text-secondary)" }}
       >
         Recently Played
       </div>

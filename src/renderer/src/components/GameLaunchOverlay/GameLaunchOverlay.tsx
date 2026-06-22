@@ -26,25 +26,25 @@ export const GameLaunchOverlay: React.FC = React.memo(() => {
       <div
         className="flex flex-col items-center gap-5 px-8 py-7 rounded-2xl"
         style={{
-          background: "var(--color-launching-overlay, rgba(0, 0, 0, 0.82))",
+          background: "var(--launching-overlay, rgba(0, 0, 0, 0.82))",
           boxShadow: "0 16px 40px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(255,255,255,0.08)",
         }}
       >
         <div
-          className="w-16 h-16 rounded-full border-[4px] border-white/20 border-t-[var(--color-launching-spinner,var(--color-accent))] animate-spin"
+          className="w-16 h-16 rounded-full border-[4px] border-white/20 border-t-[var(--launching-spinner,var(--accent))] animate-spin"
         />
         <div className="text-center">
           <div
             className="text-xl font-bold uppercase tracking-widest"
             style={{
-              color: "var(--color-launching-text, var(--color-accent))",
+              color: "var(--launching-text, var(--accent))",
             }}
           >
             Starting
           </div>
           <div
             className="text-sm font-medium mt-2 opacity-90"
-            style={{ color: "var(--color-text)" }}
+            style={{ color: "var(--text-primary)" }}
           >
             {label}
           </div>

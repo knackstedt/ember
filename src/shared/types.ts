@@ -2,15 +2,14 @@ import type { ScanSourceId } from "./scan-sources";
 export type { ScanSourceId };
 
 export type ThemeName =
+  | "ember"
   | "dark-oled"
   | "glassmorphism"
   | "neon-cyberpunk"
   | "terminal-tui"
-  | "custom"
   | "synthwave-sunset"
   | "deep-ocean"
   | "monokai"
-  | "nord-aurora"
   | "warm-paper";
 
 export type TabId =

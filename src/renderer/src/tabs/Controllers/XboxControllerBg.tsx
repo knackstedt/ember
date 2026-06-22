@@ -2,8 +2,8 @@ import React from "react";
 
 export const XboxControllerBg: React.FC = () => (
   <g
-    fill="var(--color-surface-raised)"
-    stroke="var(--color-border)"
+    fill="var(--surface-1)"
+    stroke="var(--border-default)"
     strokeWidth="1.5"
     className="xbox-controller-bg"
   >

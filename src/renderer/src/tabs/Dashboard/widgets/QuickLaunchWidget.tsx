@@ -58,13 +58,13 @@ export const QuickLaunchWidget: React.FC<{ title?: string; maxItems?: number }> 
             key={g.id}
             onClick={() => launch(g.id)}
             className="group flex flex-col items-center gap-0.5 p-1 rounded-xl transition-all duration-200 hover:scale-[1.05]"
-            style={{ background: "var(--color-surface-raised)" }}
+            style={{ background: "var(--surface-1)" }}
           >
             <div className="relative w-full aspect-[3/4] max-h-16">
               {g.coverUrl ? (
                 <img src={g.coverUrl} alt="" className="w-full h-full object-cover rounded-lg" loading="lazy" />
               ) : (
-                <div className="w-full h-full rounded-lg flex items-center justify-center" style={{ background: "var(--color-surface)" }}>
+                <div className="w-full h-full rounded-lg flex items-center justify-center" style={{ background: "var(--surface-0)" }}>
                   <Gamepad2 size={14} className="opacity-40" />
                 </div>
               )}

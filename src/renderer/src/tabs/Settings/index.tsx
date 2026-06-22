@@ -361,8 +361,8 @@ export const SettingsTab: React.FC = () => {
       <div
         className="flex-shrink-0 flex gap-1 p-2 overflow-x-auto"
         style={{
-          borderBottom: "1px solid var(--color-border)",
-          background: "var(--color-surface)",
+          borderBottom: "1px solid var(--border-default)",
+          background: "var(--surface-0)",
         }}
       >
         {SUB_TABS.map((tab) => (
@@ -376,12 +376,12 @@ export const SettingsTab: React.FC = () => {
             style={{
               background:
                 activeTab === tab.id
-                  ? "var(--color-accent)"
+                  ? "var(--accent)"
                   : "transparent",
               color:
                 activeTab === tab.id
-                  ? "var(--color-bg)"
-                  : "var(--color-text-dim)",
+                  ? "var(--surface-base)"
+                  : "var(--text-secondary)",
               fontWeight: activeTab === tab.id ? 600 : 400,
             }}
             whileTap={{ scale: 0.96 }}

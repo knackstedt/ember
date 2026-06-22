@@ -4,22 +4,93 @@
 
 /* ─── Themeable game launch overlay defaults ───────────────── */
 [data-theme] {
-  --color-launching-overlay: rgba(0, 0, 0, 0.55);
-  --color-launching-spinner: var(--color-accent);
-  --color-launching-text: var(--color-accent);
+  --launching-overlay: rgba(0, 0, 0, 0.55);
+  --launching-spinner: var(--accent);
+  --launching-text: var(--accent);
+}
+
+/* ─── Theme: Ember ─────────────────────────────────────────── */
+[data-theme="ember"] {
+  /* Surfaces */
+  --surface-base:     #121110;
+  --surface-0:        #1d1b19;
+  --surface-1:        #262320;
+  --surface-2:        #302c28;
+  --surface-3:        #3e3830;
+
+  /* Border */
+  --border-subtle:    rgba(255, 255, 255, 0.06);
+  --border-default:   rgba(255, 255, 255, 0.10);
+  --border-strong:    rgba(255, 255, 255, 0.18);
+
+  /* Accent */
+  --accent-dim:       #6c2e08;
+  --accent-muted:     #a04410;
+  --accent:           #FF7700;
+  --accent-hover:     #FF8800;
+  --accent-active:    #FF9900;
+  --accent-bright:    #FFAA00;
+
+  /* Text */
+  --text-primary:     #d8d0c8;
+  --text-secondary:   #988a80;
+  --text-muted:       #6a5e56;
+  --text-ghost:       #4a4038;
+  --text-on-accent:   #fff8f0;
+
+  /* States */
+  --state-hover:      rgba(255, 255, 255, 0.05);
+  --state-selected:   rgba(217, 95, 10, 0.18);
+  --state-active:     rgba(255, 255, 255, 0.10);
+  --focus-ring:       #f07830;
+
+  /* Semantic */
+  --success-bg:       #1c2210;
+  --success-border:   #3a4820;
+  --success-fg:       #88b060;
+  --warning-bg:       #211808;
+  --warning-border:   #4a3810;
+  --warning-fg:       #d4a030;
+  --error-bg:         #221008;
+  --error-border:     #4e2010;
+  --error-fg:         #e05830;
+  --info-bg:          #101822;
+  --info-border:      #1e3048;
+  --info-fg:          #5888c8;
+
+  /* Utility */
+  --scrim:            rgba(0, 0, 0, 0.72);
+  --divider:          rgba(255, 255, 255, 0.07);
+  --skeleton-base:    #262320;
+  --skeleton-shimmer: #302c28;
+
+  /* Typography & effects */
+  --font-sans:        'Mukta Vaani', system-ui, sans-serif;
+  --font-mono:        'JetBrains Mono', monospace;
+  --radius-card:      12px;
+  --shadow-card:      0 4px 24px rgba(0, 0, 0, 0.8);
+  --shadow-glow:      0 0 20px rgba(217, 95, 10, 0.25);
+  --blur-panel:       0px;
+}
+
+[data-theme="ember"] ::-webkit-scrollbar-thumb {
+  background: rgba(217, 95, 10, 0.25);
+}
+[data-theme="ember"] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(217, 95, 10, 0.45);
 }
 
 /* ─── Theme: Dark OLED ─────────────────────────────────────── */
 [data-theme="dark-oled"] {
-  --color-bg: #000000;
-  --color-surface: #0a0a0a;
-  --color-surface-raised: #141414;
-  --color-surface-overlay: rgba(20, 20, 20, 0.95);
-  --color-accent: #e2e2e2;
-  --color-accent-dim: #666666;
-  --color-text: #f0f0f0;
-  --color-text-dim: #888888;
-  --color-border: rgba(255, 255, 255, 0.08);
+  --surface-base: #000000;
+  --surface-0: #0a0a0a;
+  --surface-1: #141414;
+  --surface-2: rgba(20, 20, 20, 0.95);
+  --accent: #e2e2e2;
+  --accent-muted: #666666;
+  --text-primary: #f0f0f0;
+  --text-secondary: #888888;
+  --border-default: rgba(255, 255, 255, 0.08);
   --font-sans: 'Inter', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
   --radius-card: 12px;
@@ -30,15 +101,15 @@
 
 /* ─── Theme: Glassmorphism ──────────────────────────────────── */
 [data-theme="glassmorphism"] {
-  --color-bg: #0d1117;
-  --color-surface: rgba(255, 255, 255, 0.05);
-  --color-surface-raised: rgba(255, 255, 255, 0.09);
-  --color-surface-overlay: rgba(13, 17, 23, 0.85);
-  --color-accent: #7dd3fc;
-  --color-accent-dim: #38bdf8;
-  --color-text: #f0f6ff;
-  --color-text-dim: #8ba3c7;
-  --color-border: rgba(125, 211, 252, 0.15);
+  --surface-base: #0d1117;
+  --surface-0: rgba(255, 255, 255, 0.05);
+  --surface-1: rgba(255, 255, 255, 0.09);
+  --surface-2: rgba(13, 17, 23, 0.85);
+  --accent: #7dd3fc;
+  --accent-muted: #38bdf8;
+  --text-primary: #f0f6ff;
+  --text-secondary: #8ba3c7;
+  --border-default: rgba(125, 211, 252, 0.15);
   --font-sans: 'Inter', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
   --radius-card: 16px;
@@ -49,15 +120,15 @@
 
 /* ─── Theme: Neon Cyberpunk ─────────────────────────────────── */
 [data-theme="neon-cyberpunk"] {
-  --color-bg: #07070f;
-  --color-surface: #0e0e1a;
-  --color-surface-raised: #16162a;
-  --color-surface-overlay: rgba(14, 14, 26, 0.95);
-  --color-accent: #ff2d78;
-  --color-accent-dim: #a020f0;
-  --color-text: #e8e8ff;
-  --color-text-dim: #7878aa;
-  --color-border: rgba(255, 45, 120, 0.2);
+  --surface-base: #07070f;
+  --surface-0: #0e0e1a;
+  --surface-1: #16162a;
+  --surface-2: rgba(14, 14, 26, 0.95);
+  --accent: #ff2d78;
+  --accent-muted: #a020f0;
+  --text-primary: #e8e8ff;
+  --text-secondary: #7878aa;
+  --border-default: rgba(255, 45, 120, 0.2);
   --font-sans: 'Rajdhani', 'Orbitron', system-ui, sans-serif;
   --font-mono: 'Share Tech Mono', monospace;
   --radius-card: 4px;
@@ -66,36 +137,17 @@
   --blur-panel: 0px;
 }
 
-/* ─── Theme: Custom ─────────────────────────────────────────── */
-[data-theme="custom"] {
-  --color-bg: #000000;
-  --color-surface: #0a0a0a;
-  --color-surface-raised: #141414;
-  --color-surface-overlay: rgba(20, 20, 20, 0.95);
-  --color-accent: #e2e2e2;
-  --color-accent-dim: #666666;
-  --color-text: #f0f0f0;
-  --color-text-dim: #888888;
-  --color-border: rgba(255, 255, 255, 0.08);
-  --font-sans: 'Inter', system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
-  --radius-card: 12px;
-  --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.8);
-  --shadow-glow: 0 0 20px rgba(226, 226, 226, 0.15);
-  --blur-panel: 0px;
-}
-
 /* ─── Theme: Terminal TUI ───────────────────────────────────── */
 [data-theme="terminal-tui"] {
-  --color-bg: #0c0c0c;
-  --color-surface: #121212;
-  --color-surface-raised: #1a1a1a;
-  --color-surface-overlay: rgba(12, 12, 12, 0.98);
-  --color-accent: #00ff41;
-  --color-accent-dim: #00aa2b;
-  --color-text: #ccffcc;
-  --color-text-dim: #557755;
-  --color-border: rgba(0, 255, 65, 0.2);
+  --surface-base: #0c0c0c;
+  --surface-0: #121212;
+  --surface-1: #1a1a1a;
+  --surface-2: rgba(12, 12, 12, 0.98);
+  --accent: #00ff41;
+  --accent-muted: #00aa2b;
+  --text-primary: #ccffcc;
+  --text-secondary: #557755;
+  --border-default: rgba(0, 255, 65, 0.2);
   --font-sans: 'VT323', 'Courier New', monospace;
   --font-mono: 'VT323', 'Courier New', monospace;
   --radius-card: 0px;
@@ -106,15 +158,15 @@
 
 /* ─── Theme: Synthwave Sunset ───────────────────────────────── */
 [data-theme="synthwave-sunset"] {
-  --color-bg: #0d0418;
-  --color-surface: #1a0b2e;
-  --color-surface-raised: #2d1b4e;
-  --color-surface-overlay: rgba(26, 11, 46, 0.95);
-  --color-accent: #ff6b9d;
-  --color-accent-dim: #c445a0;
-  --color-text: #ffe4e1;
-  --color-text-dim: #9b7cb6;
-  --color-border: rgba(255, 107, 157, 0.2);
+  --surface-base: #0d0418;
+  --surface-0: #1a0b2e;
+  --surface-1: #2d1b4e;
+  --surface-2: rgba(26, 11, 46, 0.95);
+  --accent: #ff6b9d;
+  --accent-muted: #c445a0;
+  --text-primary: #ffe4e1;
+  --text-secondary: #9b7cb6;
+  --border-default: rgba(255, 107, 157, 0.2);
   --font-sans: 'Segoe UI', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
   --radius-card: 4px;
@@ -125,15 +177,15 @@
 
 /* ─── Theme: Deep Ocean ──────────────────────────────────────── */
 [data-theme="deep-ocean"] {
-  --color-bg: #001219;
-  --color-surface: #002838;
-  --color-surface-raised: #003d4d;
-  --color-surface-overlay: rgba(0, 18, 25, 0.95);
-  --color-accent: #00f5d4;
-  --color-accent-dim: #00bbf9;
-  --color-text: #e0f7fa;
-  --color-text-dim: #4a7c8c;
-  --color-border: rgba(0, 245, 212, 0.2);
+  --surface-base: #001219;
+  --surface-0: #002838;
+  --surface-1: #003d4d;
+  --surface-2: rgba(0, 18, 25, 0.95);
+  --accent: #00f5d4;
+  --accent-muted: #00bbf9;
+  --text-primary: #e0f7fa;
+  --text-secondary: #4a7c8c;
+  --border-default: rgba(0, 245, 212, 0.2);
   --font-sans: 'Inter', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
   --radius-card: 16px;
@@ -144,15 +196,15 @@
 
 /* ─── Theme: Monokai ───────────────────────────────────────── */
 [data-theme="monokai"] {
-  --color-bg: #1e1e1e;
-  --color-surface: #272727;
-  --color-surface-raised: #323232;
-  --color-surface-overlay: rgba(39, 39, 39, 0.98);
-  --color-accent: #ffd866;
-  --color-accent-dim: #fc9867;
-  --color-text: #f8f8f2;
-  --color-text-dim: #727072;
-  --color-border: rgba(255, 216, 102, 0.2);
+  --surface-base: #1e1e1e;
+  --surface-0: #272727;
+  --surface-1: #323232;
+  --surface-2: rgba(39, 39, 39, 0.98);
+  --accent: #ffd866;
+  --accent-muted: #fc9867;
+  --text-primary: #f8f8f2;
+  --text-secondary: #727072;
+  --border-default: rgba(255, 216, 102, 0.2);
   --font-sans: 'SF Pro Display', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
   --radius-card: 6px;
@@ -161,36 +213,17 @@
   --blur-panel: 0px;
 }
 
-/* ─── Theme: Nord Aurora ──────────────────────────────────── */
-[data-theme="nord-aurora"] {
-  --color-bg: #2e3440;
-  --color-surface: #3b4252;
-  --color-surface-raised: #434c5e;
-  --color-surface-overlay: rgba(59, 66, 82, 0.95);
-  --color-accent: #d08770;
-  --color-accent-dim: #bf616a;
-  --color-text: #eceff4;
-  --color-text-dim: #9196a1;
-  --color-border: rgba(208, 135, 112, 0.25);
-  --font-sans: 'Inter', system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
-  --radius-card: 8px;
-  --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.4);
-  --shadow-glow: 0 0 25px rgba(208, 135, 112, 0.35);
-  --blur-panel: 0px;
-}
-
 /* ─── Theme: Warm Paper ────────────────────────────────────── */
 [data-theme="warm-paper"] {
-  --color-bg: #f4ecd8;
-  --color-surface: #ebe4d1;
-  --color-surface-raised: #e3dcc6;
-  --color-surface-overlay: rgba(235, 228, 209, 0.98);
-  --color-accent: #8b4513;
-  --color-accent-dim: #a0522d;
-  --color-text: #2c2416;
-  --color-text-dim: #7d6f5a;
-  --color-border: rgba(139, 69, 19, 0.2);
+  --surface-base: #f4ecd8;
+  --surface-0: #ebe4d1;
+  --surface-1: #e3dcc6;
+  --surface-2: rgba(235, 228, 209, 0.98);
+  --accent: #8b4513;
+  --accent-muted: #a0522d;
+  --text-primary: #2c2416;
+  --text-secondary: #7d6f5a;
+  --border-default: rgba(139, 69, 19, 0.2);
   --font-sans: 'Noto Serif', 'DejaVu Serif', 'Liberation Serif', 'Georgia', serif;
   --font-mono: 'Courier New', monospace;
   --radius-card: 4px;
@@ -218,8 +251,8 @@ html, body, #root {
   margin: 0;
   padding: 0;
   overflow: hidden;
-  background-color: var(--color-bg);
-  color: var(--color-text);
+  background-color: var(--surface-base);
+  color: var(--text-primary);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
 }
@@ -230,25 +263,25 @@ section {
 }
 
 :focus-visible {
-  outline: 2px solid var(--color-accent);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
 /* Controller-navigation highlight inside Settings */
 .settings-group-focus {
-  outline: 2px dashed var(--color-accent-dim) !important;
+  outline: 2px dashed var(--accent-muted) !important;
   outline-offset: 4px !important;
   border-radius: var(--radius-card);
-  background: color-mix(in srgb, var(--color-accent) 8%, var(--color-surface-raised)) !important;
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface-1)) !important;
 }
 
 .settings-focus {
-  outline: 2px solid var(--color-accent) !important;
+  outline: 2px solid var(--accent) !important;
   outline-offset: 2px !important;
 }
 
 .settings-subtab-focus {
-  outline: 2px solid var(--color-accent) !important;
+  outline: 2px solid var(--accent) !important;
   outline-offset: 2px !important;
 }
 
@@ -268,17 +301,17 @@ section {
 
 /* Glassmorphism context menu background */
 [data-theme="glassmorphism"] .context-menu {
-  background: var(--color-surface-overlay) !important;
+  background: var(--surface-2) !important;
   backdrop-filter: blur(var(--blur-panel));
   -webkit-backdrop-filter: blur(var(--blur-panel));
 }
 
 /* Glassmorphism panel utility */
 .glass-panel {
-  background: var(--color-surface);
+  background: var(--surface-0);
   backdrop-filter: blur(var(--blur-panel));
   -webkit-backdrop-filter: blur(var(--blur-panel));
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border-default);
 }
 
 /* Neon cyberpunk scanlines overlay */
@@ -301,7 +334,7 @@ section {
 [data-theme="terminal-tui"] .cursor::after {
   content: '█';
   animation: blink 1s step-end infinite;
-  color: var(--color-accent);
+  color: var(--accent);
 }
 
 @keyframes blink {
@@ -320,14 +353,14 @@ section {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--color-border);
+  background: var(--border-default);
   border-radius: 2px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--color-accent-dim);
+  background: var(--accent-muted);
 }
 ::-webkit-scrollbar-thumb:active {
-  background: var(--color-accent);
+  background: var(--accent);
 }
 ::-webkit-scrollbar-button {
   display: none;
@@ -355,8 +388,8 @@ section {
 .react-grid-item > .react-resizable-handle::after {
   width: 12px !important;
   height: 12px !important;
-  border-right-color: var(--color-accent) !important;
-  border-bottom-color: var(--color-accent) !important;
+  border-right-color: var(--accent) !important;
+  border-bottom-color: var(--accent) !important;
 }
 
 /* ─── Skeleton shimmer ─────────────────────────────────────── */
@@ -372,7 +405,7 @@ section {
   background: linear-gradient(
     90deg,
     transparent 0%,
-    color-mix(in srgb, var(--color-text) 6%, transparent) 50%,
+    color-mix(in srgb, var(--text-primary) 6%, transparent) 50%,
     transparent 100%
   );
   transform: translateX(-100%);

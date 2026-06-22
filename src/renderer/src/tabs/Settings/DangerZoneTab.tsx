@@ -49,17 +49,17 @@ const DangerAction: React.FC<DangerActionProps> = ({
     <div
       className="flex flex-col gap-3 p-4 rounded-[var(--radius-card)]"
       style={{
-        background: "var(--color-surface-raised)",
-        border: "1px solid var(--color-border)",
+        background: "var(--surface-1)",
+        border: "1px solid var(--border-default)",
       }}
     >
       <div className="flex items-center gap-2 mb-1">
         {icon}
-        <span className="font-medium" style={{ color: "var(--color-text)" }}>
+        <span className="font-medium" style={{ color: "var(--text-primary)" }}>
           {label}
         </span>
       </div>
-      <p className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+      <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
         {description}
       </p>
       <AnimatePresence mode="wait">
@@ -73,7 +73,7 @@ const DangerAction: React.FC<DangerActionProps> = ({
           >
             <span
               className="text-sm"
-              style={{ color: "var(--color-text-dim)" }}
+              style={{ color: "var(--text-secondary)" }}
             >
               {confirmText}
             </span>
@@ -81,7 +81,7 @@ const DangerAction: React.FC<DangerActionProps> = ({
               <motion.button
                 className="px-4 py-2 rounded-[var(--radius-card)] text-sm"
                 style={{
-                  background: destructive ? "#e05252" : "var(--color-accent)",
+                  background: destructive ? "#e05252" : "var(--accent)",
                   color: "#fff",
                 }}
                 onClick={async () => {
@@ -98,9 +98,9 @@ const DangerAction: React.FC<DangerActionProps> = ({
               <motion.button
                 className="px-4 py-2 rounded-[var(--radius-card)] text-sm"
                 style={{
-                  background: "var(--color-surface)",
-                  color: "var(--color-text)",
-                  border: "1px solid var(--color-border)",
+                  background: "var(--surface-0)",
+                  color: "var(--text-primary)",
+                  border: "1px solid var(--border-default)",
                 }}
                 onClick={() => setConfirming(false)}
                 whileTap={{ scale: 0.96 }}
@@ -122,10 +122,10 @@ const DangerAction: React.FC<DangerActionProps> = ({
                   }
                 : {
                     background:
-                      "color-mix(in srgb, var(--color-accent) 15%, transparent)",
-                    color: "var(--color-accent)",
+                      "color-mix(in srgb, var(--accent) 15%, transparent)",
+                    color: "var(--accent)",
                     border:
-                      "1px solid color-mix(in srgb, var(--color-accent) 40%, transparent)",
+                      "1px solid color-mix(in srgb, var(--accent) 40%, transparent)",
                   }
             }
             onClick={() => setConfirming(true)}
@@ -183,16 +183,16 @@ function CorruptedItemCard({
       exit={{ opacity: 0, scale: 0.98 }}
       className="flex flex-col gap-2 p-3 rounded-[var(--radius-card)]"
       style={{
-        background: "var(--color-surface)",
-        border: "1px solid var(--color-border)",
+        background: "var(--surface-0)",
+        border: "1px solid var(--border-default)",
       }}
     >
       <div className="flex items-start gap-3">
         <div
           className="p-2 rounded-lg shrink-0"
-          style={{ background: "var(--color-surface-raised)" }}
+          style={{ background: "var(--surface-1)" }}
         >
-          <Icon size={18} style={{ color: "var(--color-accent)" }} />
+          <Icon size={18} style={{ color: "var(--accent)" }} />
         </div>
         <div className="flex-1 min-w-0">
           <span
@@ -206,7 +206,7 @@ function CorruptedItemCard({
           </span>
           <p
             className="font-medium text-sm truncate mt-1"
-            style={{ color: "var(--color-text)" }}
+            style={{ color: "var(--text-primary)" }}
             title={entry.title}
           >
             {entry.title}
@@ -214,7 +214,7 @@ function CorruptedItemCard({
           {entry.path && (
             <p
               className="text-xs truncate"
-              style={{ color: "var(--color-text-dim)" }}
+              style={{ color: "var(--text-secondary)" }}
               title={entry.path}
             >
               {entry.path}
@@ -226,9 +226,9 @@ function CorruptedItemCard({
         <motion.button
           className="self-start flex items-center gap-2 px-3 py-1.5 rounded-[var(--radius-card)] text-xs"
           style={{
-            background: "var(--color-surface-raised)",
-            color: "var(--color-text)",
-            border: "1px solid var(--color-border)",
+            background: "var(--surface-1)",
+            color: "var(--text-primary)",
+            border: "1px solid var(--border-default)",
           }}
           onClick={() => onOpenLocation(entry)}
           whileTap={{ scale: 0.96 }}
@@ -397,21 +397,21 @@ export const DangerZoneTab: React.FC = () => {
     <div className="flex flex-col gap-8">
       <section className="flex flex-col gap-4">
         <div className="flex items-center gap-2 mb-2">
-          <Archive size={20} style={{ color: "var(--color-accent)" }} />
+          <Archive size={20} style={{ color: "var(--accent)" }} />
           <h2
             className="text-lg font-semibold"
-            style={{ color: "var(--color-text)" }}
+            style={{ color: "var(--text-primary)" }}
           >
             ROM Compression
           </h2>
         </div>
-        <p className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+        <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
           Compress ROM files to emulator-compatible formats to save disk space.
           Original files are always preserved.
         </p>
 
         <DangerAction
-          icon={<Archive size={16} style={{ color: "var(--color-accent)" }} />}
+          icon={<Archive size={16} style={{ color: "var(--accent)" }} />}
           label="Auto Compress All ROMs"
           description="Compresses all ROM files to their optimal emulator-compatible format (.chd, .rvz, .7z, etc.). Original files are kept intact."
           buttonText="Compress All ROMs"
@@ -425,15 +425,15 @@ export const DangerZoneTab: React.FC = () => {
 
       <section className="flex flex-col gap-4">
         <div className="flex items-center gap-2 mb-2">
-          <Ghost size={20} style={{ color: "var(--color-accent)" }} />
+          <Ghost size={20} style={{ color: "var(--accent)" }} />
           <h2
             className="text-lg font-semibold"
-            style={{ color: "var(--color-text)" }}
+            style={{ color: "var(--text-primary)" }}
           >
             Missing Items
           </h2>
         </div>
-        <p className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+        <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
           Manage library entries whose files could not be found during the last
           scan.
         </p>
@@ -454,19 +454,19 @@ export const DangerZoneTab: React.FC = () => {
       <section className="flex flex-col gap-4">
         <div className="flex items-center gap-2 mb-2">
           <ShieldAlert size={20} style={{ color: "#ff4444" }} />
-          <h2 className="text-lg font-semibold" style={{ color: "var(--color-text)" }}>
+          <h2 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
             Corrupted Files
           </h2>
         </div>
-        <p className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+        <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
           Manage library entries whose files were detected as corrupt or malformed.
         </p>
 
         <div className="flex flex-col gap-3">
-          <h3 className="text-sm font-medium" style={{ color: "var(--color-text)" }}>
+          <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
             Corrupted files policy
           </h3>
-          <p className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+          <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
             Choose how the app handles newly detected corrupt files.
           </p>
           <div className="flex flex-wrap gap-2">
@@ -478,10 +478,10 @@ export const DangerZoneTab: React.FC = () => {
                   className="px-4 py-2 rounded-[var(--radius-card)] text-sm"
                   style={{
                     background: active
-                      ? "var(--color-accent)"
-                      : "var(--color-surface-raised)",
-                    color: active ? "var(--color-bg)" : "var(--color-text)",
-                    border: "1px solid var(--color-border)",
+                      ? "var(--accent)"
+                      : "var(--surface-1)",
+                    color: active ? "var(--surface-base)" : "var(--text-primary)",
+                    border: "1px solid var(--border-default)",
                   }}
                   onClick={() => update({ corruptedFilesPolicy: option.value })}
                   whileTap={{ scale: 0.96 }}
@@ -509,13 +509,13 @@ export const DangerZoneTab: React.FC = () => {
             </div>
           )}
           {policy === "hide" && (
-            <p className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+            <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
               Corrupted entries will be hidden from the main library views but remain
               visible in this list.
             </p>
           )}
           {policy === "warn" && (
-            <p className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+            <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
               Corrupted entries will be flagged and listed here for manual review.
             </p>
           )}
@@ -523,15 +523,15 @@ export const DangerZoneTab: React.FC = () => {
 
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="flex flex-wrap gap-2 text-sm">
-            <span style={{ color: "var(--color-text-dim)" }}>
+            <span style={{ color: "var(--text-secondary)" }}>
               {corruptCounts.games} games
             </span>
-            <span style={{ color: "var(--color-border)" }}>•</span>
-            <span style={{ color: "var(--color-text-dim)" }}>
+            <span style={{ color: "var(--border-default)" }}>•</span>
+            <span style={{ color: "var(--text-secondary)" }}>
               {corruptCounts.movies} movies
             </span>
-            <span style={{ color: "var(--color-border)" }}>•</span>
-            <span style={{ color: "var(--color-text-dim)" }}>
+            <span style={{ color: "var(--border-default)" }}>•</span>
+            <span style={{ color: "var(--text-secondary)" }}>
               {corruptCounts.music} music tracks
             </span>
           </div>
@@ -539,9 +539,9 @@ export const DangerZoneTab: React.FC = () => {
             <motion.button
               className="flex items-center gap-2 px-3 py-2 rounded-[var(--radius-card)] text-sm"
               style={{
-                background: "var(--color-surface-raised)",
-                color: "var(--color-text)",
-                border: "1px solid var(--color-border)",
+                background: "var(--surface-1)",
+                color: "var(--text-primary)",
+                border: "1px solid var(--border-default)",
               }}
               onClick={loadCorrupt}
               whileTap={{ scale: 0.96 }}
@@ -575,9 +575,9 @@ export const DangerZoneTab: React.FC = () => {
                   <motion.button
                     className="flex items-center gap-2 px-3 py-2 rounded-[var(--radius-card)] text-sm"
                     style={{
-                      background: "var(--color-surface)",
-                      color: "var(--color-text)",
-                      border: "1px solid var(--color-border)",
+                      background: "var(--surface-0)",
+                      color: "var(--text-primary)",
+                      border: "1px solid var(--border-default)",
                     }}
                     onClick={() => setCorruptConfirming(false)}
                     whileTap={{ scale: 0.96 }}
@@ -632,7 +632,7 @@ export const DangerZoneTab: React.FC = () => {
             <div
               className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin"
               style={{
-                borderColor: "var(--color-accent)",
+                borderColor: "var(--accent)",
                 borderTopColor: "transparent",
               }}
             />
@@ -641,12 +641,12 @@ export const DangerZoneTab: React.FC = () => {
           <div
             className="flex flex-col items-center justify-center gap-3 py-12 rounded-[var(--radius-card)]"
             style={{
-              background: "var(--color-surface-raised)",
-              border: "1px solid var(--color-border)",
+              background: "var(--surface-1)",
+              border: "1px solid var(--border-default)",
             }}
           >
-            <AlertTriangle size={32} style={{ color: "var(--color-accent)" }} />
-            <p style={{ color: "var(--color-text-dim)" }}>
+            <AlertTriangle size={32} style={{ color: "var(--accent)" }} />
+            <p style={{ color: "var(--text-secondary)" }}>
               No corrupted entries found.
             </p>
           </div>
@@ -679,7 +679,7 @@ export const DangerZoneTab: React.FC = () => {
             Danger Zone
           </h2>
         </div>
-        <p className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+        <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
           These actions are destructive and cannot be undone. Please proceed
           with caution.
         </p>

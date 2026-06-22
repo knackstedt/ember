@@ -35,7 +35,7 @@
 }
 
 .gc-card-wrapper.focused .gc-card {
-  box-shadow: 0 0 0 2px var(--color-accent), rgba(0, 0, 0, 0.8) calc((var(--pointer-from-left) * 10px) - 3px) calc((var(--pointer-from-top) * 20px) - 6px) 20px -5px;
+  box-shadow: 0 0 0 2px var(--accent), rgba(0, 0, 0, 0.8) calc((var(--pointer-from-left) * 10px) - 3px) calc((var(--pointer-from-top) * 20px) - 6px) 20px -5px;
 }
 
 .gc-card-wrapper.gc-missing .gc-card {
@@ -372,7 +372,7 @@
 
 .gc-progress-fill {
   height: 100%;
-  background: var(--color-accent);
+  background: var(--accent);
   transition: width 0.3s ease;
 }
 

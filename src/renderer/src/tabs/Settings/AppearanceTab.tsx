@@ -64,13 +64,13 @@ export const AppearanceTab: React.FC = () => {
   return (
     <div className="flex flex-col gap-8">
       <section className="flex flex-col gap-4" data-nav-orientation="grid" data-nav-columns="5">
-        <h2 className="text-lg font-semibold" style={{ color: "var(--color-text)" }}>
+        <h2 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
           Appearance
         </h2>
         <div>
           <label
             className="text-sm font-medium mb-3 block"
-            style={{ color: "var(--color-text)" }}
+            style={{ color: "var(--text-primary)" }}
           >
             Theme
           </label>
@@ -80,8 +80,8 @@ export const AppearanceTab: React.FC = () => {
                 key={t.id}
                 className="flex flex-col items-center gap-2 p-2 rounded-[var(--radius-card)]"
                 style={{
-                  border: `2px solid ${settings.theme === t.id ? "var(--color-accent)" : "var(--color-border)"}`,
-                  background: "var(--color-surface-raised)",
+                  border: `2px solid ${settings.theme === t.id ? "var(--accent)" : "var(--border-default)"}`,
+                  background: "var(--surface-1)",
                   boxShadow:
                     settings.theme === t.id ? "var(--shadow-glow)" : "none",
                 }}
@@ -95,7 +95,7 @@ export const AppearanceTab: React.FC = () => {
                 />
                 <span
                   className="text-xs text-center"
-                  style={{ color: "var(--color-text-dim)" }}
+                  style={{ color: "var(--text-secondary)" }}
                 >
                   {t.label}
                 </span>
@@ -114,17 +114,17 @@ export const AppearanceTab: React.FC = () => {
       </section>
 
       <section className="flex flex-col gap-4">
-        <h2 className="text-lg font-semibold" style={{ color: "var(--color-text)" }}>
+        <h2 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
           Background
         </h2>
-        <p className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+        <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
           Choose what appears behind the app content.
         </p>
 
         <div>
           <label
             className="text-xs font-medium mb-1.5 block"
-            style={{ color: "var(--color-text-dim)" }}
+            style={{ color: "var(--text-secondary)" }}
           >
             Type
           </label>
@@ -135,9 +135,9 @@ export const AppearanceTab: React.FC = () => {
             }
             className="w-full text-sm px-2 py-1.5 rounded"
             style={{
-              background: "var(--color-surface-raised)",
-              border: "1px solid var(--color-border)",
-              color: "var(--color-text)",
+              background: "var(--surface-1)",
+              border: "1px solid var(--border-default)",
+              color: "var(--text-primary)",
               outline: "none",
             }}
           >
@@ -153,7 +153,7 @@ export const AppearanceTab: React.FC = () => {
           <div>
             <label
               className="text-xs font-medium mb-1.5 block"
-              style={{ color: "var(--color-text-dim)" }}
+              style={{ color: "var(--text-secondary)" }}
             >
               Preset
             </label>
@@ -164,9 +164,9 @@ export const AppearanceTab: React.FC = () => {
               }
               className="w-full text-sm px-2 py-1.5 rounded"
               style={{
-                background: "var(--color-surface-raised)",
-                border: "1px solid var(--color-border)",
-                color: "var(--color-text)",
+                background: "var(--surface-1)",
+                border: "1px solid var(--border-default)",
+                color: "var(--text-primary)",
                 outline: "none",
               }}
             >
@@ -186,7 +186,7 @@ export const AppearanceTab: React.FC = () => {
             <div>
               <label
                 className="text-xs font-medium mb-1.5 block"
-                style={{ color: "var(--color-text-dim)" }}
+                style={{ color: "var(--text-secondary)" }}
               >
                 Source
               </label>
@@ -197,9 +197,9 @@ export const AppearanceTab: React.FC = () => {
                 }
                 className="w-full text-sm px-2 py-1.5 rounded"
                 style={{
-                  background: "var(--color-surface-raised)",
-                  border: "1px solid var(--color-border)",
-                  color: "var(--color-text)",
+                  background: "var(--surface-1)",
+                  border: "1px solid var(--border-default)",
+                  color: "var(--text-primary)",
                   outline: "none",
                 }}
               >
@@ -234,9 +234,9 @@ export const AppearanceTab: React.FC = () => {
               <motion.button
                 className="px-3 py-2 rounded text-sm"
                 style={{
-                  background: "var(--color-surface-raised)",
-                  color: "var(--color-text)",
-                  border: "1px solid var(--color-border)",
+                  background: "var(--surface-1)",
+                  color: "var(--text-primary)",
+                  border: "1px solid var(--border-default)",
                 }}
                 onClick={async () => {
                   const path = await window.htpc.openFile({
@@ -259,7 +259,7 @@ export const AppearanceTab: React.FC = () => {
             <div>
               <label
                 className="text-xs font-medium mb-1.5 block"
-                style={{ color: "var(--color-text-dim)" }}
+                style={{ color: "var(--text-secondary)" }}
               >
                 Fit Mode
               </label>
@@ -270,9 +270,9 @@ export const AppearanceTab: React.FC = () => {
                 }
                 className="w-full text-sm px-2 py-1.5 rounded"
                 style={{
-                  background: "var(--color-surface-raised)",
-                  border: "1px solid var(--color-border)",
-                  color: "var(--color-text)",
+                  background: "var(--surface-1)",
+                  border: "1px solid var(--border-default)",
+                  color: "var(--text-primary)",
                   outline: "none",
                 }}
               >
@@ -292,7 +292,7 @@ export const AppearanceTab: React.FC = () => {
           <div className="flex flex-col gap-2">
             <label
               className="text-xs font-medium"
-              style={{ color: "var(--color-text-dim)" }}
+              style={{ color: "var(--text-secondary)" }}
             >
               Color
             </label>
@@ -304,7 +304,7 @@ export const AppearanceTab: React.FC = () => {
                 className="w-10 h-10 rounded cursor-pointer"
                 style={{
                   background: "transparent",
-                  border: "1px solid var(--color-border)",
+                  border: "1px solid var(--border-default)",
                   padding: 2,
                 }}
               />
@@ -314,9 +314,9 @@ export const AppearanceTab: React.FC = () => {
                 onChange={(e) => setBg({ solidColor: e.target.value })}
                 className="flex-1 text-sm px-3 py-2 rounded"
                 style={{
-                  background: "var(--color-surface-raised)",
-                  color: "var(--color-text)",
-                  border: "1px solid var(--color-border)",
+                  background: "var(--surface-1)",
+                  color: "var(--text-primary)",
+                  border: "1px solid var(--border-default)",
                   outline: "none",
                 }}
                 placeholder="#000000"
@@ -329,7 +329,7 @@ export const AppearanceTab: React.FC = () => {
           <div className="flex flex-col gap-2">
             <label
               className="text-xs font-medium"
-              style={{ color: "var(--color-text-dim)" }}
+              style={{ color: "var(--text-secondary)" }}
             >
               CSS Gradient
             </label>
@@ -339,9 +339,9 @@ export const AppearanceTab: React.FC = () => {
               onChange={(e) => setBg({ gradient: e.target.value })}
               className="w-full text-sm px-3 py-2 rounded"
               style={{
-                background: "var(--color-surface-raised)",
-                color: "var(--color-text)",
-                border: "1px solid var(--color-border)",
+                background: "var(--surface-1)",
+                color: "var(--text-primary)",
+                border: "1px solid var(--border-default)",
                 outline: "none",
               }}
               placeholder="linear-gradient(to right, #000, #333)"
@@ -349,7 +349,7 @@ export const AppearanceTab: React.FC = () => {
             <div
               className="w-full h-12 rounded border"
               style={{
-                borderColor: "var(--color-border)",
+                borderColor: "var(--border-default)",
                 background: bg.gradient || "linear-gradient(to right, #000, #333)",
               }}
             />
@@ -358,10 +358,10 @@ export const AppearanceTab: React.FC = () => {
       </section>
 
       <section className="flex flex-col gap-4">
-        <h2 className="text-lg font-semibold" style={{ color: "var(--color-text)" }}>
+        <h2 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
           Gallery View
         </h2>
-        <p className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+        <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
           Choose how media libraries are displayed.
         </p>
         <div className="grid grid-cols-3 gap-3">
@@ -370,8 +370,8 @@ export const AppearanceTab: React.FC = () => {
               key={v}
               className="flex flex-col items-center gap-1 p-2 rounded-[var(--radius-card)]"
               style={{
-                border: `2px solid ${settings.galleryView === v ? "var(--color-accent)" : "var(--color-border)"}`,
-                background: "var(--color-surface-raised)",
+                border: `2px solid ${settings.galleryView === v ? "var(--accent)" : "var(--border-default)"}`,
+                background: "var(--surface-1)",
                 boxShadow:
                   settings.galleryView === v ? "var(--shadow-glow)" : "none",
               }}
@@ -381,12 +381,12 @@ export const AppearanceTab: React.FC = () => {
             >
               <span
                 className="text-xs text-center font-medium"
-                style={{ color: "var(--color-text)" }}
+                style={{ color: "var(--text-primary)" }}
               >
                 {GALLERY_VIEW_LABELS[v]}
               </span>
               {v === "theme-default" && (
-                <span className="text-[10px] text-center" style={{ color: "var(--color-text-dim)" }}>
+                <span className="text-[10px] text-center" style={{ color: "var(--text-secondary)" }}>
                   Follows theme
                 </span>
               )}
@@ -396,10 +396,10 @@ export const AppearanceTab: React.FC = () => {
       </section>
 
       <section className="flex flex-col gap-4">
-        <h2 className="text-lg font-semibold" style={{ color: "var(--color-text)" }}>
+        <h2 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
           Tabs
         </h2>
-        <p className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+        <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
           Choose which tabs are visible in the navigation bar.
         </p>
         {(
@@ -414,7 +414,7 @@ export const AppearanceTab: React.FC = () => {
           const disabled = settings.disabledTabs.includes(id);
           return (
             <div key={id} className="flex items-center justify-between py-1">
-              <span className="text-sm flex items-center gap-1.5" style={{ color: "var(--color-text)" }}>
+              <span className="text-sm flex items-center gap-1.5" style={{ color: "var(--text-primary)" }}>
                 <Icon size={16} /> {label}
               </span>
               <button
@@ -428,9 +428,9 @@ export const AppearanceTab: React.FC = () => {
                 className="w-11 h-6 rounded-full transition-colors relative"
                 style={{
                   background: !disabled
-                    ? "var(--color-accent)"
-                    : "var(--color-surface-raised)",
-                  border: "1px solid var(--color-border)",
+                    ? "var(--accent)"
+                    : "var(--surface-1)",
+                  border: "1px solid var(--border-default)",
                 }}
               >
                 <span

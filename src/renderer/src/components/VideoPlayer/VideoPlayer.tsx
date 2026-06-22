@@ -685,7 +685,7 @@ export const VideoPlayer: React.FC = () => {
                   left: 0,
                   height: "100%",
                   width: `${currentPct}%`,
-                  background: "var(--color-accent, #fff)",
+                  background: "var(--accent, #fff)",
                   borderRadius: 2,
                   pointerEvents: "none",
                 }}
@@ -723,7 +723,7 @@ export const VideoPlayer: React.FC = () => {
                 onClick={togglePlay}
                 className="w-9 h-9 flex items-center justify-center rounded-full transition-colors font-bold"
                 style={{
-                  background: "var(--color-accent, rgba(255,255,255,0.9))",
+                  background: "var(--accent, rgba(255,255,255,0.9))",
                   color: "#000",
                   flexShrink: 0,
                 }}
@@ -927,7 +927,7 @@ export const VideoPlayer: React.FC = () => {
                   value={muted ? 0 : volume}
                   onChange={handleVolumeChange}
                   className="w-20 h-1 cursor-pointer"
-                  style={{ accentColor: "var(--color-accent, #fff)" }}
+                  style={{ accentColor: "var(--accent, #fff)" }}
                   aria-label="Volume"
                 />
               </div>

@@ -88,12 +88,12 @@ export const InputTab: React.FC = () => {
     <div className="flex flex-col gap-6">
       {/* Section Tabs */}
       <section className="flex flex-col gap-4" data-nav-orientation="horizontal">
-        <div className="flex gap-2 p-1 rounded-[var(--radius-card)]" style={{ background: "var(--color-surface-raised)" }}>
+        <div className="flex gap-2 p-1 rounded-[var(--radius-card)]" style={{ background: "var(--surface-1)" }}>
           <motion.button
           className="flex items-center gap-2 px-4 py-2 rounded-[var(--radius-card)] text-sm font-medium transition-colors"
           style={{
-            background: activeSection === "keyboard" ? "var(--color-accent)" : "transparent",
-            color: activeSection === "keyboard" ? "var(--color-bg)" : "var(--color-text)",
+            background: activeSection === "keyboard" ? "var(--accent)" : "transparent",
+            color: activeSection === "keyboard" ? "var(--surface-base)" : "var(--text-primary)",
           }}
           onClick={() => setActiveSection("keyboard")}
           whileTap={{ scale: 0.98 }}
@@ -104,8 +104,8 @@ export const InputTab: React.FC = () => {
         <motion.button
           className="flex items-center gap-2 px-4 py-2 rounded-[var(--radius-card)] text-sm font-medium transition-colors"
           style={{
-            background: activeSection === "controller" ? "var(--color-accent)" : "transparent",
-            color: activeSection === "controller" ? "var(--color-bg)" : "var(--color-text)",
+            background: activeSection === "controller" ? "var(--accent)" : "transparent",
+            color: activeSection === "controller" ? "var(--surface-base)" : "var(--text-primary)",
           }}
           onClick={() => setActiveSection("controller")}
           whileTap={{ scale: 0.98 }}
@@ -116,8 +116,8 @@ export const InputTab: React.FC = () => {
         <motion.button
           className="flex items-center gap-2 px-4 py-2 rounded-[var(--radius-card)] text-sm font-medium transition-colors"
           style={{
-            background: activeSection === "browser" ? "var(--color-accent)" : "transparent",
-            color: activeSection === "browser" ? "var(--color-bg)" : "var(--color-text)",
+            background: activeSection === "browser" ? "var(--accent)" : "transparent",
+            color: activeSection === "browser" ? "var(--surface-base)" : "var(--text-primary)",
           }}
           onClick={() => setActiveSection("browser")}
           whileTap={{ scale: 0.98 }}
@@ -137,7 +137,7 @@ export const InputTab: React.FC = () => {
             exit={{ opacity: 0, y: -10 }}
             className="flex flex-col gap-2 p-4 rounded-[var(--radius-card)]"
             style={{
-              background: "color-mix(in srgb, #ff4444 15%, var(--color-surface-raised))",
+              background: "color-mix(in srgb, #ff4444 15%, var(--surface-1))",
               border: "1px solid #ff444430",
             }}
           >
@@ -147,14 +147,14 @@ export const InputTab: React.FC = () => {
                 Overmapping Detected
               </span>
             </div>
-            <p className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+            <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
               Multiple commands are mapped to the same {overmappedKeys.length > 0 && overmappedButtons.length > 0 ? "keys and buttons" : overmappedKeys.length > 0 ? "keys" : "buttons"}. This may cause unexpected behavior.
             </p>
             {overmappedKeys.length > 0 && (
               <div className="flex flex-col gap-1 mt-1">
                 {overmappedKeys.map(({ key, cmdIds }) => (
-                  <div key={key} className="text-xs" style={{ color: "var(--color-text-dim)" }}>
-                    <span className="font-mono px-1.5 py-0.5 rounded" style={{ background: "var(--color-surface)" }}>{key}</span>
+                  <div key={key} className="text-xs" style={{ color: "var(--text-secondary)" }}>
+                    <span className="font-mono px-1.5 py-0.5 rounded" style={{ background: "var(--surface-0)" }}>{key}</span>
                     {" → "}
                     {cmdIds.length} commands
                   </div>
@@ -164,8 +164,8 @@ export const InputTab: React.FC = () => {
             {overmappedButtons.length > 0 && (
               <div className="flex flex-col gap-1 mt-1">
                 {overmappedButtons.map(({ button, cmdIds }) => (
-                  <div key={button} className="text-xs" style={{ color: "var(--color-text-dim)" }}>
-                    <span className="font-mono px-1.5 py-0.5 rounded" style={{ background: "var(--color-surface)" }}>{button}</span>
+                  <div key={button} className="text-xs" style={{ color: "var(--text-secondary)" }}>
+                    <span className="font-mono px-1.5 py-0.5 rounded" style={{ background: "var(--surface-0)" }}>{button}</span>
                     {" → "}
                     {cmdIds.length} commands
                   </div>
@@ -177,10 +177,10 @@ export const InputTab: React.FC = () => {
       </AnimatePresence>
 
       {/* Info Box */}
-      <div className="flex items-start gap-3 p-3 rounded-[var(--radius-card)]" style={{ background: "var(--color-surface-raised)" }}>
-        <Info size={16} style={{ color: "var(--color-accent)", marginTop: 2 }} />
-        <p className="text-sm" style={{ color: "var(--color-text-dim)" }}>
-          Click a shortcut to record a new keyboard combination. Press <kbd className="px-1 py-0.5 rounded text-xs font-mono" style={{ background: "var(--color-surface)" }}>Escape</kbd> to cancel recording.
+      <div className="flex items-start gap-3 p-3 rounded-[var(--radius-card)]" style={{ background: "var(--surface-1)" }}>
+        <Info size={16} style={{ color: "var(--accent)", marginTop: 2 }} />
+        <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+          Click a shortcut to record a new keyboard combination. Press <kbd className="px-1 py-0.5 rounded text-xs font-mono" style={{ background: "var(--surface-0)" }}>Escape</kbd> to cancel recording.
           For controller, click the button column to assign or change a gamepad button.
         </p>
       </div>
@@ -202,9 +202,9 @@ export const InputTab: React.FC = () => {
       {/* Browser Controller Settings */}
       {activeSection === "browser" && (
         <section className="flex flex-col gap-6">
-          <div className="flex items-start gap-3 p-3 rounded-[var(--radius-card)]" style={{ background: "var(--color-surface-raised)" }}>
-            <Info size={16} style={{ color: "var(--color-accent)", marginTop: 2 }} />
-            <p className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+          <div className="flex items-start gap-3 p-3 rounded-[var(--radius-card)]" style={{ background: "var(--surface-1)" }}>
+            <Info size={16} style={{ color: "var(--accent)", marginTop: 2 }} />
+            <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
               Configure controller navigation for web browsers (Store tab). Right stick moves mouse, A/RT left click, X/LT right click, B back, Y forward, left stick scroll, D-pad arrows, bumpers tab navigation.
             </p>
           </div>
@@ -212,8 +212,8 @@ export const InputTab: React.FC = () => {
           {/* Snap to Element */}
           <div className="flex flex-col gap-3">
             <div className="flex items-center gap-2">
-              <Mouse size={16} style={{ color: "var(--color-accent)" }} />
-              <span className="text-sm font-medium" style={{ color: "var(--color-text)" }}>
+              <Mouse size={16} style={{ color: "var(--accent)" }} />
+              <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
                 Snap to Element
               </span>
             </div>
@@ -224,9 +224,9 @@ export const InputTab: React.FC = () => {
                   checked={settings.controllerBrowser?.snapToElement ?? true}
                   onChange={(e) => handleBrowserSettingChange("snapToElement", e.target.checked)}
                   className="w-4 h-4 rounded"
-                  style={{ accentColor: "var(--color-accent)" }}
+                  style={{ accentColor: "var(--accent)" }}
                 />
-                <span className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+                <span className="text-sm" style={{ color: "var(--text-secondary)" }}>
                   Enable snap-to-element on left click
                 </span>
               </label>
@@ -236,8 +236,8 @@ export const InputTab: React.FC = () => {
           {/* Snap Distance */}
           <div className="flex flex-col gap-3">
             <div className="flex items-center gap-2">
-              <Sliders size={16} style={{ color: "var(--color-accent)" }} />
-              <span className="text-sm font-medium" style={{ color: "var(--color-text)" }}>
+              <Sliders size={16} style={{ color: "var(--accent)" }} />
+              <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
                 Snap Distance
               </span>
             </div>
@@ -250,9 +250,9 @@ export const InputTab: React.FC = () => {
                 value={settings.controllerBrowser?.snapDistance ?? 50}
                 onChange={(e) => handleBrowserSettingChange("snapDistance", parseInt(e.target.value))}
                 className="flex-1 h-2 rounded-lg cursor-pointer"
-                style={{ accentColor: "var(--color-accent)" }}
+                style={{ accentColor: "var(--accent)" }}
               />
-              <span className="text-sm w-12 text-right" style={{ color: "var(--color-text-dim)" }}>
+              <span className="text-sm w-12 text-right" style={{ color: "var(--text-secondary)" }}>
                 {settings.controllerBrowser?.snapDistance ?? 50}px
               </span>
             </div>
@@ -261,8 +261,8 @@ export const InputTab: React.FC = () => {
           {/* Mouse Speed */}
           <div className="flex flex-col gap-3">
             <div className="flex items-center gap-2">
-              <Gamepad2 size={16} style={{ color: "var(--color-accent)" }} />
-              <span className="text-sm font-medium" style={{ color: "var(--color-text)" }}>
+              <Gamepad2 size={16} style={{ color: "var(--accent)" }} />
+              <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
                 Mouse Speed
               </span>
             </div>
@@ -275,9 +275,9 @@ export const InputTab: React.FC = () => {
                 value={settings.controllerBrowser?.mouseSpeed ?? 0.5}
                 onChange={(e) => handleBrowserSettingChange("mouseSpeed", parseFloat(e.target.value))}
                 className="flex-1 h-2 rounded-lg cursor-pointer"
-                style={{ accentColor: "var(--color-accent)" }}
+                style={{ accentColor: "var(--accent)" }}
               />
-              <span className="text-sm w-12 text-right" style={{ color: "var(--color-text-dim)" }}>
+              <span className="text-sm w-12 text-right" style={{ color: "var(--text-secondary)" }}>
                 {settings.controllerBrowser?.mouseSpeed ?? 0.5}x
               </span>
             </div>
@@ -286,8 +286,8 @@ export const InputTab: React.FC = () => {
           {/* Swap Right Stick Axes */}
           <div className="flex flex-col gap-3">
             <div className="flex items-center gap-2">
-              <Gamepad2 size={16} style={{ color: "var(--color-accent)" }} />
-              <span className="text-sm font-medium" style={{ color: "var(--color-text)" }}>
+              <Gamepad2 size={16} style={{ color: "var(--accent)" }} />
+              <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
                 Right Stick Axis Mapping
               </span>
             </div>
@@ -298,14 +298,14 @@ export const InputTab: React.FC = () => {
                   checked={settings.controllerBrowser?.swapRightStickAxes ?? false}
                   onChange={(e) => handleBrowserSettingChange("swapRightStickAxes", e.target.checked)}
                   className="w-4 h-4 rounded"
-                  style={{ accentColor: "var(--color-accent)" }}
+                  style={{ accentColor: "var(--accent)" }}
                 />
-                <span className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+                <span className="text-sm" style={{ color: "var(--text-secondary)" }}>
                   Swap axes (try this if cursor moves wrong direction)
                 </span>
               </label>
             </div>
-            <p className="text-xs" style={{ color: "var(--color-text-dim)" }}>
+            <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
               Default: axis 2 = horizontal, axis 3 = vertical. Enable to swap to axis 3 = horizontal, axis 2 = vertical.
             </p>
           </div>
@@ -313,8 +313,8 @@ export const InputTab: React.FC = () => {
           {/* Snap Selectors */}
           <div className="flex flex-col gap-3">
             <div className="flex items-center gap-2">
-              <Globe size={16} style={{ color: "var(--color-accent)" }} />
-              <span className="text-sm font-medium" style={{ color: "var(--color-text)" }}>
+              <Globe size={16} style={{ color: "var(--accent)" }} />
+              <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
                 Snap CSS Selectors
               </span>
             </div>
@@ -327,14 +327,14 @@ export const InputTab: React.FC = () => {
               placeholder="button&#10;a&#10;input&#10;textarea&#10;select&#10;[role='button']"
               className="w-full p-3 rounded-[var(--radius-card)] text-sm font-mono resize-none"
               style={{
-                background: "var(--color-surface)",
-                color: "var(--color-text)",
-                border: "1px solid var(--color-border)",
+                background: "var(--surface-0)",
+                color: "var(--text-primary)",
+                border: "1px solid var(--border-default)",
                 minHeight: "120px",
               }}
               rows={6}
             />
-            <p className="text-xs" style={{ color: "var(--color-text-dim)" }}>
+            <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
               CSS selectors for elements to snap to (one per line)
             </p>
           </div>

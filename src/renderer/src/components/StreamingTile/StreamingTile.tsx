@@ -55,7 +55,7 @@ export const StreamingTile: React.FC<Props> = ({ services, onLaunch }) => {
       </div>
       <p
         className="text-xs select-none"
-        style={{ color: "var(--color-text-dim)" }}
+        style={{ color: "var(--text-secondary)" }}
       >
         {hasEmbed && !onLaunch
           ? "Opens in your default browser or desktop app"

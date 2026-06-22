@@ -616,10 +616,10 @@ export const MusicTab: React.FC = () => {
 
           {/* Back / breadcrumb for drill-down */}
           {activeNav === "folders" && selectedGroup ? (
-            <div className="px-4 py-1.5 flex-shrink-0 flex items-center gap-1 text-xs font-medium" style={{ color: "var(--color-text-dim)" }}>
+            <div className="px-4 py-1.5 flex-shrink-0 flex items-center gap-1 text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
               <button
                 className="px-2 py-1 rounded hover:bg-white/10 transition-colors"
-                style={{ color: "var(--color-text)" }}
+                style={{ color: "var(--text-primary)" }}
                 onClick={() => { setSelectedGroup(null); setContentIndex(0); }}
               >
                 Library
@@ -631,11 +631,11 @@ export const MusicTab: React.FC = () => {
                   <React.Fragment key={path}>
                     <span>/</span>
                     {isLast ? (
-                      <span style={{ color: "var(--color-accent)" }}>{segment}</span>
+                      <span style={{ color: "var(--accent)" }}>{segment}</span>
                     ) : (
                       <button
                         className="px-1 rounded hover:bg-white/10 transition-colors"
-                        style={{ color: "var(--color-text)" }}
+                        style={{ color: "var(--text-primary)" }}
                         onClick={() => { setSelectedGroup(path); setContentIndex(0); }}
                       >
                         {segment}
@@ -650,9 +650,9 @@ export const MusicTab: React.FC = () => {
               <motion.button
                 className="flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium"
                 style={{
-                  background: "var(--color-surface-raised)",
-                  color: "var(--color-text)",
-                  border: "1px solid var(--color-border)",
+                  background: "var(--surface-1)",
+                  color: "var(--text-primary)",
+                  border: "1px solid var(--border-default)",
                 }}
                 onClick={() => {
                   setSelectedGroup(null);

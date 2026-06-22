@@ -194,17 +194,17 @@ export const MusicTagEditor: React.FC<MusicTagEditorProps> = React.memo(({
           ref={containerRef}
           className="w-full max-w-lg max-h-full overflow-y-auto rounded-xl p-6 flex flex-col gap-4"
           style={{
-            background: "var(--color-surface)",
-            border: "1px solid var(--color-border)",
+            background: "var(--surface-0)",
+            border: "1px solid var(--border-default)",
           }}
         >
           {/* Header */}
           <div className="flex items-center gap-2 mb-2">
-            <Tag size={18} style={{ color: "var(--color-accent)" }} />
-            <h2 className="text-lg font-semibold" style={{ color: "var(--color-text)" }}>
+            <Tag size={18} style={{ color: "var(--accent)" }} />
+            <h2 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
               Edit Tags
             </h2>
-            <span className="ml-auto text-xs truncate" style={{ color: "var(--color-text-dim)" }}>
+            <span className="ml-auto text-xs truncate" style={{ color: "var(--text-secondary)" }}>
               {getTrackDisplayName(track)}
             </span>
           </div>
@@ -216,18 +216,18 @@ export const MusicTagEditor: React.FC<MusicTagEditorProps> = React.memo(({
               data-tag-field
               className={`flex flex-col gap-1 rounded-lg p-3 transition-all ${focusClass(index)}`}
               style={{
-                background: isFocused(index) ? "var(--color-accent-dim)" : "transparent",
+                background: isFocused(index) ? "var(--accent-muted)" : "transparent",
               }}
             >
               <label
                 className="text-xs font-medium uppercase tracking-wide"
-                style={{ color: "var(--color-text-dim)" }}
+                style={{ color: "var(--text-secondary)" }}
               >
                 {field.label}
               </label>
               <div
                 className="text-sm font-medium truncate"
-                style={{ color: "var(--color-text)" }}
+                style={{ color: "var(--text-primary)" }}
               >
                 {values[field.key] || "—"}
               </div>
@@ -240,9 +240,9 @@ export const MusicTagEditor: React.FC<MusicTagEditorProps> = React.memo(({
               data-tag-field
               className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg font-medium transition-all ${focusClass(FIELDS.length)}`}
               style={{
-                background: isFocused(FIELDS.length) ? "var(--color-accent)" : "var(--color-bg)",
-                color: isFocused(FIELDS.length) ? "var(--color-bg)" : "var(--color-text)",
-                border: "1px solid var(--color-border)",
+                background: isFocused(FIELDS.length) ? "var(--accent)" : "var(--surface-base)",
+                color: isFocused(FIELDS.length) ? "var(--surface-base)" : "var(--text-primary)",
+                border: "1px solid var(--border-default)",
               }}
               onClick={handleSave}
               disabled={saving}
@@ -254,9 +254,9 @@ export const MusicTagEditor: React.FC<MusicTagEditorProps> = React.memo(({
               data-tag-field
               className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg font-medium transition-all ${focusClass(FIELDS.length + 1)}`}
               style={{
-                background: isFocused(FIELDS.length + 1) ? "var(--color-accent)" : "var(--color-bg)",
-                color: isFocused(FIELDS.length + 1) ? "var(--color-bg)" : "var(--color-text)",
-                border: "1px solid var(--color-border)",
+                background: isFocused(FIELDS.length + 1) ? "var(--accent)" : "var(--surface-base)",
+                color: isFocused(FIELDS.length + 1) ? "var(--surface-base)" : "var(--text-primary)",
+                border: "1px solid var(--border-default)",
               }}
               onClick={onClose}
             >

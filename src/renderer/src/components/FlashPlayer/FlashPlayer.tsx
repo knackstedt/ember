@@ -596,12 +596,12 @@ export const FlashPlayer: React.FC = () => {
               width: 340,
               maxHeight: "calc(100vh - 64px)",
               overflowY: "auto",
-              background: "var(--color-surface-raised, #1a1a1a)",
-              border: "1px solid var(--color-border, #333)",
+              background: "var(--surface-1, #1a1a1a)",
+              border: "1px solid var(--border-default, #333)",
               borderRadius: 12,
               padding: 16,
               zIndex: 3,
-              color: "var(--color-text, #fff)",
+              color: "var(--text-primary, #fff)",
             }}
             className="gpu-scroll"
           >
@@ -609,7 +609,7 @@ export const FlashPlayer: React.FC = () => {
 
             {/* Aspect Ratio */}
             <div className="mb-4">
-              <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--color-text-dim)" }}>
+              <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--text-secondary)" }}>
                 Aspect Ratio
               </label>
               <select
@@ -619,9 +619,9 @@ export const FlashPlayer: React.FC = () => {
                 }
                 className="w-full text-sm px-2 py-1.5 rounded"
                 style={{
-                  background: "var(--color-bg, #000)",
-                  border: "1px solid var(--color-border, #333)",
-                  color: "var(--color-text, #fff)",
+                  background: "var(--surface-base, #000)",
+                  border: "1px solid var(--border-default, #333)",
+                  color: "var(--text-primary, #fff)",
                   outline: "none",
                 }}
               >
@@ -634,7 +634,7 @@ export const FlashPlayer: React.FC = () => {
 
             {/* Canvas Size */}
             <div className="mb-4">
-              <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--color-text-dim)" }}>
+              <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--text-secondary)" }}>
                 Canvas Size
               </label>
               <select
@@ -644,9 +644,9 @@ export const FlashPlayer: React.FC = () => {
                 }
                 className="w-full text-sm px-2 py-1.5 rounded"
                 style={{
-                  background: "var(--color-bg, #000)",
-                  border: "1px solid var(--color-border, #333)",
-                  color: "var(--color-text, #fff)",
+                  background: "var(--surface-base, #000)",
+                  border: "1px solid var(--border-default, #333)",
+                  color: "var(--text-primary, #fff)",
                   outline: "none",
                 }}
               >
@@ -670,9 +670,9 @@ export const FlashPlayer: React.FC = () => {
                     placeholder="Width"
                     className="flex-1 text-sm px-2 py-1.5 rounded"
                     style={{
-                      background: "var(--color-bg, #000)",
-                      border: "1px solid var(--color-border, #333)",
-                      color: "var(--color-text, #fff)",
+                      background: "var(--surface-base, #000)",
+                      border: "1px solid var(--border-default, #333)",
+                      color: "var(--text-primary, #fff)",
                       outline: "none",
                     }}
                   />
@@ -687,9 +687,9 @@ export const FlashPlayer: React.FC = () => {
                     placeholder="Height"
                     className="flex-1 text-sm px-2 py-1.5 rounded"
                     style={{
-                      background: "var(--color-bg, #000)",
-                      border: "1px solid var(--color-border, #333)",
-                      color: "var(--color-text, #fff)",
+                      background: "var(--surface-base, #000)",
+                      border: "1px solid var(--border-default, #333)",
+                      color: "var(--text-primary, #fff)",
                       outline: "none",
                     }}
                   />
@@ -699,7 +699,7 @@ export const FlashPlayer: React.FC = () => {
 
             {/* Upscale Style */}
             <div className="mb-4">
-              <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--color-text-dim)" }}>
+              <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--text-secondary)" }}>
                 Upscaling Style
               </label>
               <select
@@ -709,9 +709,9 @@ export const FlashPlayer: React.FC = () => {
                 }
                 className="w-full text-sm px-2 py-1.5 rounded"
                 style={{
-                  background: "var(--color-bg, #000)",
-                  border: "1px solid var(--color-border, #333)",
-                  color: "var(--color-text, #fff)",
+                  background: "var(--surface-base, #000)",
+                  border: "1px solid var(--border-default, #333)",
+                  color: "var(--text-primary, #fff)",
                   outline: "none",
                 }}
               >
@@ -723,7 +723,7 @@ export const FlashPlayer: React.FC = () => {
 
             {/* Visual Filter */}
             <div className="mb-4">
-              <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--color-text-dim)" }}>
+              <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--text-secondary)" }}>
                 Visual Filter
               </label>
               <select
@@ -738,9 +738,9 @@ export const FlashPlayer: React.FC = () => {
                 }}
                 className="w-full text-sm px-2 py-1.5 rounded"
                 style={{
-                  background: "var(--color-bg, #000)",
-                  border: "1px solid var(--color-border, #333)",
-                  color: "var(--color-text, #fff)",
+                  background: "var(--surface-base, #000)",
+                  border: "1px solid var(--border-default, #333)",
+                  color: "var(--text-primary, #fff)",
                   outline: "none",
                 }}
               >
@@ -761,7 +761,7 @@ export const FlashPlayer: React.FC = () => {
               </select>
               {localSettings.filter !== "none" && (
                 <div className="flex items-center gap-2 mt-2">
-                  <span className="text-xs" style={{ color: "var(--color-text-dim)" }}>
+                  <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
                     Intensity
                   </span>
                   <input
@@ -774,7 +774,7 @@ export const FlashPlayer: React.FC = () => {
                       saveSettings({ filterIntensity: parseFloat(e.target.value) })
                     }
                     className="flex-1 h-1 cursor-pointer"
-                    style={{ accentColor: "var(--color-accent, #0af)" }}
+                    style={{ accentColor: "var(--accent, #0af)" }}
                   />
                   <span className="text-xs tabular-nums w-8 text-right">
                     {Math.round(localSettings.filterIntensity * 100)}%
@@ -783,7 +783,7 @@ export const FlashPlayer: React.FC = () => {
               )}
               {localSettings.filter === "pixelate" && (
                 <div className="flex items-center gap-2 mt-2">
-                  <span className="text-xs" style={{ color: "var(--color-text-dim)" }}>
+                  <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
                     Block Size
                   </span>
                   <select
@@ -793,9 +793,9 @@ export const FlashPlayer: React.FC = () => {
                     }
                     className="text-xs px-2 py-1 rounded flex-1"
                     style={{
-                      background: "var(--color-bg, #000)",
-                      border: "1px solid var(--color-border, #333)",
-                      color: "var(--color-text, #fff)",
+                      background: "var(--surface-base, #000)",
+                      border: "1px solid var(--border-default, #333)",
+                      color: "var(--text-primary, #fff)",
                       outline: "none",
                     }}
                   >
@@ -809,7 +809,7 @@ export const FlashPlayer: React.FC = () => {
               )}
               {localSettings.filter === "dither" && (
                 <div className="flex items-center gap-2 mt-2">
-                  <span className="text-xs" style={{ color: "var(--color-text-dim)" }}>
+                  <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
                     Levels
                   </span>
                   <input
@@ -822,7 +822,7 @@ export const FlashPlayer: React.FC = () => {
                       saveSettings({ ditherLevels: parseInt(e.target.value, 10) })
                     }
                     className="flex-1 h-1 cursor-pointer"
-                    style={{ accentColor: "var(--color-accent, #0af)" }}
+                    style={{ accentColor: "var(--accent, #0af)" }}
                   />
                   <span className="text-xs tabular-nums w-8 text-right">
                     {localSettings.ditherLevels}
@@ -833,9 +833,9 @@ export const FlashPlayer: React.FC = () => {
                 onClick={() => void window.htpc.flashFilters.openDir()}
                 className="mt-2 w-full text-xs py-1 rounded hover:bg-white/10 transition-colors"
                 style={{
-                  color: "var(--color-text-dim)",
+                  color: "var(--text-secondary)",
                   background: "rgba(255,255,255,0.05)",
-                  border: "1px dashed var(--color-border, #333)",
+                  border: "1px dashed var(--border-default, #333)",
                 }}
               >
                 Open custom filters folder
@@ -844,7 +844,7 @@ export const FlashPlayer: React.FC = () => {
 
             {/* Controller Input Mapping */}
             <div className="mb-4">
-              <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--color-text-dim)" }}>
+              <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--text-secondary)" }}>
                 Controller Button Mapping
               </label>
               <div className="flex flex-col gap-1.5">
@@ -865,7 +865,7 @@ export const FlashPlayer: React.FC = () => {
                   ] as { key: keyof FlashControllerMap; label: string }[]
                 ).map(({ key, label }) => (
                   <div key={key} className="flex items-center justify-between">
-                    <span className="text-xs" style={{ color: "var(--color-text-dim)" }}>
+                    <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
                       {label}
                     </span>
                     <select
@@ -880,9 +880,9 @@ export const FlashPlayer: React.FC = () => {
                       }
                       className="text-xs px-1.5 py-1 rounded"
                       style={{
-                        background: "var(--color-bg, #000)",
-                        border: "1px solid var(--color-border, #333)",
-                        color: "var(--color-text, #fff)",
+                        background: "var(--surface-base, #000)",
+                        border: "1px solid var(--border-default, #333)",
+                        color: "var(--text-primary, #fff)",
                         outline: "none",
                         minWidth: 120,
                       }}
@@ -901,7 +901,7 @@ export const FlashPlayer: React.FC = () => {
             {/* Stick to Mouse */}
             <div className="mb-4">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium" style={{ color: "var(--color-text-dim)" }}>
+                <span className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
                   Stick to Mouse
                 </span>
                 <button
@@ -909,8 +909,8 @@ export const FlashPlayer: React.FC = () => {
                   className="w-9 h-5 rounded-full relative transition-colors"
                   style={{
                     background: localSettings.stickToMouse
-                      ? "var(--color-accent, #0af)"
-                      : "var(--color-surface-raised, #333)",
+                      ? "var(--accent, #0af)"
+                      : "var(--surface-1, #333)",
                   }}
                 >
                   <span
@@ -923,7 +923,7 @@ export const FlashPlayer: React.FC = () => {
               </div>
               {localSettings.stickToMouse && (
                 <div className="flex items-center gap-2">
-                  <span className="text-xs" style={{ color: "var(--color-text-dim)" }}>
+                  <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
                     Sensitivity
                   </span>
                   <input
@@ -936,7 +936,7 @@ export const FlashPlayer: React.FC = () => {
                       saveSettings({ stickSensitivity: parseFloat(e.target.value) })
                     }
                     className="flex-1 h-1 cursor-pointer"
-                    style={{ accentColor: "var(--color-accent, #0af)" }}
+                    style={{ accentColor: "var(--accent, #0af)" }}
                   />
                   <span className="text-xs tabular-nums w-8 text-right">
                     {localSettings.stickSensitivity.toFixed(1)}x
@@ -948,7 +948,7 @@ export const FlashPlayer: React.FC = () => {
             {/* AI Upscaling */}
             <div className="mb-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium" style={{ color: "var(--color-text-dim)" }}>
+                <span className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
                   AI Upscaling (Experimental)
                 </span>
                 <span
@@ -962,7 +962,7 @@ export const FlashPlayer: React.FC = () => {
                   Coming Soon
                 </span>
               </div>
-              <p className="text-[10px] mt-1" style={{ color: "var(--color-text-dim)" }}>
+              <p className="text-[10px] mt-1" style={{ color: "var(--text-secondary)" }}>
                 AI-powered upscaling will be available in a future update.
               </p>
             </div>

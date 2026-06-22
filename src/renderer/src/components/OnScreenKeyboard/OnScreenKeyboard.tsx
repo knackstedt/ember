@@ -221,7 +221,7 @@ export const OnScreenKeyboard: React.FC<OnScreenKeyboardProps> = ({
       transition={{ type: "spring", damping: 30, stiffness: 300 }}
       className="pointer-events-auto p-3 rounded-[var(--radius-panel)]"
       style={{
-        background: "var(--color-surface-overlay)",
+        background: "var(--surface-2)",
         backdropFilter: "blur(var(--blur-panel))",
         border: `1px solid ${accentColor}`,
         boxShadow: `0 0 20px ${accentColor}33`,
@@ -235,12 +235,12 @@ export const OnScreenKeyboard: React.FC<OnScreenKeyboardProps> = ({
         {label && (
           <div
             className="text-sm opacity-60"
-            style={{ color: "var(--color-text-dim)" }}
+            style={{ color: "var(--text-secondary)" }}
           >
             {label}
           </div>
         )}
-        <div className="ml-auto text-xs opacity-40 font-mono" style={{ color: "var(--color-text-dim)" }}>
+        <div className="ml-auto text-xs opacity-40 font-mono" style={{ color: "var(--text-secondary)" }}>
           {modeLabel}
         </div>
       </div>
@@ -248,9 +248,9 @@ export const OnScreenKeyboard: React.FC<OnScreenKeyboardProps> = ({
       <div
         className="mb-3 px-3 py-2 rounded-[var(--radius-card)] font-mono text-base truncate"
         style={{
-          background: "var(--color-surface-raised)",
-          color: "var(--color-text)",
-          border: "1px solid var(--color-border)",
+          background: "var(--surface-1)",
+          color: "var(--text-primary)",
+          border: "1px solid var(--border-default)",
           minHeight: "2.5rem",
         }}
       >
@@ -266,9 +266,9 @@ export const OnScreenKeyboard: React.FC<OnScreenKeyboardProps> = ({
                 style={{
                   background: mode !== "normal"
                     ? accentColor
-                    : "var(--color-surface-raised)",
-                  color: mode !== "normal" ? "var(--color-bg)" : "var(--color-text)",
-                  border: "1px solid var(--color-border)",
+                    : "var(--surface-1)",
+                  color: mode !== "normal" ? "var(--surface-base)" : "var(--text-primary)",
+                  border: "1px solid var(--border-default)",
                   minWidth: "3rem",
                   ...(focusedKey[0] === rows.length - 1 && focusedKey[1] === 0
                     ? { boxShadow: `0 0 0 2px ${accentColor}`, transform: "scale(1.1)" }
@@ -295,10 +295,10 @@ export const OnScreenKeyboard: React.FC<OnScreenKeyboardProps> = ({
                     background:
                       key === "OK"
                         ? accentColor
-                        : "var(--color-surface-raised)",
+                        : "var(--surface-1)",
                     color:
-                      key === "OK" ? "var(--color-bg)" : "var(--color-text)",
-                    border: "1px solid var(--color-border)",
+                      key === "OK" ? "var(--surface-base)" : "var(--text-primary)",
+                    border: "1px solid var(--border-default)",
                     minWidth: key === " " ? "8rem" : "2.5rem",
                     ...(isFocused
                       ? { boxShadow: `0 0 0 2px ${accentColor}`, transform: "scale(1.1)" }
@@ -318,7 +318,7 @@ export const OnScreenKeyboard: React.FC<OnScreenKeyboardProps> = ({
       {/* Controller button hints bar */}
       <div
         className="mt-3 flex items-center justify-between px-1 text-[10px] uppercase tracking-wider"
-        style={{ color: "var(--color-text-dim)", opacity: 0.5 }}
+        style={{ color: "var(--text-secondary)", opacity: 0.5 }}
       >
         <div className="flex gap-3">
           <span><span style={{ color: accentColor }}>A</span> Type</span>
@@ -369,9 +369,9 @@ export const OskInput: React.FC<OskInputProps> = ({
         }}
         placeholder={placeholder}
         style={{
-          background: "var(--color-surface-raised)",
-          color: "var(--color-text)",
-          border: "1px solid var(--color-border)",
+          background: "var(--surface-1)",
+          color: "var(--text-primary)",
+          border: "1px solid var(--border-default)",
           borderRadius: "var(--radius-card)",
           padding: "0.5rem 0.75rem",
           width: "100%",

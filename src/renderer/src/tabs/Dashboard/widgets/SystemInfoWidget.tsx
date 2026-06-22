@@ -59,8 +59,8 @@ export const SystemInfoWidget: React.FC<{ title?: string }> = ({ title }) => {
 
       <div className="flex-1 flex flex-col gap-1.5 text-xs overflow-hidden min-h-0">
         <div className="flex items-start gap-1.5">
-          <div className="p-1 rounded-lg flex-shrink-0" style={{ background: "var(--color-surface-raised)" }}>
-            <Cpu size={12} style={{ color: "var(--color-accent)" }} />
+          <div className="p-1 rounded-lg flex-shrink-0" style={{ background: "var(--surface-1)" }}>
+            <Cpu size={12} style={{ color: "var(--accent)" }} />
           </div>
           <div className="flex-1 min-w-0 flex flex-col gap-0">
             <span className="truncate font-medium opacity-90 text-[11px]">{info?.cpu?.model ?? "Loading…"}</span>
@@ -69,8 +69,8 @@ export const SystemInfoWidget: React.FC<{ title?: string }> = ({ title }) => {
         </div>
 
         <div className="flex items-start gap-1.5">
-          <div className="p-1 rounded-lg flex-shrink-0" style={{ background: "var(--color-surface-raised)" }}>
-            <MemoryStick size={12} style={{ color: "var(--color-accent)" }} />
+          <div className="p-1 rounded-lg flex-shrink-0" style={{ background: "var(--surface-1)" }}>
+            <MemoryStick size={12} style={{ color: "var(--accent)" }} />
           </div>
           <div className="flex-1 min-w-0 flex flex-col gap-0.5">
             <ProgressBar value={memUsed} max={memTotal || 1} label="Memory" valueLabel={`${memUsed.toFixed(1)} / ${memTotal.toFixed(1)} GB`} height={3} />
@@ -78,8 +78,8 @@ export const SystemInfoWidget: React.FC<{ title?: string }> = ({ title }) => {
         </div>
 
         <div className="flex items-start gap-1.5">
-          <div className="p-1 rounded-lg flex-shrink-0" style={{ background: "var(--color-surface-raised)" }}>
-            <HardDrive size={12} style={{ color: "var(--color-accent)" }} />
+          <div className="p-1 rounded-lg flex-shrink-0" style={{ background: "var(--surface-1)" }}>
+            <HardDrive size={12} style={{ color: "var(--accent)" }} />
           </div>
           <div className="flex-1 min-w-0 flex flex-col gap-0">
             <span className="truncate opacity-90 text-[11px] capitalize">{info?.os?.platform} {info?.os?.release}</span>
@@ -88,8 +88,8 @@ export const SystemInfoWidget: React.FC<{ title?: string }> = ({ title }) => {
         </div>
 
         <div className="flex items-start gap-1.5">
-          <div className="p-1 rounded-lg flex-shrink-0" style={{ background: "var(--color-surface-raised)" }}>
-            <Activity size={12} style={{ color: "var(--color-accent)" }} />
+          <div className="p-1 rounded-lg flex-shrink-0" style={{ background: "var(--surface-1)" }}>
+            <Activity size={12} style={{ color: "var(--accent)" }} />
           </div>
           <div className="flex-1 min-w-0 flex flex-col gap-0">
             <span className="opacity-90 text-[11px]">Uptime: {fmtUptime()}</span>

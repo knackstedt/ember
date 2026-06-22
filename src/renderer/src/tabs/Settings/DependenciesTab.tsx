@@ -147,11 +147,11 @@ export const DependenciesTab: React.FC = () => {
       <section className="flex flex-col gap-4">
         <h2
           className="text-lg font-semibold"
-          style={{ color: "var(--color-text)" }}
+          style={{ color: "var(--text-primary)" }}
         >
           Dependencies & Cores
         </h2>
-        <p className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+        <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
           Install, uninstall, and manage Libretro cores, emulators, and system
           dependencies.
         </p>
@@ -165,9 +165,9 @@ export const DependenciesTab: React.FC = () => {
               onChange={(e) => setPackageSearch(e.target.value)}
               className="flex-1 px-3 py-2 rounded text-sm"
               style={{
-                background: "var(--color-surface-raised)",
-                color: "var(--color-text)",
-                border: "1px solid var(--color-border)",
+                background: "var(--surface-1)",
+                color: "var(--text-primary)",
+                border: "1px solid var(--border-default)",
                 outline: "none",
               }}
             />
@@ -189,13 +189,13 @@ export const DependenciesTab: React.FC = () => {
                 style={{
                   background:
                     selectedCategory === tab.id
-                      ? "var(--color-accent)"
-                      : "var(--color-surface-raised)",
+                      ? "var(--accent)"
+                      : "var(--surface-1)",
                   color:
                     selectedCategory === tab.id
-                      ? "var(--color-bg)"
-                      : "var(--color-text)",
-                  border: "1px solid var(--color-border)",
+                      ? "var(--surface-base)"
+                      : "var(--text-primary)",
+                  border: "1px solid var(--border-default)",
                 }}
               >
                 {tab.label}
@@ -207,9 +207,9 @@ export const DependenciesTab: React.FC = () => {
             <motion.button
               className="px-3 py-2 rounded text-sm flex items-center gap-1.5"
               style={{
-                background: "var(--color-surface-raised)",
-                color: "var(--color-text)",
-                border: "1px solid var(--color-border)",
+                background: "var(--surface-1)",
+                color: "var(--text-primary)",
+                border: "1px solid var(--border-default)",
               }}
               onClick={loadPackages}
               whileTap={{ scale: 0.96 }}
@@ -233,14 +233,14 @@ export const DependenciesTab: React.FC = () => {
           <div
             className="flex flex-col gap-2 max-h-[70vh] overflow-y-auto rounded p-2"
             style={{
-              background: "var(--color-surface)",
-              border: "1px solid var(--color-border)",
+              background: "var(--surface-0)",
+              border: "1px solid var(--border-default)",
             }}
           >
             {filteredPackages.length === 0 ? (
               <p
                 className="text-sm text-center py-4"
-                style={{ color: "var(--color-text-dim)" }}
+                style={{ color: "var(--text-secondary)" }}
               >
                 No packages found matching your search.
               </p>
@@ -257,21 +257,21 @@ export const DependenciesTab: React.FC = () => {
                     key={pkg.id}
                     className="flex flex-col gap-2 p-3 rounded"
                     style={{
-                      background: "var(--color-surface-raised)",
-                      border: "1px solid var(--color-border)",
+                      background: "var(--surface-1)",
+                      border: "1px solid var(--border-default)",
                     }}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
                         <div
                           className="text-sm font-medium"
-                          style={{ color: "var(--color-text)" }}
+                          style={{ color: "var(--text-primary)" }}
                         >
                           {pkg.displayName}
                         </div>
                         <div
                           className="text-xs"
-                          style={{ color: "var(--color-text-dim)" }}
+                          style={{ color: "var(--text-secondary)" }}
                         >
                           {pkg.name} · {pkg.category} · {pkg.manager}
                           {pkg.version && ` · v${pkg.version}`}
@@ -279,7 +279,7 @@ export const DependenciesTab: React.FC = () => {
                         {pkg.description && (
                           <div
                             className="text-xs mt-1"
-                            style={{ color: "var(--color-text-dim)" }}
+                            style={{ color: "var(--text-secondary)" }}
                           >
                             {pkg.description}
                           </div>
@@ -291,12 +291,12 @@ export const DependenciesTab: React.FC = () => {
                           disabled={isOp}
                           style={{
                             background: pkg.isPinned
-                              ? "var(--color-accent)20"
-                              : "var(--color-surface)",
+                              ? "var(--accent)20"
+                              : "var(--surface-0)",
                             color: pkg.isPinned
-                              ? "var(--color-accent)"
-                              : "var(--color-text-dim)",
-                            border: "1px solid var(--color-border)",
+                              ? "var(--accent)"
+                              : "var(--text-secondary)",
+                            border: "1px solid var(--border-default)",
                             opacity: isOp ? 0.5 : 1,
                             cursor: isOp ? "not-allowed" : "pointer",
                           }}
@@ -323,12 +323,12 @@ export const DependenciesTab: React.FC = () => {
                           disabled={isOp}
                           style={{
                             background: pkg.autoUpdate
-                              ? "var(--color-accent)20"
-                              : "var(--color-surface)",
+                              ? "var(--accent)20"
+                              : "var(--surface-0)",
                             color: pkg.autoUpdate
-                              ? "var(--color-accent)"
-                              : "var(--color-text-dim)",
-                            border: "1px solid var(--color-border)",
+                              ? "var(--accent)"
+                              : "var(--text-secondary)",
+                            border: "1px solid var(--border-default)",
                             opacity: isOp ? 0.5 : 1,
                             cursor: isOp ? "not-allowed" : "pointer",
                           }}
@@ -373,9 +373,9 @@ export const DependenciesTab: React.FC = () => {
                           <motion.button
                             className="px-3 py-1.5 rounded text-xs font-medium"
                             style={{
-                              background: "var(--color-accent)15",
-                              color: "var(--color-accent)",
-                              border: "1px solid var(--color-accent)40",
+                              background: "var(--accent)15",
+                              color: "var(--accent)",
+                              border: "1px solid var(--accent)40",
                               opacity: isOp ? 0.5 : 1,
                               cursor: isOp ? "not-allowed" : "pointer",
                             }}
@@ -394,14 +394,14 @@ export const DependenciesTab: React.FC = () => {
                         <div className="flex items-center justify-between">
                           <span
                             className="text-xs"
-                            style={{ color: "var(--color-text-dim)" }}
+                            style={{ color: "var(--text-secondary)" }}
                           >
                             {progress.message}
                           </span>
                           {progress.percent !== undefined && (
                             <span
                               className="text-xs"
-                              style={{ color: "var(--color-text-dim)" }}
+                              style={{ color: "var(--text-secondary)" }}
                             >
                               {progress.percent}%
                             </span>
@@ -411,8 +411,8 @@ export const DependenciesTab: React.FC = () => {
                           <div
                             className="h-1 rounded"
                             style={{
-                              background: "var(--color-surface)",
-                              border: "1px solid var(--color-border)",
+                              background: "var(--surface-0)",
+                              border: "1px solid var(--border-default)",
                             }}
                           >
                             <div
@@ -422,7 +422,7 @@ export const DependenciesTab: React.FC = () => {
                                 background:
                                   progress.status === "error"
                                     ? "#ff4444"
-                                    : "var(--color-accent)",
+                                    : "var(--accent)",
                               }}
                             />
                           </div>
@@ -453,8 +453,8 @@ export const DependenciesTab: React.FC = () => {
             <motion.div
               className="p-6 rounded-lg max-w-md w-full"
               style={{
-                background: "var(--color-surface-raised)",
-                border: "1px solid var(--color-border)",
+                background: "var(--surface-1)",
+                border: "1px solid var(--border-default)",
               }}
               initial={{ scale: 0.9 }}
               animate={{ scale: 1 }}
@@ -463,13 +463,13 @@ export const DependenciesTab: React.FC = () => {
             >
               <h3
                 className="text-lg font-semibold mb-4"
-                style={{ color: "var(--color-text)" }}
+                style={{ color: "var(--text-primary)" }}
               >
                 APT Password Required
               </h3>
               <p
                 className="text-sm mb-4"
-                style={{ color: "var(--color-text-dim)" }}
+                style={{ color: "var(--text-secondary)" }}
               >
                 Installing system packages requires sudo privileges. Enter your
                 password to continue.
@@ -484,9 +484,9 @@ export const DependenciesTab: React.FC = () => {
                 placeholder="Enter password..."
                 className="w-full px-3 py-2 rounded text-sm mb-4"
                 style={{
-                  background: "var(--color-surface)",
-                  color: "var(--color-text)",
-                  border: "1px solid var(--color-border)",
+                  background: "var(--surface-0)",
+                  color: "var(--text-primary)",
+                  border: "1px solid var(--border-default)",
                   outline: "none",
                 }}
                 autoFocus
@@ -495,9 +495,9 @@ export const DependenciesTab: React.FC = () => {
                 <motion.button
                   className="px-4 py-2 rounded text-sm"
                   style={{
-                    background: "var(--color-surface)",
-                    color: "var(--color-text)",
-                    border: "1px solid var(--color-border)",
+                    background: "var(--surface-0)",
+                    color: "var(--text-primary)",
+                    border: "1px solid var(--border-default)",
                   }}
                   onClick={() => setShowAptPassword(false)}
                   whileTap={{ scale: 0.96 }}
@@ -507,8 +507,8 @@ export const DependenciesTab: React.FC = () => {
                 <motion.button
                   className="px-4 py-2 rounded text-sm"
                   style={{
-                    background: "var(--color-accent)",
-                    color: "var(--color-bg)",
+                    background: "var(--accent)",
+                    color: "var(--surface-base)",
                   }}
                   onClick={handleAptPasswordSubmit}
                   whileTap={{ scale: 0.96 }}

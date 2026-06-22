@@ -13,8 +13,8 @@ export const GeneralTab: React.FC = () => {
     <div className="flex flex-col gap-8">
       <section className="flex flex-col gap-4">
         <div className="flex items-center gap-2 mb-2">
-          <Power size={20} style={{ color: "var(--color-accent)" }} />
-          <h2 className="text-lg font-semibold" style={{ color: "var(--color-text)" }}>
+          <Power size={20} style={{ color: "var(--accent)" }} />
+          <h2 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
             Startup & Power
           </h2>
         </div>
@@ -30,8 +30,8 @@ export const GeneralTab: React.FC = () => {
 
       <section className="flex flex-col gap-4">
         <div className="flex items-center gap-2 mb-2">
-          <Monitor size={20} style={{ color: "var(--color-accent)" }} />
-          <h2 className="text-lg font-semibold" style={{ color: "var(--color-text)" }}>
+          <Monitor size={20} style={{ color: "var(--accent)" }} />
+          <h2 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
             Performance
           </h2>
         </div>
@@ -47,21 +47,21 @@ export const GeneralTab: React.FC = () => {
 
       <section className="flex flex-col gap-4">
         <div className="flex items-center gap-2 mb-2">
-          <RotateCcw size={20} style={{ color: "var(--color-accent)" }} />
-          <h2 className="text-lg font-semibold" style={{ color: "var(--color-text)" }}>
+          <RotateCcw size={20} style={{ color: "var(--accent)" }} />
+          <h2 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
             Application Data
           </h2>
         </div>
         <div className="flex flex-col gap-3 pl-1">
-          <p className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+          <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
             Manage application settings and cached data.
           </p>
           <motion.button
             className="self-start px-4 py-2 rounded-[var(--radius-card)] text-sm flex items-center gap-2"
             style={{
-              background: "var(--color-surface-raised)",
-              color: "var(--color-text)",
-              border: "1px solid var(--color-border)",
+              background: "var(--surface-1)",
+              color: "var(--text-primary)",
+              border: "1px solid var(--border-default)",
             }}
             onClick={async () => {
               await window.htpc.app.restart();

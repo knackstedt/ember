@@ -107,13 +107,13 @@ function SignalStrengthBar({ pct }: { pct?: number }) {
   return (
     <div className="flex items-center gap-1.5">
       <Activity size={14} style={{ color }} />
-      <div className="w-16 h-1.5 rounded-full overflow-hidden" style={{ background: "var(--color-surface-raised)" }}>
+      <div className="w-16 h-1.5 rounded-full overflow-hidden" style={{ background: "var(--surface-1)" }}>
         <div
           className="h-full rounded-full"
           style={{ width: `${pct}%`, background: color }}
         />
       </div>
-      <span className="text-[10px] font-mono" style={{ color: "var(--color-text-dim)" }}>
+      <span className="text-[10px] font-mono" style={{ color: "var(--text-secondary)" }}>
         {pct}%
       </span>
     </div>
@@ -286,10 +286,10 @@ const MappingRow: React.FC<MappingRowProps> = ({
       className="flex items-center justify-between py-2 px-3 rounded gap-2"
       style={{
         background: isLearning
-          ? "color-mix(in srgb, var(--color-accent) 18%, var(--color-surface-raised))"
-          : "var(--color-surface-raised)",
-        border: `1px solid ${isLearning ? "var(--color-accent)" : "var(--color-border)"}`,
-        outline: isLearning ? "1px solid var(--color-accent)" : "none",
+          ? "color-mix(in srgb, var(--accent) 18%, var(--surface-1))"
+          : "var(--surface-1)",
+        border: `1px solid ${isLearning ? "var(--accent)" : "var(--border-default)"}`,
+        outline: isLearning ? "1px solid var(--accent)" : "none",
       }}
       animate={isLearning ? { opacity: [1, 0.6, 1] } : { opacity: 1 }}
       transition={isLearning ? { repeat: Infinity, duration: 0.9 } : {}}
@@ -298,14 +298,14 @@ const MappingRow: React.FC<MappingRowProps> = ({
     >
       <span
         className="text-sm font-mono w-28 shrink-0"
-        style={{ color: "var(--color-text)" }}
+        style={{ color: "var(--text-primary)" }}
       >
         {getButtonLabel(controllerType, inputCode)}
       </span>
 
       {isLearning ? (
         <div className="flex flex-1 items-center gap-2 justify-between">
-          <span className="text-xs" style={{ color: "var(--color-accent)" }}>
+          <span className="text-xs" style={{ color: "var(--accent)" }}>
             {learnedRaw !== null
               ? `Captured raw code ${learnedRaw} — save?`
               : "Press a button on the controller…"}
@@ -315,8 +315,8 @@ const MappingRow: React.FC<MappingRowProps> = ({
               <motion.button
                 className="px-3 py-1 rounded text-xs"
                 style={{
-                  background: "var(--color-accent)",
-                  color: "var(--color-bg)",
+                  background: "var(--accent)",
+                  color: "var(--surface-base)",
                 }}
                 onClick={() => {
                   onSave(currentAction || DEFAULT_ACTIONS[0]);
@@ -330,9 +330,9 @@ const MappingRow: React.FC<MappingRowProps> = ({
             <motion.button
               className="px-2 py-1 rounded text-xs"
               style={{
-                background: "var(--color-surface)",
-                color: "var(--color-text-dim)",
-                border: "1px solid var(--color-border)",
+                background: "var(--surface-0)",
+                color: "var(--text-secondary)",
+                border: "1px solid var(--border-default)",
               }}
               onClick={onCancelLearn}
               whileTap={{ scale: 0.96 }}
@@ -348,9 +348,9 @@ const MappingRow: React.FC<MappingRowProps> = ({
             onChange={(e) => setSelected(e.target.value)}
             className="flex-1 text-sm px-2 py-1 rounded"
             style={{
-              background: "var(--color-surface)",
-              color: "var(--color-text)",
-              border: "1px solid var(--color-border)",
+              background: "var(--surface-0)",
+              color: "var(--text-primary)",
+              border: "1px solid var(--border-default)",
               outline: "none",
             }}
           >
@@ -364,8 +364,8 @@ const MappingRow: React.FC<MappingRowProps> = ({
             <motion.button
               className="px-3 py-1 rounded text-xs"
               style={{
-                background: "var(--color-accent)",
-                color: "var(--color-bg)",
+                background: "var(--accent)",
+                color: "var(--surface-base)",
               }}
               onClick={() => {
                 onSave(selected);
@@ -378,9 +378,9 @@ const MappingRow: React.FC<MappingRowProps> = ({
             <motion.button
               className="px-2 py-1 rounded text-xs"
               style={{
-                background: "var(--color-surface)",
-                color: "var(--color-text-dim)",
-                border: "1px solid var(--color-border)",
+                background: "var(--surface-0)",
+                color: "var(--text-secondary)",
+                border: "1px solid var(--border-default)",
               }}
               onClick={() => setEditing(false)}
               whileTap={{ scale: 0.96 }}
@@ -395,8 +395,8 @@ const MappingRow: React.FC<MappingRowProps> = ({
             className="text-sm"
             style={{
               color: currentAction
-                ? "var(--color-accent)"
-                : "var(--color-text-dim)",
+                ? "var(--accent)"
+                : "var(--text-secondary)",
             }}
           >
             {currentAction || "—"}
@@ -405,9 +405,9 @@ const MappingRow: React.FC<MappingRowProps> = ({
             <motion.button
               className="px-2 py-0.5 rounded text-xs"
               style={{
-                background: "var(--color-surface)",
-                color: "var(--color-text-dim)",
-                border: "1px solid var(--color-border)",
+                background: "var(--surface-0)",
+                color: "var(--text-secondary)",
+                border: "1px solid var(--border-default)",
               }}
               onClick={onStartLearn}
               title="Learn: press a physical button to map it"
@@ -418,9 +418,9 @@ const MappingRow: React.FC<MappingRowProps> = ({
             <motion.button
               className="px-2 py-0.5 rounded text-xs"
               style={{
-                background: "var(--color-surface)",
-                color: "var(--color-text-dim)",
-                border: "1px solid var(--color-border)",
+                background: "var(--surface-0)",
+                color: "var(--text-secondary)",
+                border: "1px solid var(--border-default)",
               }}
               onClick={() => setEditing(true)}
               whileTap={{ scale: 0.96 }}
@@ -950,7 +950,7 @@ export const ControllersTab: React.FC = () => {
       <div className="w-60 flex-shrink-0 flex flex-col gap-3">
         <h2
           className="text-base font-semibold"
-          style={{ color: "var(--color-text)" }}
+          style={{ color: "var(--text-primary)" }}
         >
           Devices
         </h2>
@@ -958,7 +958,7 @@ export const ControllersTab: React.FC = () => {
         {deviceItems.length === 0 ? (
           <div
             className="text-sm text-center py-8"
-            style={{ color: "var(--color-text-dim)" }}
+            style={{ color: "var(--text-secondary)" }}
           >
             No controllers detected.
             <br />
@@ -978,9 +978,9 @@ export const ControllersTab: React.FC = () => {
                   style={{
                     background:
                       selectedDevice?.id === dev.id
-                        ? "var(--color-surface-raised)"
-                        : "var(--color-surface)",
-                    border: `1px solid ${selectedDevice?.id === dev.id ? "var(--color-accent)" : "var(--color-border)"}`,
+                        ? "var(--surface-1)"
+                        : "var(--surface-0)",
+                    border: `1px solid ${selectedDevice?.id === dev.id ? "var(--accent)" : "var(--border-default)"}`,
                     boxShadow:
                       selectedDevice?.id === dev.id
                         ? "var(--shadow-glow)"
@@ -996,8 +996,8 @@ export const ControllersTab: React.FC = () => {
                       <span
                         className="absolute -bottom-0.5 -right-0.5 inline-flex items-center justify-center w-4 h-4 rounded-full"
                         style={{
-                          background: "var(--color-surface-raised)",
-                          border: "1px solid var(--color-border)",
+                          background: "var(--surface-1)",
+                          border: "1px solid var(--border-default)",
                         }}
                         title={CONNECTION_LABELS[dev.connectionType]}
                       >
@@ -1011,13 +1011,13 @@ export const ControllersTab: React.FC = () => {
                   <div className="flex flex-col min-w-0 flex-1">
                     <span
                       className="text-sm font-medium truncate"
-                      style={{ color: "var(--color-text)" }}
+                      style={{ color: "var(--text-primary)" }}
                     >
                       {aliases[aliasId] ?? dev.name}
                     </span>
                     <span
                       className="text-[10px] capitalize"
-                      style={{ color: "var(--color-text-dim)" }}
+                      style={{ color: "var(--text-secondary)" }}
                     >
                       {dev.type}
                     </span>
@@ -1032,17 +1032,17 @@ export const ControllersTab: React.FC = () => {
           <div
             className="mt-auto p-3 rounded-[var(--radius-card)] text-xs"
             style={{
-              background: "var(--color-surface-raised)",
-              border: "1px solid var(--color-border)",
+              background: "var(--surface-1)",
+              border: "1px solid var(--border-default)",
             }}
           >
             <div
               className="font-medium mb-1"
-              style={{ color: "var(--color-accent)" }}
+              style={{ color: "var(--accent)" }}
             >
               Last Input
             </div>
-            <div style={{ color: "var(--color-text-dim)" }}>
+            <div style={{ color: "var(--text-secondary)" }}>
               <div className="truncate" title={lastEvent.deviceName}>
                 Name: {lastEvent.deviceName}
               </div>
@@ -1062,11 +1062,11 @@ export const ControllersTab: React.FC = () => {
                   style={{
                     background:
                       eventRates.inputHz > 30
-                        ? "color-mix(in srgb, #f87171 20%, var(--color-surface))"
-                        : "var(--color-surface)",
+                        ? "color-mix(in srgb, #f87171 20%, var(--surface-0))"
+                        : "var(--surface-0)",
                     color:
-                      eventRates.inputHz > 30 ? "#f87171" : "var(--color-text-dim)",
-                    border: "1px solid var(--color-border)",
+                      eventRates.inputHz > 30 ? "#f87171" : "var(--text-secondary)",
+                    border: "1px solid var(--border-default)",
                   }}
                   title="Events/sec for this specific input (spam indicator)"
                 >
@@ -1075,9 +1075,9 @@ export const ControllersTab: React.FC = () => {
                 <span
                   className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono"
                   style={{
-                    background: "var(--color-surface)",
-                    color: "var(--color-text-dim)",
-                    border: "1px solid var(--color-border)",
+                    background: "var(--surface-0)",
+                    color: "var(--text-secondary)",
+                    border: "1px solid var(--border-default)",
                   }}
                   title="Events/sec for this whole device"
                 >
@@ -1100,11 +1100,11 @@ export const ControllersTab: React.FC = () => {
                 <div className="flex flex-col gap-1">
                   <h2
                     className="text-lg font-semibold"
-                    style={{ color: "var(--color-text)" }}
+                    style={{ color: "var(--text-primary)" }}
                   >
                     {aliases[selectedDevice.id] ?? selectedDevice.name}
                   </h2>
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs" style={{ color: "var(--color-text-dim)" }}>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs" style={{ color: "var(--text-secondary)" }}>
                     <span className="capitalize">{selectedDevice.type}</span>
                     <span>·</span>
                     <span>{selectedDevice.buttonCount}b {selectedDevice.axisCount}ax</span>
@@ -1190,7 +1190,7 @@ export const ControllersTab: React.FC = () => {
                   >
                     <span
                       className="text-xs"
-                      style={{ color: "var(--color-text-dim)" }}
+                      style={{ color: "var(--text-secondary)" }}
                     >
                       Clear all mappings?
                     </span>
@@ -1205,9 +1205,9 @@ export const ControllersTab: React.FC = () => {
                     <motion.button
                       className="px-2 py-1 rounded text-xs"
                       style={{
-                        background: "var(--color-surface)",
-                        color: "var(--color-text-dim)",
-                        border: "1px solid var(--color-border)",
+                        background: "var(--surface-0)",
+                        color: "var(--text-secondary)",
+                        border: "1px solid var(--border-default)",
                       }}
                       onClick={() => setConfirmReset(false)}
                       whileTap={{ scale: 0.96 }}
@@ -1220,9 +1220,9 @@ export const ControllersTab: React.FC = () => {
                     key="reset"
                     className="px-3 py-1.5 rounded text-xs"
                     style={{
-                      background: "var(--color-surface)",
-                      color: "var(--color-text-dim)",
-                      border: "1px solid var(--color-border)",
+                      background: "var(--surface-0)",
+                      color: "var(--text-secondary)",
+                      border: "1px solid var(--border-default)",
                     }}
                     onClick={() => setConfirmReset(true)}
                     whileTap={{ scale: 0.96 }}
@@ -1243,28 +1243,28 @@ export const ControllersTab: React.FC = () => {
                   className="flex flex-col gap-2 px-4 py-3 rounded text-sm"
                   style={{
                     background:
-                      "color-mix(in srgb, var(--color-accent) 12%, var(--color-surface))",
-                    border: "1px solid var(--color-accent)",
+                      "color-mix(in srgb, var(--accent) 12%, var(--surface-0))",
+                    border: "1px solid var(--accent)",
                   }}
                   initial={{ opacity: 0, y: -8 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -8 }}
                 >
                   <div className="flex items-center gap-2">
-                    <Lock size={16} style={{ color: "var(--color-accent)" }} />
-                    <span style={{ color: "var(--color-text)" }}>
+                    <Lock size={16} style={{ color: "var(--accent)" }} />
+                    <span style={{ color: "var(--text-primary)" }}>
                       Controller navigation is <strong>locked</strong> while
                       viewing this tab.
                     </span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-xs" style={{ color: "var(--color-text-dim)" }}>
+                    <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
                       Hold <strong>X / <PSSquareIcon /></strong> for 5 seconds to unlock
                     </span>
-                    <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: "var(--color-surface-raised)" }}>
+                    <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: "var(--surface-1)" }}>
                       <motion.div
                         className="h-full rounded-full"
-                        style={{ background: "var(--color-accent)" }}
+                        style={{ background: "var(--accent)" }}
                         animate={{ width: `${controllersTabUnlockProgress * 100}%` }}
                         transition={{ duration: 0.05 }}
                       />
@@ -1277,7 +1277,7 @@ export const ControllersTab: React.FC = () => {
                   className="flex items-center gap-2 px-4 py-2 rounded text-sm"
                   style={{
                     background:
-                      "color-mix(in srgb, #5bba47 12%, var(--color-surface))",
+                      "color-mix(in srgb, #5bba47 12%, var(--surface-0))",
                     border: "1px solid #5bba47",
                   }}
                   initial={{ opacity: 0, y: -8 }}
@@ -1285,7 +1285,7 @@ export const ControllersTab: React.FC = () => {
                   exit={{ opacity: 0, y: -8 }}
                 >
                   <Unlock size={16} style={{ color: "#5bba47" }} />
-                  <span style={{ color: "var(--color-text)" }}>
+                  <span style={{ color: "var(--text-primary)" }}>
                     Controller navigation <strong>unlocked</strong>
                   </span>
                 </motion.div>
@@ -1297,8 +1297,8 @@ export const ControllersTab: React.FC = () => {
               <div
                 className="rounded-[var(--radius-card)] p-4 md:p-5"
                 style={{
-                  background: "var(--color-surface)",
-                  border: "1px solid var(--color-border)",
+                  background: "var(--surface-0)",
+                  border: "1px solid var(--border-default)",
                 }}
               >
                 <DiagramForDevice
@@ -1322,13 +1322,13 @@ export const ControllersTab: React.FC = () => {
               <div
                 className="rounded-[var(--radius-card)] p-4 flex flex-col gap-3"
                 style={{
-                  background: "var(--color-surface)",
-                  border: "1px solid var(--color-border)",
+                  background: "var(--surface-0)",
+                  border: "1px solid var(--border-default)",
                 }}
               >
                 <h3
                   className="text-xs font-semibold uppercase tracking-wider"
-                  style={{ color: "var(--color-text-dim)" }}
+                  style={{ color: "var(--text-secondary)" }}
                 >
                   Live Input
                 </h3>
@@ -1342,14 +1342,14 @@ export const ControllersTab: React.FC = () => {
                         className="flex flex-col items-center gap-1 p-2 rounded"
                         style={{
                           background: pressed
-                            ? "color-mix(in srgb, var(--color-accent) 25%, var(--color-surface-raised))"
-                            : "var(--color-surface-raised)",
-                          border: `1px solid ${pressed ? "var(--color-accent)" : "var(--color-border)"}`,
+                            ? "color-mix(in srgb, var(--accent) 25%, var(--surface-1))"
+                            : "var(--surface-1)",
+                          border: `1px solid ${pressed ? "var(--accent)" : "var(--border-default)"}`,
                         }}
                       >
                         <span
                           className="text-[10px] font-medium uppercase"
-                          style={{ color: "var(--color-text-dim)" }}
+                          style={{ color: "var(--text-secondary)" }}
                         >
                           {selectedDevice && getButtonLabel(selectedDevice.type, code)}
                         </span>
@@ -1357,8 +1357,8 @@ export const ControllersTab: React.FC = () => {
                           className="w-3 h-3 rounded-full"
                           style={{
                             background: pressed
-                              ? "var(--color-accent)"
-                              : "var(--color-border)",
+                              ? "var(--accent)"
+                              : "var(--border-default)",
                           }}
                         />
                       </div>
@@ -1379,22 +1379,22 @@ export const ControllersTab: React.FC = () => {
                           <div key={axis} className="flex items-center gap-3">
                             <span
                               className="text-[10px] font-mono uppercase w-20 shrink-0"
-                              style={{ color: "var(--color-text-dim)" }}
+                              style={{ color: "var(--text-secondary)" }}
                             >
                               {axis}
                             </span>
-                            <div className="flex-1 h-3 rounded-full relative overflow-hidden" style={{ background: "var(--color-surface-raised)" }}>
+                            <div className="flex-1 h-3 rounded-full relative overflow-hidden" style={{ background: "var(--surface-1)" }}>
                               <div
                                 className="absolute top-0 bottom-0 left-0 rounded-full transition-all"
                                 style={{
                                   width: `${pct}%`,
-                                  background: pct < 5 ? "var(--color-border)" : "var(--color-accent)",
+                                  background: pct < 5 ? "var(--border-default)" : "var(--accent)",
                                 }}
                               />
                             </div>
                             <span
                               className="text-[10px] font-mono w-10 text-right shrink-0"
-                              style={{ color: "var(--color-text-dim)" }}
+                              style={{ color: "var(--text-secondary)" }}
                             >
                               {typeof value === "number" ? value.toFixed(2) : value}
                             </span>
@@ -1407,19 +1407,19 @@ export const ControllersTab: React.FC = () => {
                         <div key={axis} className="flex items-center gap-3">
                           <span
                             className="text-[10px] font-mono uppercase w-20 shrink-0"
-                            style={{ color: "var(--color-text-dim)" }}
+                            style={{ color: "var(--text-secondary)" }}
                           >
                             {axis}
                           </span>
-                          <div className="flex-1 h-3 rounded-full relative overflow-hidden" style={{ background: "var(--color-surface-raised)" }}>
+                          <div className="flex-1 h-3 rounded-full relative overflow-hidden" style={{ background: "var(--surface-1)" }}>
                             <div
                               className="absolute top-0 bottom-0 rounded-full transition-all"
                               style={{
                                 left: "50%",
                                 width: isCenter ? "2px" : `${Math.abs(pct - 50) * 2}%`,
                                 background: isCenter
-                                  ? "var(--color-border)"
-                                  : "var(--color-accent)",
+                                  ? "var(--border-default)"
+                                  : "var(--accent)",
                                 transform: isCenter
                                   ? "translateX(-1px)"
                                   : normalized >= 0
@@ -1431,14 +1431,14 @@ export const ControllersTab: React.FC = () => {
                               className="absolute top-0 bottom-0 w-0.5 rounded-full"
                               style={{
                                 left: "50%",
-                                background: "var(--color-text-dim)",
+                                background: "var(--text-secondary)",
                                 transform: "translateX(-50%)",
                               }}
                             />
                           </div>
                           <span
                             className="text-[10px] font-mono w-10 text-right shrink-0"
-                            style={{ color: "var(--color-text-dim)" }}
+                            style={{ color: "var(--text-secondary)" }}
                           >
                             {typeof value === "number" ? value.toFixed(2) : value}
                           </span>
@@ -1457,22 +1457,22 @@ export const ControllersTab: React.FC = () => {
                   className="flex items-center gap-3 px-4 py-2 rounded text-sm"
                   style={{
                     background:
-                      "color-mix(in srgb, var(--color-accent) 22%, var(--color-surface))",
-                    border: "1px solid var(--color-accent)",
+                      "color-mix(in srgb, var(--accent) 22%, var(--surface-0))",
+                    border: "1px solid var(--accent)",
                   }}
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: "auto" }}
                   exit={{ opacity: 0, height: 0 }}
                 >
-                  <span style={{ color: "var(--color-accent)" }}>●</span>
-                  <span style={{ color: "var(--color-text)" }}>
+                  <span style={{ color: "var(--accent)" }}>●</span>
+                  <span style={{ color: "var(--text-primary)" }}>
                     Learning{" "}
                     <strong>
                       {selectedDevice && getButtonLabel(selectedDevice.type, learningCode)}
                     </strong>{" "}
                     — press any button on the controller
                     {learnedRaw !== null && (
-                      <span style={{ color: "var(--color-accent)" }}>
+                      <span style={{ color: "var(--accent)" }}>
                         {" "}
                         · raw code: {learnedRaw}
                       </span>
@@ -1481,9 +1481,9 @@ export const ControllersTab: React.FC = () => {
                   <motion.button
                     className="ml-auto px-2 py-0.5 rounded text-xs"
                     style={{
-                      background: "var(--color-surface)",
-                      color: "var(--color-text-dim)",
-                      border: "1px solid var(--color-border)",
+                      background: "var(--surface-0)",
+                      color: "var(--text-secondary)",
+                      border: "1px solid var(--border-default)",
                     }}
                     onClick={cancelLearn}
                     whileTap={{ scale: 0.96 }}
@@ -1497,7 +1497,7 @@ export const ControllersTab: React.FC = () => {
             {/* Mappings list */}
             <h3
               className="text-xs font-semibold uppercase tracking-wider"
-              style={{ color: "var(--color-text-dim)" }}
+              style={{ color: "var(--text-secondary)" }}
             >
               Button Mappings
             </h3>
@@ -1544,7 +1544,7 @@ export const ControllersTab: React.FC = () => {
                   <div className="flex flex-col gap-2">
                     <h3
                       className="text-xs font-semibold uppercase tracking-wider"
-                      style={{ color: "var(--color-text-dim)" }}
+                      style={{ color: "var(--text-secondary)" }}
                     >
                       Unknown Inputs
                     </h3>
@@ -1554,19 +1554,19 @@ export const ControllersTab: React.FC = () => {
                           key={`unknown-btn-${rawCode}`}
                           className="flex items-center justify-between py-2 px-3 rounded gap-2"
                           style={{
-                            background: "var(--color-surface-raised)",
-                            border: "1px solid var(--color-border)",
+                            background: "var(--surface-1)",
+                            border: "1px solid var(--border-default)",
                           }}
                         >
                           <span
                             className="text-sm font-mono w-28 shrink-0"
-                            style={{ color: "var(--color-text)" }}
+                            style={{ color: "var(--text-primary)" }}
                           >
                             {name}
                           </span>
                           <span
                             className="text-xs ml-auto"
-                            style={{ color: "var(--color-text-dim)" }}
+                            style={{ color: "var(--text-secondary)" }}
                           >
                             raw {rawCode}
                           </span>
@@ -1577,19 +1577,19 @@ export const ControllersTab: React.FC = () => {
                           key={`unknown-axis-${rawCode}`}
                           className="flex items-center justify-between py-2 px-3 rounded gap-2"
                           style={{
-                            background: "var(--color-surface-raised)",
-                            border: "1px solid var(--color-border)",
+                            background: "var(--surface-1)",
+                            border: "1px solid var(--border-default)",
                           }}
                         >
                           <span
                             className="text-sm font-mono w-28 shrink-0"
-                            style={{ color: "var(--color-text)" }}
+                            style={{ color: "var(--text-primary)" }}
                           >
                             {info.name}
                           </span>
                           <span
                             className="text-xs ml-auto"
-                            style={{ color: "var(--color-text-dim)" }}
+                            style={{ color: "var(--text-secondary)" }}
                           >
                             raw {rawCode} &middot; range{" "}
                             {info.min.toFixed(2)} .. {info.max.toFixed(2)}
@@ -1606,7 +1606,7 @@ export const ControllersTab: React.FC = () => {
               <div className="flex flex-col gap-2">
                 <button
                   className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider"
-                  style={{ color: "var(--color-text-dim)" }}
+                  style={{ color: "var(--text-secondary)" }}
                   onClick={() => setRawExpanded((v) => !v)}
                 >
                   {rawExpanded ? (
@@ -1631,19 +1631,19 @@ export const ControllersTab: React.FC = () => {
                           key={`raw-btn-${rawCode}`}
                           className="flex items-center justify-between py-1.5 px-3 rounded gap-2"
                           style={{
-                            background: "var(--color-surface-raised)",
-                            border: "1px solid var(--color-border)",
+                            background: "var(--surface-1)",
+                            border: "1px solid var(--border-default)",
                           }}
                         >
                           <span
                             className="text-xs font-mono"
-                            style={{ color: "var(--color-text)" }}
+                            style={{ color: "var(--text-primary)" }}
                           >
                             {name}
                           </span>
                           <span
                             className="text-[10px]"
-                            style={{ color: "var(--color-text-dim)" }}
+                            style={{ color: "var(--text-secondary)" }}
                           >
                             button &middot; raw {rawCode}
                           </span>
@@ -1656,19 +1656,19 @@ export const ControllersTab: React.FC = () => {
                           key={`raw-axis-${rawCode}`}
                           className="flex items-center justify-between py-1.5 px-3 rounded gap-2"
                           style={{
-                            background: "var(--color-surface-raised)",
-                            border: "1px solid var(--color-border)",
+                            background: "var(--surface-1)",
+                            border: "1px solid var(--border-default)",
                           }}
                         >
                           <span
                             className="text-xs font-mono"
-                            style={{ color: "var(--color-text)" }}
+                            style={{ color: "var(--text-primary)" }}
                           >
                             {info.name}
                           </span>
                           <span
                             className="text-[10px]"
-                            style={{ color: "var(--color-text-dim)" }}
+                            style={{ color: "var(--text-secondary)" }}
                           >
                             axis &middot; raw {rawCode} &middot; range{" "}
                             {info.min.toFixed(3)} .. {info.max.toFixed(3)}
@@ -1684,7 +1684,7 @@ export const ControllersTab: React.FC = () => {
         ) : (
           <div
             className="h-full flex items-center justify-center"
-            style={{ color: "var(--color-text-dim)" }}
+            style={{ color: "var(--text-secondary)" }}
           >
             Select a controller to configure it.
           </div>

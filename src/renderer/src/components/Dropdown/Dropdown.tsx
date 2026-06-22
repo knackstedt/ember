@@ -162,11 +162,11 @@ export const Dropdown: React.FC<DropdownProps> = ({
         onClick={handleToggle}
         className="w-full text-sm px-2 py-1.5 rounded flex items-center justify-between gap-2 text-left transition-colors"
         style={{
-          background: "var(--color-surface-raised)",
+          background: "var(--surface-1)",
           border: focused
-            ? "2px solid var(--color-accent)"
-            : "1px solid var(--color-border)",
-          color: "var(--color-text)",
+            ? "2px solid var(--accent)"
+            : "1px solid var(--border-default)",
+          color: "var(--text-primary)",
           outline: "none",
           boxShadow: focused ? "var(--shadow-glow)" : "none",
         }}
@@ -178,7 +178,7 @@ export const Dropdown: React.FC<DropdownProps> = ({
           className="flex-shrink-0 transition-transform"
           style={{
             transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
-            color: "var(--color-text-dim)",
+            color: "var(--text-secondary)",
           }}
         />
       </button>
@@ -188,8 +188,8 @@ export const Dropdown: React.FC<DropdownProps> = ({
           <motion.div
             className="absolute z-[50] left-0 right-0 mt-1 flex flex-col rounded-[var(--radius-card)] overflow-hidden py-1"
             style={{
-              background: "var(--color-surface-raised)",
-              border: "1px solid var(--color-border)",
+              background: "var(--surface-1)",
+              border: "1px solid var(--border-default)",
               boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
               maxHeight: 240,
               overflowY: "auto",
@@ -208,12 +208,12 @@ export const Dropdown: React.FC<DropdownProps> = ({
                 style={{
                   background:
                     i === activeIndex || opt.value === value
-                      ? "color-mix(in srgb, var(--color-accent) 18%, transparent)"
+                      ? "color-mix(in srgb, var(--accent) 18%, transparent)"
                       : "transparent",
                   color:
                     i === activeIndex || opt.value === value
-                      ? "var(--color-accent)"
-                      : "var(--color-text)",
+                      ? "var(--accent)"
+                      : "var(--text-primary)",
                   outline: "none",
                   cursor: "pointer",
                 }}

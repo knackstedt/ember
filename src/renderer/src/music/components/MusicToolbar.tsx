@@ -55,8 +55,8 @@ export const MusicToolbar: React.FC<MusicToolbarProps> = React.memo(({
           isFocused(0) ? "ring-2 ring-accent" : ""
         }`}
         style={{
-          background: viewMode === "grid" ? "var(--color-accent-dim)" : "var(--color-surface)",
-          color: viewMode === "grid" ? "var(--color-accent)" : "var(--color-text-dim)",
+          background: viewMode === "grid" ? "var(--accent-muted)" : "var(--surface-0)",
+          color: viewMode === "grid" ? "var(--accent)" : "var(--text-secondary)",
         }}
         onClick={() => onViewModeChange("grid")}
         title="Grid view"
@@ -68,8 +68,8 @@ export const MusicToolbar: React.FC<MusicToolbarProps> = React.memo(({
           isFocused(0) ? "ring-2 ring-accent" : ""
         }`}
         style={{
-          background: viewMode === "list" ? "var(--color-accent-dim)" : "var(--color-surface)",
-          color: viewMode === "list" ? "var(--color-accent)" : "var(--color-text-dim)",
+          background: viewMode === "list" ? "var(--accent-muted)" : "var(--surface-0)",
+          color: viewMode === "list" ? "var(--accent)" : "var(--text-secondary)",
         }}
         onClick={() => onViewModeChange("list")}
         title="List view"
@@ -87,9 +87,9 @@ export const MusicToolbar: React.FC<MusicToolbarProps> = React.memo(({
           isFocused(1) ? "ring-2 ring-accent" : ""
         }`}
         style={{
-          background: "var(--color-surface)",
-          color: "var(--color-text)",
-          border: "1px solid var(--color-border)",
+          background: "var(--surface-0)",
+          color: "var(--text-primary)",
+          border: "1px solid var(--border-default)",
         }}
         onClick={() => {
           const idx = SORT_OPTIONS.findIndex((o) => o.value === sortBy);
@@ -112,11 +112,11 @@ export const MusicToolbar: React.FC<MusicToolbarProps> = React.memo(({
         isFocused(2) ? "ring-2 ring-accent" : ""
       }`}
       style={{
-        background: searchQuery ? "var(--color-accent-dim)" : "var(--color-surface)",
-        border: "1px solid var(--color-border)",
+        background: searchQuery ? "var(--accent-muted)" : "var(--surface-0)",
+        border: "1px solid var(--border-default)",
       }}
     >
-      <Search size={14} style={{ color: searchQuery ? "var(--color-accent)" : "var(--color-text-dim)", flexShrink: 0 }} />
+      <Search size={14} style={{ color: searchQuery ? "var(--accent)" : "var(--text-secondary)", flexShrink: 0 }} />
       <input
         type="text"
         value={searchQuery}
@@ -125,7 +125,7 @@ export const MusicToolbar: React.FC<MusicToolbarProps> = React.memo(({
         placeholder="Search..."
         className="bg-transparent outline-none text-sm min-w-0 w-32"
         style={{
-          color: searchQuery ? "var(--color-accent)" : "var(--color-text)",
+          color: searchQuery ? "var(--accent)" : "var(--text-primary)",
         }}
       />
       {searchQuery && (
@@ -135,7 +135,7 @@ export const MusicToolbar: React.FC<MusicToolbarProps> = React.memo(({
             e.stopPropagation();
             onClearSearch();
           }}
-          style={{ color: "var(--color-text-dim)" }}
+          style={{ color: "var(--text-secondary)" }}
         >
           <X size={12} />
         </button>
@@ -152,9 +152,9 @@ export const MusicToolbar: React.FC<MusicToolbarProps> = React.memo(({
           isFocused(3) ? "ring-2 ring-accent" : ""
         }`}
         style={{
-          background: "var(--color-surface)",
-          color: "var(--color-text)",
-          border: "1px solid var(--color-border)",
+          background: "var(--surface-0)",
+          color: "var(--text-primary)",
+          border: "1px solid var(--border-default)",
         }}
         onClick={onCreatePlaylist}
         title="Create playlist"
@@ -175,9 +175,9 @@ export const MusicToolbar: React.FC<MusicToolbarProps> = React.memo(({
           isFocused(editIndex) ? "ring-2 ring-accent" : ""
         }`}
         style={{
-          background: "var(--color-surface)",
-          color: "var(--color-text)",
-          border: "1px solid var(--color-border)",
+          background: "var(--surface-0)",
+          color: "var(--text-primary)",
+          border: "1px solid var(--border-default)",
         }}
         onClick={onEditTags}
         title="Edit tags"
@@ -192,16 +192,16 @@ export const MusicToolbar: React.FC<MusicToolbarProps> = React.memo(({
     <div
       className="flex items-center gap-3 px-4 py-2 flex-shrink-0"
       style={{
-        background: "var(--color-bg)",
-        borderBottom: "1px solid var(--color-border)",
+        background: "var(--surface-base)",
+        borderBottom: "1px solid var(--border-default)",
       }}
     >
       {activeFilterLabel && onClearFilter && (
         <motion.button
           className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium"
           style={{
-            background: "var(--color-accent)",
-            color: "var(--color-bg)",
+            background: "var(--accent)",
+            color: "var(--surface-base)",
           }}
           onClick={onClearFilter}
           whileTap={{ scale: 0.95 }}

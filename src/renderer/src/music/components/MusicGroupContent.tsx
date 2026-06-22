@@ -58,9 +58,9 @@ const GroupListItem: React.FC<{
       className="flex items-center gap-3 w-full h-full px-3 cursor-pointer select-none"
       style={{
         background: isFocused
-          ? "color-mix(in srgb, var(--color-accent) 10%, transparent)"
+          ? "color-mix(in srgb, var(--accent) 10%, transparent)"
           : "transparent",
-        outline: isFocused ? "2px solid var(--color-accent)" : "none",
+        outline: isFocused ? "2px solid var(--accent)" : "none",
         outlineOffset: -2,
         borderRadius: "var(--radius-card)",
       }}
@@ -70,19 +70,19 @@ const GroupListItem: React.FC<{
         className="w-12 h-12 flex-shrink-0 rounded overflow-hidden bg-cover bg-center flex items-center justify-center text-sm"
         style={{
           backgroundImage: group.coverUrl ? `url(${group.coverUrl})` : undefined,
-          backgroundColor: !group.coverUrl ? "var(--color-surface-raised)" : undefined,
+          backgroundColor: !group.coverUrl ? "var(--surface-1)" : undefined,
         }}
       >
-        {!group.coverUrl && <span style={{ color: "var(--color-text-dim)" }}>♪</span>}
+        {!group.coverUrl && <span style={{ color: "var(--text-secondary)" }}>♪</span>}
       </div>
       <div className="flex-1 min-w-0 flex flex-col justify-center">
         <div
           className="font-medium truncate text-sm"
-          style={{ color: isFocused ? "var(--color-accent)" : "var(--color-text)" }}
+          style={{ color: isFocused ? "var(--accent)" : "var(--text-primary)" }}
         >
           {group.name}
         </div>
-        <div className="text-xs truncate" style={{ color: "var(--color-text-dim)" }}>
+        <div className="text-xs truncate" style={{ color: "var(--text-secondary)" }}>
           {group.trackCount} track{group.trackCount !== 1 ? "s" : ""}
           {group.subtitle ? ` · ${group.subtitle}` : ""}
         </div>
@@ -137,7 +137,7 @@ export const MusicGroupContent: React.FC<MusicGroupContentProps> = React.memo(({
   if (items.length === 0) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <div className="text-center" style={{ color: "var(--color-text-dim)" }}>
+        <div className="text-center" style={{ color: "var(--text-secondary)" }}>
           No items found
         </div>
       </div>

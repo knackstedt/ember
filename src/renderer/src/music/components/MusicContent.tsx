@@ -87,9 +87,9 @@ const MusicListItem: React.FC<{
       className="flex items-center gap-3 w-full h-full px-3 cursor-pointer select-none"
       style={{
         background: isFocused
-          ? "color-mix(in srgb, var(--color-accent) 10%, transparent)"
+          ? "color-mix(in srgb, var(--accent) 10%, transparent)"
           : "transparent",
-        outline: isFocused ? "2px solid var(--color-accent)" : "none",
+        outline: isFocused ? "2px solid var(--accent)" : "none",
         outlineOffset: -2,
         borderRadius: "var(--radius-card)",
       }}
@@ -99,7 +99,7 @@ const MusicListItem: React.FC<{
         className="w-12 h-12 flex-shrink-0 rounded overflow-hidden bg-cover bg-center"
         style={{
           backgroundImage: coverUrl ? `url(${coverUrl})` : undefined,
-          backgroundColor: !coverUrl ? "var(--color-surface-raised)" : undefined,
+          backgroundColor: !coverUrl ? "var(--surface-1)" : undefined,
           filter: track.missing ? "grayscale(80%)" : undefined,
           opacity: track.missing ? 0.6 : undefined,
         }}
@@ -107,11 +107,11 @@ const MusicListItem: React.FC<{
       <div className="flex-1 min-w-0 flex flex-col justify-center">
         <div
           className="font-medium truncate text-sm"
-          style={{ color: isFocused ? "var(--color-accent)" : "var(--color-text)" }}
+          style={{ color: isFocused ? "var(--accent)" : "var(--text-primary)" }}
         >
           {title}
         </div>
-        <div className="text-xs truncate" style={{ color: "var(--color-text-dim)" }}>
+        <div className="text-xs truncate" style={{ color: "var(--text-secondary)" }}>
           {track.artist}
           {track.artist && track.album ? ` · ${track.album}` : ""}
           {track.year ? ` · ${track.year}` : ""}
@@ -120,13 +120,13 @@ const MusicListItem: React.FC<{
       {track.duration && (
         <span
           className="text-xs tabular-nums flex-shrink-0"
-          style={{ color: "var(--color-text-dim)" }}
+          style={{ color: "var(--text-secondary)" }}
         >
           {Math.floor(track.duration / 60)}:{String(Math.round(track.duration % 60)).padStart(2, "0")}
         </span>
       )}
       {track.isFavorite && (
-        <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="var(--color-accent)">
+        <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="var(--accent)">
           <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
         </svg>
       )}
@@ -193,7 +193,7 @@ export const MusicContent: React.FC<MusicContentProps> = React.memo(({
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center">
           <div className="text-4xl mb-2 opacity-30">♪</div>
-          <div style={{ color: "var(--color-text-dim)" }}>No music found</div>
+          <div style={{ color: "var(--text-secondary)" }}>No music found</div>
         </div>
       </div>
     );

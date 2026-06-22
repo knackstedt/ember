@@ -125,7 +125,7 @@ export const BookshelfView = React.forwardRef(function BookshelfViewInner<T>(
           <div
             className="flex items-end gap-[3px] px-3 pt-3 overflow-x-auto"
             style={{
-              background: "var(--color-surface-raised)",
+              background: "var(--surface-1)",
               borderRadius: "10px 10px 0 0",
               minHeight: shelfHeight - 26,
               scrollbarWidth: "none",

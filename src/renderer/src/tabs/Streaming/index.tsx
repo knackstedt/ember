@@ -218,15 +218,15 @@ export const StreamingTab: React.FC = () => {
             transition={{ duration: 0.15 }}
           >
             <div className="flex items-center justify-between">
-              <h1 className="text-2xl font-bold" style={{ color: "var(--color-text)" }}>
+              <h1 className="text-2xl font-bold" style={{ color: "var(--text-primary)" }}>
                 Streaming
               </h1>
               <motion.button
                 className="flex items-center gap-2 px-3 py-1.5 rounded-[var(--radius-card)] text-xs font-medium"
                 style={{
-                  background: "var(--color-surface-raised)",
-                  color: "var(--color-text)",
-                  border: "1px solid var(--color-border)",
+                  background: "var(--surface-1)",
+                  color: "var(--text-primary)",
+                  border: "1px solid var(--border-default)",
                 }}
                 whileTap={{ scale: 0.96 }}
                 onClick={openSettings}
@@ -245,21 +245,21 @@ export const StreamingTab: React.FC = () => {
               <div
                 className="flex flex-col gap-3 p-4 rounded-[var(--radius-card)]"
                 style={{
-                  background: "var(--color-surface-raised)",
-                  border: "1px solid var(--color-border)",
+                  background: "var(--surface-1)",
+                  border: "1px solid var(--border-default)",
                 }}
               >
                 <div className="flex items-center gap-2">
-                  <Globe size={18} style={{ color: "var(--color-accent)" }} />
-                  <span className="font-medium" style={{ color: "var(--color-text)" }}>
+                  <Globe size={18} style={{ color: "var(--accent)" }} />
+                  <span className="font-medium" style={{ color: "var(--text-primary)" }}>
                     Getting Started
                   </span>
                 </div>
-                <p className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+                <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
                   No streaming services are enabled. Enable built-in services or add your own in{" "}
                   <button
                     className="underline hover:text-white transition-colors"
-                    style={{ color: "var(--color-accent)" }}
+                    style={{ color: "var(--accent)" }}
                     onClick={openSettings}
                   >
                     Settings → Streaming Services
@@ -275,10 +275,10 @@ export const StreamingTab: React.FC = () => {
                     className="flex flex-col gap-3"
                   >
                     <div className="flex items-center gap-2">
-                      <Music size={18} style={{ color: "var(--color-accent)" }} />
+                      <Music size={18} style={{ color: "var(--accent)" }} />
                       <h2
                         className="text-sm font-semibold uppercase tracking-wide"
-                        style={{ color: "var(--color-text-dim)" }}
+                        style={{ color: "var(--text-secondary)" }}
                       >
                         Music
                       </h2>
@@ -310,10 +310,10 @@ export const StreamingTab: React.FC = () => {
                     className="flex flex-col gap-3"
                   >
                     <div className="flex items-center gap-2">
-                      <Film size={18} style={{ color: "var(--color-accent)" }} />
+                      <Film size={18} style={{ color: "var(--accent)" }} />
                       <h2
                         className="text-sm font-semibold uppercase tracking-wide"
-                        style={{ color: "var(--color-text-dim)" }}
+                        style={{ color: "var(--text-secondary)" }}
                       >
                         Videos
                       </h2>
@@ -356,8 +356,8 @@ export const StreamingTab: React.FC = () => {
             <div
               className="flex items-center gap-2 px-3 py-2 border-b"
               style={{
-                borderColor: "var(--color-border)",
-                background: "var(--color-surface-raised)",
+                borderColor: "var(--border-default)",
+                background: "var(--surface-1)",
               }}
             >
               <button
@@ -365,9 +365,9 @@ export const StreamingTab: React.FC = () => {
                 onClick={handleCloseWebview}
                 title="Back to services"
               >
-                <ArrowLeft size={16} style={{ color: "var(--color-text)" }} />
+                <ArrowLeft size={16} style={{ color: "var(--text-primary)" }} />
               </button>
-              <div className="flex-1 text-sm font-medium truncate px-2" style={{ color: "var(--color-text)" }}>
+              <div className="flex-1 text-sm font-medium truncate px-2" style={{ color: "var(--text-primary)" }}>
                 {activeService.name}
               </div>
               <button
@@ -375,14 +375,14 @@ export const StreamingTab: React.FC = () => {
                 onClick={() => setShowExtensionManager(true)}
                 title="Manage extensions"
               >
-                <Settings size={16} style={{ color: "var(--color-text)" }} />
+                <Settings size={16} style={{ color: "var(--text-primary)" }} />
               </button>
               <button
                 className="p-1.5 rounded hover:bg-white/10 transition-colors"
                 onClick={handleCloseWebview}
                 title="Close"
               >
-                <X size={16} style={{ color: "var(--color-text)" }} />
+                <X size={16} style={{ color: "var(--text-primary)" }} />
               </button>
             </div>
 
@@ -443,8 +443,8 @@ const ServiceTile = React.forwardRef<HTMLButtonElement, ServiceTileProps>(
         className="relative flex flex-col justify-between rounded-[var(--radius-card)] overflow-hidden transition-all text-left"
         style={{
           aspectRatio: "16/9",
-          background: service.color || "var(--color-surface-raised)",
-          boxShadow: focused ? "0 0 0 3px var(--color-accent)" : "var(--shadow-card)",
+          background: service.color || "var(--surface-1)",
+          boxShadow: focused ? "0 0 0 3px var(--accent)" : "var(--shadow-card)",
           transform: focused ? "scale(1.05)" : undefined,
         }}
         whileHover={{ scale: 1.05, y: -3 }}
@@ -458,7 +458,7 @@ const ServiceTile = React.forwardRef<HTMLButtonElement, ServiceTileProps>(
         </span>
         <span
           className="text-sm font-bold px-3 pb-2.5 leading-tight"
-          style={{ color: service.textColor || "var(--color-text)" }}
+          style={{ color: service.textColor || "var(--text-primary)" }}
         >
           {service.name}
         </span>

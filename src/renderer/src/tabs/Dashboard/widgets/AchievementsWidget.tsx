@@ -14,7 +14,7 @@ function AchievementRing({ pct, color }: { pct: number; color: string }) {
   return (
     <div className="relative w-7 h-7 flex-shrink-0">
       <svg className="w-full h-full -rotate-90" viewBox="0 0 24 24">
-        <circle cx="12" cy="12" r="10" fill="none" stroke="var(--color-surface-raised)" strokeWidth="3" />
+        <circle cx="12" cy="12" r="10" fill="none" stroke="var(--surface-1)" strokeWidth="3" />
         <circle
           cx="12" cy="12" r="10" fill="none" stroke={color} strokeWidth="3"
           strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={offset}
@@ -51,16 +51,16 @@ export const AchievementsWidget: React.FC<{ title?: string }> = ({ title }) => {
             key={a.id}
             className="flex items-center gap-1.5 px-1.5 py-1 rounded-xl"
             style={{
-              background: a.unlocked ? "var(--color-surface-raised)" : "transparent",
+              background: a.unlocked ? "var(--surface-1)" : "transparent",
               opacity: a.unlocked ? 1 : 0.6,
             }}
           >
-            <AchievementRing pct={(a.progress / a.total) * 100} color={a.unlocked ? "var(--color-accent)" : "var(--color-text)"} />
+            <AchievementRing pct={(a.progress / a.total) * 100} color={a.unlocked ? "var(--accent)" : "var(--text-primary)"} />
             <div className="flex-1 min-w-0 flex flex-col gap-0">
               <div className="text-[11px] font-medium truncate">{a.name}</div>
               <div className="text-[9px] opacity-40 truncate">{a.desc}</div>
             </div>
-            {a.unlocked && <Trophy size={10} style={{ color: "var(--color-accent)" }} />}
+            {a.unlocked && <Trophy size={10} style={{ color: "var(--accent)" }} />}
           </div>
         ))}
       </div>

@@ -39,7 +39,7 @@ export const ClockWidget: React.FC<ClockWidgetProps> = ({
       <div
         className="absolute inset-0 opacity-[0.03] rounded-full pointer-events-none"
         style={{
-          background: `radial-gradient(circle at 50% 50%, var(--color-accent) 0%, transparent 70%)`,
+          background: `radial-gradient(circle at 50% 50%, var(--accent) 0%, transparent 70%)`,
         }}
       />
 
@@ -51,17 +51,17 @@ export const ClockWidget: React.FC<ClockWidgetProps> = ({
       )}
 
       <div className="flex items-baseline gap-1 z-10">
-        <span className="text-5xl font-bold tabular-nums leading-none" style={{ color: "var(--color-text)" }}>
+        <span className="text-5xl font-bold tabular-nums leading-none" style={{ color: "var(--text-primary)" }}>
           {pad(displayHours)}
         </span>
-        <span className="text-5xl font-light tabular-nums leading-none animate-pulse" style={{ color: "var(--color-accent-dim)" }}>
+        <span className="text-5xl font-light tabular-nums leading-none animate-pulse" style={{ color: "var(--accent-muted)" }}>
           :
         </span>
-        <span className="text-5xl font-bold tabular-nums leading-none" style={{ color: "var(--color-text)" }}>
+        <span className="text-5xl font-bold tabular-nums leading-none" style={{ color: "var(--text-primary)" }}>
           {pad(minutes)}
         </span>
         <span className="flex flex-col gap-0.5 ml-1">
-          <span className="text-lg font-semibold tabular-nums leading-none" style={{ color: "var(--color-accent)" }}>
+          <span className="text-lg font-semibold tabular-nums leading-none" style={{ color: "var(--accent)" }}>
             {pad(seconds)}
           </span>
           {ampm && (

@@ -277,25 +277,25 @@ export const KeybindEditor: React.FC<KeybindEditorProps> = ({
             placeholder="Search commands..."
             className="w-full px-3 py-2 rounded text-sm pl-9"
             style={{
-              background: "var(--color-surface-raised)",
-              border: "1px solid var(--color-border)",
-              color: "var(--color-text)",
+              background: "var(--surface-1)",
+              border: "1px solid var(--border-default)",
+              color: "var(--text-primary)",
               outline: "none",
             }}
           />
           <Keyboard
             size={16}
             className="absolute left-3 top-1/2 -translate-y-1/2"
-            style={{ color: "var(--color-text-dim)" }}
+            style={{ color: "var(--text-secondary)" }}
           />
         </div>
         <motion.button
           onClick={onResetAll}
           className="px-3 py-2 rounded text-sm font-medium"
           style={{
-            background: "var(--color-surface-raised)",
-            border: "1px solid var(--color-border)",
-            color: "var(--color-text-dim)",
+            background: "var(--surface-1)",
+            border: "1px solid var(--border-default)",
+            color: "var(--text-secondary)",
           }}
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
@@ -311,7 +311,7 @@ export const KeybindEditor: React.FC<KeybindEditorProps> = ({
           animate={{ opacity: 1, y: 0 }}
           className="flex flex-col gap-2 p-3 rounded-[var(--radius-card)]"
           style={{
-            background: "color-mix(in srgb, #ff9800 15%, var(--color-surface-raised))",
+            background: "color-mix(in srgb, #ff9800 15%, var(--surface-1))",
             border: "1px solid #ff980040",
           }}
         >
@@ -328,7 +328,7 @@ export const KeybindEditor: React.FC<KeybindEditorProps> = ({
       <div
         className="flex flex-col gap-1 rounded-[var(--radius-card)] overflow-hidden"
         style={{
-          border: "1px solid var(--color-border)",
+          border: "1px solid var(--border-default)",
           maxHeight: "60vh",
           overflowY: "auto",
         }}
@@ -338,9 +338,9 @@ export const KeybindEditor: React.FC<KeybindEditorProps> = ({
             <div
               className="px-3 py-2 text-xs font-semibold uppercase tracking-wider sticky top-0"
               style={{
-                background: "var(--color-surface-raised)",
-                color: "var(--color-text-dim)",
-                borderBottom: "1px solid var(--color-border)",
+                background: "var(--surface-1)",
+                color: "var(--text-secondary)",
+                borderBottom: "1px solid var(--border-default)",
               }}
             >
               {CATEGORY_LABELS[category]}
@@ -359,21 +359,21 @@ export const KeybindEditor: React.FC<KeybindEditorProps> = ({
                   layout
                   className="flex items-center gap-3 px-3 py-2.5"
                   style={{
-                    borderBottom: "1px solid var(--color-border)",
-                    background: "var(--color-surface)",
+                    borderBottom: "1px solid var(--border-default)",
+                    background: "var(--surface-0)",
                   }}
                 >
                   <div className="flex-1 min-w-0">
                     <div
                       className="text-sm font-medium truncate"
-                      style={{ color: "var(--color-text)" }}
+                      style={{ color: "var(--text-primary)" }}
                     >
                       {cmd.label}
                     </div>
                     {cmd.description && (
                       <div
                         className="text-xs truncate"
-                        style={{ color: "var(--color-text-dim)" }}
+                        style={{ color: "var(--text-secondary)" }}
                       >
                         {cmd.description}
                       </div>
@@ -389,8 +389,8 @@ export const KeybindEditor: React.FC<KeybindEditorProps> = ({
                           animate={{ scale: 1 }}
                           className="px-3 py-1.5 rounded text-xs font-medium flex items-center gap-2"
                           style={{
-                            background: "var(--color-accent)",
-                            color: "var(--color-bg)",
+                            background: "var(--accent)",
+                            color: "var(--surface-base)",
                           }}
                         >
                           <span className="animate-pulse">
@@ -407,15 +407,15 @@ export const KeybindEditor: React.FC<KeybindEditorProps> = ({
                             style={{
                               background: customKb
                                 ? kbDuplicate
-                                  ? "color-mix(in srgb, #ff9800 70%, var(--color-accent))"
-                                  : "var(--color-accent)"
-                                : "var(--color-surface-raised)",
+                                  ? "color-mix(in srgb, #ff9800 70%, var(--accent))"
+                                  : "var(--accent)"
+                                : "var(--surface-1)",
                               color: customKb
-                                ? "var(--color-bg)"
-                                : "var(--color-text-dim)",
+                                ? "var(--surface-base)"
+                                : "var(--text-secondary)",
                               border: `1px solid ${customKb
-                                ? kbDuplicate ? "#ff9800" : "var(--color-accent)"
-                                : "var(--color-border)"}`,
+                                ? kbDuplicate ? "#ff9800" : "var(--accent)"
+                                : "var(--border-default)"}`,
                               boxShadow: customKb
                                 ? "0 2px 4px rgba(0,0,0,0.2)"
                                 : "none",
@@ -432,7 +432,7 @@ export const KeybindEditor: React.FC<KeybindEditorProps> = ({
                               onClick={() => onChangeKeybind(cmd.id, undefined)}
                               className="p-1 rounded"
                               style={{
-                                color: "var(--color-text-dim)",
+                                color: "var(--text-secondary)",
                                 background: "transparent",
                               }}
                               title="Clear shortcut"
@@ -459,25 +459,25 @@ export const KeybindEditor: React.FC<KeybindEditorProps> = ({
                             exit={{ opacity: 0, scale: 0.95, y: 5 }}
                             className="absolute right-0 top-10 z-20 flex flex-col gap-0.5 p-2 rounded-[var(--radius-card)]"
                             style={{
-                              background: "var(--color-surface)",
-                              border: "1px solid var(--color-border)",
+                              background: "var(--surface-0)",
+                              border: "1px solid var(--border-default)",
                               boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
                               minWidth: 180,
                               maxHeight: 300,
                               overflowY: "auto",
                             }}
                           >
-                            <div className="text-xs font-medium px-2 py-1" style={{ color: "var(--color-text-dim)" }}>
+                            <div className="text-xs font-medium px-2 py-1" style={{ color: "var(--text-secondary)" }}>
                               Select button
                             </div>
                             {CONTROLLER_BUTTONS.map((btn) => (
                               <motion.button
                                 key={btn.id}
-                                whileHover={{ backgroundColor: "var(--color-surface-raised)" }}
+                                whileHover={{ backgroundColor: "var(--surface-1)" }}
                                 onClick={() => handleControllerPick(cmd.id, btn.id)}
                                 className="text-left px-2 py-1.5 rounded text-xs flex items-center justify-between"
                                 style={{
-                                  color: "var(--color-text)",
+                                  color: "var(--text-primary)",
                                   background: "transparent",
                                   border: "none",
                                   cursor: "pointer",
@@ -485,20 +485,20 @@ export const KeybindEditor: React.FC<KeybindEditorProps> = ({
                               >
                                 <span>{btn.label}</span>
                                 {controllerMap[cmd.id] === btn.id && (
-                                  <span style={{ color: "var(--color-accent)" }}>✓</span>
+                                  <span style={{ color: "var(--accent)" }}>✓</span>
                                 )}
                               </motion.button>
                             ))}
-                            <div style={{ borderTop: "1px solid var(--color-border)", margin: "4px 0" }} />
+                            <div style={{ borderTop: "1px solid var(--border-default)", margin: "4px 0" }} />
                             <motion.button
-                              whileHover={{ backgroundColor: "var(--color-surface-raised)" }}
+                              whileHover={{ backgroundColor: "var(--surface-1)" }}
                               onClick={() => {
                                 onChangeController(cmd.id, undefined);
                                 setRecordingControllerFor(null);
                               }}
                               className="text-left px-2 py-1.5 rounded text-xs"
                               style={{
-                                color: "var(--color-text-dim)",
+                                color: "var(--text-secondary)",
                                 background: "transparent",
                                 border: "none",
                                 cursor: "pointer",
@@ -507,11 +507,11 @@ export const KeybindEditor: React.FC<KeybindEditorProps> = ({
                               Clear mapping
                             </motion.button>
                             <motion.button
-                              whileHover={{ backgroundColor: "var(--color-surface-raised)" }}
+                              whileHover={{ backgroundColor: "var(--surface-1)" }}
                               onClick={() => setRecordingControllerFor(null)}
                               className="text-left px-2 py-1.5 rounded text-xs"
                               style={{
-                                color: "var(--color-text-dim)",
+                                color: "var(--text-secondary)",
                                 background: "transparent",
                                 border: "none",
                                 cursor: "pointer",
@@ -534,15 +534,15 @@ export const KeybindEditor: React.FC<KeybindEditorProps> = ({
                         style={{
                           background: customCtrl
                             ? ctrlDuplicate
-                              ? "color-mix(in srgb, #ff9800 70%, var(--color-accent))"
-                              : "var(--color-accent)"
-                            : "var(--color-surface-raised)",
+                              ? "color-mix(in srgb, #ff9800 70%, var(--accent))"
+                              : "var(--accent)"
+                            : "var(--surface-1)",
                           color: customCtrl
-                            ? "var(--color-bg)"
-                            : "var(--color-text-dim)",
+                            ? "var(--surface-base)"
+                            : "var(--text-secondary)",
                           border: `1px solid ${customCtrl
-                            ? ctrlDuplicate ? "#ff9800" : "var(--color-accent)"
-                            : "var(--color-border)"}`,
+                            ? ctrlDuplicate ? "#ff9800" : "var(--accent)"
+                            : "var(--border-default)"}`,
                           cursor: "pointer",
                           minWidth: 100,
                           boxShadow: customCtrl
@@ -570,7 +570,7 @@ export const KeybindEditor: React.FC<KeybindEditorProps> = ({
         {filtered.length === 0 && (
           <div
             className="px-3 py-8 text-center text-sm flex flex-col items-center gap-2"
-            style={{ color: "var(--color-text-dim)" }}
+            style={{ color: "var(--text-secondary)" }}
           >
             <Keyboard size={24} style={{ opacity: 0.5 }} />
             No commands found

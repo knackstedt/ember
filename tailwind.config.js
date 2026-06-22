@@ -7,14 +7,14 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        accent: "var(--color-accent)",
-        "accent-dim": "var(--color-accent-dim)",
-        surface: "var(--color-surface)",
-        "surface-raised": "var(--color-surface-raised)",
-        "surface-overlay": "var(--color-surface-overlay)",
-        text: "var(--color-text)",
-        "text-dim": "var(--color-text-dim)",
-        border: "var(--color-border)",
+        accent: "var(--accent)",
+        "accent-dim": "var(--accent-muted)",
+        surface: "var(--surface-0)",
+        "surface-raised": "var(--surface-1)",
+        "surface-overlay": "var(--surface-2)",
+        text: "var(--text-primary)",
+        "text-dim": "var(--text-secondary)",
+        border: "var(--border-default)",
       },
       fontFamily: {
         sans: "var(--font-sans)",

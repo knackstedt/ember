@@ -11,12 +11,12 @@ export const EmulatorsTab: React.FC = () => {
   return (
     <div className="flex flex-col gap-8">
       <section className="flex flex-col gap-4">
-        <h2 className="text-lg font-semibold" style={{ color: "var(--color-text)" }}>
+        <h2 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
           Flash Player
         </h2>
         <div className="flex flex-col gap-3">
           <div>
-            <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--color-text-dim)" }}>
+            <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--text-secondary)" }}>
               Default Aspect Ratio
             </label>
             <select
@@ -31,9 +31,9 @@ export const EmulatorsTab: React.FC = () => {
               }
               className="w-full text-sm px-2 py-1.5 rounded"
               style={{
-                background: "var(--color-surface-raised)",
-                border: "1px solid var(--color-border)",
-                color: "var(--color-text)",
+                background: "var(--surface-1)",
+                border: "1px solid var(--border-default)",
+                color: "var(--text-primary)",
                 outline: "none",
               }}
             >
@@ -44,7 +44,7 @@ export const EmulatorsTab: React.FC = () => {
             </select>
           </div>
           <div>
-            <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--color-text-dim)" }}>
+            <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--text-secondary)" }}>
               Default Canvas Size
             </label>
             <select
@@ -59,9 +59,9 @@ export const EmulatorsTab: React.FC = () => {
               }
               className="w-full text-sm px-2 py-1.5 rounded"
               style={{
-                background: "var(--color-surface-raised)",
-                border: "1px solid var(--color-border)",
-                color: "var(--color-text)",
+                background: "var(--surface-1)",
+                border: "1px solid var(--border-default)",
+                color: "var(--text-primary)",
                 outline: "none",
               }}
             >
@@ -90,9 +90,9 @@ export const EmulatorsTab: React.FC = () => {
                   placeholder="Width"
                   className="flex-1 text-sm px-2 py-1.5 rounded"
                   style={{
-                    background: "var(--color-surface-raised)",
-                    border: "1px solid var(--color-border)",
-                    color: "var(--color-text)",
+                    background: "var(--surface-1)",
+                    border: "1px solid var(--border-default)",
+                    color: "var(--text-primary)",
                     outline: "none",
                   }}
                 />
@@ -112,9 +112,9 @@ export const EmulatorsTab: React.FC = () => {
                   placeholder="Height"
                   className="flex-1 text-sm px-2 py-1.5 rounded"
                   style={{
-                    background: "var(--color-surface-raised)",
-                    border: "1px solid var(--color-border)",
-                    color: "var(--color-text)",
+                    background: "var(--surface-1)",
+                    border: "1px solid var(--border-default)",
+                    color: "var(--text-primary)",
                     outline: "none",
                   }}
                 />
@@ -122,7 +122,7 @@ export const EmulatorsTab: React.FC = () => {
             )}
           </div>
           <div>
-            <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--color-text-dim)" }}>
+            <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--text-secondary)" }}>
               Default Upscaling Style
             </label>
             <select
@@ -137,9 +137,9 @@ export const EmulatorsTab: React.FC = () => {
               }
               className="w-full text-sm px-2 py-1.5 rounded"
               style={{
-                background: "var(--color-surface-raised)",
-                border: "1px solid var(--color-border)",
-                color: "var(--color-text)",
+                background: "var(--surface-1)",
+                border: "1px solid var(--border-default)",
+                color: "var(--text-primary)",
                 outline: "none",
               }}
             >
@@ -150,7 +150,7 @@ export const EmulatorsTab: React.FC = () => {
             </select>
           </div>
           <div>
-            <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--color-text-dim)" }}>
+            <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--text-secondary)" }}>
               Thumbnail Concurrency
             </label>
             <input
@@ -165,13 +165,13 @@ export const EmulatorsTab: React.FC = () => {
               }
               className="w-full text-sm px-2 py-1.5 rounded"
               style={{
-                background: "var(--color-surface-raised)",
-                border: "1px solid var(--color-border)",
-                color: "var(--color-text)",
+                background: "var(--surface-1)",
+                border: "1px solid var(--border-default)",
+                color: "var(--text-primary)",
                 outline: "none",
               }}
             />
-            <p className="text-xs mt-1" style={{ color: "var(--color-text-dim)" }}>
+            <p className="text-xs mt-1" style={{ color: "var(--text-secondary)" }}>
               Max number of flash games to thumbnail at once (1–10)
             </p>
           </div>
@@ -179,12 +179,12 @@ export const EmulatorsTab: React.FC = () => {
       </section>
 
       <section className="flex flex-col gap-4">
-        <h2 className="text-lg font-semibold" style={{ color: "var(--color-text)" }}>
+        <h2 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
           Emulators
         </h2>
         <div className="flex flex-col gap-3">
           <div>
-            <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--color-text-dim)" }}>
+            <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--text-secondary)" }}>
               Default Shader (Global)
             </label>
             <select
@@ -192,9 +192,9 @@ export const EmulatorsTab: React.FC = () => {
               onChange={(e) => update({ defaultEmulatorShader: e.target.value })}
               className="w-full text-sm px-2 py-1.5 rounded"
               style={{
-                background: "var(--color-surface-raised)",
-                border: "1px solid var(--color-border)",
-                color: "var(--color-text)",
+                background: "var(--surface-1)",
+                border: "1px solid var(--border-default)",
+                color: "var(--text-primary)",
                 outline: "none",
               }}
             >
@@ -221,7 +221,7 @@ export const EmulatorsTab: React.FC = () => {
             ] as [GamePlatform, string][]
           ).map(([platform, label]) => (
             <div key={platform}>
-              <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--color-text-dim)" }}>
+              <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--text-secondary)" }}>
                 {label} Default Shader
               </label>
               <select
@@ -232,9 +232,9 @@ export const EmulatorsTab: React.FC = () => {
                 }}
                 className="w-full text-sm px-2 py-1.5 rounded"
                 style={{
-                  background: "var(--color-surface-raised)",
-                  border: "1px solid var(--color-border)",
-                  color: "var(--color-text)",
+                  background: "var(--surface-1)",
+                  border: "1px solid var(--border-default)",
+                  color: "var(--text-primary)",
                   outline: "none",
                 }}
               >
@@ -257,12 +257,12 @@ export const EmulatorsTab: React.FC = () => {
       </section>
 
       <section className="flex flex-col gap-4">
-        <h2 className="text-lg font-semibold" style={{ color: "var(--color-text)" }}>
+        <h2 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
           Dolphin Emulator
         </h2>
         <div className="flex flex-col gap-3">
           <div>
-            <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--color-text-dim)" }}>
+            <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--text-secondary)" }}>
               Dolphin Settings
             </label>
             <button
@@ -286,9 +286,9 @@ export const EmulatorsTab: React.FC = () => {
               }}
               className="w-full text-sm px-3 py-2 rounded flex items-center justify-center gap-2"
               style={{
-                background: "var(--color-surface-raised)",
-                border: "1px solid var(--color-border)",
-                color: "var(--color-text)",
+                background: "var(--surface-1)",
+                border: "1px solid var(--border-default)",
+                color: "var(--text-primary)",
               }}
             >
               <Settings size={16} />
@@ -296,7 +296,7 @@ export const EmulatorsTab: React.FC = () => {
             </button>
           </div>
           <div>
-            <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--color-text-dim)" }}>
+            <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--text-secondary)" }}>
               Default Post-Processing Effect
             </label>
             <select
@@ -304,9 +304,9 @@ export const EmulatorsTab: React.FC = () => {
               onChange={(e) => update({ dolphinPostProcessing: e.target.value || undefined })}
               className="w-full text-sm px-2 py-1.5 rounded"
               style={{
-                background: "var(--color-surface-raised)",
-                border: "1px solid var(--color-border)",
-                color: "var(--color-text)",
+                background: "var(--surface-1)",
+                border: "1px solid var(--border-default)",
+                color: "var(--text-primary)",
                 outline: "none",
               }}
             >
@@ -326,7 +326,7 @@ export const EmulatorsTab: React.FC = () => {
             </select>
           </div>
           <div>
-            <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--color-text-dim)" }}>
+            <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--text-secondary)" }}>
               Dolphin Configuration
             </label>
             <button
@@ -350,9 +350,9 @@ export const EmulatorsTab: React.FC = () => {
               }}
               className="w-full text-sm px-3 py-2 rounded flex items-center justify-center gap-2"
               style={{
-                background: "var(--color-surface-raised)",
-                border: "1px solid var(--color-border)",
-                color: "var(--color-text)",
+                background: "var(--surface-1)",
+                border: "1px solid var(--border-default)",
+                color: "var(--text-primary)",
               }}
             >
               <ExternalLink size={16} />
@@ -363,12 +363,12 @@ export const EmulatorsTab: React.FC = () => {
       </section>
 
       <section className="flex flex-col gap-4">
-        <h2 className="text-lg font-semibold" style={{ color: "var(--color-text)" }}>
+        <h2 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
           Controller Mappings
         </h2>
         <div className="flex flex-col gap-3">
           <div>
-            <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--color-text-dim)" }}>
+            <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--text-secondary)" }}>
               Controller Mapping Configuration
             </label>
             <button
@@ -391,9 +391,9 @@ export const EmulatorsTab: React.FC = () => {
               }}
               className="w-full text-sm px-3 py-2 rounded flex items-center justify-center gap-2"
               style={{
-                background: "var(--color-surface-raised)",
-                border: "1px solid var(--color-border)",
-                color: "var(--color-text)",
+                background: "var(--surface-1)",
+                border: "1px solid var(--border-default)",
+                color: "var(--text-primary)",
               }}
             >
               <Settings size={16} />
@@ -401,7 +401,7 @@ export const EmulatorsTab: React.FC = () => {
             </button>
           </div>
           <div>
-            <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--color-text-dim)" }}>
+            <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--text-secondary)" }}>
               Reset Controller Mappings
             </label>
             <button

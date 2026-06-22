@@ -2,15 +2,14 @@ import { GalleryView, ThemeName } from "../../../../shared/types";
 import { useSettingsStore } from "../../store/settings.store";
 
 const THEME_DEFAULTS: Record<ThemeName, GalleryView> = {
+  ember: "grid",
   "dark-oled": "grid",
   glassmorphism: "grid",
   "neon-cyberpunk": "grid",
   "terminal-tui": "grid",
-  custom: "grid",
   "synthwave-sunset": "grid",
   "deep-ocean": "grid",
   monokai: "grid",
-  "nord-aurora": "grid",
   "warm-paper": "grid",
 };
 

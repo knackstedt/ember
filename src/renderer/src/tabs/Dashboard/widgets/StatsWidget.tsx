@@ -28,7 +28,7 @@ function RingStat({
             cy="22"
             r="18"
             fill="none"
-            stroke="var(--color-surface-raised)"
+            stroke="var(--surface-1)"
             strokeWidth="3"
           />
           <circle
@@ -103,7 +103,7 @@ export const StatsWidget: React.FC<{ title?: string }> = ({ title }) => {
         <RingStat value={music.length} pct={total > 0 ? (music.length / total) * 100 : 0} label="Tracks" icon={Music} color="#86efac" />
         <RingStat value={tv.length} pct={total > 0 ? (tv.length / total) * 100 : 0} label="Shows" icon={Tv} color="#c4b5fd" />
       </div>
-      <div className="flex items-center justify-between gap-2 pt-1 border-t text-[10px] opacity-50" style={{ borderColor: "var(--color-border)" }}>
+      <div className="flex items-center justify-between gap-2 pt-1 border-t text-[10px] opacity-50" style={{ borderColor: "var(--border-default)" }}>
         <span className="truncate">{gamesPlayed} played</span>
         <span className="truncate">{totalPlaytime}h gaming</span>
         <span className="truncate">{mediaHours}h music/video</span>

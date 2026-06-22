@@ -32,13 +32,13 @@ function SectionCard({
       transition={{ duration: 0.3 }}
       className="flex flex-col gap-3 rounded-lg p-4"
       style={{
-        background: "var(--color-surface)",
-        border: "1px solid var(--color-border)",
+        background: "var(--surface-0)",
+        border: "1px solid var(--border-default)",
       }}
     >
       <div className="flex items-center gap-2">
-        <Icon size={18} style={{ color: "var(--color-accent)" }} />
-        <h3 className="font-semibold" style={{ color: "var(--color-text)" }}>
+        <Icon size={18} style={{ color: "var(--accent)" }} />
+        <h3 className="font-semibold" style={{ color: "var(--text-primary)" }}>
           {title}
         </h3>
       </div>
@@ -181,7 +181,7 @@ export const AboutTab: React.FC = () => {
       {/* Application Info & Updater */}
       <SectionCard icon={Info} title="Ember">
         <div className="flex flex-col gap-4">
-          <p className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+          <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
             Ember is a Home Theater PC application built for the living room.
             It brings together local media, game emulation, and streaming into a single unified interface.
           </p>
@@ -189,16 +189,16 @@ export const AboutTab: React.FC = () => {
           {/* Version & Status */}
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-3">
-              <span className="text-sm font-medium" style={{ color: "var(--color-text)" }}>
+              <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
                 Current version
               </span>
-              <span className="text-sm font-mono" style={{ color: "var(--color-text-dim)" }}>
+              <span className="text-sm font-mono" style={{ color: "var(--text-secondary)" }}>
                 {currentVersion}
               </span>
               {status === "available" && (
                 <span
                   className="text-xs px-2 py-0.5 rounded-full"
-                  style={{ background: "var(--color-accent)", color: "#fff" }}
+                  style={{ background: "var(--accent)", color: "#fff" }}
                 >
                   Update available: {availableVersion}
                 </span>
@@ -206,7 +206,7 @@ export const AboutTab: React.FC = () => {
               {status === "downloaded" && (
                 <span
                   className="text-xs px-2 py-0.5 rounded-full"
-                  style={{ background: "var(--color-accent)", color: "#fff" }}
+                  style={{ background: "var(--accent)", color: "#fff" }}
                 >
                   Ready to install: {availableVersion}
                 </span>
@@ -214,7 +214,7 @@ export const AboutTab: React.FC = () => {
               {status === "rollback" && (
                 <span
                   className="text-xs px-2 py-0.5 rounded-full"
-                  style={{ background: "var(--color-warn)", color: "#fff" }}
+                  style={{ background: "var(--warning-fg)", color: "#fff" }}
                 >
                   Rolling back…
                 </span>
@@ -233,16 +233,16 @@ export const AboutTab: React.FC = () => {
             {/* Progress bar */}
             {(status === "downloading" || status === "installing") && (
               <div className="flex flex-col gap-1">
-                <div className="h-2 rounded-full overflow-hidden" style={{ background: "var(--color-border)" }}>
+                <div className="h-2 rounded-full overflow-hidden" style={{ background: "var(--border-default)" }}>
                   <motion.div
                     className="h-full rounded-full"
-                    style={{ background: "var(--color-accent)", width: `${progress}%` }}
+                    style={{ background: "var(--accent)", width: `${progress}%` }}
                     initial={{ width: 0 }}
                     animate={{ width: `${progress}%` }}
                     transition={{ duration: 0.3 }}
                   />
                 </div>
-                <div className="flex justify-between text-xs" style={{ color: "var(--color-text-dim)" }}>
+                <div className="flex justify-between text-xs" style={{ color: "var(--text-secondary)" }}>
                   <span>
                     {status === "downloading" ? "Downloading" : "Installing"}… {progress}%
                   </span>
@@ -266,7 +266,7 @@ export const AboutTab: React.FC = () => {
               onClick={handleCheck}
               disabled={isBusy}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm disabled:opacity-50"
-              style={{ background: "var(--color-accent)", color: "#fff" }}
+              style={{ background: "var(--accent)", color: "#fff" }}
             >
               {status === "checking" ? (
                 <Loader2 size={14} className="animate-spin" />
@@ -281,7 +281,7 @@ export const AboutTab: React.FC = () => {
                 onClick={handleDownload}
                 disabled={isBusy}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm disabled:opacity-50"
-                style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", color: "var(--color-text)" }}
+                style={{ background: "var(--surface-0)", border: "1px solid var(--border-default)", color: "var(--text-primary)" }}
               >
                 <Download size={14} />
                 Download {availableVersion}
@@ -292,7 +292,7 @@ export const AboutTab: React.FC = () => {
               <button
                 onClick={handleInstall}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm"
-                style={{ background: "var(--color-accent)", color: "#fff" }}
+                style={{ background: "var(--accent)", color: "#fff" }}
               >
                 <Check size={14} />
                 Install & Restart
@@ -303,7 +303,7 @@ export const AboutTab: React.FC = () => {
               onClick={handleRollback}
               disabled={isBusy}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm disabled:opacity-50"
-              style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", color: "var(--color-text)" }}
+              style={{ background: "var(--surface-0)", border: "1px solid var(--border-default)", color: "var(--text-primary)" }}
             >
               <RotateCcw size={14} />
               Rollback
@@ -311,10 +311,10 @@ export const AboutTab: React.FC = () => {
           </div>
 
           {/* Update settings */}
-          <div className="flex flex-col gap-3 pt-2 border-t" style={{ borderColor: "var(--color-border)" }}>
+          <div className="flex flex-col gap-3 pt-2 border-t" style={{ borderColor: "var(--border-default)" }}>
             {/* Check frequency */}
             <div className="flex items-center justify-between">
-              <span className="text-sm" style={{ color: "var(--color-text)" }}>
+              <span className="text-sm" style={{ color: "var(--text-primary)" }}>
                 Auto check for updates
               </span>
               <div className="relative">
@@ -324,14 +324,14 @@ export const AboutTab: React.FC = () => {
                     setShowFreqDropdown((v) => !v);
                   }}
                   className="flex items-center gap-1 px-2 py-1 rounded text-sm"
-                  style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", color: "var(--color-text)" }}
+                  style={{ background: "var(--surface-0)", border: "1px solid var(--border-default)", color: "var(--text-primary)" }}
                 >
                   {FREQ_LABELS[freq]}
                   <ChevronDown size={14} />
                 </button>
                 {showFreqDropdown && (
                   <div className="absolute right-0 mt-1 rounded-md overflow-hidden shadow-lg z-10 min-w-[140px]"
-                    style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)" }}
+                    style={{ background: "var(--surface-0)", border: "1px solid var(--border-default)" }}
                   >
                     {(["day", "week", "off"] as UpdateCheckFrequency[]).map((f) => (
                       <button
@@ -341,7 +341,7 @@ export const AboutTab: React.FC = () => {
                           setShowFreqDropdown(false);
                         }}
                         className="block w-full text-left px-3 py-1.5 text-sm hover:opacity-80"
-                        style={{ color: "var(--color-text)" }}
+                        style={{ color: "var(--text-primary)" }}
                       >
                         {FREQ_LABELS[f]}
                       </button>
@@ -353,7 +353,7 @@ export const AboutTab: React.FC = () => {
 
             {/* Auto download */}
             <label className="flex items-center justify-between cursor-pointer">
-              <span className="text-sm" style={{ color: "var(--color-text)" }}>
+              <span className="text-sm" style={{ color: "var(--text-primary)" }}>
                 Auto download updates
               </span>
               <input
@@ -361,13 +361,13 @@ export const AboutTab: React.FC = () => {
                 checked={autoDownload}
                 onChange={(e) => setAutoDownload(e.target.checked)}
                 className="w-4 h-4 accent-current"
-                style={{ accentColor: "var(--color-accent)" }}
+                style={{ accentColor: "var(--accent)" }}
               />
             </label>
 
             {/* Auto install */}
             <label className="flex items-center justify-between cursor-pointer">
-              <span className="text-sm" style={{ color: "var(--color-text)" }}>
+              <span className="text-sm" style={{ color: "var(--text-primary)" }}>
                 Auto install updates
               </span>
               <input
@@ -375,13 +375,13 @@ export const AboutTab: React.FC = () => {
                 checked={autoInstall}
                 onChange={(e) => setAutoInstall(e.target.checked)}
                 className="w-4 h-4 accent-current"
-                style={{ accentColor: "var(--color-accent)" }}
+                style={{ accentColor: "var(--accent)" }}
               />
             </label>
 
             {/* Pin version */}
             <div className="flex items-center justify-between">
-              <span className="text-sm" style={{ color: "var(--color-text)" }}>
+              <span className="text-sm" style={{ color: "var(--text-primary)" }}>
                 Pin version
               </span>
               <div className="relative">
@@ -392,14 +392,14 @@ export const AboutTab: React.FC = () => {
                     setShowPinDropdown((v) => !v);
                   }}
                   className="flex items-center gap-1 px-2 py-1 rounded text-sm min-w-[140px] justify-between"
-                  style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", color: "var(--color-text)" }}
+                  style={{ background: "var(--surface-0)", border: "1px solid var(--border-default)", color: "var(--text-primary)" }}
                 >
                   <span className="truncate">{pinned ?? "Latest"}</span>
                   <ChevronDown size={14} />
                 </button>
                 {showPinDropdown && (
                   <div className="absolute right-0 mt-1 rounded-md overflow-hidden shadow-lg z-10 max-h-48 overflow-y-auto min-w-[200px]"
-                    style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)" }}
+                    style={{ background: "var(--surface-0)", border: "1px solid var(--border-default)" }}
                   >
                     <button
                       onClick={() => {
@@ -407,7 +407,7 @@ export const AboutTab: React.FC = () => {
                         setShowPinDropdown(false);
                       }}
                       className="block w-full text-left px-3 py-1.5 text-sm hover:opacity-80"
-                      style={{ color: pinned ? "var(--color-text-dim)" : "var(--color-accent)" }}
+                      style={{ color: pinned ? "var(--text-secondary)" : "var(--accent)" }}
                     >
                       Latest (no pin)
                     </button>
@@ -416,7 +416,7 @@ export const AboutTab: React.FC = () => {
                         key={r.tag_name}
                         onClick={() => handlePin(r.tag_name)}
                         className="block w-full text-left px-3 py-1.5 text-sm hover:opacity-80"
-                        style={{ color: pinned === r.tag_name ? "var(--color-accent)" : "var(--color-text)" }}
+                        style={{ color: pinned === r.tag_name ? "var(--accent)" : "var(--text-primary)" }}
                       >
                         {r.tag_name}
                       </button>
@@ -427,7 +427,7 @@ export const AboutTab: React.FC = () => {
             </div>
 
             {pinned && (
-              <p className="text-xs" style={{ color: "var(--color-text-dim)" }}>
+              <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
                 Pinned to {pinned}. Ember will only auto-update to this version.
               </p>
             )}
@@ -439,7 +439,7 @@ export const AboutTab: React.FC = () => {
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-1 text-sm"
-              style={{ color: "var(--color-accent)" }}
+              style={{ color: "var(--accent)" }}
             >
               <ExternalLink size={14} />
               getember.tv
@@ -449,7 +449,7 @@ export const AboutTab: React.FC = () => {
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-1 text-sm"
-              style={{ color: "var(--color-accent)" }}
+              style={{ color: "var(--accent)" }}
             >
               <ExternalLink size={14} />
               github.com/knackstedt/ember
@@ -461,22 +461,22 @@ export const AboutTab: React.FC = () => {
       {/* Trademark Disclaimer */}
       <SectionCard icon={Copyright} title="Trademarks & Copyright">
         <div className="flex flex-col gap-3">
-          <p className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+          <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
             All product names, logos, brand identifiers, and icons displayed within Ember are the
             property of their respective copyright holders. This includes but is not limited to:
           </p>
-          <ul className="list-disc list-inside text-sm" style={{ color: "var(--color-text-dim)" }}>
+          <ul className="list-disc list-inside text-sm" style={{ color: "var(--text-secondary)" }}>
             <li>Game console and platform logos (Nintendo, Sony PlayStation, Microsoft Xbox, Sega, etc.)</li>
             <li>Game titles and their associated artwork</li>
             <li>Media company and streaming service logos</li>
             <li>Icons from the Simple Icons and Lucide icon libraries</li>
           </ul>
-          <p className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+          <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
             Use of these marks does not imply any affiliation with or endorsement by their respective owners.
             Ember is an independent project and is not sponsored, authorized, or affiliated with any of the
             aforementioned companies or organizations.
           </p>
-          <p className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+          <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
             Users are responsible for obtaining their own legally owned copies of games, firmware, and BIOS
             files required for emulation. Ember does not distribute copyrighted material.
           </p>
@@ -486,17 +486,17 @@ export const AboutTab: React.FC = () => {
       {/* Open Source Dependencies */}
       <SectionCard icon={Heart} title="Open Source Dependencies">
         <div className="flex flex-col gap-4">
-          <p className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+          <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
             Ember is built on top of many excellent open-source projects. We are grateful to the
             communities and individuals who make this possible.
           </p>
 
           {/* Bundled */}
           <div className="flex flex-col gap-2">
-            <h4 className="text-sm font-semibold" style={{ color: "var(--color-text)" }}>
+            <h4 className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
               Bundled with Ember
             </h4>
-            <p className="text-xs" style={{ color: "var(--color-text-dim)" }}>
+            <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
               These libraries are shipped with the application.
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
@@ -504,19 +504,19 @@ export const AboutTab: React.FC = () => {
                 <div
                   key={dep.name}
                   className="flex justify-between items-center text-sm py-1 border-b border-dashed"
-                  style={{ borderColor: "var(--color-border)" }}
+                  style={{ borderColor: "var(--border-default)" }}
                 >
                   <a
                     href={dep.url}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-1"
-                    style={{ color: "var(--color-text)" }}
+                    style={{ color: "var(--text-primary)" }}
                   >
                     {dep.name}
-                    <ExternalLink size={12} style={{ color: "var(--color-text-dim)" }} />
+                    <ExternalLink size={12} style={{ color: "var(--text-secondary)" }} />
                   </a>
-                  <span className="font-mono text-xs" style={{ color: "var(--color-text-dim)" }}>
+                  <span className="font-mono text-xs" style={{ color: "var(--text-secondary)" }}>
                     {dep.license}
                   </span>
                 </div>
@@ -526,10 +526,10 @@ export const AboutTab: React.FC = () => {
 
           {/* System / Runtime */}
           <div className="flex flex-col gap-2">
-            <h4 className="text-sm font-semibold" style={{ color: "var(--color-text)" }}>
+            <h4 className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
               System Runtime Dependencies
             </h4>
-            <p className="text-xs" style={{ color: "var(--color-text-dim)" }}>
+            <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
               These are installed on your system's package manager and Ember links to them dynamically at runtime. Ember provides installation helpers for them in the Dependencies tab.
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
@@ -537,19 +537,19 @@ export const AboutTab: React.FC = () => {
                 <div
                   key={dep.name}
                   className="flex justify-between items-center text-sm py-1 border-b border-dashed"
-                  style={{ borderColor: "var(--color-border)" }}
+                  style={{ borderColor: "var(--border-default)" }}
                 >
                   <a
                     href={dep.url}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-1"
-                    style={{ color: "var(--color-text)" }}
+                    style={{ color: "var(--text-primary)" }}
                   >
                     {dep.name}
-                    <ExternalLink size={12} style={{ color: "var(--color-text-dim)" }} />
+                    <ExternalLink size={12} style={{ color: "var(--text-secondary)" }} />
                   </a>
-                  <span className="font-mono text-xs" style={{ color: "var(--color-text-dim)" }}>
+                  <span className="font-mono text-xs" style={{ color: "var(--text-secondary)" }}>
                     {dep.license}
                   </span>
                 </div>
@@ -562,7 +562,7 @@ export const AboutTab: React.FC = () => {
       {/* Warranty Disclaimer */}
       <SectionCard icon={Info} title="Disclaimer">
         <div className="flex flex-col gap-2">
-          <p className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+          <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
             Ember is provided &quot;as is&quot;, without warranty of any kind, express or implied, including
             but not limited to the warranties of merchantability, fitness for a particular purpose,
             and noninfringement. In no event shall the authors or copyright holders be liable for any

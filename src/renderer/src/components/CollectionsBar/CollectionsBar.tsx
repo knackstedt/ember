@@ -47,10 +47,10 @@ export function CollectionsBar({
         className="relative flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-colors focus:outline-none"
         style={{
           backgroundColor: active === "__none__"
-            ? "var(--color-accent)"
-            : "var(--color-surface-raised)",
-          color: active === "__none__" ? "var(--color-bg)" : "var(--color-text-dim)",
-          border: `1px solid ${active === "__none__" ? "var(--color-accent)" : "var(--color-border)"}`,
+            ? "var(--accent)"
+            : "var(--surface-1)",
+          color: active === "__none__" ? "var(--surface-base)" : "var(--text-secondary)",
+          border: `1px solid ${active === "__none__" ? "var(--accent)" : "var(--border-default)"}`,
           boxShadow: active === "__none__" ? "var(--shadow-glow)" : "none",
         }}
         whileHover={{ scale: 1.05 }}
@@ -68,14 +68,14 @@ export function CollectionsBar({
             className="relative flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-colors focus:outline-none"
             style={{
               backgroundColor: isActive
-                ? isSmart ? "var(--color-accent)" : "var(--color-accent)"
-                : "var(--color-surface-raised)",
-              color: isActive ? "var(--color-bg)" : "var(--color-text-dim)",
+                ? isSmart ? "var(--accent)" : "var(--accent)"
+                : "var(--surface-1)",
+              color: isActive ? "var(--surface-base)" : "var(--text-secondary)",
               border: isActive
-                ? `1px solid ${isSmart ? "var(--color-accent)" : "var(--color-accent)"}`
+                ? `1px solid ${isSmart ? "var(--accent)" : "var(--accent)"}`
                 : isSmart
-                  ? "1px dashed var(--color-accent)"
-                  : "1px solid var(--color-border)",
+                  ? "1px dashed var(--accent)"
+                  : "1px solid var(--border-default)",
               boxShadow: isActive && isSmart
                 ? "0 0 8px rgba(100, 200, 255, 0.4), var(--shadow-glow)"
                 : isActive ? "var(--shadow-glow)" : "none",
@@ -94,9 +94,9 @@ export function CollectionsBar({
           onClick={() => handleSelect("__manage__")}
           className="relative flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-colors focus:outline-none"
           style={{
-            backgroundColor: "var(--color-surface-raised)",
-            color: "var(--color-text-dim)",
-            border: "1px solid var(--color-border)",
+            backgroundColor: "var(--surface-1)",
+            color: "var(--text-secondary)",
+            border: "1px solid var(--border-default)",
           }}
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}

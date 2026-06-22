@@ -96,8 +96,8 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
             maxWidth: 320,
             maxHeight: estimatedHeight,
             overflow: "hidden auto",
-            background: "var(--color-surface-raised)",
-            border: "1px solid var(--color-border)",
+            background: "var(--surface-1)",
+            border: "1px solid var(--border-default)",
             boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
           }}
           initial={{ opacity: 0, scale: 0.96, y: -4 }}
@@ -112,7 +112,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
                 <div
                   key={opt.id}
                   className={`px-3 py-1.5 text-xs font-medium tracking-wide ${opt.header ? "" : "uppercase"}`}
-                  style={{ color: "var(--color-text-dim)", borderTop: "1px solid var(--color-border)" }}
+                  style={{ color: "var(--text-secondary)", borderTop: "1px solid var(--border-default)" }}
                 >
                   {opt.label}
                 </div>
@@ -126,13 +126,13 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
                 style={{
                   background:
                     i === activeIndex
-                      ? "color-mix(in srgb, var(--color-accent) 18%, transparent)"
+                      ? "color-mix(in srgb, var(--accent) 18%, transparent)"
                       : "transparent",
                   color: opt.destructive
                     ? "#ff6b6b"
                     : i === activeIndex
-                      ? "var(--color-accent)"
-                      : "var(--color-text)",
+                      ? "var(--accent)"
+                      : "var(--text-primary)",
                   outline: "none",
                   cursor: opt.disabled ? "not-allowed" : "pointer",
                   opacity: opt.disabled ? 0.4 : 1,

@@ -86,7 +86,7 @@ export const StreamingWebview = forwardRef<StreamingWebviewHandle, Props>(
           {showSpinner && (
             <motion.div
               className="absolute inset-0 z-10 flex items-center justify-center"
-              style={{ background: "var(--color-surface)" }}
+              style={{ background: "var(--surface-0)" }}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -95,8 +95,8 @@ export const StreamingWebview = forwardRef<StreamingWebviewHandle, Props>(
               <div
                 className="w-8 h-8 rounded-full border-2 border-transparent animate-spin"
                 style={{
-                  borderTopColor: "var(--color-accent)",
-                  borderRightColor: "var(--color-accent)",
+                  borderTopColor: "var(--accent)",
+                  borderRightColor: "var(--accent)",
                 }}
               />
             </motion.div>

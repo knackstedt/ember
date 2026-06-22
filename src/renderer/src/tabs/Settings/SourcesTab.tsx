@@ -315,7 +315,7 @@ export const SourcesTab: React.FC = () => {
     <div className="flex flex-col gap-8">
       {/* ── Media Directories ── */}
       <section className="flex flex-col gap-4">
-        <h2 className="text-lg font-semibold" style={{ color: "var(--color-text)" }}>
+        <h2 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
           Media Directories
         </h2>
         <PathList
@@ -343,7 +343,7 @@ export const SourcesTab: React.FC = () => {
           onChange={(p) => update({ gamePaths: p })}
         />
         {xdgDefaults && (
-          <div className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+          <div className="text-sm" style={{ color: "var(--text-secondary)" }}>
             <strong className="block mb-1">Auto-discovered game sources</strong>
             <div className="flex flex-col gap-2 mt-2">
               {xdgDefaults.steam.length > 0 && (
@@ -386,7 +386,7 @@ export const SourcesTab: React.FC = () => {
           </div>
         )}
         {xdgDefaults && (
-          <div className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+          <div className="text-sm" style={{ color: "var(--text-secondary)" }}>
             <strong className="block mb-1">Media Servers</strong>
             <div className="flex flex-col gap-2 mt-2">
               {xdgDefaults.kodi.length > 0 && (
@@ -411,7 +411,7 @@ export const SourcesTab: React.FC = () => {
           </div>
         )}
         {xdgDefaults?.mounts && xdgDefaults.mounts.length > 0 && (
-          <div className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+          <div className="text-sm" style={{ color: "var(--text-secondary)" }}>
             <strong className="block mb-1">Mounts</strong>
             {xdgDefaults.mounts.join(", ")}
           </div>
@@ -420,10 +420,10 @@ export const SourcesTab: React.FC = () => {
 
       {/* ── Scan Sources ── */}
       <section className="flex flex-col gap-4">
-        <h2 className="text-lg font-semibold" style={{ color: "var(--color-text)" }}>
+        <h2 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
           Scan Sources
         </h2>
-        <p className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+        <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
           Disable sources you don't want to include in game scans. Disabling a source leaves existing games in the library until you clear them.
         </p>
         <div className="flex flex-col gap-3 pl-1">
@@ -439,7 +439,7 @@ export const SourcesTab: React.FC = () => {
                 />
                 {!enabled && count > 0 && (
                   <div className="flex items-center justify-between gap-4">
-                    <span className="text-xs" style={{ color: "var(--color-text-dim)" }}>
+                    <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
                       {count} game{count === 1 ? "" : "s"} previously scanned
                     </span>
                     <motion.button
@@ -473,16 +473,16 @@ export const SourcesTab: React.FC = () => {
       {/* ── Remote Sources ── */}
       <section className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold" style={{ color: "var(--color-text)" }}>
+          <h2 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
             Remote Sources
           </h2>
           <div className="flex gap-2">
             <motion.button
               className="px-3 py-1.5 rounded-[var(--radius-card)] text-xs font-medium flex items-center gap-1.5"
               style={{
-                background: "var(--color-surface-raised)",
-                color: "var(--color-text)",
-                border: "1px solid var(--color-border)",
+                background: "var(--surface-1)",
+                color: "var(--text-primary)",
+                border: "1px solid var(--border-default)",
               }}
               onClick={handleDiscover}
               whileTap={{ scale: 0.96 }}
@@ -494,8 +494,8 @@ export const SourcesTab: React.FC = () => {
             <motion.button
               className="px-3 py-1.5 rounded-[var(--radius-card)] text-xs font-medium"
               style={{
-                background: "var(--color-accent)",
-                color: "var(--color-bg)",
+                background: "var(--accent)",
+                color: "var(--surface-base)",
               }}
               onClick={() => setShowAddRemote(true)}
               whileTap={{ scale: 0.96 }}
@@ -506,21 +506,21 @@ export const SourcesTab: React.FC = () => {
         </div>
 
         {remoteLoading ? (
-          <div className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+          <div className="text-sm" style={{ color: "var(--text-secondary)" }}>
             Loading remote sources…
           </div>
         ) : remoteSources.length === 0 ? (
           <div
             className="flex flex-col items-center justify-center gap-4 py-8"
-            style={{ color: "var(--color-text-dim)" }}
+            style={{ color: "var(--text-secondary)" }}
           >
             <Globe size={32} />
             <p className="text-sm">No remote sources configured.</p>
             <motion.button
               className="px-4 py-2 rounded-[var(--radius-card)] text-sm font-medium"
               style={{
-                background: "var(--color-accent)",
-                color: "var(--color-bg)",
+                background: "var(--accent)",
+                color: "var(--surface-base)",
               }}
               onClick={() => setShowAddRemote(true)}
               whileTap={{ scale: 0.96 }}
@@ -538,34 +538,34 @@ export const SourcesTab: React.FC = () => {
                   key={source.id}
                   className="flex items-center justify-between p-3 rounded-[var(--radius-card)]"
                   style={{
-                    background: "var(--color-surface-raised)",
-                    border: "1px solid var(--color-border)",
+                    background: "var(--surface-1)",
+                    border: "1px solid var(--border-default)",
                   }}
                 >
                   <div className="flex flex-col gap-1">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium" style={{ color: "var(--color-text)" }}>
+                      <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
                         {source.name}
                       </span>
                       <span
                         className="px-1.5 py-0.5 rounded text-[10px] font-medium"
                         style={{
-                          background: "var(--color-accent)",
-                          color: "var(--color-bg)",
+                          background: "var(--accent)",
+                          color: "var(--surface-base)",
                         }}
                       >
                         {PROTOCOL_LABELS[source.protocol] ?? source.protocol}
                       </span>
                       <span
                         className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px]"
-                        style={{ color: "var(--color-text-dim)", background: "var(--color-surface)" }}
+                        style={{ color: "var(--text-secondary)", background: "var(--surface-0)" }}
                         title={MODE_LABELS[source.credentialMode]}
                       >
                         <ModeIcon size={10} />
                         {MODE_LABELS[source.credentialMode]}
                       </span>
                     </div>
-                    <div className="text-xs" style={{ color: "var(--color-text-dim)" }}>
+                    <div className="text-xs" style={{ color: "var(--text-secondary)" }}>
                       {source.host}
                       {source.port ? `:${source.port}` : ""}
                       {source.remotePath}
@@ -576,8 +576,8 @@ export const SourcesTab: React.FC = () => {
                           key={t}
                           className="px-1 py-0.5 rounded text-[10px]"
                           style={{
-                            background: "var(--color-surface)",
-                            color: "var(--color-text-dim)",
+                            background: "var(--surface-0)",
+                            color: "var(--text-secondary)",
                           }}
                         >
                           {t}
@@ -589,8 +589,8 @@ export const SourcesTab: React.FC = () => {
                     <motion.button
                       className="p-1.5 rounded"
                       style={{
-                        background: isServing ? "var(--color-accent)" : "var(--color-surface)",
-                        color: isServing ? "var(--color-bg)" : "var(--color-text-dim)",
+                        background: isServing ? "var(--accent)" : "var(--surface-0)",
+                        color: isServing ? "var(--surface-base)" : "var(--text-secondary)",
                       }}
                       onClick={() => handleToggleServe(source)}
                       whileTap={{ scale: 0.9 }}
@@ -601,8 +601,8 @@ export const SourcesTab: React.FC = () => {
                     <motion.button
                       className="p-1.5 rounded"
                       style={{
-                        background: "var(--color-surface)",
-                        color: "var(--color-text-dim)",
+                        background: "var(--surface-0)",
+                        color: "var(--text-secondary)",
                       }}
                       onClick={() => handleRemoveRemote(source.id)}
                       whileTap={{ scale: 0.9 }}
@@ -620,19 +620,19 @@ export const SourcesTab: React.FC = () => {
 
       {/* ── Remote File Availability ── */}
       <section className="flex flex-col gap-4">
-        <h2 className="text-lg font-semibold" style={{ color: "var(--color-text)" }}>
+        <h2 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
           Remote File Availability
         </h2>
-        <p className="text-xs" style={{ color: "var(--color-text-dim)" }}>
+        <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
           An automatic worker checks every 5 minutes whether remote files still exist and marks missing ones.
         </p>
         <div className="flex flex-wrap gap-2">
           <motion.button
             className="px-3 py-1.5 rounded-[var(--radius-card)] text-xs font-medium flex items-center gap-1.5"
             style={{
-              background: "var(--color-surface-raised)",
-              color: "var(--color-text)",
-              border: "1px solid var(--color-border)",
+              background: "var(--surface-1)",
+              color: "var(--text-primary)",
+              border: "1px solid var(--border-default)",
             }}
             onClick={handleCheckAvailability}
             whileTap={{ scale: 0.96 }}
@@ -643,7 +643,7 @@ export const SourcesTab: React.FC = () => {
           </motion.button>
         </div>
         <div className="flex flex-col gap-2 mt-2">
-          <p className="text-xs font-medium" style={{ color: "var(--color-text-dim)" }}>
+          <p className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
             Delete entries marked as missing:
           </p>
           <div className="flex flex-wrap gap-2">
@@ -674,10 +674,10 @@ export const SourcesTab: React.FC = () => {
 
       {/* ── API Keys ── */}
       <section className="flex flex-col gap-4">
-        <h2 className="text-lg font-semibold" style={{ color: "var(--color-text)" }}>
+        <h2 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
           API Keys
         </h2>
-        <p className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+        <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
           Optional. Improves metadata quality and rate limits.
         </p>
         <Field
@@ -712,10 +712,10 @@ export const SourcesTab: React.FC = () => {
 
       {/* ── Streaming Services ── */}
       <section className="flex flex-col gap-4">
-        <h2 className="text-lg font-semibold" style={{ color: "var(--color-text)" }}>
+        <h2 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
           Streaming Services
         </h2>
-        <p className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+        <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
           Manage which streaming services appear in the Streaming tab. Services are grouped into Music and Videos sections.
         </p>
 
@@ -725,16 +725,16 @@ export const SourcesTab: React.FC = () => {
               key={svc.id}
               className="flex items-center gap-3 px-3 py-2 rounded"
               style={{
-                background: "var(--color-surface-raised)",
-                border: "1px solid var(--color-border)",
+                background: "var(--surface-1)",
+                border: "1px solid var(--border-default)",
               }}
             >
               {svc.icon ? <span className="text-lg">{svc.icon}</span> : <Link size={20} />}
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium truncate" style={{ color: "var(--color-text)" }}>
+                <div className="text-sm font-medium truncate" style={{ color: "var(--text-primary)" }}>
                   {svc.name}
                 </div>
-                <div className="text-xs truncate" style={{ color: "var(--color-text-dim)" }}>
+                <div className="text-xs truncate" style={{ color: "var(--text-secondary)" }}>
                   {svc.category} · {svc.url}
                 </div>
               </div>
@@ -743,9 +743,9 @@ export const SourcesTab: React.FC = () => {
                 className="w-11 h-6 rounded-full transition-colors relative flex-shrink-0"
                 style={{
                   background: svc.enabled
-                    ? "var(--color-accent)"
-                    : "var(--color-surface)",
-                  border: "1px solid var(--color-border)",
+                    ? "var(--accent)"
+                    : "var(--surface-0)",
+                  border: "1px solid var(--border-default)",
                 }}
               >
                 <span
@@ -778,14 +778,14 @@ export const SourcesTab: React.FC = () => {
             <motion.div
               className="flex flex-col gap-3 p-4 rounded"
               style={{
-                background: "var(--color-surface-raised)",
-                border: "1px solid var(--color-border)",
+                background: "var(--surface-1)",
+                border: "1px solid var(--border-default)",
               }}
               initial={{ opacity: 0, y: -8 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
             >
-              <h3 className="text-sm font-semibold" style={{ color: "var(--color-text)" }}>
+              <h3 className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
                 Add Custom Service
               </h3>
               <Field
@@ -801,7 +801,7 @@ export const SourcesTab: React.FC = () => {
                 placeholder="https://..."
               />
               <div>
-                <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--color-text-dim)" }}>
+                <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--text-secondary)" }}>
                   Category
                 </label>
                 <select
@@ -814,9 +814,9 @@ export const SourcesTab: React.FC = () => {
                   }
                   className="w-full text-sm px-2 py-1.5 rounded"
                   style={{
-                    background: "var(--color-surface)",
-                    border: "1px solid var(--color-border)",
-                    color: "var(--color-text)",
+                    background: "var(--surface-0)",
+                    border: "1px solid var(--border-default)",
+                    color: "var(--text-primary)",
                     outline: "none",
                   }}
                 >
@@ -828,8 +828,8 @@ export const SourcesTab: React.FC = () => {
                 <motion.button
                   className="px-4 py-2 rounded text-sm"
                   style={{
-                    background: "var(--color-accent)",
-                    color: "var(--color-bg)",
+                    background: "var(--accent)",
+                    color: "var(--surface-base)",
                   }}
                   onClick={handleAddService}
                   whileTap={{ scale: 0.96 }}
@@ -839,9 +839,9 @@ export const SourcesTab: React.FC = () => {
                 <motion.button
                   className="px-4 py-2 rounded text-sm"
                   style={{
-                    background: "var(--color-surface)",
-                    color: "var(--color-text)",
-                    border: "1px solid var(--color-border)",
+                    background: "var(--surface-0)",
+                    color: "var(--text-primary)",
+                    border: "1px solid var(--border-default)",
                   }}
                   onClick={() => setShowAddService(false)}
                   whileTap={{ scale: 0.96 }}
@@ -857,9 +857,9 @@ export const SourcesTab: React.FC = () => {
           <motion.button
             className="self-start px-4 py-2 rounded-[var(--radius-card)] text-sm"
             style={{
-              background: "var(--color-surface-raised)",
-              color: "var(--color-text)",
-              border: "1px solid var(--color-border)",
+              background: "var(--surface-1)",
+              color: "var(--text-primary)",
+              border: "1px solid var(--border-default)",
             }}
             onClick={() => setShowAddService(true)}
             whileTap={{ scale: 0.96 }}
@@ -1020,13 +1020,13 @@ const AddRemoteSourceModal: React.FC<AddRemoteSourceModalProps> = ({ onClose, on
       <motion.div
         className="w-full max-w-lg rounded-[var(--radius-card)] flex flex-col gap-4 p-6"
         style={{
-          background: "var(--color-surface-raised)",
-          border: "1px solid var(--color-border)",
+          background: "var(--surface-1)",
+          border: "1px solid var(--border-default)",
         }}
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
       >
-        <h3 className="text-lg font-semibold" style={{ color: "var(--color-text)" }}>
+        <h3 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
           Add Remote Source
         </h3>
 
@@ -1036,8 +1036,8 @@ const AddRemoteSourceModal: React.FC<AddRemoteSourceModalProps> = ({ onClose, on
               key={s.id}
               className="flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full"
               style={{
-                background: step === s.id ? "var(--color-accent)" : "var(--color-surface)",
-                color: step === s.id ? "var(--color-bg)" : "var(--color-text-dim)",
+                background: step === s.id ? "var(--accent)" : "var(--surface-0)",
+                color: step === s.id ? "var(--surface-base)" : "var(--text-secondary)",
               }}
             >
               {s.id}. {s.label}
@@ -1054,7 +1054,7 @@ const AddRemoteSourceModal: React.FC<AddRemoteSourceModalProps> = ({ onClose, on
         {step === 1 && (
           <div className="flex flex-col gap-3">
             <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium" style={{ color: "var(--color-text-dim)" }}>
+              <span className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
                 Name
               </span>
               <input
@@ -1063,12 +1063,12 @@ const AddRemoteSourceModal: React.FC<AddRemoteSourceModalProps> = ({ onClose, on
                 onChange={(e) => setName(e.target.value)}
                 placeholder="My NAS"
                 className="px-3 py-2 rounded-[var(--radius-card)] text-sm bg-transparent"
-                style={{ border: "1px solid var(--color-border)", color: "var(--color-text)" }}
+                style={{ border: "1px solid var(--border-default)", color: "var(--text-primary)" }}
               />
             </label>
 
             <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium" style={{ color: "var(--color-text-dim)" }}>
+              <span className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
                 Protocol
               </span>
               <select
@@ -1076,16 +1076,16 @@ const AddRemoteSourceModal: React.FC<AddRemoteSourceModalProps> = ({ onClose, on
                 onChange={(e) => setProtocol(e.target.value as RemoteSource["protocol"])}
                 className="px-3 py-2 rounded-[var(--radius-card)] text-sm"
                 style={{
-                  backgroundColor: "var(--color-surface)",
-                  color: "var(--color-text)",
-                  border: "1px solid var(--color-border)",
+                  backgroundColor: "var(--surface-0)",
+                  color: "var(--text-primary)",
+                  border: "1px solid var(--border-default)",
                 }}
               >
                 {PROTOCOLS.map((p) => (
                   <option
                     key={p.value}
                     value={p.value}
-                    style={{ backgroundColor: "var(--color-surface)", color: "var(--color-text)" }}
+                    style={{ backgroundColor: "var(--surface-0)", color: "var(--text-primary)" }}
                   >
                     {p.label}
                   </option>
@@ -1096,7 +1096,7 @@ const AddRemoteSourceModal: React.FC<AddRemoteSourceModalProps> = ({ onClose, on
             {!isCloud && (
               <>
                 <label className="flex flex-col gap-1">
-                  <span className="text-xs font-medium" style={{ color: "var(--color-text-dim)" }}>
+                  <span className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
                     Host
                   </span>
                   <input
@@ -1105,11 +1105,11 @@ const AddRemoteSourceModal: React.FC<AddRemoteSourceModalProps> = ({ onClose, on
                     onChange={(e) => setHost(e.target.value)}
                     placeholder="192.168.1.5 or nas.local"
                     className="px-3 py-2 rounded-[var(--radius-card)] text-sm bg-transparent"
-                    style={{ border: "1px solid var(--color-border)", color: "var(--color-text)" }}
+                    style={{ border: "1px solid var(--border-default)", color: "var(--text-primary)" }}
                   />
                 </label>
                 <label className="flex flex-col gap-1">
-                  <span className="text-xs font-medium" style={{ color: "var(--color-text-dim)" }}>
+                  <span className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
                     Port (optional)
                   </span>
                   <input
@@ -1118,14 +1118,14 @@ const AddRemoteSourceModal: React.FC<AddRemoteSourceModalProps> = ({ onClose, on
                     onChange={(e) => setPort(e.target.value)}
                     placeholder="22"
                     className="px-3 py-2 rounded-[var(--radius-card)] text-sm bg-transparent"
-                    style={{ border: "1px solid var(--color-border)", color: "var(--color-text)" }}
+                    style={{ border: "1px solid var(--border-default)", color: "var(--text-primary)" }}
                   />
                 </label>
               </>
             )}
 
             <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium" style={{ color: "var(--color-text-dim)" }}>
+              <span className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
                 Remote Path
               </span>
               <input
@@ -1134,7 +1134,7 @@ const AddRemoteSourceModal: React.FC<AddRemoteSourceModalProps> = ({ onClose, on
                 onChange={(e) => setRemotePath(e.target.value)}
                 placeholder="/media/movies"
                 className="px-3 py-2 rounded-[var(--radius-card)] text-sm bg-transparent"
-                style={{ border: "1px solid var(--color-border)", color: "var(--color-text)" }}
+                style={{ border: "1px solid var(--border-default)", color: "var(--text-primary)" }}
               />
             </label>
           </div>
@@ -1145,7 +1145,7 @@ const AddRemoteSourceModal: React.FC<AddRemoteSourceModalProps> = ({ onClose, on
             {!isCloud && (
               <>
                 <label className="flex flex-col gap-1">
-                  <span className="text-xs font-medium" style={{ color: "var(--color-text-dim)" }}>
+                  <span className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
                     Username (optional)
                   </span>
                   <input
@@ -1153,11 +1153,11 @@ const AddRemoteSourceModal: React.FC<AddRemoteSourceModalProps> = ({ onClose, on
                     value={user}
                     onChange={(e) => setUser(e.target.value)}
                     className="px-3 py-2 rounded-[var(--radius-card)] text-sm bg-transparent"
-                    style={{ border: "1px solid var(--color-border)", color: "var(--color-text)" }}
+                    style={{ border: "1px solid var(--border-default)", color: "var(--text-primary)" }}
                   />
                 </label>
                 <label className="flex flex-col gap-1">
-                  <span className="text-xs font-medium" style={{ color: "var(--color-text-dim)" }}>
+                  <span className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
                     Password (optional)
                   </span>
                   <input
@@ -1165,21 +1165,21 @@ const AddRemoteSourceModal: React.FC<AddRemoteSourceModalProps> = ({ onClose, on
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="px-3 py-2 rounded-[var(--radius-card)] text-sm bg-transparent"
-                    style={{ border: "1px solid var(--color-border)", color: "var(--color-text)" }}
+                    style={{ border: "1px solid var(--border-default)", color: "var(--text-primary)" }}
                   />
                 </label>
               </>
             )}
 
             <div className="flex flex-col gap-2">
-              <span className="text-xs font-medium" style={{ color: "var(--color-text-dim)" }}>
+              <span className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
                 Credential Storage
               </span>
               {CREDENTIAL_MODES.map((mode) => (
                 <label
                   key={mode.value}
                   className="flex items-start gap-2 p-2 rounded-[var(--radius-card)] cursor-pointer"
-                  style={{ border: "1px solid var(--color-border)" }}
+                  style={{ border: "1px solid var(--border-default)" }}
                 >
                   <input
                     type="radio"
@@ -1189,10 +1189,10 @@ const AddRemoteSourceModal: React.FC<AddRemoteSourceModalProps> = ({ onClose, on
                     onChange={() => setCredentialMode(mode.value)}
                   />
                   <div className="flex flex-col">
-                    <span className="text-sm font-medium" style={{ color: "var(--color-text)" }}>
+                    <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
                       {mode.label}
                     </span>
-                    <span className="text-xs" style={{ color: "var(--color-text-dim)" }}>
+                    <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
                       {mode.description}
                     </span>
                   </div>
@@ -1201,7 +1201,7 @@ const AddRemoteSourceModal: React.FC<AddRemoteSourceModalProps> = ({ onClose, on
             </div>
 
             <div className="flex flex-col gap-2 mt-2">
-              <span className="text-xs font-medium" style={{ color: "var(--color-text-dim)" }}>
+              <span className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
                 Verify Setup
               </span>
               <div className="flex flex-col gap-2">
@@ -1236,7 +1236,7 @@ const AddRemoteSourceModal: React.FC<AddRemoteSourceModalProps> = ({ onClose, on
 
         {step === 3 && (
           <div className="flex flex-col gap-3">
-            <span className="text-xs font-medium" style={{ color: "var(--color-text-dim)" }}>
+            <span className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
               Media Types
             </span>
             <div className="flex gap-2">
@@ -1245,9 +1245,9 @@ const AddRemoteSourceModal: React.FC<AddRemoteSourceModalProps> = ({ onClose, on
                   key={t}
                   className="flex items-center gap-1 px-3 py-1.5 rounded-[var(--radius-card)] cursor-pointer text-xs"
                   style={{
-                    background: mediaTypes.includes(t) ? "var(--color-accent)" : "var(--color-surface)",
-                    color: mediaTypes.includes(t) ? "var(--color-bg)" : "var(--color-text)",
-                    border: "1px solid var(--color-border)",
+                    background: mediaTypes.includes(t) ? "var(--accent)" : "var(--surface-0)",
+                    color: mediaTypes.includes(t) ? "var(--surface-base)" : "var(--text-primary)",
+                    border: "1px solid var(--border-default)",
                   }}
                 >
                   <input
@@ -1273,9 +1273,9 @@ const AddRemoteSourceModal: React.FC<AddRemoteSourceModalProps> = ({ onClose, on
           <motion.button
             className="px-4 py-2 rounded-[var(--radius-card)] text-sm font-medium"
             style={{
-              background: "var(--color-surface)",
-              color: "var(--color-text)",
-              border: "1px solid var(--color-border)",
+              background: "var(--surface-0)",
+              color: "var(--text-primary)",
+              border: "1px solid var(--border-default)",
             }}
             onClick={step === 1 ? onClose : () => setStep((s) => s - 1)}
             whileTap={{ scale: 0.96 }}
@@ -1286,8 +1286,8 @@ const AddRemoteSourceModal: React.FC<AddRemoteSourceModalProps> = ({ onClose, on
           <motion.button
             className="px-4 py-2 rounded-[var(--radius-card)] text-sm font-medium"
             style={{
-              background: "var(--color-accent)",
-              color: "var(--color-bg)",
+              background: "var(--accent)",
+              color: "var(--surface-base)",
             }}
             onClick={step < 3 ? () => setStep((s) => s + 1) : handleAdd}
             whileTap={{ scale: 0.96 }}
@@ -1318,9 +1318,9 @@ const DeleteMissingButton: React.FC<DeleteMissingButtonProps> = ({ label, icon, 
     <motion.button
       className="flex items-center gap-2 px-3 py-2 rounded-[var(--radius-card)] text-xs font-medium"
       style={{
-        background: "var(--color-surface)",
-        color: "var(--color-text)",
-        border: "1px solid var(--color-border)",
+        background: "var(--surface-0)",
+        color: "var(--text-primary)",
+        border: "1px solid var(--border-default)",
       }}
       onClick={onClick}
       whileTap={{ scale: 0.96 }}
@@ -1351,13 +1351,13 @@ const TestButton: React.FC<TestButtonProps> = ({ label, icon, result, testing, o
             ? result.success
               ? "#1a3a1a"
               : "#3a1515"
-            : "var(--color-surface)",
+            : "var(--surface-0)",
           color: result
             ? result.success
               ? "#99ff99"
               : "#ff9999"
-            : "var(--color-text)",
-          border: "1px solid var(--color-border)",
+            : "var(--text-primary)",
+          border: "1px solid var(--border-default)",
           opacity: disabled ? 0.5 : 1,
         }}
         onClick={onClick}

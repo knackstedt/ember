@@ -63,11 +63,11 @@ export const FavoriteGamesWidget: React.FC<{ title?: string; maxItems?: number }
             onClick={() => launch(g)}
             className="group flex items-center gap-2 px-1.5 py-1 rounded-xl text-left text-sm transition-all duration-200 hover:scale-[1.02]"
             style={{
-              background: "var(--color-surface-raised)",
+              background: "var(--surface-1)",
               border: "1px solid transparent",
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = "var(--color-border)";
+              e.currentTarget.style.borderColor = "var(--border-default)";
               e.currentTarget.style.boxShadow = "var(--shadow-card)";
             }}
             onMouseLeave={(e) => {
@@ -79,12 +79,12 @@ export const FavoriteGamesWidget: React.FC<{ title?: string; maxItems?: number }
               {g.coverUrl ? (
                 <img src={g.coverUrl} alt="" className="w-8 h-10 object-cover rounded-lg" loading="lazy" />
               ) : (
-                <div className="w-8 h-10 rounded-lg flex items-center justify-center" style={{ background: "var(--color-surface)" }}>
+                <div className="w-8 h-10 rounded-lg flex items-center justify-center" style={{ background: "var(--surface-0)" }}>
                   <Gamepad2 size={14} className="opacity-40" />
                 </div>
               )}
-              <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity" style={{ background: "var(--color-accent)" }}>
-                <Play size={7} style={{ color: "var(--color-bg)" }} />
+              <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity" style={{ background: "var(--accent)" }}>
+                <Play size={7} style={{ color: "var(--surface-base)" }} />
               </div>
             </div>
             <div className="flex-1 min-w-0 flex flex-col gap-0">
@@ -93,7 +93,7 @@ export const FavoriteGamesWidget: React.FC<{ title?: string; maxItems?: number }
                 <span className="text-[8px] px-1 py-0.5 rounded font-medium uppercase" style={{ background: PLATFORM_COLORS[g.platform] ?? "#7f8c8d", color: "#fff" }}>
                   {g.platform}
                 </span>
-                <Star size={8} style={{ color: "var(--color-accent)" }} className="opacity-60" />
+                <Star size={8} style={{ color: "var(--accent)" }} className="opacity-60" />
               </div>
               {g.playTime && g.playTime > 0 && (
                 <span className="text-[9px] opacity-30">{formatPlayTime(g.playTime)} played</span>

@@ -111,8 +111,8 @@ export const QueueBlade: React.FC = () => {
       className="flex-shrink-0 h-full relative flex"
       style={{
         width: bladeCollapsed ? COLLAPSED_WIDTH : BLADE_WIDTH,
-        background: "var(--color-surface-raised)",
-        borderLeft: "1px solid var(--color-border)",
+        background: "var(--surface-1)",
+        borderLeft: "1px solid var(--border-default)",
       }}
       initial={{ width: COLLAPSED_WIDTH, opacity: 0 }}
       animate={{ width: bladeCollapsed ? COLLAPSED_WIDTH : BLADE_WIDTH, opacity: 1 }}
@@ -123,7 +123,7 @@ export const QueueBlade: React.FC = () => {
       <button
         onClick={toggleBlade}
         className="flex-shrink-0 h-full flex flex-col items-center justify-center gap-1 cursor-pointer"
-        style={{ width: COLLAPSED_WIDTH, color: "var(--color-text-dim)" }}
+        style={{ width: COLLAPSED_WIDTH, color: "var(--text-secondary)" }}
         aria-label={bladeCollapsed ? "Expand queue" : "Collapse queue"}
         title={bladeCollapsed ? "Expand queue" : "Collapse queue"}
       >
@@ -164,17 +164,17 @@ export const QueueBlade: React.FC = () => {
             {/* Header */}
             <div
               className="flex items-center justify-between px-3 py-2 flex-shrink-0"
-              style={{ borderBottom: "1px solid var(--color-border)" }}
+              style={{ borderBottom: "1px solid var(--border-default)" }}
             >
               <span
                 className="text-sm font-semibold truncate"
-                style={{ color: "var(--color-text)" }}
+                style={{ color: "var(--text-primary)" }}
               >
                 Queue
               </span>
               <span
                 className="text-xs"
-                style={{ color: "var(--color-text-dim)" }}
+                style={{ color: "var(--text-secondary)" }}
               >
                 {queue.length} tracks
               </span>
@@ -185,13 +185,13 @@ export const QueueBlade: React.FC = () => {
               <div
                 className="flex items-center gap-2 px-3 py-2 flex-shrink-0"
                 style={{
-                  borderBottom: "1px solid var(--color-border)",
-                  background: "var(--color-surface)",
+                  borderBottom: "1px solid var(--border-default)",
+                  background: "var(--surface-0)",
                 }}
               >
                 <div
                   className="w-10 h-10 rounded-[var(--radius-card)] flex-shrink-0 overflow-hidden"
-                  style={{ background: "var(--color-bg)" }}
+                  style={{ background: "var(--surface-base)" }}
                 >
                   {currentTrack.albumArtUrl ? (
                     <img
@@ -208,20 +208,20 @@ export const QueueBlade: React.FC = () => {
                 <div className="flex flex-col min-w-0 flex-1">
                   <span
                     className="text-xs font-medium truncate"
-                    style={{ color: "var(--color-accent)" }}
+                    style={{ color: "var(--accent)" }}
                   >
                     {playing ? "Now Playing" : "Paused"}
                   </span>
                   <span
                     className="text-sm font-medium truncate"
-                    style={{ color: "var(--color-text)" }}
+                    style={{ color: "var(--text-primary)" }}
                     title={currentTrack.title}
                   >
                     {currentTrack.title}
                   </span>
                   <span
                     className="text-xs truncate"
-                    style={{ color: "var(--color-text-dim)" }}
+                    style={{ color: "var(--text-secondary)" }}
                     title={currentTrack.artist ?? currentTrack.album}
                   >
                     {currentTrack.artist ?? currentTrack.album ?? ""}
@@ -236,7 +236,7 @@ export const QueueBlade: React.FC = () => {
                 <button
                   onClick={prev}
                   className="w-7 h-7 flex items-center justify-center rounded hover:bg-white/10 transition-colors text-sm"
-                  style={{ color: "var(--color-text)" }}
+                  style={{ color: "var(--text-primary)" }}
                   aria-label="Previous"
                   title="Previous"
                 >
@@ -248,8 +248,8 @@ export const QueueBlade: React.FC = () => {
                   }}
                   className="w-8 h-8 flex items-center justify-center rounded-full text-xs font-bold"
                   style={{
-                    background: "var(--color-accent)",
-                    color: "var(--color-bg)",
+                    background: "var(--accent)",
+                    color: "var(--surface-base)",
                   }}
                   aria-label={playing ? "Pause" : "Play"}
                 >
@@ -258,7 +258,7 @@ export const QueueBlade: React.FC = () => {
                 <button
                   onClick={next}
                   className="w-7 h-7 flex items-center justify-center rounded hover:bg-white/10 transition-colors text-sm"
-                  style={{ color: "var(--color-text)" }}
+                  style={{ color: "var(--text-primary)" }}
                   aria-label="Next"
                   title="Next"
                 >
@@ -279,19 +279,19 @@ export const QueueBlade: React.FC = () => {
                     className="w-full flex items-center gap-2 px-3 py-2 text-left transition-colors"
                     style={{
                       background: isFocused
-                        ? "color-mix(in srgb, var(--color-accent) 20%, transparent)"
+                        ? "color-mix(in srgb, var(--accent) 20%, transparent)"
                         : isCurrent
-                          ? "var(--color-accent-dim)"
+                          ? "var(--accent-muted)"
                           : "transparent",
                       opacity: isCurrent ? 1 : 0.85,
-                      borderBottom: "1px solid var(--color-border)",
-                      outline: isFocused ? "2px solid var(--color-accent)" : "none",
+                      borderBottom: "1px solid var(--border-default)",
+                      outline: isFocused ? "2px solid var(--accent)" : "none",
                       outlineOffset: isFocused ? "-2px" : undefined,
                     }}
                   >
                     <span
                       className="text-xs tabular-nums w-5 flex-shrink-0 text-center"
-                      style={{ color: "var(--color-text-dim)" }}
+                      style={{ color: "var(--text-secondary)" }}
                     >
                       {isCurrent ? (playing ? <Play size={12} /> : <Pause size={12} />) : index + 1}
                     </span>
@@ -300,8 +300,8 @@ export const QueueBlade: React.FC = () => {
                         className="text-sm truncate"
                         style={{
                           color: isCurrent
-                            ? "var(--color-accent)"
-                            : "var(--color-text)",
+                            ? "var(--accent)"
+                            : "var(--text-primary)",
                           fontWeight: isCurrent ? 600 : 400,
                         }}
                         title={track.title}
@@ -310,7 +310,7 @@ export const QueueBlade: React.FC = () => {
                       </span>
                       <span
                         className="text-xs truncate"
-                        style={{ color: "var(--color-text-dim)" }}
+                        style={{ color: "var(--text-secondary)" }}
                       >
                         {track.artist ?? track.album ?? ""}
                         {track.duration ? ` · ${fmt(track.duration)}` : ""}

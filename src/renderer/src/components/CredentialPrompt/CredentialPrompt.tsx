@@ -115,16 +115,16 @@ export const CredentialPrompt: React.FC = () => {
           ref={containerRef}
           className="w-full max-w-md rounded-[var(--radius-card)] flex flex-col gap-4 p-6"
           style={{
-            background: "var(--color-surface-raised)",
-            border: "1px solid var(--color-border)",
+            background: "var(--surface-1)",
+            border: "1px solid var(--border-default)",
           }}
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <KeyRound size={20} style={{ color: "var(--color-accent)" }} />
-              <h3 className="text-lg font-semibold" style={{ color: "var(--color-text)" }}>
+              <KeyRound size={20} style={{ color: "var(--accent)" }} />
+              <h3 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
                 {mode === "master-password"
                   ? "Enter Master Password"
                   : `Reconnect to ${currentSource?.name ?? "Remote"}`}
@@ -133,7 +133,7 @@ export const CredentialPrompt: React.FC = () => {
             <button
               onClick={() => setShow(false)}
               className="p-1 rounded"
-              style={{ color: "var(--color-text-dim)" }}
+              style={{ color: "var(--text-secondary)" }}
             >
               <X size={18} />
             </button>
@@ -141,12 +141,12 @@ export const CredentialPrompt: React.FC = () => {
 
           {mode === "master-password" && (
             <>
-              <div className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+              <div className="text-sm" style={{ color: "var(--text-secondary)" }}>
                 You have remote sources encrypted with a master password. Please enter it to
                 decrypt your credentials for this session.
               </div>
               <label className="flex flex-col gap-1">
-                <span className="text-xs font-medium" style={{ color: "var(--color-text-dim)" }}>
+                <span className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
                   Master Password
                 </span>
                 <input
@@ -157,7 +157,7 @@ export const CredentialPrompt: React.FC = () => {
                     if (e.key === "Enter") handleMasterPasswordSubmit();
                   }}
                   className="px-3 py-2 rounded-[var(--radius-card)] text-sm bg-transparent"
-                  style={{ border: "1px solid var(--color-border)", color: "var(--color-text)" }}
+                  style={{ border: "1px solid var(--border-default)", color: "var(--text-primary)" }}
                   autoFocus
                 />
               </label>
@@ -166,12 +166,12 @@ export const CredentialPrompt: React.FC = () => {
 
           {mode === "session-reauth" && currentSource && (
             <>
-              <div className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+              <div className="text-sm" style={{ color: "var(--text-secondary)" }}>
                 This source is configured for session-only credentials. Please re-enter your
                 authentication details.
               </div>
               <label className="flex flex-col gap-1">
-                <span className="text-xs font-medium" style={{ color: "var(--color-text-dim)" }}>
+                <span className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
                   Username
                 </span>
                 <input
@@ -179,12 +179,12 @@ export const CredentialPrompt: React.FC = () => {
                   value={user}
                   onChange={(e) => setUser(e.target.value)}
                   className="px-3 py-2 rounded-[var(--radius-card)] text-sm bg-transparent"
-                  style={{ border: "1px solid var(--color-border)", color: "var(--color-text)" }}
+                  style={{ border: "1px solid var(--border-default)", color: "var(--text-primary)" }}
                   autoFocus
                 />
               </label>
               <label className="flex flex-col gap-1">
-                <span className="text-xs font-medium" style={{ color: "var(--color-text-dim)" }}>
+                <span className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
                   Password
                 </span>
                 <input
@@ -195,11 +195,11 @@ export const CredentialPrompt: React.FC = () => {
                     if (e.key === "Enter") handleSessionReauthSubmit();
                   }}
                   className="px-3 py-2 rounded-[var(--radius-card)] text-sm bg-transparent"
-                  style={{ border: "1px solid var(--color-border)", color: "var(--color-text)" }}
+                  style={{ border: "1px solid var(--border-default)", color: "var(--text-primary)" }}
                 />
               </label>
               {sources.length > 1 && (
-                <div className="text-xs" style={{ color: "var(--color-text-dim)" }}>
+                <div className="text-xs" style={{ color: "var(--text-secondary)" }}>
                   Source {currentIndex + 1} of {sources.length}
                 </div>
               )}
@@ -217,9 +217,9 @@ export const CredentialPrompt: React.FC = () => {
             <motion.button
               className="px-4 py-2 rounded-[var(--radius-card)] text-sm font-medium"
               style={{
-                background: "var(--color-surface)",
-                color: "var(--color-text)",
-                border: "1px solid var(--color-border)",
+                background: "var(--surface-0)",
+                color: "var(--text-primary)",
+                border: "1px solid var(--border-default)",
               }}
               onClick={() => setShow(false)}
               whileTap={{ scale: 0.96 }}
@@ -230,8 +230,8 @@ export const CredentialPrompt: React.FC = () => {
             <motion.button
               className="px-4 py-2 rounded-[var(--radius-card)] text-sm font-medium"
               style={{
-                background: "var(--color-accent)",
-                color: "var(--color-bg)",
+                background: "var(--accent)",
+                color: "var(--surface-base)",
               }}
               onClick={mode === "master-password" ? handleMasterPasswordSubmit : handleSessionReauthSubmit}
               whileTap={{ scale: 0.96 }}

@@ -171,10 +171,10 @@ export const GameCard: React.FC<GameCardProps> = React.memo(({
         <div className="gc-card-shell">
           <section className="gc-card">
             <div className="gc-inside">
-              <div className="gc-cover-content skeleton-shimmer" style={{ backgroundColor: "var(--color-surface-raised)" }} />
+              <div className="gc-cover-content skeleton-shimmer" style={{ backgroundColor: "var(--surface-1)" }} />
               <div className="gc-details">
-                <div className="skeleton-shimmer" style={{ width: "85%", height: 13, borderRadius: 4, backgroundColor: "var(--color-surface)", marginBottom: 6 }} />
-                <div className="skeleton-shimmer" style={{ width: "55%", height: 11, borderRadius: 4, backgroundColor: "var(--color-surface)" }} />
+                <div className="skeleton-shimmer" style={{ width: "85%", height: 13, borderRadius: 4, backgroundColor: "var(--surface-0)", marginBottom: 6 }} />
+                <div className="skeleton-shimmer" style={{ width: "55%", height: 11, borderRadius: 4, backgroundColor: "var(--surface-0)" }} />
               </div>
             </div>
           </section>
@@ -254,8 +254,8 @@ export const GameCard: React.FC<GameCardProps> = React.memo(({
                 <span
                   className="gc-badge"
                   style={{
-                    backgroundColor: badgeColor ?? "var(--color-accent)",
-                    color: "var(--color-bg)",
+                    backgroundColor: badgeColor ?? "var(--accent)",
+                    color: "var(--surface-base)",
                   }}
                 >
                   {badge}
@@ -274,8 +274,8 @@ export const GameCard: React.FC<GameCardProps> = React.memo(({
                   <svg
                     className="gc-favorite-icon"
                     viewBox="0 0 24 24"
-                    fill={isFavorite ? "var(--color-accent)" : "none"}
-                    stroke={isFavorite ? "var(--color-accent)" : "white"}
+                    fill={isFavorite ? "var(--accent)" : "none"}
+                    stroke={isFavorite ? "var(--accent)" : "white"}
                     strokeWidth={2}
                   >
                     <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />

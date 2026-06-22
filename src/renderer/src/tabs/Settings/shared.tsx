@@ -43,6 +43,7 @@ export function getFlashSettings(settings?: Partial<FlashSettings>): FlashSettin
 }
 
 export const THEMES: { id: ThemeName; label: string; preview: string }[] = [
+  { id: "ember", label: "Ember", preview: "linear-gradient(135deg,#121110,#d95f0a)" },
   { id: "dark-oled", label: "Dark OLED", preview: "#000" },
   {
     id: "glassmorphism",
@@ -59,7 +60,6 @@ export const THEMES: { id: ThemeName; label: string; preview: string }[] = [
     label: "Terminal TUI",
     preview: "linear-gradient(135deg,#0c0c0c,#004400)",
   },
-  { id: "custom", label: "Custom", preview: "var(--color-surface-raised)" },
   {
     id: "synthwave-sunset",
     label: "Synthwave",
@@ -74,11 +74,6 @@ export const THEMES: { id: ThemeName; label: string; preview: string }[] = [
     id: "monokai",
     label: "Monokai",
     preview: "linear-gradient(135deg,#1e1e1e,#ffd866)",
-  },
-  {
-    id: "nord-aurora",
-    label: "Nord Aurora",
-    preview: "linear-gradient(135deg,#2e3440,#d08770)",
   },
   {
     id: "warm-paper",
@@ -106,7 +101,7 @@ export function PathList({
     <div className="flex flex-col gap-2">
       <label
         className="text-sm font-medium"
-        style={{ color: "var(--color-text)" }}
+        style={{ color: "var(--text-primary)" }}
       >
         {label}
       </label>
@@ -114,7 +109,7 @@ export function PathList({
         <p
           className="text-xs"
           style={{
-            color: "var(--color-text-dim)",
+            color: "var(--text-secondary)",
             fontFamily: "var(--font-mono)",
           }}
         >
@@ -126,9 +121,9 @@ export function PathList({
           <span
             className="flex-1 text-sm px-3 py-1.5 rounded"
             style={{
-              background: "var(--color-surface-raised)",
-              color: "var(--color-text)",
-              border: "1px solid var(--color-border)",
+              background: "var(--surface-1)",
+              color: "var(--text-primary)",
+              border: "1px solid var(--border-default)",
               fontFamily: "var(--font-mono)",
             }}
           >
@@ -154,9 +149,9 @@ export function PathList({
           placeholder={placeholder ?? "/path/to/folder"}
           className="flex-1 text-sm px-3 py-1.5 rounded"
           style={{
-            background: "var(--color-surface-raised)",
-            color: "var(--color-text)",
-            border: "1px solid var(--color-border)",
+            background: "var(--surface-1)",
+            color: "var(--text-primary)",
+            border: "1px solid var(--border-default)",
             fontFamily: "var(--font-mono)",
             outline: "none",
           }}
@@ -170,8 +165,8 @@ export function PathList({
         <motion.button
           className="px-3 py-1.5 rounded text-sm"
           style={{
-            background: "var(--color-accent)",
-            color: "var(--color-bg)",
+            background: "var(--accent)",
+            color: "var(--surface-base)",
           }}
           onClick={() => {
             if (newPath.trim()) {
@@ -186,9 +181,9 @@ export function PathList({
         <motion.button
           className="px-3 py-1.5 rounded text-sm"
           style={{
-            background: "var(--color-surface-raised)",
-            color: "var(--color-text)",
-            border: "1px solid var(--color-border)",
+            background: "var(--surface-1)",
+            color: "var(--text-primary)",
+            border: "1px solid var(--border-default)",
           }}
           onClick={async () => {
             const dir = await window.htpc.openDirectory();
@@ -220,7 +215,7 @@ export function Field({
     <div className="flex flex-col gap-1.5">
       <label
         className="text-sm font-medium"
-        style={{ color: "var(--color-text)" }}
+        style={{ color: "var(--text-primary)" }}
       >
         {label}
       </label>
@@ -231,9 +226,9 @@ export function Field({
         placeholder={placeholder}
         className="px-3 py-2 rounded text-sm"
         style={{
-          background: "var(--color-surface-raised)",
-          color: "var(--color-text)",
-          border: "1px solid var(--color-border)",
+          background: "var(--surface-1)",
+          color: "var(--text-primary)",
+          border: "1px solid var(--border-default)",
           outline: "none",
         }}
       />
@@ -255,11 +250,11 @@ export function Toggle({
   return (
     <div className="flex items-center justify-between gap-4 py-2">
       <div className="flex flex-col gap-0.5 min-w-0">
-        <span className="text-sm" style={{ color: "var(--color-text)" }}>
+        <span className="text-sm" style={{ color: "var(--text-primary)" }}>
           {label}
         </span>
         {description && (
-          <span className="text-xs" style={{ color: "var(--color-text-dim)" }}>
+          <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
             {description}
           </span>
         )}
@@ -269,9 +264,9 @@ export function Toggle({
         className="w-11 h-6 rounded-full transition-colors relative flex-shrink-0"
         style={{
           background: value
-            ? "var(--color-accent)"
-            : "var(--color-surface-raised)",
-          border: "1px solid var(--color-border)",
+            ? "var(--accent)"
+            : "var(--surface-1)",
+          border: "1px solid var(--border-default)",
         }}
       >
         <span

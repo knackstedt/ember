@@ -38,10 +38,10 @@ export function ChipFilters<T extends string>({
             className="relative flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-colors focus:outline-none"
             style={{
               backgroundColor: isActive
-                ? "var(--color-accent)"
-                : "var(--color-surface-raised)",
-              color: isActive ? "var(--color-bg)" : "var(--color-text-dim)",
-              border: `1px solid ${isActive ? "var(--color-accent)" : "var(--color-border)"}`,
+                ? "var(--accent)"
+                : "var(--surface-1)",
+              color: isActive ? "var(--surface-base)" : "var(--text-secondary)",
+              border: `1px solid ${isActive ? "var(--accent)" : "var(--border-default)"}`,
               boxShadow: isActive ? "var(--shadow-glow)" : "none",
             }}
             whileHover={{ scale: 1.05 }}
@@ -52,7 +52,7 @@ export function ChipFilters<T extends string>({
               <span
                 className="ml-1.5 text-xs opacity-70"
                 style={{
-                  color: isActive ? "var(--color-bg)" : "var(--color-text-dim)",
+                  color: isActive ? "var(--surface-base)" : "var(--text-secondary)",
                 }}
               >
                 {f.count}

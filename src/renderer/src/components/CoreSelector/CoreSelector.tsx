@@ -57,7 +57,7 @@ export const CoreSelector: React.FC<CoreSelectorProps> = ({ game, onSelectCore }
 
   if (loading) {
     return (
-      <div className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+      <div className="text-sm" style={{ color: "var(--text-secondary)" }}>
         Scanning for cores...
       </div>
     );
@@ -65,7 +65,7 @@ export const CoreSelector: React.FC<CoreSelectorProps> = ({ game, onSelectCore }
 
   if (cores.length === 0) {
     return (
-      <div className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+      <div className="text-sm" style={{ color: "var(--text-secondary)" }}>
         No libretro cores found. Install libretro cores to enable native emulation.
       </div>
     );
@@ -81,9 +81,9 @@ export const CoreSelector: React.FC<CoreSelectorProps> = ({ game, onSelectCore }
       }}
       className="w-full text-sm px-2 py-1.5 rounded"
       style={{
-        background: "var(--color-surface-raised)",
-        border: "1px solid var(--color-border)",
-        color: "var(--color-text)",
+        background: "var(--surface-1)",
+        border: "1px solid var(--border-default)",
+        color: "var(--text-primary)",
         outline: "none",
       }}
     >

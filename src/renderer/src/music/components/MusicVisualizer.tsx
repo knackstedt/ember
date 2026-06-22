@@ -154,7 +154,7 @@ export const MusicVisualizer: React.FC<MusicVisualizerProps> = React.memo(({
       <canvas
         ref={canvasRef}
         className="absolute inset-0 w-full h-full"
-        style={{ background: "var(--color-bg)" }}
+        style={{ background: "var(--surface-base)" }}
       />
       <div
         className="absolute inset-0 pointer-events-none"

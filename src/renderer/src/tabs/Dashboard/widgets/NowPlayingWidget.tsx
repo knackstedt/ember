@@ -51,7 +51,7 @@ export const NowPlayingWidget: React.FC<{ title?: string }> = ({ title }) => {
               <div className="absolute inset-0 rounded-xl opacity-20 blur-md -z-10" style={{ backgroundImage: `url(${current.albumArtUrl})`, backgroundSize: "cover", transform: "scale(1.2)" }} />
             </>
           ) : (
-            <div className="w-14 h-14 rounded-xl flex items-center justify-center" style={{ background: "var(--color-surface-raised)" }}>
+            <div className="w-14 h-14 rounded-xl flex items-center justify-center" style={{ background: "var(--surface-1)" }}>
               <Music size={20} className="opacity-40" />
             </div>
           )}
@@ -64,8 +64,8 @@ export const NowPlayingWidget: React.FC<{ title?: string }> = ({ title }) => {
         </div>
 
         <div className="w-full flex flex-col gap-0.5 px-1">
-          <div className="w-full rounded-full overflow-hidden" style={{ height: 3, background: "var(--color-surface-raised)" }}>
-            <div className="h-full rounded-full" style={{ width: `${progressPct}%`, background: "var(--color-accent)", transition: "width 0.3s linear" }} />
+          <div className="w-full rounded-full overflow-hidden" style={{ height: 3, background: "var(--surface-1)" }}>
+            <div className="h-full rounded-full" style={{ width: `${progressPct}%`, background: "var(--accent)", transition: "width 0.3s linear" }} />
           </div>
           <div className="flex justify-between text-[9px] opacity-30 tabular-nums">
             <span>{formatTime(progress)}</span>
@@ -75,13 +75,13 @@ export const NowPlayingWidget: React.FC<{ title?: string }> = ({ title }) => {
       </div>
 
       <div className="flex items-center justify-center gap-2 flex-shrink-0">
-        <button onClick={prev} className="p-1 rounded-lg transition-colors hover:opacity-80" style={{ background: "var(--color-surface-raised)" }}>
+        <button onClick={prev} className="p-1 rounded-lg transition-colors hover:opacity-80" style={{ background: "var(--surface-1)" }}>
           <SkipBack size={10} />
         </button>
-        <button onClick={playing ? pause : resume} className="p-1.5 rounded-xl transition-all hover:scale-105" style={{ background: "var(--color-accent)", color: "var(--color-bg)" }}>
+        <button onClick={playing ? pause : resume} className="p-1.5 rounded-xl transition-all hover:scale-105" style={{ background: "var(--accent)", color: "var(--surface-base)" }}>
           {playing ? <Pause size={14} /> : <Play size={14} />}
         </button>
-        <button onClick={next} className="p-1 rounded-lg transition-colors hover:opacity-80" style={{ background: "var(--color-surface-raised)" }}>
+        <button onClick={next} className="p-1 rounded-lg transition-colors hover:opacity-80" style={{ background: "var(--surface-1)" }}>
           <SkipForward size={10} />
         </button>
       </div>

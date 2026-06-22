@@ -1,6 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
+import "@fontsource/mukta-vaani";
 import "./styles/globals.css";
 import { useFlashPlayerStore } from "./store/flashPlayer.store";
 import { useJsnesPlayerStore } from "./store/jsnesPlayer.store";

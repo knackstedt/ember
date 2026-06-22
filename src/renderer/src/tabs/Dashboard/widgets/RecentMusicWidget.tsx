@@ -54,11 +54,11 @@ export const RecentMusicWidget: React.FC<{ title?: string; maxItems?: number }> 
             onClick={() => play(t)}
             className="group flex items-center gap-2 px-1.5 py-1 rounded-xl text-left text-sm transition-all duration-200 hover:scale-[1.02]"
             style={{
-              background: "var(--color-surface-raised)",
+              background: "var(--surface-1)",
               border: "1px solid transparent",
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = "var(--color-border)";
+              e.currentTarget.style.borderColor = "var(--border-default)";
               e.currentTarget.style.boxShadow = "var(--shadow-card)";
             }}
             onMouseLeave={(e) => {
@@ -70,7 +70,7 @@ export const RecentMusicWidget: React.FC<{ title?: string; maxItems?: number }> 
               {t.albumArtUrl ? (
                 <img src={t.albumArtUrl} alt="" className="w-8 h-8 object-cover rounded-lg" loading="lazy" />
               ) : (
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "var(--color-surface)" }}>
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "var(--surface-0)" }}>
                   <Music size={12} className="opacity-40" />
                 </div>
               )}

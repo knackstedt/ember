@@ -107,8 +107,8 @@ const WidgetConfigDialogContent: React.FC<WidgetConfigDialogContentProps> = ({
       <div
         className="rounded-xl p-4 w-full max-w-sm flex flex-col gap-3"
         style={{
-          background: "var(--color-surface-overlay)",
-          border: "1px solid var(--color-border)",
+          background: "var(--surface-2)",
+          border: "1px solid var(--border-default)",
           boxShadow: "var(--shadow-card)",
         }}
         onClick={(e) => e.stopPropagation()}
@@ -118,7 +118,7 @@ const WidgetConfigDialogContent: React.FC<WidgetConfigDialogContentProps> = ({
           <button
             onClick={onClose}
             className="p-1 rounded hover:opacity-70"
-            style={{ color: "var(--color-text-dim)" }}
+            style={{ color: "var(--text-secondary)" }}
           >
             <X size={16} />
           </button>
@@ -136,9 +136,9 @@ const WidgetConfigDialogContent: React.FC<WidgetConfigDialogContentProps> = ({
             placeholder={widget.type}
             className="px-2 py-1.5 rounded text-sm outline-none"
             style={{
-              background: "var(--color-surface-raised)",
-              border: "1px solid var(--color-border)",
-              color: "var(--color-text)",
+              background: "var(--surface-1)",
+              border: "1px solid var(--border-default)",
+              color: "var(--text-primary)",
             }}
           />
         </div>
@@ -156,9 +156,9 @@ const WidgetConfigDialogContent: React.FC<WidgetConfigDialogContentProps> = ({
               placeholder="https://example.com"
               className="px-2 py-1.5 rounded text-sm outline-none"
               style={{
-                background: "var(--color-surface-raised)",
-                border: "1px solid var(--color-border)",
-                color: "var(--color-text)",
+                background: "var(--surface-1)",
+                border: "1px solid var(--border-default)",
+                color: "var(--text-primary)",
               }}
             />
           </div>
@@ -178,9 +178,9 @@ const WidgetConfigDialogContent: React.FC<WidgetConfigDialogContentProps> = ({
               onChange={(e) => setMaxItems(parseInt(e.target.value, 10) || 1)}
               className="px-2 py-1.5 rounded text-sm outline-none"
               style={{
-                background: "var(--color-surface-raised)",
-                border: "1px solid var(--color-border)",
-                color: "var(--color-text)",
+                background: "var(--surface-1)",
+                border: "1px solid var(--border-default)",
+                color: "var(--text-primary)",
               }}
             />
           </div>
@@ -199,9 +199,9 @@ const WidgetConfigDialogContent: React.FC<WidgetConfigDialogContentProps> = ({
               placeholder="New York"
               className="px-2 py-1.5 rounded text-sm outline-none"
               style={{
-                background: "var(--color-surface-raised)",
-                border: "1px solid var(--color-border)",
-                color: "var(--color-text)",
+                background: "var(--surface-1)",
+                border: "1px solid var(--border-default)",
+                color: "var(--text-primary)",
               }}
             />
           </div>
@@ -211,14 +211,14 @@ const WidgetConfigDialogContent: React.FC<WidgetConfigDialogContentProps> = ({
           <button
             onClick={onClose}
             className="px-3 py-1.5 rounded text-xs font-medium"
-            style={{ background: "var(--color-surface-raised)", color: "var(--color-text)" }}
+            style={{ background: "var(--surface-1)", color: "var(--text-primary)" }}
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
             className="px-3 py-1.5 rounded text-xs font-medium"
-            style={{ background: "var(--color-accent)", color: "var(--color-bg)" }}
+            style={{ background: "var(--accent)", color: "var(--surface-base)" }}
           >
             Save
           </button>

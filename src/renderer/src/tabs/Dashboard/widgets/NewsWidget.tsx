@@ -53,11 +53,11 @@ export const NewsWidget: React.FC<{ title?: string }> = ({ title }) => {
           <button
             key={item.id}
             className="group flex items-start gap-1.5 px-1.5 py-1 rounded-xl text-left transition-all duration-200 hover:scale-[1.01]"
-            style={{ background: "var(--color-surface-raised)" }}
+            style={{ background: "var(--surface-1)" }}
           >
             <div className="flex flex-col gap-0 flex-1 min-w-0">
               <div className="flex items-center gap-1">
-                <span className="text-[7px] px-1 py-0.5 rounded font-medium uppercase flex-shrink-0" style={{ background: TAG_COLORS[item.tag] ?? "var(--color-surface)", color: "#000", opacity: 0.8 }}>
+                <span className="text-[7px] px-1 py-0.5 rounded font-medium uppercase flex-shrink-0" style={{ background: TAG_COLORS[item.tag] ?? "var(--surface-0)", color: "#000", opacity: 0.8 }}>
                   {item.tag}
                 </span>
                 <span className="text-[8px] opacity-30 flex-shrink-0">{item.source}</span>

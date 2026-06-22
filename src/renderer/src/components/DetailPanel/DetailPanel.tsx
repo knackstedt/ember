@@ -65,9 +65,9 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
           style={{
             width: "min(480px, 90%)",
             right: 0,
-            background: "var(--color-surface-overlay)",
+            background: "var(--surface-2)",
             backdropFilter: "blur(var(--blur-panel))",
-            borderLeft: "1px solid var(--color-border)",
+            borderLeft: "1px solid var(--border-default)",
           }}
           initial={{ x: "100%" }}
           animate={{ x: 0 }}
@@ -81,7 +81,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                   alt=""
                   className="w-full h-full object-cover"
                 />
-                <div className="absolute inset-0 bg-gradient-to-b from-transparent to-[var(--color-surface-overlay)]" />
+                <div className="absolute inset-0 bg-gradient-to-b from-transparent to-[var(--surface-2)]" />
               </div>
             )}
 
@@ -97,16 +97,16 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
               <div className="flex flex-col justify-end gap-1 min-w-0">
                 <h2
                   className="text-xl font-bold leading-tight"
-                  style={{ color: "var(--color-text)" }}
+                  style={{ color: "var(--text-primary)" }}
                 >
                   {title}
                 </h2>
                 {metadata?.slice(0, 3).map((m) => (
                   <div key={m.label} className="flex gap-1 text-sm">
-                    <span style={{ color: "var(--color-text-dim)" }}>
+                    <span style={{ color: "var(--text-secondary)" }}>
                       {m.label}:
                     </span>
-                    <span style={{ color: "var(--color-text)" }}>
+                    <span style={{ color: "var(--text-primary)" }}>
                       {m.value}
                     </span>
                   </div>
@@ -122,7 +122,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
 
             <div
               className="flex-1 overflow-y-auto px-4 pb-4 gpu-scroll"
-              style={{ color: "var(--color-text-dim)" }}
+              style={{ color: "var(--text-secondary)" }}
             >
               {description && (
                 <p className="text-sm leading-relaxed mb-4">{description}</p>
@@ -131,10 +131,10 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                 <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm mb-4">
                   {metadata.slice(3).map((m) => (
                     <React.Fragment key={m.label}>
-                      <span style={{ color: "var(--color-text-dim)" }}>
+                      <span style={{ color: "var(--text-secondary)" }}>
                         {m.label}
                       </span>
-                      <span style={{ color: "var(--color-text)" }}>
+                      <span style={{ color: "var(--text-primary)" }}>
                         {m.value}
                       </span>
                     </React.Fragment>
@@ -145,7 +145,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                 <div className="mb-4">
                   <div
                     className="text-xs font-semibold uppercase tracking-wide mb-2"
-                    style={{ color: "var(--color-text-dim)" }}
+                    style={{ color: "var(--text-secondary)" }}
                   >
                     Tags
                   </div>
@@ -156,16 +156,16 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                         className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium"
                         style={{
                           background:
-                            "color-mix(in srgb, var(--color-accent) 18%, transparent)",
+                            "color-mix(in srgb, var(--accent) 18%, transparent)",
                           border:
-                            "1px solid color-mix(in srgb, var(--color-accent) 40%, transparent)",
-                          color: "var(--color-text)",
+                            "1px solid color-mix(in srgb, var(--accent) 40%, transparent)",
+                          color: "var(--text-primary)",
                         }}
                       >
                         {tag}
                         <button
                           className="flex items-center opacity-60 hover:opacity-100 transition-opacity leading-none"
-                          style={{ color: "var(--color-text)" }}
+                          style={{ color: "var(--text-primary)" }}
                           onClick={() => handleRemoveTag(tag)}
                           aria-label={`Remove tag ${tag}`}
                         >
@@ -182,10 +182,10 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
                     placeholder="Add tag…"
                     className="w-full text-xs px-2.5 py-1 rounded outline-none"
                     style={{
-                      background: "var(--color-surface-raised)",
-                      border: "1px solid var(--color-border)",
-                      color: "var(--color-text)",
-                      caretColor: "var(--color-accent)",
+                      background: "var(--surface-1)",
+                      border: "1px solid var(--border-default)",
+                      color: "var(--text-primary)",
+                      caretColor: "var(--accent)",
                     }}
                   />
                 </div>

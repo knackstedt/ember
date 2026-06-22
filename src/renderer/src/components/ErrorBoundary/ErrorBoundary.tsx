@@ -96,17 +96,17 @@ function SectionFallback({ error }: { error?: Error }) {
   return (
     <div
       className="h-full w-full flex items-center justify-center p-6"
-      style={{ color: "var(--color-text-dim)", background: "var(--color-surface)" }}
+      style={{ color: "var(--text-secondary)", background: "var(--surface-0)" }}
     >
       <div
         className="flex flex-col items-center gap-3 p-6 rounded-xl max-w-md w-full"
         style={{
-          background: "var(--color-surface-raised)",
-          border: "1px solid var(--color-border)",
+          background: "var(--surface-1)",
+          border: "1px solid var(--border-default)",
         }}
       >
         <div className="text-2xl">⚠</div>
-        <h3 className="text-sm font-medium" style={{ color: "var(--color-text)" }}>
+        <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
           This section failed to load
         </h3>
         <pre
@@ -126,7 +126,7 @@ function SectionFallback({ error }: { error?: Error }) {
           className="px-4 py-1.5 rounded-md text-xs font-medium"
           onClick={() => window.location.reload()}
           style={{
-            background: "var(--color-accent)",
+            background: "var(--accent)",
             color: "#fff",
             cursor: "pointer",
           }}

@@ -4,10 +4,10 @@ import { Info, Check, X, Loader } from "lucide-react";
 import { useToastStore, Toast, ToastType } from "../../store/toast.store";
 
 const TYPE_META: Record<ToastType, { icon: React.ReactNode; accent: string }> = {
-  info: { icon: <Info size={16} />, accent: "var(--color-accent)" },
+  info: { icon: <Info size={16} />, accent: "var(--accent)" },
   success: { icon: <Check size={16} />, accent: "#22c55e" },
   error: { icon: <X size={16} />, accent: "#ef4444" },
-  progress: { icon: <Loader size={16} />, accent: "var(--color-accent)" },
+  progress: { icon: <Loader size={16} />, accent: "var(--accent)" },
 };
 
 function ToastItem({ toast }: { toast: Toast }) {
@@ -25,8 +25,8 @@ function ToastItem({ toast }: { toast: Toast }) {
       style={{
         minWidth: 280,
         maxWidth: 360,
-        background: "var(--color-surface-raised)",
-        border: "1px solid var(--color-border)",
+        background: "var(--surface-1)",
+        border: "1px solid var(--border-default)",
         boxShadow: "var(--shadow-card)",
       }}
     >
@@ -39,7 +39,7 @@ function ToastItem({ toast }: { toast: Toast }) {
 
       <p
         className="flex-1 text-sm leading-snug break-words"
-        style={{ color: "var(--color-text)" }}
+        style={{ color: "var(--text-primary)" }}
       >
         {toast.message}
       </p>
@@ -47,7 +47,7 @@ function ToastItem({ toast }: { toast: Toast }) {
       <button
         onClick={() => dismiss(toast.id)}
         className="flex-shrink-0 ml-1 transition-opacity"
-        style={{ color: "var(--color-text-dim)", opacity: 0.5 }}
+        style={{ color: "var(--text-secondary)", opacity: 0.5 }}
         onMouseEnter={(e) =>
           ((e.currentTarget as HTMLButtonElement).style.opacity = "1")
         }
@@ -63,7 +63,7 @@ function ToastItem({ toast }: { toast: Toast }) {
       {toast.type === "progress" && (
         <div
           className="absolute bottom-0 left-0 right-0 h-0.5"
-          style={{ background: "var(--color-border)" }}
+          style={{ background: "var(--border-default)" }}
         >
           <motion.div
             className="h-full"

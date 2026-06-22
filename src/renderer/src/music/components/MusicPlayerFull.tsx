@@ -313,16 +313,16 @@ export const MusicPlayerFull: React.FC<MusicPlayerFullProps> = React.memo(({
 
   const focusStyle = (focused: boolean): React.CSSProperties =>
     focused
-      ? { outline: "2px solid var(--color-accent)", outlineOffset: "3px", borderRadius: "var(--radius-card)" }
+      ? { outline: "2px solid var(--accent)", outlineOffset: "3px", borderRadius: "var(--radius-card)" }
       : {};
 
   const tabStyle = (id: FullTab): React.CSSProperties => {
     const focused = isTabFocused(id);
     const active = activeTab === id;
     return {
-      color: active ? "var(--color-accent)" : "var(--color-text-dim)",
-      background: active ? "var(--color-accent-dim)" : "transparent",
-      outline: focused ? "2px solid var(--color-accent)" : "none",
+      color: active ? "var(--accent)" : "var(--text-secondary)",
+      background: active ? "var(--accent-muted)" : "transparent",
+      outline: focused ? "2px solid var(--accent)" : "none",
       outlineOffset: focused ? "2px" : "0",
       borderRadius: "var(--radius-card)",
     };
@@ -332,7 +332,7 @@ export const MusicPlayerFull: React.FC<MusicPlayerFullProps> = React.memo(({
     <motion.div
       className="absolute inset-0 flex flex-col"
       style={{
-        background: "var(--color-bg)",
+        background: "var(--surface-base)",
         zIndex: 100,
       }}
       initial={{ y: "100%" }}
@@ -365,7 +365,7 @@ export const MusicPlayerFull: React.FC<MusicPlayerFullProps> = React.memo(({
         <button
           onClick={onClose}
           className="w-8 h-8 flex items-center justify-center rounded hover:bg-white/10 transition-colors"
-          style={{ color: "var(--color-text-dim)" }}
+          style={{ color: "var(--text-secondary)" }}
           aria-label="Close player"
         >
           <ChevronDown size={20} />
@@ -378,28 +378,28 @@ export const MusicPlayerFull: React.FC<MusicPlayerFullProps> = React.memo(({
           <div className="h-full flex flex-col items-center justify-center gap-4 px-6 py-4 overflow-y-auto">
             <div
               className="w-64 h-64 rounded-[var(--radius-card)] overflow-hidden shadow-2xl flex-shrink-0"
-              style={{ background: "var(--color-surface-raised)" }}
+              style={{ background: "var(--surface-1)" }}
             >
               {track.albumArtUrl ? (
                 <img src={track.albumArtUrl} alt={getTrackDisplayName(track)} className="w-full h-full object-cover" />
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-6xl select-none" style={{ color: "var(--color-text-dim)" }}>
+                <div className="w-full h-full flex items-center justify-center text-6xl select-none" style={{ color: "var(--text-secondary)" }}>
                   ♪
                 </div>
               )}
             </div>
             <div className="text-center max-w-md">
-              <div className="text-lg font-semibold truncate" style={{ color: "var(--color-text)" }} title={getTrackDisplayName(track)}>
+              <div className="text-lg font-semibold truncate" style={{ color: "var(--text-primary)" }} title={getTrackDisplayName(track)}>
                 {getTrackDisplayName(track)}
               </div>
-              <div className="text-sm truncate" style={{ color: "var(--color-text-dim)" }} title={track.artist ?? track.album}>
+              <div className="text-sm truncate" style={{ color: "var(--text-secondary)" }} title={track.artist ?? track.album}>
                 {track.artist ?? track.album ?? ""}
               </div>
             </div>
 
             {/* Seek bar */}
             <div className="w-full max-w-md flex items-center gap-3">
-              <span className="text-xs tabular-nums" style={{ color: "var(--color-text-dim)" }}>
+              <span className="text-xs tabular-nums" style={{ color: "var(--text-secondary)" }}>
                 {fmt(position)}
               </span>
               <input
@@ -410,10 +410,10 @@ export const MusicPlayerFull: React.FC<MusicPlayerFullProps> = React.memo(({
                 value={position}
                 onChange={(e) => seek(parseFloat(e.target.value))}
                 className="flex-1 h-1.5 cursor-pointer"
-                style={{ accentColor: "var(--color-accent)" }}
+                style={{ accentColor: "var(--accent)" }}
                 aria-label="Seek"
               />
-              <span className="text-xs tabular-nums" style={{ color: "var(--color-text-dim)" }}>
+              <span className="text-xs tabular-nums" style={{ color: "var(--text-secondary)" }}>
                 {fmt(duration)}
               </span>
             </div>
@@ -423,7 +423,7 @@ export const MusicPlayerFull: React.FC<MusicPlayerFullProps> = React.memo(({
               <button
                 onClick={prev}
                 className="w-10 h-10 flex items-center justify-center rounded hover:bg-white/10 transition-colors"
-                style={{ color: "var(--color-text)", ...focusStyle(isControlFocused("prev")) }}
+                style={{ color: "var(--text-primary)", ...focusStyle(isControlFocused("prev")) }}
                 aria-label="Previous"
               >
                 <SkipBack size={20} />
@@ -431,7 +431,7 @@ export const MusicPlayerFull: React.FC<MusicPlayerFullProps> = React.memo(({
               <button
                 onClick={() => seek(Math.max(0, position - 15))}
                 className="w-8 h-8 flex items-center justify-center rounded hover:bg-white/10 transition-colors text-xs font-bold"
-                style={{ color: "var(--color-text-dim)", ...focusStyle(isControlFocused("seekBack")) }}
+                style={{ color: "var(--text-secondary)", ...focusStyle(isControlFocused("seekBack")) }}
                 aria-label="Seek back 15s"
                 title="-15s"
               >
@@ -441,8 +441,8 @@ export const MusicPlayerFull: React.FC<MusicPlayerFullProps> = React.memo(({
                 onClick={playing ? pause : resume}
                 className="w-14 h-14 flex items-center justify-center rounded-full text-lg font-bold"
                 style={{
-                  background: "var(--color-accent)",
-                  color: "var(--color-bg)",
+                  background: "var(--accent)",
+                  color: "var(--surface-base)",
                   ...focusStyle(isControlFocused("play")),
                 }}
                 aria-label={playing ? "Pause" : "Play"}
@@ -452,7 +452,7 @@ export const MusicPlayerFull: React.FC<MusicPlayerFullProps> = React.memo(({
               <button
                 onClick={() => seek(Math.min(duration, position + 15))}
                 className="w-8 h-8 flex items-center justify-center rounded hover:bg-white/10 transition-colors text-xs font-bold"
-                style={{ color: "var(--color-text-dim)", ...focusStyle(isControlFocused("seekFwd")) }}
+                style={{ color: "var(--text-secondary)", ...focusStyle(isControlFocused("seekFwd")) }}
                 aria-label="Seek forward 15s"
                 title="+15s"
               >
@@ -461,7 +461,7 @@ export const MusicPlayerFull: React.FC<MusicPlayerFullProps> = React.memo(({
               <button
                 onClick={next}
                 className="w-10 h-10 flex items-center justify-center rounded hover:bg-white/10 transition-colors"
-                style={{ color: "var(--color-text)", ...focusStyle(isControlFocused("next")) }}
+                style={{ color: "var(--text-primary)", ...focusStyle(isControlFocused("next")) }}
                 aria-label="Next"
               >
                 <SkipForward size={20} />
@@ -474,8 +474,8 @@ export const MusicPlayerFull: React.FC<MusicPlayerFullProps> = React.memo(({
                 onClick={toggleShuffle}
                 className="w-9 h-9 flex items-center justify-center rounded transition-colors"
                 style={{
-                  color: shuffle ? "var(--color-accent)" : "var(--color-text-dim)",
-                  background: shuffle ? "var(--color-accent-dim)" : "transparent",
+                  color: shuffle ? "var(--accent)" : "var(--text-secondary)",
+                  background: shuffle ? "var(--accent-muted)" : "transparent",
                   ...focusStyle(isControlFocused("shuffle")),
                 }}
                 aria-label={shuffle ? "Shuffle on" : "Shuffle off"}
@@ -486,15 +486,15 @@ export const MusicPlayerFull: React.FC<MusicPlayerFullProps> = React.memo(({
                 onClick={toggleRepeat}
                 className="w-9 h-9 flex items-center justify-center rounded transition-colors relative"
                 style={{
-                  color: repeat !== "none" ? "var(--color-accent)" : "var(--color-text-dim)",
-                  background: repeat !== "none" ? "var(--color-accent-dim)" : "transparent",
+                  color: repeat !== "none" ? "var(--accent)" : "var(--text-secondary)",
+                  background: repeat !== "none" ? "var(--accent-muted)" : "transparent",
                   ...focusStyle(isControlFocused("repeat")),
                 }}
                 aria-label={`Repeat: ${repeat}`}
               >
                 <Repeat size={18} />
                 {repeat === "one" && (
-                  <span className="absolute bottom-0.5 right-0.5 text-[9px] font-bold" style={{ color: "var(--color-accent)" }}>
+                  <span className="absolute bottom-0.5 right-0.5 text-[9px] font-bold" style={{ color: "var(--accent)" }}>
                     1
                   </span>
                 )}
@@ -511,7 +511,7 @@ export const MusicPlayerFull: React.FC<MusicPlayerFullProps> = React.memo(({
                 <button
                   onClick={() => setVolume(Math.max(0, volume - 0.05))}
                   className="w-8 h-8 flex items-center justify-center rounded hover:bg-white/10 transition-colors"
-                  style={{ color: "var(--color-text-dim)", ...focusStyle(isControlFocused("volDown")) }}
+                  style={{ color: "var(--text-secondary)", ...focusStyle(isControlFocused("volDown")) }}
                   aria-label="Volume down"
                 >
                   <VolumeX size={16} />
@@ -533,8 +533,8 @@ export const MusicPlayerFull: React.FC<MusicPlayerFullProps> = React.memo(({
                     style={{
                       WebkitAppearance: "none",
                       appearance: "none",
-                      background: `linear-gradient(to right, var(--color-accent) ${volume * 100}%, var(--color-surface) ${volume * 100}%)`,
-                      outline: isControlFocused("volDown") || isControlFocused("volUp") ? "2px solid var(--color-accent)" : "none",
+                      background: `linear-gradient(to right, var(--accent) ${volume * 100}%, var(--surface-0) ${volume * 100}%)`,
+                      outline: isControlFocused("volDown") || isControlFocused("volUp") ? "2px solid var(--accent)" : "none",
                     }}
                   />
                   <style>{`
@@ -544,18 +544,18 @@ export const MusicPlayerFull: React.FC<MusicPlayerFullProps> = React.memo(({
                       width: 14px;
                       height: 14px;
                       border-radius: 50%;
-                      background: var(--color-accent);
+                      background: var(--accent);
                       cursor: pointer;
-                      border: 2px solid var(--color-bg);
+                      border: 2px solid var(--surface-base);
                       box-shadow: 0 0 4px rgba(0,0,0,0.3);
                     }
                     input[type="range"]::-moz-range-thumb {
                       width: 14px;
                       height: 14px;
                       border-radius: 50%;
-                      background: var(--color-accent);
+                      background: var(--accent);
                       cursor: pointer;
-                      border: 2px solid var(--color-bg);
+                      border: 2px solid var(--surface-base);
                       box-shadow: 0 0 4px rgba(0,0,0,0.3);
                     }
                   `}</style>
@@ -563,7 +563,7 @@ export const MusicPlayerFull: React.FC<MusicPlayerFullProps> = React.memo(({
                 <button
                   onClick={() => setVolume(Math.min(1, volume + 0.05))}
                   className="w-8 h-8 flex items-center justify-center rounded hover:bg-white/10 transition-colors"
-                  style={{ color: "var(--color-text-dim)", ...focusStyle(isControlFocused("volUp")) }}
+                  style={{ color: "var(--text-secondary)", ...focusStyle(isControlFocused("volUp")) }}
                   aria-label="Volume up"
                 >
                   {volume === 0 ? <VolumeX size={16} /> : volume < 0.5 ? <Volume1 size={16} /> : <Volume2 size={16} />}
@@ -575,11 +575,11 @@ export const MusicPlayerFull: React.FC<MusicPlayerFullProps> = React.memo(({
 
         {activeTab === "lyrics" && (
           <div className="h-full flex flex-col items-center justify-center px-6 text-center">
-            <FileText size={48} style={{ color: "var(--color-text-dim)" }} />
-            <div className="mt-4 text-base font-medium" style={{ color: "var(--color-text)" }}>
+            <FileText size={48} style={{ color: "var(--text-secondary)" }} />
+            <div className="mt-4 text-base font-medium" style={{ color: "var(--text-primary)" }}>
               Lyrics not available
             </div>
-            <div className="text-sm mt-1" style={{ color: "var(--color-text-dim)" }}>
+            <div className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>
               Connect a lyrics source to see synchronized lyrics here.
             </div>
           </div>
@@ -593,13 +593,13 @@ export const MusicPlayerFull: React.FC<MusicPlayerFullProps> = React.memo(({
                 onChange={(e) => setPresetIndex(Number(e.target.value))}
                 className="min-w-0 px-2 py-1 text-xs font-medium rounded border-none outline-none cursor-pointer transition-colors"
                 style={{
-                  color: "var(--color-text)",
-                  background: "var(--color-surface-raised)",
+                  color: "var(--text-primary)",
+                  background: "var(--surface-1)",
                 }}
                 aria-label="Visualizer preset"
               >
                 {PRESETS.map((p, i) => (
-                  <option key={p.name} value={i} style={{ background: "var(--color-surface-raised)" }}>
+                  <option key={p.name} value={i} style={{ background: "var(--surface-1)" }}>
                     {p.name}{p.description ? ` — ${p.description}` : ""}
                   </option>
                 ))}
@@ -614,16 +614,16 @@ export const MusicPlayerFull: React.FC<MusicPlayerFullProps> = React.memo(({
         {activeTab === "queue" && (
           <div
             className="h-full flex flex-col overflow-hidden"
-            style={{ background: "var(--color-surface-raised)" }}
+            style={{ background: "var(--surface-1)" }}
           >
             <div
               className="flex items-center justify-between px-4 py-2 flex-shrink-0"
-              style={{ borderBottom: "1px solid var(--color-border)" }}
+              style={{ borderBottom: "1px solid var(--border-default)" }}
             >
-              <span className="text-sm font-semibold" style={{ color: "var(--color-text)" }}>
+              <span className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
                 Queue
               </span>
-              <span className="text-xs" style={{ color: "var(--color-text-dim)" }}>
+              <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
                 {queue.length} tracks
               </span>
             </div>
@@ -648,42 +648,42 @@ export const MusicPlayerFull: React.FC<MusicPlayerFullProps> = React.memo(({
                         height: QUEUE_ITEM_HEIGHT,
                         background:
                           idx === currentIndex
-                            ? "color-mix(in srgb, var(--color-accent) 12%, transparent)"
+                            ? "color-mix(in srgb, var(--accent) 12%, transparent)"
                             : isQueueItemFocused(idx)
-                              ? "color-mix(in srgb, var(--color-accent) 8%, transparent)"
+                              ? "color-mix(in srgb, var(--accent) 8%, transparent)"
                               : "transparent",
-                        outline: isQueueItemFocused(idx) ? "2px solid var(--color-accent)" : "none",
+                        outline: isQueueItemFocused(idx) ? "2px solid var(--accent)" : "none",
                         outlineOffset: -2,
                       }}
                       onClick={() => play(queue, idx)}
                     >
                       <div
                         className="w-8 h-8 rounded flex-shrink-0 overflow-hidden flex items-center justify-center text-xs"
-                        style={{ background: "var(--color-surface)" }}
+                        style={{ background: "var(--surface-0)" }}
                       >
                         {t.albumArtUrl ? (
                           <img src={t.albumArtUrl} alt={getTrackDisplayName(t)} className="w-full h-full object-cover" />
                         ) : (
-                          <span style={{ color: "var(--color-text-dim)" }}>♪</span>
+                          <span style={{ color: "var(--text-secondary)" }}>♪</span>
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div
                           className="text-sm truncate"
                           style={{
-                            color: idx === currentIndex ? "var(--color-accent)" : "var(--color-text)",
+                            color: idx === currentIndex ? "var(--accent)" : "var(--text-primary)",
                             fontWeight: idx === currentIndex ? 600 : 400,
                           }}
                           title={getTrackDisplayName(t)}
                         >
                           {getTrackDisplayName(t)}
                         </div>
-                        <div className="text-xs truncate" style={{ color: "var(--color-text-dim)" }}>
+                        <div className="text-xs truncate" style={{ color: "var(--text-secondary)" }}>
                           {t.artist}
                         </div>
                       </div>
                       {t.duration && (
-                        <span className="text-xs tabular-nums flex-shrink-0" style={{ color: "var(--color-text-dim)" }}>
+                        <span className="text-xs tabular-nums flex-shrink-0" style={{ color: "var(--text-secondary)" }}>
                           {fmt(t.duration)}
                         </span>
                       )}

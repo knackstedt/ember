@@ -12,7 +12,7 @@ interface ProgressBarProps {
 export const ProgressBar: React.FC<ProgressBarProps> = ({
   value,
   max = 100,
-  color = "var(--color-accent)",
+  color = "var(--accent)",
   height = 6,
   label,
   valueLabel,
@@ -26,7 +26,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
           <span className="truncate">{valueLabel}</span>
         </div>
       )}
-      <div className="w-full rounded-full overflow-hidden" style={{ height, background: "var(--color-surface-raised)" }}>
+      <div className="w-full rounded-full overflow-hidden" style={{ height, background: "var(--surface-1)" }}>
         <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: color, opacity: 0.85 }} />
       </div>
     </div>

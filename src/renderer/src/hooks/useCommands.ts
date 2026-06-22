@@ -21,11 +21,15 @@ import { useLibretroPlayerStore } from "../store/libretroPlayer.store";
 import { useFocusZoneStore } from "../store/focusZone.store";
 
 const THEME_CYCLE: ThemeName[] = [
+  "ember",
   "dark-oled",
   "glassmorphism",
   "neon-cyberpunk",
   "terminal-tui",
-  "custom",
+  "synthwave-sunset",
+  "deep-ocean",
+  "monokai",
+  "warm-paper",
 ];
 
 export interface CommandContext {

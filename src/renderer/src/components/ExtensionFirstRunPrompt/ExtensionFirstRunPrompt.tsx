@@ -130,8 +130,8 @@ export const ExtensionFirstRunPrompt: React.FC<Props> = ({ service, partition, o
       <motion.div
         className="relative flex flex-col w-[min(480px,90vw)] max-h-[80vh] rounded-[var(--radius-card)] overflow-hidden"
         style={{
-          background: "var(--color-surface-overlay)",
-          border: "1px solid var(--color-border)",
+          background: "var(--surface-2)",
+          border: "1px solid var(--border-default)",
         }}
         initial={{ scale: 0.9, y: 20 }}
         animate={{ scale: 1, y: 0 }}
@@ -140,9 +140,9 @@ export const ExtensionFirstRunPrompt: React.FC<Props> = ({ service, partition, o
       >
         <div
           className="flex items-center justify-between px-5 py-4 border-b"
-          style={{ borderColor: "var(--color-border)" }}
+          style={{ borderColor: "var(--border-default)" }}
         >
-          <h2 className="text-lg font-semibold" style={{ color: "var(--color-text)" }}>
+          <h2 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
             Enhance {service.name}
           </h2>
           <button
@@ -150,12 +150,12 @@ export const ExtensionFirstRunPrompt: React.FC<Props> = ({ service, partition, o
             onClick={dismiss}
             aria-label="Close"
           >
-            <X size={18} style={{ color: "var(--color-text)" }} />
+            <X size={18} style={{ color: "var(--text-primary)" }} />
           </button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-4">
-          <p className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+          <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
             Add these community extensions to improve your {service.name} experience. They run
             locally and can be toggled on or off at any time.
           </p>
@@ -164,11 +164,11 @@ export const ExtensionFirstRunPrompt: React.FC<Props> = ({ service, partition, o
             <div className="flex flex-col items-center gap-2 py-6">
               <div
                 className="w-10 h-10 rounded-full flex items-center justify-center"
-                style={{ background: "var(--color-accent)" }}
+                style={{ background: "var(--accent)" }}
               >
                 <Check size={20} color="#fff" />
               </div>
-              <span className="text-sm font-medium" style={{ color: "var(--color-text)" }}>
+              <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
                 All set!
               </span>
             </div>
@@ -182,26 +182,26 @@ export const ExtensionFirstRunPrompt: React.FC<Props> = ({ service, partition, o
                     className="flex items-start gap-3 px-3 py-3 rounded-[var(--radius-card)] text-left transition-colors"
                     style={{
                       background: selected
-                        ? "var(--color-surface-raised)"
+                        ? "var(--surface-1)"
                         : "transparent",
-                      border: `1px solid ${selected ? "var(--color-accent)" : "var(--color-border)"}`,
+                      border: `1px solid ${selected ? "var(--accent)" : "var(--border-default)"}`,
                     }}
                     onClick={() => toggle(rec.id)}
                   >
                     <div
                       className="w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 mt-0.5"
                       style={{
-                        borderColor: selected ? "var(--color-accent)" : "var(--color-border)",
-                        background: selected ? "var(--color-accent)" : "transparent",
+                        borderColor: selected ? "var(--accent)" : "var(--border-default)",
+                        background: selected ? "var(--accent)" : "transparent",
                       }}
                     >
                       {selected && <Check size={14} color="#fff" />}
                     </div>
                     <div className="flex flex-col min-w-0">
-                      <span className="text-sm font-medium" style={{ color: "var(--color-text)" }}>
+                      <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
                         {rec.name}
                       </span>
-                      <span className="text-xs" style={{ color: "var(--color-text-dim)" }}>
+                      <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
                         {rec.description}
                       </span>
                     </div>
@@ -215,18 +215,18 @@ export const ExtensionFirstRunPrompt: React.FC<Props> = ({ service, partition, o
         {!done && (
           <div
             className="flex items-center justify-end gap-2 px-5 py-4 border-t"
-            style={{ borderColor: "var(--color-border)" }}
+            style={{ borderColor: "var(--border-default)" }}
           >
             <button
               className="px-4 py-2 rounded text-sm font-medium transition-colors"
-              style={{ color: "var(--color-text-dim)" }}
+              style={{ color: "var(--text-secondary)" }}
               onClick={dismiss}
             >
               Skip
             </button>
             <button
               className="flex items-center gap-1.5 px-4 py-2 rounded text-sm font-medium transition-colors"
-              style={{ background: "var(--color-accent)", color: "#fff" }}
+              style={{ background: "var(--accent)", color: "#fff" }}
               onClick={installSelected}
               disabled={installing || selectedIds.size === 0}
             >

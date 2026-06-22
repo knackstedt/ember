@@ -119,7 +119,7 @@ const HexCell = React.memo(function HexCellInner({ hex, isFocused, cellWidth, he
               position: "absolute",
               inset: 2,
               clipPath: HEX_CLIP,
-              backgroundColor: "var(--color-surface-raised)",
+              backgroundColor: "var(--surface-1)",
             }}
           />
         </div>
@@ -140,7 +140,7 @@ const HexCell = React.memo(function HexCellInner({ hex, isFocused, cellWidth, he
         transform: isFocused ? "scale(1.04)" : "scale(1)",
         transition: "transform 0.2s ease",
         filter: isFocused
-          ? "drop-shadow(0 0 10px var(--color-accent)) drop-shadow(0 0 4px var(--color-accent))"
+          ? "drop-shadow(0 0 10px var(--accent)) drop-shadow(0 0 4px var(--accent))"
           : undefined,
         willChange: "transform",
         backfaceVisibility: "hidden",
@@ -235,8 +235,8 @@ const HexCell = React.memo(function HexCellInner({ hex, isFocused, cellWidth, he
                 fontSize: 10,
                 fontWeight: 700,
                 textTransform: "uppercase",
-                backgroundColor: hex.badgeColor ?? "var(--color-accent)",
-                color: "var(--color-bg)",
+                backgroundColor: hex.badgeColor ?? "var(--accent)",
+                color: "var(--surface-base)",
                 letterSpacing: "0.05em",
                 zIndex: 3,
               }}
@@ -280,7 +280,7 @@ const HexCell = React.memo(function HexCellInner({ hex, isFocused, cellWidth, he
                 style={{
                   height: "100%",
                   width: `${hex.progress * 100}%`,
-                  background: "var(--color-accent)",
+                  background: "var(--accent)",
                   borderRadius: 2,
                 }}
               />
@@ -316,7 +316,7 @@ const HexCell = React.memo(function HexCellInner({ hex, isFocused, cellWidth, he
         {hex.isFavorite && !hex.onFavorite && (
           <svg
             viewBox="0 0 24 24"
-            fill="var(--color-accent)"
+            fill="var(--accent)"
             style={{
               position: "absolute",
               top: "28%",
@@ -358,8 +358,8 @@ const HexCell = React.memo(function HexCellInner({ hex, isFocused, cellWidth, he
           >
             <svg
               viewBox="0 0 24 24"
-              fill={hex.isFavorite ? "var(--color-accent)" : "none"}
-              stroke={hex.isFavorite ? "var(--color-accent)" : "white"}
+              fill={hex.isFavorite ? "var(--accent)" : "none"}
+              stroke={hex.isFavorite ? "var(--accent)" : "white"}
               strokeWidth={2}
               style={{ width: 14, height: 14 }}
             >

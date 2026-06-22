@@ -66,7 +66,7 @@ export function DynamicFacetFilters({
         const active = activeFilters[field.key] ?? null;
         return (
           <div key={field.key} className="flex items-center gap-2 overflow-x-auto pb-0.5" style={{ scrollbarWidth: "none" }}>
-            <span className="text-xs font-medium flex-shrink-0" style={{ color: "var(--color-text-dim)" }}>
+            <span className="text-xs font-medium flex-shrink-0" style={{ color: "var(--text-secondary)" }}>
               {field.label}:
             </span>
             <motion.button
@@ -74,10 +74,10 @@ export function DynamicFacetFilters({
               className="relative flex-shrink-0 px-2.5 py-0.5 rounded-full text-xs font-medium transition-colors focus:outline-none"
               style={{
                 backgroundColor: active === null
-                  ? "var(--color-accent)"
-                  : "var(--color-surface-raised)",
-                color: active === null ? "var(--color-bg)" : "var(--color-text-dim)",
-                border: `1px solid ${active === null ? "var(--color-accent)" : "var(--color-border)"}`,
+                  ? "var(--accent)"
+                  : "var(--surface-1)",
+                color: active === null ? "var(--surface-base)" : "var(--text-secondary)",
+                border: `1px solid ${active === null ? "var(--accent)" : "var(--border-default)"}`,
               }}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -91,10 +91,10 @@ export function DynamicFacetFilters({
                 className="relative flex-shrink-0 px-2.5 py-0.5 rounded-full text-xs font-medium transition-colors focus:outline-none"
                 style={{
                   backgroundColor: active === v
-                    ? "var(--color-accent)"
-                    : "var(--color-surface-raised)",
-                  color: active === v ? "var(--color-bg)" : "var(--color-text-dim)",
-                  border: `1px solid ${active === v ? "var(--color-accent)" : "var(--color-border)"}`,
+                    ? "var(--accent)"
+                    : "var(--surface-1)",
+                  color: active === v ? "var(--surface-base)" : "var(--text-secondary)",
+                  border: `1px solid ${active === v ? "var(--accent)" : "var(--border-default)"}`,
                 }}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
@@ -104,7 +104,7 @@ export function DynamicFacetFilters({
               </motion.button>
             ))}
             {total > values.length && (
-              <span className="text-xs flex-shrink-0" style={{ color: "var(--color-text-dim)" }}>
+              <span className="text-xs flex-shrink-0" style={{ color: "var(--text-secondary)" }}>
                 +{total - values.length}
               </span>
             )}

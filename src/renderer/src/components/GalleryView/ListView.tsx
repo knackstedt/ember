@@ -43,7 +43,7 @@ export const ListView = React.forwardRef(function ListViewInner<T>(
 
   const rowStyle: CSSProperties = {
     height: rowHeight,
-    borderBottom: "1px solid var(--color-border)",
+    borderBottom: "1px solid var(--border-default)",
   };
 
   if (scrollRef) {

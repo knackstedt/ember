@@ -102,13 +102,13 @@ export const PluginsTab: React.FC = () => {
   return (
     <div className="flex flex-col gap-8">
       <section className="flex flex-col gap-4">
-        <h2 className="text-lg font-semibold" style={{ color: "var(--color-text)" }}>
+        <h2 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
           Plugins
         </h2>
-        <p className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+        <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
           Install plugins from GitHub releases to add emulator support and other features.
           Plugins are downloaded as{" "}
-          <code className="px-1 py-0.5 rounded text-xs" style={{ background: "var(--color-surface-raised)", fontFamily: "var(--font-mono)" }}>
+          <code className="px-1 py-0.5 rounded text-xs" style={{ background: "var(--surface-1)", fontFamily: "var(--font-mono)" }}>
             ember-plugin-&lt;name&gt;-&lt;version&gt;.tar.gz
           </code>{" "}
           release assets.
@@ -124,7 +124,7 @@ export const PluginsTab: React.FC = () => {
         <div className="flex gap-2">
           <motion.button
             className="self-start px-4 py-2 rounded-[var(--radius-card)] text-sm flex items-center gap-1.5"
-            style={{ background: "var(--color-surface-raised)", color: "var(--color-text)", border: "1px solid var(--color-border)" }}
+            style={{ background: "var(--surface-1)", color: "var(--text-primary)", border: "1px solid var(--border-default)" }}
             onClick={() => window.htpc.plugins.reload()}
             whileTap={{ scale: 0.96 }}
           >
@@ -133,7 +133,7 @@ export const PluginsTab: React.FC = () => {
           </motion.button>
           <motion.button
             className="self-start px-4 py-2 rounded-[var(--radius-card)] text-sm flex items-center gap-1.5"
-            style={{ background: "var(--color-accent)", color: "#fff" }}
+            style={{ background: "var(--accent)", color: "#fff" }}
             onClick={discover}
             whileTap={{ scale: 0.96 }}
           >
@@ -146,7 +146,7 @@ export const PluginsTab: React.FC = () => {
       {/* Installed plugins */}
       {installed.length > 0 && (
         <section className="flex flex-col gap-3">
-          <h3 className="text-sm font-semibold uppercase tracking-wide" style={{ color: "var(--color-text-dim)" }}>
+          <h3 className="text-sm font-semibold uppercase tracking-wide" style={{ color: "var(--text-secondary)" }}>
             Installed
           </h3>
           <div className="flex flex-col gap-2">
@@ -178,7 +178,7 @@ export const PluginsTab: React.FC = () => {
             exit={{ opacity: 0, y: -8 }}
             className="flex flex-col gap-3"
           >
-            <h3 className="text-sm font-semibold uppercase tracking-wide" style={{ color: "var(--color-text-dim)" }}>
+            <h3 className="text-sm font-semibold uppercase tracking-wide" style={{ color: "var(--text-secondary)" }}>
               Available from GitHub
             </h3>
             <div className="flex flex-col gap-2">
@@ -215,14 +215,14 @@ const PluginCard: React.FC<{
   return (
     <div
       className="flex items-center gap-3 px-4 py-3 rounded-[var(--radius-card)]"
-      style={{ background: "var(--color-surface-raised)", border: "1px solid var(--color-border)" }}
+      style={{ background: "var(--surface-1)", border: "1px solid var(--border-default)" }}
     >
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium truncate" style={{ color: "var(--color-text)" }}>
+          <span className="text-sm font-medium truncate" style={{ color: "var(--text-primary)" }}>
             {plugin.displayName || plugin.name}
           </span>
-          <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: "var(--color-surface)", color: "var(--color-text-dim)" }}>
+          <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: "var(--surface-0)", color: "var(--text-secondary)" }}>
             v{plugin.version}
           </span>
           {plugin.installed && (
@@ -233,7 +233,7 @@ const PluginCard: React.FC<{
           )}
         </div>
         {plugin.description && (
-          <p className="text-xs truncate mt-0.5" style={{ color: "var(--color-text-dim)" }}>
+          <p className="text-xs truncate mt-0.5" style={{ color: "var(--text-secondary)" }}>
             {plugin.description}
           </p>
         )}
@@ -246,7 +246,7 @@ const PluginCard: React.FC<{
               onClick={() => onToggleEnabled(!plugin.enabled)}
               className="p-1.5 rounded transition-colors"
               style={{
-                color: plugin.enabled ? "#4ade80" : "var(--color-text-dim)",
+                color: plugin.enabled ? "#4ade80" : "var(--text-secondary)",
                 background: "transparent",
               }}
               title={plugin.enabled ? "Enabled" : "Disabled"}
@@ -258,7 +258,7 @@ const PluginCard: React.FC<{
                 onClick={onInstall}
                 disabled={busy}
                 className="px-3 py-1.5 rounded text-xs font-medium flex items-center gap-1 transition-colors"
-                style={{ background: "var(--color-accent)", color: "#fff", opacity: busy ? 0.6 : 1 }}
+                style={{ background: "var(--accent)", color: "#fff", opacity: busy ? 0.6 : 1 }}
               >
                 <RefreshCw size={12} className={busy ? "animate-spin" : ""} />
                 Update
@@ -280,7 +280,7 @@ const PluginCard: React.FC<{
             onClick={onInstall}
             disabled={busy}
             className="px-3 py-1.5 rounded text-xs font-medium flex items-center gap-1 transition-colors"
-            style={{ background: "var(--color-accent)", color: "#fff", opacity: busy ? 0.6 : 1 }}
+            style={{ background: "var(--accent)", color: "#fff", opacity: busy ? 0.6 : 1 }}
           >
             <Download size={12} />
             {busy ? "Installing..." : "Install"}

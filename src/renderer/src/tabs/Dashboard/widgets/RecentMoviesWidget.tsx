@@ -55,11 +55,11 @@ export const RecentMoviesWidget: React.FC<{ title?: string; maxItems?: number }>
             onClick={() => play(m)}
             className="group flex items-center gap-2 px-1.5 py-1 rounded-xl text-left text-sm transition-all duration-200 hover:scale-[1.02]"
             style={{
-              background: "var(--color-surface-raised)",
+              background: "var(--surface-1)",
               border: "1px solid transparent",
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = "var(--color-border)";
+              e.currentTarget.style.borderColor = "var(--border-default)";
               e.currentTarget.style.boxShadow = "var(--shadow-card)";
             }}
             onMouseLeave={(e) => {
@@ -71,7 +71,7 @@ export const RecentMoviesWidget: React.FC<{ title?: string; maxItems?: number }>
               {m.coverUrl ? (
                 <img src={m.coverUrl} alt="" className="w-8 h-11 object-cover rounded-lg" loading="lazy" />
               ) : (
-                <div className="w-8 h-11 rounded-lg flex items-center justify-center" style={{ background: "var(--color-surface)" }}>
+                <div className="w-8 h-11 rounded-lg flex items-center justify-center" style={{ background: "var(--surface-0)" }}>
                   <Clapperboard size={14} className="opacity-40" />
                 </div>
               )}

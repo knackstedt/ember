@@ -10,7 +10,7 @@ interface SettingsState {
 }
 
 const defaults: AppSettings = {
-  theme: "dark-oled",
+  theme: "ember",
   fullscreen: false,
   defaultTab: "gaming",
   moviePaths: [],

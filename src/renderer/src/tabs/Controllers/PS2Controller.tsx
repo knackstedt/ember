@@ -41,13 +41,13 @@ const STYLES = {
     fontSize: 14,
     fontWeight: 800,
     activeFill: "#fff",
-    inactiveFill: "var(--color-text-dim)",
+    inactiveFill: "var(--text-secondary)",
   },
   triggerLabel: {
     fontSize: 12,
     fontWeight: 700,
-    activeFill: "var(--color-bg)",
-    inactiveFill: "var(--color-text-dim)",
+    activeFill: "var(--surface-base)",
+    inactiveFill: "var(--text-secondary)",
   },
   triggerBar: {
     rx: 3,
@@ -63,13 +63,13 @@ const STYLES = {
     strokeWidth: 2,
   },
   colors: {
-    active: "var(--color-accent)",
-    surface: "var(--color-surface)",
-    surfaceRaised: "var(--color-surface-raised)",
-    border: "var(--color-border)",
-    bg: "var(--color-bg)",
-    textDim: "var(--color-text-dim)",
-    pressedMix: "color-mix(in srgb, var(--color-accent) 35%, var(--color-surface))",
+    active: "var(--accent)",
+    surface: "var(--surface-0)",
+    surfaceRaised: "var(--surface-1)",
+    border: "var(--border-default)",
+    bg: "var(--surface-base)",
+    textDim: "var(--text-secondary)",
+    pressedMix: "color-mix(in srgb, var(--accent) 35%, var(--surface-0))",
   },
 };
 
@@ -361,7 +361,7 @@ export const PS2Controller: React.FC<PS2ControllerProps> = React.memo(({
               opacity={active || isPressed ? STYLES.circle.activeOpacity : STYLES.circle.inactiveOpacity}
             />
             <g transform={`translate(${f.cx - 10}, ${f.cy - 10})`}>
-              <Icon size={20} color={active ? "#fff" : "var(--color-text-dim)"} />
+              <Icon size={20} color={active ? "#fff" : "var(--text-secondary)"} />
             </g>
           </g>
         );

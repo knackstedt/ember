@@ -40,7 +40,7 @@ export const SkeletonGrid: React.FC<SkeletonGridProps> = ({
                 width: cellWidth,
                 height: "100%",
                 borderRadius: "var(--radius-card)",
-                backgroundColor: "var(--color-surface-raised)",
+                backgroundColor: "var(--surface-1)",
                 contain: "layout paint",
               }}
             >
@@ -51,7 +51,7 @@ export const SkeletonGrid: React.FC<SkeletonGridProps> = ({
                   style={{
                     height: "calc(100% - 36px)",
                     borderRadius: "calc(var(--radius-card) - 2px)",
-                    backgroundColor: "var(--color-surface)",
+                    backgroundColor: "var(--surface-0)",
                   }}
                 />
               </div>
@@ -81,15 +81,15 @@ export const SkeletonList: React.FC<{ rows?: number }> = ({ rows = 6 }) => {
         <div
           key={i}
           className="flex items-center gap-3 w-full"
-          style={{ height: 80, borderBottom: "1px solid var(--color-border)", padding: "0 12px" }}
+          style={{ height: 80, borderBottom: "1px solid var(--border-default)", padding: "0 12px" }}
         >
           <div
             className="skeleton-shimmer flex-shrink-0 rounded overflow-hidden"
-            style={{ width: 48, height: 72, backgroundColor: "var(--color-surface-raised)" }}
+            style={{ width: 48, height: 72, backgroundColor: "var(--surface-1)" }}
           />
           <div className="flex flex-col gap-1.5 flex-1 min-w-0">
-            <div className="skeleton-shimmer rounded" style={{ width: "60%", height: 14, backgroundColor: "var(--color-surface-raised)" }} />
-            <div className="skeleton-shimmer rounded" style={{ width: "35%", height: 12, backgroundColor: "var(--color-surface-raised)" }} />
+            <div className="skeleton-shimmer rounded" style={{ width: "60%", height: 14, backgroundColor: "var(--surface-1)" }} />
+            <div className="skeleton-shimmer rounded" style={{ width: "35%", height: 12, backgroundColor: "var(--surface-1)" }} />
           </div>
         </div>
       ))}
@@ -130,7 +130,7 @@ export const SkeletonHexGrid: React.FC<{ columns?: number; rows?: number; cellWi
                   width: cellWidth,
                   aspectRatio: `${Math.sqrt(3)} / 2`,
                   clipPath: HEX_CLIP,
-                  backgroundColor: "var(--color-surface-raised)",
+                  backgroundColor: "var(--surface-1)",
                 }}
               />
             ))}
@@ -157,7 +157,7 @@ export const SkeletonBookshelf: React.FC<{ spinesPerShelf?: number; shelves?: nu
           <div
             className="flex items-end gap-[3px]"
             style={{
-              background: "var(--color-surface-raised)",
+              background: "var(--surface-1)",
               borderRadius: "10px 10px 0 0",
               minHeight: 234,
               padding: "12px 12px 0",
@@ -172,7 +172,7 @@ export const SkeletonBookshelf: React.FC<{ spinesPerShelf?: number; shelves?: nu
                   width: 36,
                   height: 198,
                   borderRadius: "3px 3px 0 0",
-                  backgroundColor: "var(--color-surface)",
+                  backgroundColor: "var(--surface-0)",
                 }}
               />
             ))}
@@ -224,7 +224,7 @@ export const SkeletonSpreadDeck: React.FC<{ cardsPerDeck?: number; decks?: numbe
                   width: 152,
                   height: 224,
                   borderRadius: 7,
-                  backgroundColor: "var(--color-surface-raised)",
+                  backgroundColor: "var(--surface-1)",
                 }}
               />
             ))}

@@ -135,13 +135,13 @@ function SectionCard({
       transition={{ duration: 0.3 }}
       className="flex flex-col gap-3 rounded-lg p-4"
       style={{
-        background: "var(--color-surface)",
-        border: "1px solid var(--color-border)",
+        background: "var(--surface-0)",
+        border: "1px solid var(--border-default)",
       }}
     >
       <div className="flex items-center gap-2">
-        <Icon size={18} style={{ color: "var(--color-accent)" }} />
-        <h3 className="font-semibold" style={{ color: "var(--color-text)" }}>
+        <Icon size={18} style={{ color: "var(--accent)" }} />
+        <h3 className="font-semibold" style={{ color: "var(--text-primary)" }}>
           {title}
         </h3>
       </div>
@@ -152,9 +152,9 @@ function SectionCard({
 
 function KeyValueRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="flex justify-between items-center text-sm py-1 border-b border-dashed" style={{ borderColor: "var(--color-border)" }}>
-      <span style={{ color: "var(--color-text-dim)" }}>{label}</span>
-      <span className="font-mono text-right" style={{ color: "var(--color-text)" }}>
+    <div className="flex justify-between items-center text-sm py-1 border-b border-dashed" style={{ borderColor: "var(--border-default)" }}>
+      <span style={{ color: "var(--text-secondary)" }}>{label}</span>
+      <span className="font-mono text-right" style={{ color: "var(--text-primary)" }}>
         {value}
       </span>
     </div>
@@ -190,7 +190,7 @@ export const SystemInfoTab: React.FC = () => {
       <div className="flex items-center justify-center h-64">
         <div
           className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin"
-          style={{ borderColor: "var(--color-accent)", borderTopColor: "transparent" }}
+          style={{ borderColor: "var(--accent)", borderTopColor: "transparent" }}
         />
       </div>
     );
@@ -199,8 +199,8 @@ export const SystemInfoTab: React.FC = () => {
   if (!data) {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-2">
-        <XCircle size={32} style={{ color: "var(--color-danger)" }} />
-        <p style={{ color: "var(--color-text-dim)" }}>Failed to load diagnostics.</p>
+        <XCircle size={32} style={{ color: "var(--error-fg)" }} />
+        <p style={{ color: "var(--text-secondary)" }}>Failed to load diagnostics.</p>
       </div>
     );
   }
@@ -213,10 +213,10 @@ export const SystemInfoTab: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold" style={{ color: "var(--color-text)" }}>
+          <h2 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
             System Information
           </h2>
-          <p className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+          <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
             Hardware specs, runtime versions, and installed components.
           </p>
         </div>
@@ -225,9 +225,9 @@ export const SystemInfoTab: React.FC = () => {
           whileTap={{ scale: 0.96 }}
           className="flex items-center gap-2 px-3 py-2 rounded text-sm"
           style={{
-            background: "var(--color-surface-raised)",
-            border: "1px solid var(--color-border)",
-            color: "var(--color-text)",
+            background: "var(--surface-1)",
+            border: "1px solid var(--border-default)",
+            color: "var(--text-primary)",
           }}
         >
           {copied ? <Check size={14} /> : <Copy size={14} />}
@@ -285,7 +285,7 @@ export const SystemInfoTab: React.FC = () => {
           <div className="mt-1">
             <div
               className="w-full h-2 rounded-full overflow-hidden"
-              style={{ background: "var(--color-surface-raised)" }}
+              style={{ background: "var(--surface-1)" }}
             >
               <motion.div
                 initial={{ width: 0 }}
@@ -295,14 +295,14 @@ export const SystemInfoTab: React.FC = () => {
                 style={{
                   background:
                     memoryPercent > 80
-                      ? "var(--color-danger)"
+                      ? "var(--error-fg)"
                       : memoryPercent > 60
-                      ? "var(--color-warning)"
-                      : "var(--color-accent)",
+                      ? "var(--warning-fg)"
+                      : "var(--accent)",
                 }}
               />
             </div>
-            <p className="text-xs mt-1 text-right" style={{ color: "var(--color-text-dim)" }}>
+            <p className="text-xs mt-1 text-right" style={{ color: "var(--text-secondary)" }}>
               {memoryPercent}% used
             </p>
           </div>
@@ -316,18 +316,18 @@ export const SystemInfoTab: React.FC = () => {
             <div
               key={display.id}
               className="flex flex-col gap-1 p-2 rounded"
-              style={{ background: "var(--color-surface-raised)" }}
+              style={{ background: "var(--surface-1)" }}
             >
               <div className="flex items-center gap-2">
-                <span className="text-sm font-medium" style={{ color: "var(--color-text)" }}>
+                <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
                   {display.resolution}
                 </span>
                 {display.primary && (
                   <span
                     className="text-xs px-1.5 py-0.5 rounded"
                     style={{
-                      background: "var(--color-accent-bg, rgba(59,130,246,0.15))",
-                      color: "var(--color-accent)",
+                      background: "var(--accent-dim, rgba(59,130,246,0.15))",
+                      color: "var(--accent)",
                     }}
                   >
                     Primary
@@ -337,16 +337,16 @@ export const SystemInfoTab: React.FC = () => {
                   <span
                     className="text-xs px-1.5 py-0.5 rounded"
                     style={{
-                      background: "var(--color-surface-raised)",
-                      border: "1px solid var(--color-border)",
-                      color: "var(--color-text-dim)",
+                      background: "var(--surface-1)",
+                      border: "1px solid var(--border-default)",
+                      color: "var(--text-secondary)",
                     }}
                   >
                     Internal
                   </span>
                 )}
               </div>
-              <span className="text-xs" style={{ color: "var(--color-text-dim)" }}>
+              <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
                 Scale: {display.scaleFactor}x &middot; Rotation: {display.rotation}
               </span>
             </div>
@@ -363,12 +363,12 @@ export const SystemInfoTab: React.FC = () => {
                 <div
                   key={i}
                   className="flex flex-col gap-1 p-2 rounded"
-                  style={{ background: "var(--color-surface-raised)" }}
+                  style={{ background: "var(--surface-1)" }}
                 >
-                  <span className="text-sm font-medium" style={{ color: "var(--color-text)" }}>
+                  <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
                     {getGpuModel(dev)}
                   </span>
-                  <span className="text-xs" style={{ color: "var(--color-text-dim)" }}>
+                  <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
                     {getGpuVendor(dev)}
                     {dev.deviceId ? ` · Device ID: 0x${dev.deviceId.toString(16).padStart(4, "0")}` : ""}
                   </span>
@@ -385,29 +385,29 @@ export const SystemInfoTab: React.FC = () => {
       <SectionCard icon={Film} title="Video Decoders">
         <div className="flex flex-col gap-2">
           {data.videoDecoders.map((decoder) => (
-            <div key={decoder.name} className="flex items-center justify-between p-2 rounded" style={{ background: "var(--color-surface-raised)" }}>
+            <div key={decoder.name} className="flex items-center justify-between p-2 rounded" style={{ background: "var(--surface-1)" }}>
               <div className="flex items-center gap-2">
                 {decoder.available ? (
-                  <CheckCircle2 size={16} style={{ color: "var(--color-success)" }} />
+                  <CheckCircle2 size={16} style={{ color: "var(--success-fg)" }} />
                 ) : (
-                  <XCircle size={16} style={{ color: "var(--color-danger)" }} />
+                  <XCircle size={16} style={{ color: "var(--error-fg)" }} />
                 )}
-                <span className="text-sm font-medium" style={{ color: "var(--color-text)" }}>
+                <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
                   {decoder.name}
                 </span>
               </div>
               <span
                 className="text-xs px-2 py-0.5 rounded"
                 style={{
-                  background: decoder.available ? "var(--color-success-bg, rgba(34,197,94,0.15))" : "var(--color-danger-bg, rgba(239,68,68,0.15))",
-                  color: decoder.available ? "var(--color-success)" : "var(--color-danger)",
+                  background: decoder.available ? "var(--success-bg, rgba(34,197,94,0.15))" : "var(--error-bg, rgba(239,68,68,0.15))",
+                  color: decoder.available ? "var(--success-fg)" : "var(--error-fg)",
                 }}
               >
                 {decoder.available ? "Available" : "Not Found"}
               </span>
             </div>
           ))}
-          <p className="text-xs mt-1" style={{ color: "var(--color-text-dim)" }}>
+          <p className="text-xs mt-1" style={{ color: "var(--text-secondary)" }}>
             The libmpv backend supports hardware acceleration (VA-API, NVDEC, etc.) for virtually all video codecs.
           </p>
         </div>
@@ -422,9 +422,9 @@ export const SystemInfoTab: React.FC = () => {
                 key={accel}
                 className="text-xs px-2 py-1 rounded"
                 style={{
-                  background: "var(--color-surface-raised)",
-                  border: "1px solid var(--color-border)",
-                  color: "var(--color-text)",
+                  background: "var(--surface-1)",
+                  border: "1px solid var(--border-default)",
+                  color: "var(--text-primary)",
                 }}
               >
                 {accel}
@@ -441,9 +441,9 @@ export const SystemInfoTab: React.FC = () => {
             <span
               className="text-xs px-2 py-1 rounded font-mono"
               style={{
-                background: "var(--color-surface-raised)",
-                border: "1px solid var(--color-border)",
-                color: "var(--color-text-dim)",
+                background: "var(--surface-1)",
+                border: "1px solid var(--border-default)",
+                color: "var(--text-secondary)",
               }}
             >
               {data.libmpvVersion}

@@ -39,7 +39,7 @@ function highlightMatch(text: string, query: string): React.ReactNode {
   return (
     <>
       {text.slice(0, idx)}
-      <mark style={{ backgroundColor: "transparent", color: "var(--color-accent)", fontWeight: 700 }}>
+      <mark style={{ backgroundColor: "transparent", color: "var(--accent)", fontWeight: 700 }}>
         {text.slice(idx, idx + q.length)}
       </mark>
       {text.slice(idx + q.length)}
@@ -69,9 +69,9 @@ const CommandRow = React.memo<{
       padding: "8px 16px",
       textAlign: "left",
       border: "none",
-      borderLeft: isSelected ? "3px solid var(--color-accent)" : "3px solid transparent",
-      background: isSelected ? "var(--color-surface-raised)" : "transparent",
-      color: "var(--color-text)",
+      borderLeft: isSelected ? "3px solid var(--accent)" : "3px solid transparent",
+      background: isSelected ? "var(--surface-1)" : "transparent",
+      color: "var(--text-primary)",
       cursor: "pointer",
       fontSize: 14,
       fontFamily: "inherit",
@@ -82,7 +82,7 @@ const CommandRow = React.memo<{
     <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
       <span style={{ fontWeight: 500 }}>{highlightMatch(cmd.label, query)}</span>
       {cmd.description && (
-        <span style={{ fontSize: 12, color: "var(--color-text-dim)" }}>
+        <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
           {cmd.description}
         </span>
       )}
@@ -93,9 +93,9 @@ const CommandRow = React.memo<{
           fontSize: 11,
           padding: "2px 6px",
           borderRadius: 4,
-          backgroundColor: isSelected ? "rgba(255,255,255,0.2)" : "var(--color-surface-raised)",
-          border: `1px solid ${isSelected ? "rgba(255,255,255,0.3)" : "var(--color-border)"}`,
-          color: isSelected ? "rgba(255,255,255,0.9)" : "var(--color-text-dim)",
+          backgroundColor: isSelected ? "rgba(255,255,255,0.2)" : "var(--surface-1)",
+          border: `1px solid ${isSelected ? "rgba(255,255,255,0.3)" : "var(--border-default)"}`,
+          color: isSelected ? "rgba(255,255,255,0.9)" : "var(--text-secondary)",
           fontFamily: "monospace",
           flexShrink: 0,
           marginLeft: 8,
@@ -284,8 +284,8 @@ export const CommandPalette: React.FC<{
               maxHeight: "60vh",
               display: "flex",
               flexDirection: "column",
-              backgroundColor: "var(--color-surface-overlay)",
-              border: "1px solid var(--color-border)",
+              backgroundColor: "var(--surface-2)",
+              border: "1px solid var(--border-default)",
               borderRadius: 12,
               boxShadow: "0 24px 48px rgba(0,0,0,0.4)",
               overflow: "hidden",
@@ -295,13 +295,13 @@ export const CommandPalette: React.FC<{
             <div
               style={{
                 padding: "12px 16px",
-                borderBottom: "1px solid var(--color-border)",
+                borderBottom: "1px solid var(--border-default)",
                 display: "flex",
                 alignItems: "center",
                 gap: 8,
               }}
             >
-              <span style={{ fontSize: 18, color: "var(--color-text-dim)" }}>{"/"}</span>
+              <span style={{ fontSize: 18, color: "var(--text-secondary)" }}>{"/"}</span>
               <input
                 data-command-palette-input
                 type="text"
@@ -313,14 +313,14 @@ export const CommandPalette: React.FC<{
                   background: "transparent",
                   border: "none",
                   outline: "none",
-                  color: "var(--color-text)",
+                  color: "var(--text-primary)",
                   fontSize: 15,
                   fontFamily: "inherit",
                 }}
                 autoFocus
               />
               {selectedItem && (
-                <span className="text-xs" style={{ color: "var(--color-text-dim)", flexShrink: 0 }}>
+                <span className="text-xs" style={{ color: "var(--text-secondary)", flexShrink: 0 }}>
                   {selectedIndex + 1} / {visibleCommands.length}
                 </span>
               )}
@@ -336,7 +336,7 @@ export const CommandPalette: React.FC<{
                   style={{
                     padding: 24,
                     textAlign: "center",
-                    color: "var(--color-text-dim)",
+                    color: "var(--text-secondary)",
                     fontSize: 14,
                   }}
                 >
@@ -352,7 +352,7 @@ export const CommandPalette: React.FC<{
                       fontWeight: 600,
                       textTransform: "uppercase",
                       letterSpacing: "0.05em",
-                      color: "var(--color-text-dim)",
+                      color: "var(--text-secondary)",
                     }}
                   >
                     {CATEGORY_LABELS[category]}
@@ -381,9 +381,9 @@ export const CommandPalette: React.FC<{
             <div
               style={{
                 padding: "6px 16px",
-                borderTop: "1px solid var(--color-border)",
+                borderTop: "1px solid var(--border-default)",
                 fontSize: 11,
-                color: "var(--color-text-dim)",
+                color: "var(--text-secondary)",
                 display: "flex",
                 gap: 12,
               }}

@@ -188,8 +188,8 @@ export const ExtensionManager: React.FC<Props> = ({ service, partition, onClose 
         ref={containerRef}
         className="relative flex flex-col w-[min(560px,90vw)] max-h-[85vh] rounded-[var(--radius-card)] overflow-hidden"
         style={{
-          background: "var(--color-surface-overlay)",
-          border: "1px solid var(--color-border)",
+          background: "var(--surface-2)",
+          border: "1px solid var(--border-default)",
         }}
         initial={{ scale: 0.95, y: 20 }}
         animate={{ scale: 1, y: 0 }}
@@ -198,14 +198,14 @@ export const ExtensionManager: React.FC<Props> = ({ service, partition, onClose 
       >
         <div
           className="flex items-center justify-between px-5 py-4 border-b"
-          style={{ borderColor: "var(--color-border)" }}
+          style={{ borderColor: "var(--border-default)" }}
         >
           <div className="flex items-center gap-2">
-            <Globe size={18} style={{ color: "var(--color-accent)" }} />
-            <h2 className="text-lg font-semibold" style={{ color: "var(--color-text)" }}>
+            <Globe size={18} style={{ color: "var(--accent)" }} />
+            <h2 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
               Extensions
             </h2>
-            <span className="text-xs" style={{ color: "var(--color-text-dim)" }}>
+            <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
               for {service.name}
             </span>
           </div>
@@ -214,7 +214,7 @@ export const ExtensionManager: React.FC<Props> = ({ service, partition, onClose 
             onClick={onClose}
             aria-label="Close"
           >
-            <X size={18} style={{ color: "var(--color-text)" }} />
+            <X size={18} style={{ color: "var(--text-primary)" }} />
           </button>
         </div>
 
@@ -222,7 +222,7 @@ export const ExtensionManager: React.FC<Props> = ({ service, partition, onClose 
           {/* Recommended */}
           {recommended.length > 0 && (
             <section className="flex flex-col gap-2">
-              <h3 className="text-sm font-semibold" style={{ color: "var(--color-text-dim)" }}>
+              <h3 className="text-sm font-semibold" style={{ color: "var(--text-secondary)" }}>
                 Recommended
               </h3>
               <div className="flex flex-col gap-2">
@@ -231,21 +231,21 @@ export const ExtensionManager: React.FC<Props> = ({ service, partition, onClose 
                     key={ext.id}
                     className="flex items-center justify-between px-3 py-2 rounded-[var(--radius-card)]"
                     style={{
-                      background: "var(--color-surface-raised)",
-                      border: "1px solid var(--color-border)",
+                      background: "var(--surface-1)",
+                      border: "1px solid var(--border-default)",
                     }}
                   >
                     <div className="flex flex-col min-w-0">
-                      <span className="text-sm font-medium truncate" style={{ color: "var(--color-text)" }}>
+                      <span className="text-sm font-medium truncate" style={{ color: "var(--text-primary)" }}>
                         {ext.name}
                       </span>
-                      <span className="text-xs" style={{ color: "var(--color-text-dim)" }}>
+                      <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
                         v{ext.version}
                       </span>
                     </div>
                     <button
                       className="flex items-center gap-1 px-3 py-1.5 rounded text-xs font-medium transition-colors"
-                      style={{ background: "var(--color-accent)", color: "#fff" }}
+                      style={{ background: "var(--accent)", color: "#fff" }}
                       onClick={() => installExtension(ext)}
                       disabled={installingIds.has(ext.id)}
                     >
@@ -264,11 +264,11 @@ export const ExtensionManager: React.FC<Props> = ({ service, partition, onClose 
 
           {/* Installed */}
           <section className="flex flex-col gap-2">
-            <h3 className="text-sm font-semibold" style={{ color: "var(--color-text-dim)" }}>
+            <h3 className="text-sm font-semibold" style={{ color: "var(--text-secondary)" }}>
               Installed
             </h3>
             {relevantExtensions.length === 0 ? (
-              <p className="text-sm" style={{ color: "var(--color-text-dim)" }}>
+              <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
                 No extensions installed yet.
               </p>
             ) : (
@@ -278,15 +278,15 @@ export const ExtensionManager: React.FC<Props> = ({ service, partition, onClose 
                     key={ext.id}
                     className="flex items-center justify-between px-3 py-2 rounded-[var(--radius-card)]"
                     style={{
-                      background: "var(--color-surface-raised)",
-                      border: "1px solid var(--color-border)",
+                      background: "var(--surface-1)",
+                      border: "1px solid var(--border-default)",
                     }}
                   >
                     <div className="flex flex-col min-w-0">
-                      <span className="text-sm font-medium truncate" style={{ color: "var(--color-text)" }}>
+                      <span className="text-sm font-medium truncate" style={{ color: "var(--text-primary)" }}>
                         {ext.name}
                       </span>
-                      <span className="text-xs" style={{ color: "var(--color-text-dim)" }}>
+                      <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
                         v{ext.installedVersion ?? ext.version}
                         {ext.version !== ext.installedVersion && ` (update available: v${ext.version})`}
                       </span>
@@ -295,7 +295,7 @@ export const ExtensionManager: React.FC<Props> = ({ service, partition, onClose 
                       {ext.version !== ext.installedVersion && (
                         <button
                           className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors"
-                          style={{ background: "var(--color-accent)", color: "#fff" }}
+                          style={{ background: "var(--accent)", color: "#fff" }}
                           onClick={() => updateExtension(ext)}
                           disabled={installingIds.has(ext.id)}
                         >
@@ -314,8 +314,8 @@ export const ExtensionManager: React.FC<Props> = ({ service, partition, onClose 
                             : "opacity-60"
                         }`}
                         style={{
-                          background: ext.enabled ? "var(--color-accent)" : "var(--color-surface)",
-                          color: ext.enabled ? "#fff" : "var(--color-text-dim)",
+                          background: ext.enabled ? "var(--accent)" : "var(--surface-0)",
+                          color: ext.enabled ? "#fff" : "var(--text-secondary)",
                         }}
                         onClick={() => toggleExtension(ext)}
                       >
@@ -332,7 +332,7 @@ export const ExtensionManager: React.FC<Props> = ({ service, partition, onClose 
                         onClick={() => removeExtension(ext)}
                         title="Remove"
                       >
-                        <Trash2 size={14} style={{ color: "var(--color-danger)" }} />
+                        <Trash2 size={14} style={{ color: "var(--error-fg)" }} />
                       </button>
                     </div>
                   </div>
@@ -345,7 +345,7 @@ export const ExtensionManager: React.FC<Props> = ({ service, partition, onClose 
           <section className="flex flex-col gap-2">
             <button
               className="flex items-center gap-2 text-sm font-medium transition-colors"
-              style={{ color: "var(--color-accent)" }}
+              style={{ color: "var(--accent)" }}
               onClick={() => setShowCustomForm((v) => !v)}
             >
               <Plus size={16} />
@@ -357,37 +357,37 @@ export const ExtensionManager: React.FC<Props> = ({ service, partition, onClose 
                 <motion.div
                   className="flex flex-col gap-2 p-3 rounded-[var(--radius-card)]"
                   style={{
-                    background: "var(--color-surface-raised)",
-                    border: "1px solid var(--color-border)",
+                    background: "var(--surface-1)",
+                    border: "1px solid var(--border-default)",
                   }}
                   initial={{ height: 0, opacity: 0 }}
                   animate={{ height: "auto", opacity: 1 }}
                   exit={{ height: 0, opacity: 0 }}
                 >
                   <input
-                    className="px-3 py-2 rounded text-sm bg-transparent border outline-none focus:border-[var(--color-accent)]"
-                    style={{ borderColor: "var(--color-border)", color: "var(--color-text)" }}
+                    className="px-3 py-2 rounded text-sm bg-transparent border outline-none focus:border-[var(--accent)]"
+                    style={{ borderColor: "var(--border-default)", color: "var(--text-primary)" }}
                     placeholder="Extension ID (e.g. my-extension)"
                     value={customId}
                     onChange={(e) => setCustomId(e.target.value)}
                   />
                   <input
-                    className="px-3 py-2 rounded text-sm bg-transparent border outline-none focus:border-[var(--color-accent)]"
-                    style={{ borderColor: "var(--color-border)", color: "var(--color-text)" }}
+                    className="px-3 py-2 rounded text-sm bg-transparent border outline-none focus:border-[var(--accent)]"
+                    style={{ borderColor: "var(--border-default)", color: "var(--text-primary)" }}
                     placeholder="Display name"
                     value={customName}
                     onChange={(e) => setCustomName(e.target.value)}
                   />
                   <input
-                    className="px-3 py-2 rounded text-sm bg-transparent border outline-none focus:border-[var(--color-accent)]"
-                    style={{ borderColor: "var(--color-border)", color: "var(--color-text)" }}
+                    className="px-3 py-2 rounded text-sm bg-transparent border outline-none focus:border-[var(--accent)]"
+                    style={{ borderColor: "var(--border-default)", color: "var(--text-primary)" }}
                     placeholder="ZIP download URL"
                     value={customUrl}
                     onChange={(e) => setCustomUrl(e.target.value)}
                   />
                   <button
                     className="px-3 py-1.5 rounded text-xs font-medium self-end"
-                    style={{ background: "var(--color-accent)", color: "#fff" }}
+                    style={{ background: "var(--accent)", color: "#fff" }}
                     onClick={addCustomExtension}
                     disabled={!customUrl || !customName || !customId}
                   >

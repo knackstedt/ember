@@ -525,42 +525,6 @@ function useThemeCanvas(
         animRef.current = requestAnimationFrame(draw);
       };
       draw();
-    } else if (theme === "nord-aurora") {
-      let t = 0;
-      const bands = [
-        { color: "rgba(136, 192, 208,", yOffset: 0, speed: 0.01 },
-        { color: "rgba(163, 190, 140,", yOffset: 60, speed: 0.012 },
-        { color: "rgba(180, 142, 173,", yOffset: 120, speed: 0.008 },
-      ];
-
-      const draw = (): void => {
-        ctx.clearRect(0, 0, w, h);
-        t += 1;
-
-        for (const band of bands) {
-          ctx.beginPath();
-          for (let x = 0; x <= w; x += 4) {
-            const y =
-              h * 0.35 +
-              band.yOffset +
-              Math.sin(x * 0.003 + t * band.speed) * 40 +
-              Math.sin(x * 0.007 + t * band.speed * 1.5) * 20;
-            if (x === 0) ctx.moveTo(x, y);
-            else ctx.lineTo(x, y);
-          }
-          ctx.lineTo(w, h);
-          ctx.lineTo(0, h);
-          ctx.closePath();
-          const grad = ctx.createLinearGradient(0, h * 0.3, 0, h);
-          grad.addColorStop(0, `${band.color} 0.15)`);
-          grad.addColorStop(1, "transparent");
-          ctx.fillStyle = grad;
-          ctx.fill();
-        }
-
-        animRef.current = requestAnimationFrame(draw);
-      };
-      draw();
     } else if (theme === "warm-paper") {
       const draw = (): void => {
         ctx.clearRect(0, 0, w, h);

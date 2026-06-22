@@ -188,16 +188,16 @@ export const CollectionManager: React.FC<CollectionManagerProps> = ({
           <motion.div
             className="relative flex flex-col w-[min(640px,90vw)] max-h-[85vh] rounded-[var(--radius-card)] overflow-hidden"
             style={{
-              background: "var(--color-surface-overlay)",
-              border: "1px solid var(--color-border)",
+              background: "var(--surface-2)",
+              border: "1px solid var(--border-default)",
             }}
             initial={{ scale: 0.95, y: 20 }}
             animate={{ scale: 1, y: 0 }}
             exit={{ scale: 0.95, y: 20 }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
           >
-            <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: "var(--color-border)" }}>
-              <h2 className="text-lg font-semibold" style={{ color: "var(--color-text)" }}>
+            <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: "var(--border-default)" }}>
+              <h2 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
                 {mode === "list" ? `${ITEM_TYPE_LABELS[itemType]} Collections` : editing?.id ? "Edit Collection" : "New Collection"}
               </h2>
               <button
@@ -215,7 +215,7 @@ export const CollectionManager: React.FC<CollectionManagerProps> = ({
               {mode === "list" ? (
                 <div className="flex flex-col gap-3">
                   {filtered.length === 0 ? (
-                    <div className="text-center py-8 text-sm" style={{ color: "var(--color-text-dim)" }}>
+                    <div className="text-center py-8 text-sm" style={{ color: "var(--text-secondary)" }}>
                       No collections yet.
                     </div>
                   ) : (
@@ -224,16 +224,16 @@ export const CollectionManager: React.FC<CollectionManagerProps> = ({
                         key={c.id}
                         className="flex items-center gap-3 px-4 py-3 rounded-[var(--radius-card)]"
                         style={{
-                          background: "var(--color-surface-raised)",
-                          border: "1px solid var(--color-border)",
+                          background: "var(--surface-1)",
+                          border: "1px solid var(--border-default)",
                         }}
                       >
                         {c.icon ? <span className="text-xl">{c.icon}</span> : <Folder size={20} />}
                         <div className="flex-1 min-w-0">
-                          <div className="font-medium text-sm truncate" style={{ color: "var(--color-text)" }}>
+                          <div className="font-medium text-sm truncate" style={{ color: "var(--text-primary)" }}>
                             {c.name}
                           </div>
-                          <div className="text-xs truncate" style={{ color: "var(--color-text-dim)" }}>
+                          <div className="text-xs truncate" style={{ color: "var(--text-secondary)" }}>
                             {c.type === "smart" ? "Smart filter" : "Manual"} · {c.itemType}
                           </div>
                         </div>
@@ -241,9 +241,9 @@ export const CollectionManager: React.FC<CollectionManagerProps> = ({
                           <button
                             className="px-3 py-1 rounded-full text-xs font-medium transition-colors"
                             style={{
-                              background: "var(--color-surface-overlay)",
-                              color: "var(--color-text)",
-                              border: "1px solid var(--color-border)",
+                              background: "var(--surface-2)",
+                              color: "var(--text-primary)",
+                              border: "1px solid var(--border-default)",
                             }}
                             onClick={() => startEdit(c)}
                           >
@@ -252,9 +252,9 @@ export const CollectionManager: React.FC<CollectionManagerProps> = ({
                           <button
                             className="px-3 py-1 rounded-full text-xs font-medium transition-colors"
                             style={{
-                              background: "var(--color-surface-overlay)",
+                              background: "var(--surface-2)",
                               color: "#ff4444",
-                              border: "1px solid var(--color-border)",
+                              border: "1px solid var(--border-default)",
                             }}
                             onClick={() => handleDelete(c.id)}
                           >
@@ -267,8 +267,8 @@ export const CollectionManager: React.FC<CollectionManagerProps> = ({
                   <button
                     className="mt-2 px-4 py-2.5 rounded-[var(--radius-card)] text-sm font-medium transition-colors"
                     style={{
-                      background: "var(--color-accent)",
-                      color: "var(--color-bg)",
+                      background: "var(--accent)",
+                      color: "var(--surface-base)",
                     }}
                     onClick={startNew}
                   >
@@ -285,13 +285,13 @@ export const CollectionManager: React.FC<CollectionManagerProps> = ({
             </div>
 
             {mode === "edit" && editing && (
-              <div className="flex justify-end gap-2 px-5 py-4 border-t" style={{ borderColor: "var(--color-border)" }}>
+              <div className="flex justify-end gap-2 px-5 py-4 border-t" style={{ borderColor: "var(--border-default)" }}>
                 <button
                   className="px-4 py-2 rounded-[var(--radius-card)] text-sm font-medium transition-colors"
                   style={{
-                    background: "var(--color-surface-raised)",
-                    color: "var(--color-text)",
-                    border: "1px solid var(--color-border)",
+                    background: "var(--surface-1)",
+                    color: "var(--text-primary)",
+                    border: "1px solid var(--border-default)",
                   }}
                   onClick={() => setMode("list")}
                 >
@@ -300,8 +300,8 @@ export const CollectionManager: React.FC<CollectionManagerProps> = ({
                 <button
                   className="px-4 py-2 rounded-[var(--radius-card)] text-sm font-medium transition-colors"
                   style={{
-                    background: "var(--color-accent)",
-                    color: "var(--color-bg)",
+                    background: "var(--accent)",
+                    color: "var(--surface-base)",
                   }}
                   onClick={handleSave}
                 >
@@ -339,7 +339,7 @@ function CollectionEditForm({
     <div className="flex flex-col gap-4">
       <div className="flex gap-3">
         <div className="w-20">
-          <label className="block text-xs font-medium mb-1" style={{ color: "var(--color-text-dim)" }}>
+          <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>
             Icon
           </label>
           <input
@@ -348,14 +348,14 @@ function CollectionEditForm({
             placeholder="Icon"
             className="w-full text-center text-lg px-2 py-1.5 rounded outline-none"
             style={{
-              background: "var(--color-surface-raised)",
-              border: "1px solid var(--color-border)",
-              color: "var(--color-text)",
+              background: "var(--surface-1)",
+              border: "1px solid var(--border-default)",
+              color: "var(--text-primary)",
             }}
           />
         </div>
         <div className="flex-1">
-          <label className="block text-xs font-medium mb-1" style={{ color: "var(--color-text-dim)" }}>
+          <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>
             Name
           </label>
           <input
@@ -364,16 +364,16 @@ function CollectionEditForm({
             placeholder="Collection name"
             className="w-full text-sm px-3 py-2 rounded outline-none"
             style={{
-              background: "var(--color-surface-raised)",
-              border: "1px solid var(--color-border)",
-              color: "var(--color-text)",
+              background: "var(--surface-1)",
+              border: "1px solid var(--border-default)",
+              color: "var(--text-primary)",
             }}
           />
         </div>
       </div>
 
       <div>
-        <label className="block text-xs font-medium mb-1" style={{ color: "var(--color-text-dim)" }}>
+        <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>
           Description
         </label>
         <input
@@ -382,16 +382,16 @@ function CollectionEditForm({
           placeholder="Optional description"
           className="w-full text-sm px-3 py-2 rounded outline-none"
           style={{
-            background: "var(--color-surface-raised)",
-            border: "1px solid var(--color-border)",
-            color: "var(--color-text)",
+            background: "var(--surface-1)",
+            border: "1px solid var(--border-default)",
+            color: "var(--text-primary)",
           }}
         />
       </div>
 
       <div className="flex gap-3">
         <div className="flex-1">
-          <label className="block text-xs font-medium mb-1" style={{ color: "var(--color-text-dim)" }}>
+          <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>
             Type
           </label>
           <select
@@ -399,9 +399,9 @@ function CollectionEditForm({
             onChange={(e) => update({ type: e.target.value as CollectionType })}
             className="w-full text-sm px-3 py-2 rounded outline-none"
             style={{
-              background: "var(--color-surface-raised)",
-              border: "1px solid var(--color-border)",
-              color: "var(--color-text)",
+              background: "var(--surface-1)",
+              border: "1px solid var(--border-default)",
+              color: "var(--text-primary)",
             }}
           >
             <option value="manual">Manual</option>
@@ -409,7 +409,7 @@ function CollectionEditForm({
           </select>
         </div>
         <div className="flex-1">
-          <label className="block text-xs font-medium mb-1" style={{ color: "var(--color-text-dim)" }}>
+          <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>
             Sort By
           </label>
           <select
@@ -417,9 +417,9 @@ function CollectionEditForm({
             onChange={(e) => update({ sortOrder: e.target.value as SortOrder })}
             className="w-full text-sm px-3 py-2 rounded outline-none"
             style={{
-              background: "var(--color-surface-raised)",
-              border: "1px solid var(--color-border)",
-              color: "var(--color-text)",
+              background: "var(--surface-1)",
+              border: "1px solid var(--border-default)",
+              color: "var(--text-primary)",
             }}
           >
             <option value="title">Title</option>
@@ -431,7 +431,7 @@ function CollectionEditForm({
           </select>
         </div>
         <div className="w-24">
-          <label className="block text-xs font-medium mb-1" style={{ color: "var(--color-text-dim)" }}>
+          <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>
             Direction
           </label>
           <select
@@ -439,9 +439,9 @@ function CollectionEditForm({
             onChange={(e) => update({ sortDirection: e.target.value as SortDirection })}
             className="w-full text-sm px-3 py-2 rounded outline-none"
             style={{
-              background: "var(--color-surface-raised)",
-              border: "1px solid var(--color-border)",
-              color: "var(--color-text)",
+              background: "var(--surface-1)",
+              border: "1px solid var(--border-default)",
+              color: "var(--text-primary)",
             }}
           >
             <option value="asc">Asc</option>
@@ -454,18 +454,18 @@ function CollectionEditForm({
         <div
           className="rounded-[var(--radius-card)] p-4"
           style={{
-            background: "var(--color-surface-raised)",
-            border: "1px solid var(--color-border)",
+            background: "var(--surface-1)",
+            border: "1px solid var(--border-default)",
           }}
         >
-          <label className="block text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: "var(--color-text-dim)" }}>
+          <label className="block text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: "var(--text-secondary)" }}>
             Smart Filter Rules
           </label>
           <AiFilterBuilder
             itemType={itemType}
             onFilterGenerated={updateFilter}
           />
-          <div className="my-3 border-t" style={{ borderColor: "var(--color-border)" }} />
+          <div className="my-3 border-t" style={{ borderColor: "var(--border-default)" }} />
           <SmartFilterEditor
             filter={collection.filter ?? defaultGroup()}
             onChange={updateFilter}
@@ -528,7 +528,7 @@ function SmartFilterEditor({
   return (
     <div className="flex flex-col gap-3">
       <div className="flex gap-2 items-center">
-        <span className="text-xs font-medium" style={{ color: "var(--color-text-dim)" }}>
+        <span className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
           Match
         </span>
         <select
@@ -536,15 +536,15 @@ function SmartFilterEditor({
           onChange={(e) => updateGroup({ ...filter, logic: e.target.value as "and" | "or" })}
           className="text-xs px-2 py-1 rounded outline-none"
           style={{
-            background: "var(--color-surface-overlay)",
-            border: "1px solid var(--color-border)",
-            color: "var(--color-text)",
+            background: "var(--surface-2)",
+            border: "1px solid var(--border-default)",
+            color: "var(--text-primary)",
           }}
         >
           <option value="and">all</option>
           <option value="or">any</option>
         </select>
-        <span className="text-xs" style={{ color: "var(--color-text-dim)" }}>
+        <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
           of the following rules
         </span>
       </div>
@@ -552,7 +552,7 @@ function SmartFilterEditor({
       {filter.rules.map((rule, i) => {
         if ("logic" in rule) {
           return (
-            <div key={i} className="pl-3 border-l-2" style={{ borderColor: "var(--color-accent)" }}>
+            <div key={i} className="pl-3 border-l-2" style={{ borderColor: "var(--accent)" }}>
               <SmartFilterEditor
                 filter={rule as SmartFilterGroup}
                 onChange={(sub) => {
@@ -576,9 +576,9 @@ function SmartFilterEditor({
               onChange={(e) => updateRule(i, { ...r, field: e.target.value })}
               className="text-xs px-2 py-1.5 rounded outline-none flex-1 min-w-0"
               style={{
-                background: "var(--color-surface-overlay)",
-                border: "1px solid var(--color-border)",
-                color: "var(--color-text)",
+                background: "var(--surface-2)",
+                border: "1px solid var(--border-default)",
+                color: "var(--text-primary)",
               }}
             >
               {fields.map((f) => (
@@ -592,9 +592,9 @@ function SmartFilterEditor({
               onChange={(e) => updateRule(i, { ...r, operator: e.target.value as FilterOperator })}
               className="text-xs px-2 py-1.5 rounded outline-none"
               style={{
-                background: "var(--color-surface-overlay)",
-                border: "1px solid var(--color-border)",
-                color: "var(--color-text)",
+                background: "var(--surface-2)",
+                border: "1px solid var(--border-default)",
+                color: "var(--text-primary)",
               }}
             >
               {ops.map((op) => (
@@ -616,9 +616,9 @@ function SmartFilterEditor({
                 placeholder={fieldInfo?.type === "array" ? "value1, value2" : "value"}
                 className="text-xs px-2 py-1.5 rounded outline-none flex-1 min-w-0"
                 style={{
-                  background: "var(--color-surface-overlay)",
-                  border: "1px solid var(--color-border)",
-                  color: "var(--color-text)",
+                  background: "var(--surface-2)",
+                  border: "1px solid var(--border-default)",
+                  color: "var(--text-primary)",
                 }}
               />
             )}
@@ -637,9 +637,9 @@ function SmartFilterEditor({
       <button
         className="self-start px-3 py-1 rounded-full text-xs font-medium transition-colors"
         style={{
-          background: "var(--color-surface-overlay)",
-          color: "var(--color-text)",
-          border: "1px solid var(--color-border)",
+          background: "var(--surface-2)",
+          color: "var(--text-primary)",
+          border: "1px solid var(--border-default)",
         }}
         onClick={addRule}
       >
@@ -693,7 +693,7 @@ function AiFilterBuilder({
 
   if (ready === false) {
     return (
-      <div className="text-xs" style={{ color: "var(--color-text-dim)" }}>
+      <div className="text-xs" style={{ color: "var(--text-secondary)" }}>
         AI model is loading. First use may take a moment while the embedding model downloads.
       </div>
     );
@@ -711,16 +711,16 @@ function AiFilterBuilder({
           placeholder="Describe your filter in natural language..."
           className="flex-1 text-xs px-3 py-2 rounded outline-none"
           style={{
-            background: "var(--color-surface-overlay)",
-            border: "1px solid var(--color-border)",
-            color: "var(--color-text)",
+            background: "var(--surface-2)",
+            border: "1px solid var(--border-default)",
+            color: "var(--text-primary)",
           }}
         />
         <button
           className="px-3 py-2 rounded text-xs font-medium transition-colors"
           style={{
-            background: "var(--color-accent)",
-            color: "var(--color-bg)",
+            background: "var(--accent)",
+            color: "var(--surface-base)",
             opacity: loading ? 0.6 : 1,
           }}
           onClick={() => void handleGenerate()}
@@ -729,7 +729,7 @@ function AiFilterBuilder({
           {loading ? "..." : "AI Generate"}
         </button>
       </div>
-      <div className="text-xs" style={{ color: "var(--color-text-dim)" }}>
+      <div className="text-xs" style={{ color: "var(--text-secondary)" }}>
         Examples: "games released after 2020", "movies with rating above 8", "favorite tracks by Queen"
       </div>
     </div>

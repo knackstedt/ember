@@ -965,7 +965,7 @@ export default function App(): React.ReactElement {
       className="h-screen w-screen flex flex-col overflow-hidden relative"
       style={
         {
-          background: "var(--color-bg)",
+          background: "var(--surface-base)",
           "--player-bar-height": hasPlayer ? "72px" : "0px",
         } as React.CSSProperties
       }
@@ -1008,7 +1008,7 @@ export default function App(): React.ReactElement {
         {/* Tab bar */}
         <nav
           className="flex items-center gap-1 px-4 pt-3 pb-0 flex-shrink-0"
-          style={{ borderBottom: "1px solid var(--color-border)" }}
+          style={{ borderBottom: "1px solid var(--border-default)" }}
         >
           {visibleTabs.map((tab) => {
             const isActive = tab.id === activeTab;
@@ -1019,10 +1019,10 @@ export default function App(): React.ReactElement {
                 className="relative flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium rounded-t-lg transition-colors focus:outline-none"
                 style={{
                   color: isActive
-                    ? "var(--color-text)"
-                    : "var(--color-text-dim)",
+                    ? "var(--text-primary)"
+                    : "var(--text-secondary)",
                   background: isActive
-                    ? "var(--color-surface-raised)"
+                    ? "var(--surface-1)"
                     : "transparent",
                 }}
               >
@@ -1033,7 +1033,7 @@ export default function App(): React.ReactElement {
                     layoutId="tab-indicator"
                     className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full"
                     style={{
-                      background: "var(--color-accent)",
+                      background: "var(--accent)",
                       boxShadow: "var(--shadow-glow)",
                     }}
                     transition={{ type: "spring", damping: 30, stiffness: 400 }}
@@ -1047,7 +1047,7 @@ export default function App(): React.ReactElement {
             <button
               className="px-3 py-1.5 rounded text-xs"
               style={{
-                color: "var(--color-text-dim)",
+                color: "var(--text-secondary)",
                 background: "transparent",
               }}
               onClick={() => {

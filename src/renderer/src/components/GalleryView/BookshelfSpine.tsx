@@ -102,7 +102,7 @@ export const BookshelfSpine: React.FC<BookshelfSpineProps> = React.memo(({
         <div
           className="absolute inset-0 pointer-events-none"
           style={{
-            boxShadow: "inset 0 0 0 2px var(--color-accent)",
+            boxShadow: "inset 0 0 0 2px var(--accent)",
             zIndex: 10,
           }}
         />

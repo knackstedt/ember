@@ -140,8 +140,8 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           <motion.div
             className="max-w-md w-full rounded-[var(--radius-card)] p-6 flex flex-col gap-4"
             style={{
-              background: "var(--color-surface-raised)",
-              border: "1px solid var(--color-border)",
+              background: "var(--surface-1)",
+              border: "1px solid var(--border-default)",
               boxShadow: "0 16px 48px rgba(0,0,0,0.5)",
             }}
             initial={{ opacity: 0, scale: 0.96, y: 8 }}
@@ -150,17 +150,17 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             transition={{ duration: 0.12, ease: "easeOut" }}
           >
             <div className="flex items-start gap-3">
-              <span style={{ color: destructive ? "#ff6b6b" : "var(--color-accent)" }}>
+              <span style={{ color: destructive ? "#ff6b6b" : "var(--accent)" }}>
                 <AlertTriangle size={22} />
               </span>
               <div className="flex-1">
                 <h3
                   className="text-base font-semibold"
-                  style={{ color: "var(--color-text)" }}
+                  style={{ color: "var(--text-primary)" }}
                 >
                   {title}
                 </h3>
-                <p className="text-sm mt-1" style={{ color: "var(--color-text-dim)" }}>
+                <p className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>
                   {message}
                 </p>
               </div>
@@ -175,15 +175,15 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
                     activeIndex === 0
                       ? destructive
                         ? "#ff4444"
-                        : "var(--color-accent)"
+                        : "var(--accent)"
                       : "transparent",
-                  color: activeIndex === 0 ? "#fff" : "var(--color-text)",
+                  color: activeIndex === 0 ? "#fff" : "var(--text-primary)",
                   border: `1px solid ${
                     activeIndex === 0
                       ? destructive
                         ? "#ff4444"
-                        : "var(--color-accent)"
-                      : "var(--color-border)"
+                        : "var(--accent)"
+                      : "var(--border-default)"
                   }`,
                   opacity: loading ? 0.6 : 1,
                 }}
@@ -200,11 +200,11 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
                 style={{
                   background:
                     activeIndex === 1
-                      ? "var(--color-surface)"
+                      ? "var(--surface-0)"
                       : "transparent",
-                  color: "var(--color-text)",
+                  color: "var(--text-primary)",
                   border: `1px solid ${
-                    activeIndex === 1 ? "var(--color-accent)" : "var(--color-border)"
+                    activeIndex === 1 ? "var(--accent)" : "var(--border-default)"
                   }`,
                 }}
                 onClick={onCancel}

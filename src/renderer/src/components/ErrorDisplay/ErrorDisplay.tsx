@@ -19,7 +19,7 @@ export const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
       animate={{ opacity: 1, y: 0 }}
       className="flex flex-col items-center justify-center gap-4 p-6"
       style={{
-        color: "var(--color-text-dim)",
+        color: "var(--text-secondary)",
         minHeight: 200,
       }}
     >
@@ -31,9 +31,9 @@ export const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
         <motion.button
           className="px-4 py-2 rounded-[var(--radius-card)] text-sm font-medium flex items-center gap-2"
           style={{
-            background: "var(--color-surface-raised)",
-            color: "var(--color-text)",
-            border: "1px solid var(--color-border)",
+            background: "var(--surface-1)",
+            color: "var(--text-primary)",
+            border: "1px solid var(--border-default)",
           }}
           onClick={onRetry}
           whileTap={{ scale: 0.96 }}

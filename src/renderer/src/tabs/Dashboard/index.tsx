@@ -420,11 +420,11 @@ export function DashboardTab(): React.ReactElement {
                   isDragging ? "opacity-90" : ""
                 }`}
                 style={{
-                  background: "var(--color-surface)",
+                  background: "var(--surface-0)",
                   boxShadow: isSelected
-                    ? `0 0 0 2px ${editMode ? "var(--color-accent-dim)" : "var(--color-accent)"}, var(--shadow-card)`
+                    ? `0 0 0 2px ${editMode ? "var(--accent-muted)" : "var(--accent)"}, var(--shadow-card)`
                     : "var(--shadow-card)",
-                  border: "1px solid var(--color-border)",
+                  border: "1px solid var(--border-default)",
                 } as React.CSSProperties}
                 onClick={() => {
                   if (!editMode) setSelectedId(widget.id);
@@ -438,8 +438,8 @@ export function DashboardTab(): React.ReactElement {
                   <div
                     className="drag-handle absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-2 py-1 cursor-move"
                     style={{
-                      background: "var(--color-surface-raised)",
-                      borderBottom: "1px solid var(--color-border)",
+                      background: "var(--surface-1)",
+                      borderBottom: "1px solid var(--border-default)",
                     }}
                   >
                     <div className="flex items-center gap-1">
@@ -455,7 +455,7 @@ export function DashboardTab(): React.ReactElement {
                           setConfigWidgetId(widget.id);
                         }}
                         className="p-0.5 rounded hover:opacity-70"
-                        style={{ color: "var(--color-accent-dim)" }}
+                        style={{ color: "var(--accent-muted)" }}
                         title="Widget settings"
                       >
                         <Settings size={12} />
@@ -489,7 +489,7 @@ export function DashboardTab(): React.ReactElement {
           {!editMode && (
             <span
               className="text-[10px] opacity-40 flex items-center gap-1 px-2 py-0.5 rounded"
-              style={{ background: "var(--color-surface-overlay)" }}
+              style={{ background: "var(--surface-2)" }}
             >
               <Gamepad2 size={10} />
               Hold X 2s to edit
@@ -499,7 +499,7 @@ export function DashboardTab(): React.ReactElement {
             <div
               className="w-full h-0.5 rounded-full"
               style={{
-                background: "var(--color-accent)",
+                background: "var(--accent)",
                 width: `${westProgress * 100}%`,
                 transition: "width 50ms linear",
               }}
@@ -514,7 +514,7 @@ export function DashboardTab(): React.ReactElement {
                   background: "rgba(239,68,68,0.15)",
                   color: "#ef4444",
                   boxShadow: "var(--shadow-card)",
-                  border: "1px solid var(--color-border)",
+                  border: "1px solid var(--border-default)",
                 }}
                 title="Remove selected widget"
               >
@@ -525,10 +525,10 @@ export function DashboardTab(): React.ReactElement {
               onClick={() => setAddDialogOpen(true)}
               className="flex items-center justify-center w-10 h-10 rounded-full transition-colors"
               style={{
-                background: "var(--color-surface-raised)",
-                color: "var(--color-text)",
+                background: "var(--surface-1)",
+                color: "var(--text-primary)",
                 boxShadow: "var(--shadow-card)",
-                border: "1px solid var(--color-border)",
+                border: "1px solid var(--border-default)",
               }}
               title="Add Widget"
             >
@@ -538,10 +538,10 @@ export function DashboardTab(): React.ReactElement {
               onClick={() => setEditMode((v) => !v)}
               className="flex items-center justify-center w-10 h-10 rounded-full transition-colors"
               style={{
-                background: editMode ? "var(--color-accent)" : "var(--color-surface-raised)",
-                color: editMode ? "var(--color-bg)" : "var(--color-text)",
+                background: editMode ? "var(--accent)" : "var(--surface-1)",
+                color: editMode ? "var(--surface-base)" : "var(--text-primary)",
                 boxShadow: "var(--shadow-card)",
-                border: "1px solid var(--color-border)",
+                border: "1px solid var(--border-default)",
               }}
               title={editMode ? "Done" : "Edit Layout"}
             >

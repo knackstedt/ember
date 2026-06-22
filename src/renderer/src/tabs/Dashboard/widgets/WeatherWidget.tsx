@@ -30,8 +30,8 @@ export const WeatherWidget: React.FC<{
       <div className="flex-1 flex flex-col gap-1.5 min-h-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5">
-            <div className="p-1.5 rounded-xl" style={{ background: "var(--color-surface-raised)" }}>
-              <Icon size={24} style={{ color: "var(--color-accent)" }} />
+            <div className="p-1.5 rounded-xl" style={{ background: "var(--surface-1)" }}>
+              <Icon size={24} style={{ color: "var(--accent)" }} />
             </div>
             <div className="flex flex-col">
               <span className="text-2xl font-bold tabular-nums leading-none">{condition.temp}°</span>
@@ -55,7 +55,7 @@ export const WeatherWidget: React.FC<{
 
         <div className="flex-1 flex items-stretch gap-1.5 min-h-0">
           {condition.forecast.map((temp, i) => (
-            <div key={i} className="flex-1 flex flex-col items-center justify-center gap-0.5 p-1 rounded-lg" style={{ background: "var(--color-surface-raised)" }}>
+            <div key={i} className="flex-1 flex flex-col items-center justify-center gap-0.5 p-1 rounded-lg" style={{ background: "var(--surface-1)" }}>
               <span className="text-[9px] opacity-40">{forecastLabels[i]}</span>
               <span className="text-sm font-semibold">{temp}°</span>
             </div>

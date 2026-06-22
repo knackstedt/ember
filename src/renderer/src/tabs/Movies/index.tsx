@@ -448,11 +448,11 @@ export const MoviesTab: React.FC = () => {
           <div className="flex-1 min-w-0 flex flex-col justify-center">
             <div
               className={`font-medium truncate text-sm ${index === focusedIndex ? "text-accent" : ""}`}
-              style={{ color: index === focusedIndex ? "var(--color-accent)" : "var(--color-text)" }}
+              style={{ color: index === focusedIndex ? "var(--accent)" : "var(--text-primary)" }}
             >
               {movie.title}
             </div>
-            <div className="text-xs truncate" style={{ color: "var(--color-text-dim)" }}>
+            <div className="text-xs truncate" style={{ color: "var(--text-secondary)" }}>
               {movie.releaseYear ? `${movie.releaseYear}` : ""}
               {movie.releaseYear && movie.director ? " · " : ""}
               {movie.director ? movie.director : ""}
@@ -461,13 +461,13 @@ export const MoviesTab: React.FC = () => {
             {source.badge && (
               <span
                 className="text-[10px] mt-0.5 w-fit px-1.5 py-0.5 rounded"
-                style={{ background: source.badgeColor ?? "var(--color-surface-raised)", color: "#fff" }}
+                style={{ background: source.badgeColor ?? "var(--surface-1)", color: "#fff" }}
               >
                 {source.badge}
               </span>
             )}
           </div>
-          {movie.isFavorite && <Star size={14} style={{ color: "var(--color-accent)" }} />}
+          {movie.isFavorite && <Star size={14} style={{ color: "var(--accent)" }} />}
         </div>
       );
     },
@@ -513,7 +513,7 @@ export const MoviesTab: React.FC = () => {
             <div
               className="absolute inset-0 pointer-events-none"
               style={{
-                boxShadow: "inset 0 0 0 2px var(--color-accent)",
+                boxShadow: "inset 0 0 0 2px var(--accent)",
                 zIndex: 10,
               }}
             />
@@ -560,12 +560,12 @@ export const MoviesTab: React.FC = () => {
           <div className="px-1.5 py-1">
             <div
               className="text-[11px] font-bold truncate"
-              style={{ color: index === focusedIndex ? "var(--color-accent)" : "var(--color-text)" }}
+              style={{ color: index === focusedIndex ? "var(--accent)" : "var(--text-primary)" }}
             >
               {movie.title}
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-[9px]" style={{ color: "var(--color-accent)" }}>
+              <span className="text-[9px]" style={{ color: "var(--accent)" }}>
                 {movie.releaseYear}
               </span>
               {source.badge && (
@@ -598,10 +598,10 @@ export const MoviesTab: React.FC = () => {
   const renderSkeletonListItem = useCallback(
     (_: unknown, _index: number) => (
       <div className="flex items-center gap-3 w-full h-full px-3">
-        <div className="w-12 h-[72px] flex-shrink-0 rounded overflow-hidden skeleton-shimmer" style={{ backgroundColor: "var(--color-surface-raised)" }} />
+        <div className="w-12 h-[72px] flex-shrink-0 rounded overflow-hidden skeleton-shimmer" style={{ backgroundColor: "var(--surface-1)" }} />
         <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
-          <div className="skeleton-shimmer rounded" style={{ width: "60%", height: 14, backgroundColor: "var(--color-surface-raised)" }} />
-          <div className="skeleton-shimmer rounded" style={{ width: "35%", height: 12, backgroundColor: "var(--color-surface-raised)" }} />
+          <div className="skeleton-shimmer rounded" style={{ width: "60%", height: 14, backgroundColor: "var(--surface-1)" }} />
+          <div className="skeleton-shimmer rounded" style={{ width: "35%", height: 12, backgroundColor: "var(--surface-1)" }} />
         </div>
       </div>
     ),
@@ -610,14 +610,14 @@ export const MoviesTab: React.FC = () => {
 
   const renderSkeletonSpine = useCallback(
     (_: unknown, _index: number) => (
-      <div className="w-full h-full relative skeleton-shimmer" style={{ backgroundColor: "var(--color-surface-raised)" }} />
+      <div className="w-full h-full relative skeleton-shimmer" style={{ backgroundColor: "var(--surface-1)" }} />
     ),
     [],
   );
 
   const renderSkeletonDeckCard = useCallback(
     (_: unknown, _index: number) => (
-      <div className="w-full h-full relative skeleton-shimmer" style={{ backgroundColor: "var(--color-surface-raised)", borderRadius: 7 }} />
+      <div className="w-full h-full relative skeleton-shimmer" style={{ backgroundColor: "var(--surface-1)", borderRadius: 7 }} />
     ),
     [],
   );
@@ -776,7 +776,7 @@ export const MoviesTab: React.FC = () => {
         {/* Compact bar — search + active filter summary */}
         <div
           className="flex items-center gap-2 pb-3 flex-wrap"
-          style={{ background: "var(--color-bg)" }}
+          style={{ background: "var(--surface-base)" }}
         >
           {subTab === "local" && (
             <>
@@ -790,9 +790,9 @@ export const MoviesTab: React.FC = () => {
               <motion.button
                 className="px-3 py-1.5 rounded-[var(--radius-card)] text-xs font-medium"
                 style={{
-                  background: "var(--color-surface-raised)",
-                  color: "var(--color-text)",
-                  border: "1px solid var(--color-border)",
+                  background: "var(--surface-1)",
+                  color: "var(--text-primary)",
+                  border: "1px solid var(--border-default)",
                 }}
                 onClick={scan}
                 whileTap={{ scale: 0.96 }}
@@ -803,9 +803,9 @@ export const MoviesTab: React.FC = () => {
               <motion.button
                 className="px-3 py-1.5 rounded-[var(--radius-card)] text-xs font-medium flex items-center gap-1"
                 style={{
-                  background: "var(--color-surface-raised)",
-                  color: "var(--color-text)",
-                  border: "1px solid var(--color-border)",
+                  background: "var(--surface-1)",
+                  color: "var(--text-primary)",
+                  border: "1px solid var(--border-default)",
                 }}
                 onClick={() => {
                   window.dispatchEvent(new CustomEvent("htpc:switch-tab", { detail: { tab: "settings" } }));
@@ -820,8 +820,8 @@ export const MoviesTab: React.FC = () => {
           <span
             className="px-2.5 py-0.5 rounded-full text-xs font-medium"
             style={{
-              backgroundColor: "var(--color-accent)",
-              color: "var(--color-bg)",
+              backgroundColor: "var(--accent)",
+              color: "var(--surface-base)",
             }}
           >
             {subTab === "ai-groups" ? <><Sparkles size={12} /> Groups</> : subTab}
@@ -831,8 +831,8 @@ export const MoviesTab: React.FC = () => {
             <motion.button
               className="px-2.5 py-0.5 rounded-full text-xs font-medium"
               style={{
-                backgroundColor: "var(--color-accent)",
-                color: "var(--color-bg)",
+                backgroundColor: "var(--accent)",
+                color: "var(--surface-base)",
               }}
               onClick={() => setGenre(null)}
               whileTap={{ scale: 0.95 }}
@@ -847,8 +847,8 @@ export const MoviesTab: React.FC = () => {
               <motion.button
                 className="px-2.5 py-0.5 rounded-full text-xs font-medium"
                 style={{
-                  backgroundColor: "var(--color-accent)",
-                  color: "var(--color-bg)",
+                  backgroundColor: "var(--accent)",
+                  color: "var(--surface-base)",
                 }}
                 onClick={() => setSelectedAiGroupId(null)}
                 whileTap={{ scale: 0.95 }}
@@ -864,8 +864,8 @@ export const MoviesTab: React.FC = () => {
                 key={key}
                 className="px-2.5 py-0.5 rounded-full text-xs font-medium"
                 style={{
-                  backgroundColor: "var(--color-accent)",
-                  color: "var(--color-bg)",
+                  backgroundColor: "var(--accent)",
+                  color: "var(--surface-base)",
                 }}
                 onClick={() => applyFacetFilter(key, null)}
                 whileTap={{ scale: 0.95 }}
@@ -878,9 +878,9 @@ export const MoviesTab: React.FC = () => {
           <motion.button
             className="px-2.5 py-0.5 rounded-full text-xs font-medium"
             style={{
-              background: "var(--color-surface-raised)",
-              color: "var(--color-text)",
-              border: "1px solid var(--color-border)",
+              background: "var(--surface-1)",
+              color: "var(--text-primary)",
+              border: "1px solid var(--border-default)",
             }}
             onClick={() => setFiltersExpanded((v) => !v)}
             whileTap={{ scale: 0.95 }}
@@ -901,11 +901,11 @@ export const MoviesTab: React.FC = () => {
                     style={{
                       background:
                         subTab === t
-                          ? "var(--color-accent)"
-                          : "var(--color-surface-raised)",
+                          ? "var(--accent)"
+                          : "var(--surface-1)",
                       color:
-                        subTab === t ? "var(--color-bg)" : "var(--color-text-dim)",
-                      border: "1px solid var(--color-border)",
+                        subTab === t ? "var(--surface-base)" : "var(--text-secondary)",
+                      border: "1px solid var(--border-default)",
                     }}
                     onClick={() => setSubTab(t)}
                   >
@@ -946,8 +946,8 @@ export const MoviesTab: React.FC = () => {
             {subTab === "ai-groups" && (
               <>
                 {aiGroupsLoading && (
-                  <div className="flex items-center gap-2 flex-shrink-0" style={{ color: "var(--color-text-dim)" }}>
-                    <div className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "var(--color-accent)", borderTopColor: "transparent" }} />
+                  <div className="flex items-center gap-2 flex-shrink-0" style={{ color: "var(--text-secondary)" }}>
+                    <div className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "var(--accent)", borderTopColor: "transparent" }} />
                     <span className="text-xs">Generating smart groups…</span>
                   </div>
                 )}
@@ -961,10 +961,10 @@ export const MoviesTab: React.FC = () => {
                       className="relative flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors focus:outline-none"
                       style={{
                         backgroundColor: !selectedAiGroupId
-                          ? "var(--color-accent)"
-                          : "var(--color-surface-raised)",
-                        color: !selectedAiGroupId ? "var(--color-bg)" : "var(--color-text-dim)",
-                        border: `1px solid ${!selectedAiGroupId ? "var(--color-accent)" : "var(--color-border)"}`,
+                          ? "var(--accent)"
+                          : "var(--surface-1)",
+                        color: !selectedAiGroupId ? "var(--surface-base)" : "var(--text-secondary)",
+                        border: `1px solid ${!selectedAiGroupId ? "var(--accent)" : "var(--border-default)"}`,
                       }}
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
@@ -978,10 +978,10 @@ export const MoviesTab: React.FC = () => {
                         className="relative flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors focus:outline-none"
                         style={{
                           backgroundColor: selectedAiGroupId === g.id
-                            ? "var(--color-accent)"
-                            : "var(--color-surface-raised)",
-                          color: selectedAiGroupId === g.id ? "var(--color-bg)" : "var(--color-text-dim)",
-                          border: `1px solid ${selectedAiGroupId === g.id ? "var(--color-accent)" : "var(--color-border)"}`,
+                            ? "var(--accent)"
+                            : "var(--surface-1)",
+                          color: selectedAiGroupId === g.id ? "var(--surface-base)" : "var(--text-secondary)",
+                          border: `1px solid ${selectedAiGroupId === g.id ? "var(--accent)" : "var(--border-default)"}`,
                         }}
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
@@ -1091,14 +1091,14 @@ export const MoviesTab: React.FC = () => {
             ) : items.length === 0 ? (
               <div
                 className="flex flex-col items-center justify-center gap-4"
-                style={{ color: "var(--color-text-dim)", minHeight: 200 }}
+                style={{ color: "var(--text-secondary)", minHeight: 200 }}
               >
                 <p>No movies found.</p>
                 <motion.button
                   className="px-6 py-2.5 rounded-[var(--radius-card)] font-medium"
                   style={{
-                    background: "var(--color-accent)",
-                    color: "var(--color-bg)",
+                    background: "var(--accent)",
+                    color: "var(--surface-base)",
                   }}
                   onClick={scan}
                   whileTap={{ scale: 0.96 }}
@@ -1190,7 +1190,7 @@ export const MoviesTab: React.FC = () => {
                 }
               })()
             ) : gridItems.length === 0 ? (
-              <div className="flex items-center justify-center" style={{ color: "var(--color-text-dim)", minHeight: 200 }}>
+              <div className="flex items-center justify-center" style={{ color: "var(--text-secondary)", minHeight: 200 }}>
                 <p>No movies found.</p>
               </div>
             ) : (
@@ -1265,8 +1265,8 @@ export const MoviesTab: React.FC = () => {
               <motion.button
                 className="px-6 py-2.5 rounded-[var(--radius-card)] font-semibold text-sm"
                 style={{
-                  background: "var(--color-accent)",
-                  color: "var(--color-bg)",
+                  background: "var(--accent)",
+                  color: "var(--surface-base)",
                 }}
                 onClick={() => {
                   openVideo(
@@ -1284,9 +1284,9 @@ export const MoviesTab: React.FC = () => {
               <motion.button
                 className="px-6 py-2.5 rounded-[var(--radius-card)] font-semibold text-sm"
                 style={{
-                  background: "var(--color-surface-raised)",
-                  color: "var(--color-text)",
-                  border: "1px solid var(--color-border)",
+                  background: "var(--surface-1)",
+                  color: "var(--text-primary)",
+                  border: "1px solid var(--border-default)",
                 }}
                 onClick={() => {
                   const url = selected!.tmdbId

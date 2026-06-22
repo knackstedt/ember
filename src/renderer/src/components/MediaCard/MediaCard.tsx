@@ -70,12 +70,12 @@ export const MediaCard: React.FC<MediaCardProps> = React.memo(({
     return (
       <div
         className="relative flex flex-col select-none rounded-card overflow-hidden flex-1 ring-1 ring-border"
-        style={{ backgroundColor: "var(--color-surface)", pointerEvents: "none" }}
+        style={{ backgroundColor: "var(--surface-0)", pointerEvents: "none" }}
       >
-        <div className="relative w-full flex-1 min-h-0 overflow-hidden skeleton-shimmer" style={{ backgroundColor: "var(--color-surface-raised)" }} />
+        <div className="relative w-full flex-1 min-h-0 overflow-hidden skeleton-shimmer" style={{ backgroundColor: "var(--surface-1)" }} />
         <div className="p-2 flex flex-col gap-1.5 flex-shrink-0 min-w-0">
-          <div className="skeleton-shimmer rounded" style={{ width: "85%", height: 14, backgroundColor: "var(--color-surface-raised)" }} />
-          <div className="skeleton-shimmer rounded" style={{ width: "55%", height: 12, backgroundColor: "var(--color-surface-raised)" }} />
+          <div className="skeleton-shimmer rounded" style={{ width: "85%", height: 14, backgroundColor: "var(--surface-1)" }} />
+          <div className="skeleton-shimmer rounded" style={{ width: "55%", height: 12, backgroundColor: "var(--surface-1)" }} />
         </div>
       </div>
     );
@@ -96,7 +96,7 @@ export const MediaCard: React.FC<MediaCardProps> = React.memo(({
         hover:ring-2 hover:ring-accent hover:shadow-glow
       `}
       style={{
-        backgroundColor: "var(--color-surface)",
+        backgroundColor: "var(--surface-0)",
         willChange: "transform",
       }}
       whileHover={{ scale: 1.03, y: -2 }}
@@ -153,8 +153,8 @@ export const MediaCard: React.FC<MediaCardProps> = React.memo(({
           <span
             className="absolute top-2 left-2 px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wide"
             style={{
-              backgroundColor: badgeColor ?? "var(--color-accent)",
-              color: "var(--color-bg)",
+              backgroundColor: badgeColor ?? "var(--accent)",
+              color: "var(--surface-base)",
             }}
           >
             {badge}
@@ -171,7 +171,7 @@ export const MediaCard: React.FC<MediaCardProps> = React.memo(({
                 className="h-full"
                 style={{
                   width: `${progress * 100}%`,
-                  background: "var(--color-accent)",
+                  background: "var(--accent)",
                 }}
               />
             </div>
@@ -179,8 +179,8 @@ export const MediaCard: React.FC<MediaCardProps> = React.memo(({
               <span
                 className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide"
                 style={{
-                  backgroundColor: "var(--color-accent)",
-                  color: "var(--color-bg)",
+                  backgroundColor: "var(--accent)",
+                  color: "var(--surface-base)",
                 }}
               >
                 Resume
@@ -203,8 +203,8 @@ export const MediaCard: React.FC<MediaCardProps> = React.memo(({
             <svg
               className="w-4 h-4"
               viewBox="0 0 24 24"
-              fill={isFavorite ? "var(--color-accent)" : "none"}
-              stroke={isFavorite ? "var(--color-accent)" : "white"}
+              fill={isFavorite ? "var(--accent)" : "none"}
+              stroke={isFavorite ? "var(--accent)" : "white"}
               strokeWidth={2}
             >
               <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
@@ -216,14 +216,14 @@ export const MediaCard: React.FC<MediaCardProps> = React.memo(({
       <div className="p-2 flex flex-col gap-0.5 flex-shrink-0 min-w-0">
         <span
           className="text-sm font-medium truncate"
-          style={{ color: "var(--color-text)" }}
+          style={{ color: "var(--text-primary)" }}
           title={title}
         >
           {title}
         </span>
         <span
           className={`text-xs truncate ${subtitle ? "" : "invisible"}`}
-          style={{ color: "var(--color-text-dim)" }}
+          style={{ color: "var(--text-secondary)" }}
         >
           {subtitle || "\u00A0"}
         </span>

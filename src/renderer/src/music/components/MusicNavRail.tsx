@@ -37,8 +37,8 @@ export const MusicNavRail: React.FC<MusicNavRailProps> = React.memo(({
       className="flex flex-col gap-1 p-2 flex-shrink-0 overflow-y-auto"
       style={{
         width: 72,
-        background: "var(--color-surface-raised)",
-        borderRight: "1px solid var(--color-border)",
+        background: "var(--surface-1)",
+        borderRight: "1px solid var(--border-default)",
       }}
     >
       {NAV_ITEMS.map((item, index) => {
@@ -54,9 +54,9 @@ export const MusicNavRail: React.FC<MusicNavRailProps> = React.memo(({
               ${focused ? "ring-2 ring-accent" : ""}
             `}
             style={{
-              background: active ? "var(--color-accent)" : "transparent",
-              color: active ? "var(--color-bg)" : focused ? "var(--color-accent)" : "var(--color-text-dim)",
-              outline: focused && !active ? "2px solid var(--color-accent)" : "none",
+              background: active ? "var(--accent)" : "transparent",
+              color: active ? "var(--surface-base)" : focused ? "var(--accent)" : "var(--text-secondary)",
+              outline: focused && !active ? "2px solid var(--accent)" : "none",
               outlineOffset: 2,
             }}
             onClick={() => onSelect(item.id)}

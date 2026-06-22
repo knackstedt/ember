@@ -83,9 +83,9 @@ function CycleFilterButton<T extends string>({
     <button
       className="px-2.5 py-1 rounded text-xs font-medium transition-colors whitespace-nowrap"
       style={{
-        background: isDefault ? "var(--color-surface)" : "var(--color-accent-dim)",
-        color: isDefault ? "var(--color-text-dim)" : "var(--color-accent)",
-        border: `1px solid ${isDefault ? "var(--color-border)" : "color-mix(in srgb, var(--color-accent) 30%, transparent)"}`,
+        background: isDefault ? "var(--surface-0)" : "var(--accent-muted)",
+        color: isDefault ? "var(--text-secondary)" : "var(--accent)",
+        border: `1px solid ${isDefault ? "var(--border-default)" : "color-mix(in srgb, var(--accent) 30%, transparent)"}`,
       }}
       onClick={() => {
         const idx = options.findIndex((o) => o.value === value);
@@ -131,19 +131,19 @@ export const GamingToolbar: React.FC<GamingToolbarProps> = React.memo(({
     <div
       className="flex items-center gap-3 px-4 py-2 flex-shrink-0 flex-wrap"
       style={{
-        background: "var(--color-bg)",
-        borderBottom: "1px solid var(--color-border)",
+        background: "var(--surface-base)",
+        borderBottom: "1px solid var(--border-default)",
       }}
     >
       {/* Search */}
       <div
         className="flex items-center gap-1.5 px-2 py-1 rounded text-sm transition-colors"
         style={{
-          background: searchQuery ? "var(--color-accent-dim)" : "var(--color-surface)",
-          border: "1px solid var(--color-border)",
+          background: searchQuery ? "var(--accent-muted)" : "var(--surface-0)",
+          border: "1px solid var(--border-default)",
         }}
       >
-        <Search size={14} style={{ color: searchQuery ? "var(--color-accent)" : "var(--color-text-dim)", flexShrink: 0 }} />
+        <Search size={14} style={{ color: searchQuery ? "var(--accent)" : "var(--text-secondary)", flexShrink: 0 }} />
         <input
           type="text"
           value={searchQuery}
@@ -151,7 +151,7 @@ export const GamingToolbar: React.FC<GamingToolbarProps> = React.memo(({
           placeholder="Search..."
           className="bg-transparent outline-none text-sm min-w-0 w-32"
           style={{
-            color: searchQuery ? "var(--color-accent)" : "var(--color-text)",
+            color: searchQuery ? "var(--accent)" : "var(--text-primary)",
           }}
         />
         {searchQuery && (
@@ -161,7 +161,7 @@ export const GamingToolbar: React.FC<GamingToolbarProps> = React.memo(({
               e.stopPropagation();
               onClearSearch();
             }}
-            style={{ color: "var(--color-text-dim)" }}
+            style={{ color: "var(--text-secondary)" }}
           >
             <X size={12} />
           </button>
@@ -172,9 +172,9 @@ export const GamingToolbar: React.FC<GamingToolbarProps> = React.memo(({
       <motion.button
         className="px-3 py-1.5 rounded text-xs font-medium flex items-center gap-1"
         style={{
-          background: "var(--color-surface)",
-          color: "var(--color-text)",
-          border: "1px solid var(--color-border)",
+          background: "var(--surface-0)",
+          color: "var(--text-primary)",
+          border: "1px solid var(--border-default)",
         }}
         onClick={onScan}
         whileTap={{ scale: 0.96 }}
@@ -184,12 +184,12 @@ export const GamingToolbar: React.FC<GamingToolbarProps> = React.memo(({
       </motion.button>
 
       {/* Game count */}
-      <span className="text-xs" style={{ color: "var(--color-text-dim)" }}>
+      <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
         {gameCount} games
       </span>
 
       {/* Divider */}
-      <div className="w-px h-5 flex-shrink-0" style={{ background: "var(--color-border)" }} />
+      <div className="w-px h-5 flex-shrink-0" style={{ background: "var(--border-default)" }} />
 
       {/* Library filter (online platforms only) */}
       {showLibraryFilter && (
@@ -227,8 +227,8 @@ export const GamingToolbar: React.FC<GamingToolbarProps> = React.memo(({
         <motion.button
           className="px-2 py-1 rounded text-xs font-medium"
           style={{
-            background: "var(--color-accent-dim)",
-            color: "var(--color-accent)",
+            background: "var(--accent-muted)",
+            color: "var(--accent)",
           }}
           onClick={() => {
             onClearSearch();

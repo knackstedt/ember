@@ -42,13 +42,13 @@ const STYLES = {
     fontSize: 13,
     fontWeight: 800,
     activeFill: "#fff",
-    inactiveFill: "var(--color-text-dim)",
+    inactiveFill: "var(--text-secondary)",
   },
   triggerLabel: {
     fontSize: 11,
     fontWeight: 700,
-    activeFill: "var(--color-bg)",
-    inactiveFill: "var(--color-text-dim)",
+    activeFill: "var(--surface-base)",
+    inactiveFill: "var(--text-secondary)",
   },
   triggerBar: {
     rx: 3,
@@ -64,13 +64,13 @@ const STYLES = {
     strokeWidth: 2,
   },
   colors: {
-    active: "var(--color-accent)",
-    surface: "var(--color-surface)",
-    surfaceRaised: "var(--color-surface-raised)",
-    border: "var(--color-border)",
-    bg: "var(--color-bg)",
-    textDim: "var(--color-text-dim)",
-    pressedMix: "color-mix(in srgb, var(--color-accent) 35%, var(--color-surface))",
+    active: "var(--accent)",
+    surface: "var(--surface-0)",
+    surfaceRaised: "var(--surface-1)",
+    border: "var(--border-default)",
+    bg: "var(--surface-base)",
+    textDim: "var(--text-secondary)",
+    pressedMix: "color-mix(in srgb, var(--accent) 35%, var(--surface-0))",
   },
 };
 
@@ -198,8 +198,8 @@ export const SwitchController: React.FC<SwitchControllerProps> = ({
             <text x={t.labelCx} y={t.labelCy} textAnchor="middle" fontSize={STYLES.triggerLabel.fontSize} fontWeight={STYLES.triggerLabel.fontWeight} fill={active ? STYLES.triggerLabel.activeFill : STYLES.triggerLabel.inactiveFill}>
               {t.label}
             </text>
-            <rect x={t.barX} y={t.barY} width={t.barW} height={t.barH} rx="2" fill="var(--color-surface)" stroke="var(--color-border)" strokeWidth="1" />
-            <rect x={t.barX} y={t.barY + t.barH * (1 - depth)} width={t.barW} height={t.barH * depth} rx="2" fill="var(--color-accent)" opacity={STYLES.triggerBar.fillOpacity} />
+            <rect x={t.barX} y={t.barY} width={t.barW} height={t.barH} rx="2" fill="var(--surface-0)" stroke="var(--border-default)" strokeWidth="1" />
+            <rect x={t.barX} y={t.barY + t.barH * (1 - depth)} width={t.barW} height={t.barH * depth} rx="2" fill="var(--accent)" opacity={STYLES.triggerBar.fillOpacity} />
           </g>
         );
       })}
@@ -216,7 +216,7 @@ export const SwitchController: React.FC<SwitchControllerProps> = ({
               strokeWidth="1.5"
               opacity={active || isPressed ? 1 : 0.85}
             />
-            <text x={b.labelCx} y={b.labelCy} textAnchor="middle" fontSize="9" fontWeight="700" fill={active ? "#fff" : "var(--color-text-dim)"}>
+            <text x={b.labelCx} y={b.labelCy} textAnchor="middle" fontSize="9" fontWeight="700" fill={active ? "#fff" : "var(--text-secondary)"}>
               {b.label}
             </text>
           </g>
@@ -283,7 +283,7 @@ export const SwitchController: React.FC<SwitchControllerProps> = ({
       <g>
         <circle cx={THUMB_BASE.left.cx} cy={THUMB_BASE.left.cy} r={THUMB_BASE.left.r}
           fill="none"
-          stroke="var(--color-border)"
+          stroke="var(--border-default)"
           strokeWidth={STYLES.thumbBase.strokeWidth}
           opacity={STYLES.thumbBase.opacity}
         />
@@ -294,7 +294,7 @@ export const SwitchController: React.FC<SwitchControllerProps> = ({
           strokeWidth="1.5"
           opacity={accentCode === "left_thumb" || pressedSet.has("left_thumb") ? 1 : 0.9}
         />
-        <text x={THUMB.left_thumb.labelCx + lsX} y={THUMB.left_thumb.labelCy + lsY} textAnchor="middle" fontSize="8" fontWeight="700" fill={accentCode === "left_thumb" ? "#fff" : "var(--color-text-dim)"}>
+        <text x={THUMB.left_thumb.labelCx + lsX} y={THUMB.left_thumb.labelCy + lsY} textAnchor="middle" fontSize="8" fontWeight="700" fill={accentCode === "left_thumb" ? "#fff" : "var(--text-secondary)"}>
           {THUMB.left_thumb.label}
         </text>
       </g>
@@ -303,7 +303,7 @@ export const SwitchController: React.FC<SwitchControllerProps> = ({
       <g>
         <circle cx={THUMB_BASE.right.cx} cy={THUMB_BASE.right.cy} r={THUMB_BASE.right.r}
           fill="none"
-          stroke="var(--color-border)"
+          stroke="var(--border-default)"
           strokeWidth={STYLES.thumbBase.strokeWidth}
           opacity={STYLES.thumbBase.opacity}
         />
@@ -314,7 +314,7 @@ export const SwitchController: React.FC<SwitchControllerProps> = ({
           strokeWidth="1.5"
           opacity={accentCode === "right_thumb" || pressedSet.has("right_thumb") ? 1 : 0.9}
         />
-        <text x={THUMB.right_thumb.labelCx + rsX} y={THUMB.right_thumb.labelCy + rsY} textAnchor="middle" fontSize="8" fontWeight="700" fill={accentCode === "right_thumb" ? "#fff" : "var(--color-text-dim)"}>
+        <text x={THUMB.right_thumb.labelCx + rsX} y={THUMB.right_thumb.labelCy + rsY} textAnchor="middle" fontSize="8" fontWeight="700" fill={accentCode === "right_thumb" ? "#fff" : "var(--text-secondary)"}>
           {THUMB.right_thumb.label}
         </text>
       </g>

@@ -660,10 +660,10 @@ export const GamingTab: React.FC = () => {
   const renderSkeletonListItem = useCallback(
     (_: unknown, _index: number) => (
       <div className="flex items-center gap-3 w-full h-full px-3">
-        <div className="w-12 h-[72px] flex-shrink-0 rounded overflow-hidden skeleton-shimmer" style={{ backgroundColor: "var(--color-surface-raised)" }} />
+        <div className="w-12 h-[72px] flex-shrink-0 rounded overflow-hidden skeleton-shimmer" style={{ backgroundColor: "var(--surface-1)" }} />
         <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
-          <div className="skeleton-shimmer rounded" style={{ width: "60%", height: 14, backgroundColor: "var(--color-surface-raised)" }} />
-          <div className="skeleton-shimmer rounded" style={{ width: "35%", height: 12, backgroundColor: "var(--color-surface-raised)" }} />
+          <div className="skeleton-shimmer rounded" style={{ width: "60%", height: 14, backgroundColor: "var(--surface-1)" }} />
+          <div className="skeleton-shimmer rounded" style={{ width: "35%", height: 12, backgroundColor: "var(--surface-1)" }} />
         </div>
       </div>
     ),
@@ -672,14 +672,14 @@ export const GamingTab: React.FC = () => {
 
   const renderSkeletonSpine = useCallback(
     (_: unknown, _index: number, { isHovered }: { isHovered: boolean; isFocused: boolean }) => (
-      <div className="w-full h-full relative skeleton-shimmer" style={{ backgroundColor: "var(--color-surface-raised)" }} />
+      <div className="w-full h-full relative skeleton-shimmer" style={{ backgroundColor: "var(--surface-1)" }} />
     ),
     [],
   );
 
   const renderSkeletonDeckCard = useCallback(
     (_: unknown, _index: number) => (
-      <div className="w-full h-full relative skeleton-shimmer" style={{ backgroundColor: "var(--color-surface-raised)", borderRadius: 7 }} />
+      <div className="w-full h-full relative skeleton-shimmer" style={{ backgroundColor: "var(--surface-1)", borderRadius: 7 }} />
     ),
     [],
   );
@@ -736,18 +736,18 @@ export const GamingTab: React.FC = () => {
           <div className="flex items-center gap-2 min-w-0">
             <div
               className="font-medium truncate text-sm"
-              style={{ color: index === focusedIndex ? "var(--color-accent)" : "var(--color-text)" }}
+              style={{ color: index === focusedIndex ? "var(--accent)" : "var(--text-primary)" }}
             >
               {game.title}
             </div>
                       </div>
-          <div className="text-xs truncate" style={{ color: "var(--color-text-dim)" }}>
+          <div className="text-xs truncate" style={{ color: "var(--text-secondary)" }}>
             {game.platform}
             {game.releaseYear ? ` · ${game.releaseYear}` : ""}
             {game.playTime ? ` · ${Math.round(game.playTime / 3600)}h` : ""}
           </div>
         </div>
-        {game.isFavorite && <Star size={14} style={{ color: "var(--color-accent)" }} />}
+        {game.isFavorite && <Star size={14} style={{ color: "var(--accent)" }} />}
       </div>
     ),
     [bindItem, focusedIndex],
@@ -791,7 +791,7 @@ export const GamingTab: React.FC = () => {
             <div
               className="absolute inset-0 pointer-events-none"
               style={{
-                boxShadow: "inset 0 0 0 2px var(--color-accent)",
+                boxShadow: "inset 0 0 0 2px var(--accent)",
                 zIndex: 10,
               }}
             />
@@ -839,12 +839,12 @@ export const GamingTab: React.FC = () => {
           <div className="px-1.5 py-1">
             <div
               className="text-[11px] font-bold truncate"
-              style={{ color: index === focusedIndex ? "var(--color-accent)" : "var(--color-text)" }}
+              style={{ color: index === focusedIndex ? "var(--accent)" : "var(--text-primary)" }}
             >
               {game.title}
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-[9px]" style={{ color: "var(--color-accent)" }}>
+              <span className="text-[9px]" style={{ color: "var(--accent)" }}>
                 {game.platform}
               </span>
                             {b && (
@@ -1083,14 +1083,14 @@ export const GamingTab: React.FC = () => {
             ) : items.length === 0 ? (
               <div
                 className="flex flex-col items-center justify-center gap-4"
-                style={{ color: "var(--color-text-dim)", minHeight: 200 }}
+                style={{ color: "var(--text-secondary)", minHeight: 200 }}
               >
                 <p>No games found.</p>
                 <motion.button
                   className="px-6 py-2.5 rounded-[var(--radius-card)] font-medium"
                   style={{
-                    background: "var(--color-accent)",
-                    color: "var(--color-bg)",
+                    background: "var(--accent)",
+                    color: "var(--surface-base)",
                   }}
                   onClick={scan}
                   whileTap={{ scale: 0.96 }}
@@ -1229,8 +1229,8 @@ export const GamingTab: React.FC = () => {
                 <motion.button
                   className="px-5 py-2.5 rounded-[var(--radius-card)] font-semibold text-sm flex items-center gap-2 whitespace-nowrap"
                   style={{
-                    background: selectedMissingCoreTooltip ? "var(--color-surface-raised)" : "var(--color-accent)",
-                    color: selectedMissingCoreTooltip ? "var(--color-text-dim)" : "var(--color-bg)",
+                    background: selectedMissingCoreTooltip ? "var(--surface-1)" : "var(--accent)",
+                    color: selectedMissingCoreTooltip ? "var(--text-secondary)" : "var(--surface-base)",
                     cursor: selectedMissingCoreTooltip ? "not-allowed" : "pointer",
                   }}
                   onClick={() => {
@@ -1248,9 +1248,9 @@ export const GamingTab: React.FC = () => {
                   <motion.button
                     className="px-4 py-2.5 rounded-[var(--radius-card)] font-semibold text-sm flex items-center gap-2"
                     style={{
-                      background: "var(--color-surface-raised)",
-                      color: "var(--color-text)",
-                      border: "1px solid var(--color-border)",
+                      background: "var(--surface-1)",
+                      color: "var(--text-primary)",
+                      border: "1px solid var(--border-default)",
                     }}
                     onClick={() => {
                       const toastId = useToastStore.getState().push({
@@ -1301,9 +1301,9 @@ export const GamingTab: React.FC = () => {
                 <span
                   className="px-4 py-2.5 rounded-[var(--radius-card)] text-sm font-medium flex items-center gap-2 whitespace-nowrap"
                   style={{
-                    background: "color-mix(in srgb, var(--color-accent) 12%, transparent)",
-                    color: "var(--color-accent)",
-                    border: "1px solid color-mix(in srgb, var(--color-accent) 30%, transparent)",
+                    background: "color-mix(in srgb, var(--accent) 12%, transparent)",
+                    color: "var(--accent)",
+                    border: "1px solid color-mix(in srgb, var(--accent) 30%, transparent)",
                   }}
                 >
                   <Archive size={14} /> Compressed ({selected.compressionFormat})
@@ -1313,9 +1313,9 @@ export const GamingTab: React.FC = () => {
                 <motion.button
                   className="px-3 py-2.5 rounded-[var(--radius-card)] font-semibold text-sm flex items-center gap-2"
                   style={{
-                    background: showLaunchSettings ? "var(--color-accent)" : "var(--color-surface-raised)",
-                    color: showLaunchSettings ? "var(--color-bg)" : "var(--color-text)",
-                    border: "1px solid var(--color-border)",
+                    background: showLaunchSettings ? "var(--accent)" : "var(--surface-1)",
+                    color: showLaunchSettings ? "var(--surface-base)" : "var(--text-primary)",
+                    border: "1px solid var(--border-default)",
                   }}
                   onClick={() => setShowLaunchSettings((v) => !v)}
                   whileTap={{ scale: 0.96 }}
@@ -1338,7 +1338,7 @@ export const GamingTab: React.FC = () => {
                   <div>
                     <div
                       className="text-xs font-semibold uppercase tracking-wide mb-2"
-                      style={{ color: "var(--color-text-dim)" }}
+                      style={{ color: "var(--text-secondary)" }}
                     >
                       Screenshots
                     </div>
@@ -1362,8 +1362,8 @@ export const GamingTab: React.FC = () => {
                 {/* Thumbnailing status */}
                 {(pendingThumbnailIds.has(selected.id) || regeneratingIds.has(selected.id)) && (
                   <div className="flex items-center gap-2 text-sm">
-                    <Loader size={14} className="animate-spin" style={{ color: "var(--color-accent)" }} />
-                    <span style={{ color: "var(--color-text-dim)" }}>Generating thumbnail...</span>
+                    <Loader size={14} className="animate-spin" style={{ color: "var(--accent)" }} />
+                    <span style={{ color: "var(--text-secondary)" }}>Generating thumbnail...</span>
                   </div>
                 )}
 
@@ -1372,7 +1372,7 @@ export const GamingTab: React.FC = () => {
                   <div>
                     <div
                       className="text-xs font-semibold uppercase tracking-wide mb-2"
-                      style={{ color: "var(--color-text-dim)" }}
+                      style={{ color: "var(--text-secondary)" }}
                     >
                       Videos
                     </div>
@@ -1384,11 +1384,11 @@ export const GamingTab: React.FC = () => {
                           target="_blank"
                           rel="noopener noreferrer"
                           className="flex items-center gap-2 p-2 rounded hover:bg-white/5 transition-colors"
-                          style={{ background: "var(--color-surface-raised)" }}
+                          style={{ background: "var(--surface-1)" }}
                         >
                           <Play size={18} />
                           <span className="text-sm truncate flex-1">{video.name ?? "Video"}</span>
-                          <span className="text-xs" style={{ color: "var(--color-text-dim)" }}>{video.type}</span>
+                          <span className="text-xs" style={{ color: "var(--text-secondary)" }}>{video.type}</span>
                         </a>
                       ))}
                     </div>
@@ -1396,10 +1396,10 @@ export const GamingTab: React.FC = () => {
                 )}
                 {selected.playTime !== undefined && (
                   <div className="flex items-center gap-2 text-sm">
-                    <span style={{ color: "var(--color-text-dim)" }}>
+                    <span style={{ color: "var(--text-secondary)" }}>
                       Play Time
                     </span>
-                    <span style={{ color: "var(--color-text)", fontWeight: 600 }}>
+                    <span style={{ color: "var(--text-primary)", fontWeight: 600 }}>
                       {selected.playTime >= 60
                         ? `${Math.floor(selected.playTime / 60)}h ${selected.playTime % 60}m`
                         : `${selected.playTime}m`}
@@ -1410,7 +1410,7 @@ export const GamingTab: React.FC = () => {
                   <div>
                     <div
                       className="text-xs font-semibold uppercase tracking-wide mb-2"
-                      style={{ color: "var(--color-text-dim)" }}
+                      style={{ color: "var(--text-secondary)" }}
                     >
                       Emulator Shader
                     </div>
@@ -1443,7 +1443,7 @@ export const GamingTab: React.FC = () => {
                   <div>
                     <div
                       className="text-xs font-semibold uppercase tracking-wide mb-2"
-                      style={{ color: "var(--color-text-dim)" }}
+                      style={{ color: "var(--text-secondary)" }}
                     >
                       Libretro Core
                     </div>
@@ -1455,7 +1455,7 @@ export const GamingTab: React.FC = () => {
                     />
                     <div
                       className="text-xs font-semibold uppercase tracking-wide mb-2 mt-4"
-                      style={{ color: "var(--color-text-dim)" }}
+                      style={{ color: "var(--text-secondary)" }}
                     >
                       Shader
                     </div>
@@ -1482,7 +1482,7 @@ export const GamingTab: React.FC = () => {
                     <div>
                       <div
                         className="text-xs font-semibold uppercase tracking-wide mb-2"
-                        style={{ color: "var(--color-text-dim)" }}
+                        style={{ color: "var(--text-secondary)" }}
                       >
                         Compatibility Runner
                       </div>
@@ -1505,7 +1505,7 @@ export const GamingTab: React.FC = () => {
                     <div>
                       <div
                         className="text-xs font-semibold uppercase tracking-wide mb-2"
-                        style={{ color: "var(--color-text-dim)" }}
+                        style={{ color: "var(--text-secondary)" }}
                       >
                         Wine Custom Command
                       </div>
@@ -1516,20 +1516,20 @@ export const GamingTab: React.FC = () => {
                         placeholder="wine {exe} --some-flag"
                         className="w-full text-sm px-2 py-1.5 rounded"
                         style={{
-                          background: "var(--color-surface-raised)",
-                          border: "1px solid var(--color-border)",
-                          color: "var(--color-text)",
+                          background: "var(--surface-1)",
+                          border: "1px solid var(--border-default)",
+                          color: "var(--text-primary)",
                           outline: "none",
                         }}
                       />
-                      <p className="text-[10px] mt-1" style={{ color: "var(--color-text-dim)" }}>
+                      <p className="text-[10px] mt-1" style={{ color: "var(--text-secondary)" }}>
                         Use {"{exe}"} as placeholder for the executable path. Leave empty for default.
                       </p>
                     </div>
                     <div>
                       <div
                         className="text-xs font-semibold uppercase tracking-wide mb-2"
-                        style={{ color: "var(--color-text-dim)" }}
+                        style={{ color: "var(--text-secondary)" }}
                       >
                         umu-run Custom Command
                       </div>
@@ -1540,13 +1540,13 @@ export const GamingTab: React.FC = () => {
                         placeholder="umu-run {exe}"
                         className="w-full text-sm px-2 py-1.5 rounded"
                         style={{
-                          background: "var(--color-surface-raised)",
-                          border: "1px solid var(--color-border)",
-                          color: "var(--color-text)",
+                          background: "var(--surface-1)",
+                          border: "1px solid var(--border-default)",
+                          color: "var(--text-primary)",
                           outline: "none",
                         }}
                       />
-                      <p className="text-[10px] mt-1" style={{ color: "var(--color-text-dim)" }}>
+                      <p className="text-[10px] mt-1" style={{ color: "var(--text-secondary)" }}>
                         Use {"{exe}"} as placeholder for the executable path. Leave empty for default.
                       </p>
                     </div>
@@ -1712,7 +1712,7 @@ function GameSessionSettings({ game }: { game: Game }) {
           <div>
             <div
               className="text-xs font-semibold uppercase tracking-wide mb-1.5"
-              style={{ color: "var(--color-text-dim)" }}
+              style={{ color: "var(--text-secondary)" }}
             >
               Launch Command
             </div>
@@ -1723,13 +1723,13 @@ function GameSessionSettings({ game }: { game: Game }) {
               placeholder="Override command (replaces default)"
               className="w-full text-sm px-2 py-1.5 rounded"
               style={{
-                background: "var(--color-surface-raised)",
-                border: "1px solid var(--color-border)",
-                color: "var(--color-text)",
+                background: "var(--surface-1)",
+                border: "1px solid var(--border-default)",
+                color: "var(--text-primary)",
                 outline: "none",
               }}
             />
-            <p className="text-[10px] mt-1" style={{ color: "var(--color-text-dim)" }}>
+            <p className="text-[10px] mt-1" style={{ color: "var(--text-secondary)" }}>
               Overrides the default launch command for this game.
             </p>
           </div>
@@ -1738,7 +1738,7 @@ function GameSessionSettings({ game }: { game: Game }) {
           <div>
             <div
               className="text-xs font-semibold uppercase tracking-wide mb-1.5"
-              style={{ color: "var(--color-text-dim)" }}
+              style={{ color: "var(--text-secondary)" }}
             >
               Launch Arguments
             </div>
@@ -1752,9 +1752,9 @@ function GameSessionSettings({ game }: { game: Game }) {
               placeholder='arg1 arg2 "arg with spaces"'
               className="w-full text-sm px-2 py-1.5 rounded"
               style={{
-                background: "var(--color-surface-raised)",
-                border: "1px solid var(--color-border)",
-                color: "var(--color-text)",
+                background: "var(--surface-1)",
+                border: "1px solid var(--border-default)",
+                color: "var(--text-primary)",
                 outline: "none",
               }}
             />
@@ -1764,7 +1764,7 @@ function GameSessionSettings({ game }: { game: Game }) {
           <div>
             <div
               className="text-xs font-semibold uppercase tracking-wide mb-1.5"
-              style={{ color: "var(--color-text-dim)" }}
+              style={{ color: "var(--text-secondary)" }}
             >
               Working Directory
             </div>
@@ -1775,9 +1775,9 @@ function GameSessionSettings({ game }: { game: Game }) {
               placeholder="/path/to/working/dir"
               className="w-full text-sm px-2 py-1.5 rounded"
               style={{
-                background: "var(--color-surface-raised)",
-                border: "1px solid var(--color-border)",
-                color: "var(--color-text)",
+                background: "var(--surface-1)",
+                border: "1px solid var(--border-default)",
+                color: "var(--text-primary)",
                 outline: "none",
               }}
             />
@@ -1787,7 +1787,7 @@ function GameSessionSettings({ game }: { game: Game }) {
           <div>
             <div
               className="text-xs font-semibold uppercase tracking-wide mb-1.5"
-              style={{ color: "var(--color-text-dim)" }}
+              style={{ color: "var(--text-secondary)" }}
             >
               Environment Variables
             </div>
@@ -1813,9 +1813,9 @@ function GameSessionSettings({ game }: { game: Game }) {
               rows={3}
               className="w-full text-sm px-2 py-1.5 rounded resize-none"
               style={{
-                background: "var(--color-surface-raised)",
-                border: "1px solid var(--color-border)",
-                color: "var(--color-text)",
+                background: "var(--surface-1)",
+                border: "1px solid var(--border-default)",
+                color: "var(--text-primary)",
                 outline: "none",
               }}
             />
@@ -1825,7 +1825,7 @@ function GameSessionSettings({ game }: { game: Game }) {
           <div>
             <div
               className="text-xs font-semibold uppercase tracking-wide mb-2"
-              style={{ color: "var(--color-text-dim)" }}
+              style={{ color: "var(--text-secondary)" }}
             >
               Session Hooks
             </div>
@@ -1835,20 +1835,20 @@ function GameSessionSettings({ game }: { game: Game }) {
                   key={hook.id}
                   className="flex items-center gap-2 p-2 rounded text-sm"
                   style={{
-                    background: "var(--color-surface-raised)",
-                    border: "1px solid var(--color-border)",
+                    background: "var(--surface-1)",
+                    border: "1px solid var(--border-default)",
                   }}
                 >
                   <span
                     className="px-1.5 py-0.5 rounded text-[10px] font-medium uppercase"
                     style={{
-                      background: "color-mix(in srgb, var(--color-accent) 15%, transparent)",
-                      color: "var(--color-accent)",
+                      background: "color-mix(in srgb, var(--accent) 15%, transparent)",
+                      color: "var(--accent)",
                     }}
                   >
                     {HOOK_TIMING_LABELS[hook.timing] ?? hook.timing}
                   </span>
-                  <span className="truncate flex-1" style={{ color: "var(--color-text)" }}>
+                  <span className="truncate flex-1" style={{ color: "var(--text-primary)" }}>
                     {hook.command} {hook.args?.join(" ") ?? ""}
                   </span>
                   <button
@@ -1856,7 +1856,7 @@ function GameSessionSettings({ game }: { game: Game }) {
                     className="p-1 rounded hover:bg-white/10 transition-colors"
                     aria-label="Remove hook"
                   >
-                    <X size={14} style={{ color: "var(--color-text-dim)" }} />
+                    <X size={14} style={{ color: "var(--text-secondary)" }} />
                   </button>
                 </div>
               ))}
@@ -1867,9 +1867,9 @@ function GameSessionSettings({ game }: { game: Game }) {
                 onClick={() => setEditingHook("new")}
                 className="flex items-center gap-1.5 mt-2 px-3 py-1.5 rounded text-xs font-medium"
                 style={{
-                  background: "var(--color-surface-raised)",
-                  border: "1px solid var(--color-border)",
-                  color: "var(--color-text)",
+                  background: "var(--surface-1)",
+                  border: "1px solid var(--border-default)",
+                  color: "var(--text-primary)",
                 }}
               >
                 <Plus size={14} /> Add Hook
@@ -1877,8 +1877,8 @@ function GameSessionSettings({ game }: { game: Game }) {
             ) : (
               <div className="flex flex-col gap-2 mt-2 p-3 rounded"
                 style={{
-                  background: "var(--color-surface-raised)",
-                  border: "1px solid var(--color-border)",
+                  background: "var(--surface-1)",
+                  border: "1px solid var(--border-default)",
                 }}
               >
                 <Dropdown
@@ -1900,9 +1900,9 @@ function GameSessionSettings({ game }: { game: Game }) {
                   placeholder="Command (e.g. /usr/bin/obs)"
                   className="w-full text-sm px-2 py-1.5 rounded"
                   style={{
-                    background: "var(--color-bg)",
-                    border: "1px solid var(--color-border)",
-                    color: "var(--color-text)",
+                    background: "var(--surface-base)",
+                    border: "1px solid var(--border-default)",
+                    color: "var(--text-primary)",
                     outline: "none",
                   }}
                 />
@@ -1913,9 +1913,9 @@ function GameSessionSettings({ game }: { game: Game }) {
                   placeholder="Arguments (comma-separated)"
                   className="w-full text-sm px-2 py-1.5 rounded"
                   style={{
-                    background: "var(--color-bg)",
-                    border: "1px solid var(--color-border)",
-                    color: "var(--color-text)",
+                    background: "var(--surface-base)",
+                    border: "1px solid var(--border-default)",
+                    color: "var(--text-primary)",
                     outline: "none",
                   }}
                 />
@@ -1926,9 +1926,9 @@ function GameSessionSettings({ game }: { game: Game }) {
                   placeholder="Working directory"
                   className="w-full text-sm px-2 py-1.5 rounded"
                   style={{
-                    background: "var(--color-bg)",
-                    border: "1px solid var(--color-border)",
-                    color: "var(--color-text)",
+                    background: "var(--surface-base)",
+                    border: "1px solid var(--border-default)",
+                    color: "var(--text-primary)",
                     outline: "none",
                   }}
                 />
@@ -1940,13 +1940,13 @@ function GameSessionSettings({ game }: { game: Game }) {
                     placeholder="Timeout (seconds)"
                     className="w-24 text-sm px-2 py-1.5 rounded"
                     style={{
-                      background: "var(--color-bg)",
-                      border: "1px solid var(--color-border)",
-                      color: "var(--color-text)",
+                      background: "var(--surface-base)",
+                      border: "1px solid var(--border-default)",
+                      color: "var(--text-primary)",
                       outline: "none",
                     }}
                   />
-                  <span className="text-xs self-center" style={{ color: "var(--color-text-dim)" }}>
+                  <span className="text-xs self-center" style={{ color: "var(--text-secondary)" }}>
                     seconds timeout
                   </span>
                 </div>
@@ -1957,9 +1957,9 @@ function GameSessionSettings({ game }: { game: Game }) {
                   rows={2}
                   className="w-full text-sm px-2 py-1.5 rounded resize-none"
                   style={{
-                    background: "var(--color-bg)",
-                    border: "1px solid var(--color-border)",
-                    color: "var(--color-text)",
+                    background: "var(--surface-base)",
+                    border: "1px solid var(--border-default)",
+                    color: "var(--text-primary)",
                     outline: "none",
                   }}
                 />
@@ -1968,8 +1968,8 @@ function GameSessionSettings({ game }: { game: Game }) {
                     onClick={() => setEditingHook(null)}
                     className="px-3 py-1 rounded text-xs"
                     style={{
-                      background: "var(--color-surface-raised)",
-                      color: "var(--color-text-dim)",
+                      background: "var(--surface-1)",
+                      color: "var(--text-secondary)",
                     }}
                   >
                     Cancel
@@ -1979,8 +1979,8 @@ function GameSessionSettings({ game }: { game: Game }) {
                     disabled={!hookDraft.command.trim()}
                     className="px-3 py-1 rounded text-xs font-medium"
                     style={{
-                      background: "var(--color-accent)",
-                      color: "var(--color-bg)",
+                      background: "var(--accent)",
+                      color: "var(--surface-base)",
                       opacity: hookDraft.command.trim() ? 1 : 0.5,
                     }}
                   >

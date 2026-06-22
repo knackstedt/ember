@@ -55,8 +55,8 @@ export const AddWidgetDialog: React.FC<AddWidgetDialogProps> = ({
       <div
         className="rounded-xl p-4 w-full max-w-lg max-h-[80vh] flex flex-col"
         style={{
-          background: "var(--color-surface-overlay)",
-          border: "1px solid var(--color-border)",
+          background: "var(--surface-2)",
+          border: "1px solid var(--border-default)",
           boxShadow: "var(--shadow-card)",
         }}
         onClick={(e) => e.stopPropagation()}
@@ -66,7 +66,7 @@ export const AddWidgetDialog: React.FC<AddWidgetDialogProps> = ({
           <button
             onClick={onClose}
             className="p-1 rounded hover:opacity-70"
-            style={{ color: "var(--color-text-dim)" }}
+            style={{ color: "var(--text-secondary)" }}
           >
             <X size={16} />
           </button>
@@ -82,11 +82,11 @@ export const AddWidgetDialog: React.FC<AddWidgetDialogProps> = ({
               }}
               className="flex flex-col items-center gap-2 p-3 rounded-lg text-sm transition-colors hover:opacity-80"
               style={{
-                background: "var(--color-surface-raised)",
-                border: "1px solid var(--color-border)",
+                background: "var(--surface-1)",
+                border: "1px solid var(--border-default)",
               }}
             >
-              <w.icon size={20} style={{ color: "var(--color-accent)" }} />
+              <w.icon size={20} style={{ color: "var(--accent)" }} />
               <span className="text-xs text-center">{w.label}</span>
             </button>
           ))}
