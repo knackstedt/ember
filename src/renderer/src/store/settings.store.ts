@@ -84,6 +84,9 @@ const defaults: AppSettings = {
   },
   disabledScanSources: [],
   corruptedFilesPolicy: "warn",
+  updateCheckFrequency: "week",
+  updateAutoDownload: true,
+  updateAutoInstall: false,
 };
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({

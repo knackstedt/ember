@@ -15,6 +15,13 @@ import { MovieRepo, RemoteSourceRepo } from "./db/repository";
 import { getServePort } from "./services/rclone-manager";
 import { startRemoteAvailabilityWorker, stopRemoteAvailabilityWorker } from "./services/remote-availability.service";
 import { bootPlugins, shutdownPlugins } from "./plugins/loader";
+import {
+  initUpdater,
+  checkPostUpdateCrash,
+  markCleanShutdown,
+  rollbackToPrevious,
+  getUpdaterState,
+} from "./services/updater.service";
 
 // Suppress MaxListenersExceededWarning from Electron internals (webviews, extensions)
 EventEmitter.defaultMaxListeners = 30;
@@ -520,6 +527,18 @@ protocol.registerSchemesAsPrivileged([
 app.whenReady().then(async () => {
   app.setAppUserModelId("com.ember.app");
 
+  if (!isDev) {
+    initUpdater();
+
+    if (checkPostUpdateCrash()) {
+      log.warn("updater", "App appears to have crashed after last update");
+      const result = await rollbackToPrevious();
+      if (!result.success) {
+        log.error("updater", `Rollback failed: ${result.error}`);
+      }
+    }
+  }
+
   protocol.handle("ember", async (request) => {
     const url = new URL(request.url);
     let filePath: string;
@@ -789,6 +808,7 @@ app.whenReady().then(async () => {
 
 app.on("before-quit", async (e) => {
   stopRemoteAvailabilityWorker();
+  markCleanShutdown();
   // Give renderers a brief moment to fire any pending beforeunload / IPC saves
   const windows = BrowserWindow.getAllWindows();
   if (windows.length > 0) {

@@ -468,6 +468,8 @@ export type BackgroundType =
 
 export type ImageFitMode = "cover" | "contain" | "stretch" | "center" | "repeat";
 
+export type UpdateCheckFrequency = "day" | "week" | "off";
+
 export interface AppSettings {
   theme: ThemeName;
   background: BackgroundType;
@@ -584,6 +586,14 @@ export interface AppSettings {
   corruptedFilesPolicy?: "warn" | "hide" | "delete";
   /** Flash game player settings */
   flashSettings?: FlashSettings;
+  /** How often to check for updates */
+  updateCheckFrequency?: UpdateCheckFrequency;
+  /** Automatically download updates when available */
+  updateAutoDownload?: boolean;
+  /** Automatically install updates after downloading */
+  updateAutoInstall?: boolean;
+  /** Pin to a specific version (prevents auto-updates to other versions) */
+  updatePinnedVersion?: string;
 }
 
 export type DashboardWidgetType =

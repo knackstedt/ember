@@ -1054,6 +1054,31 @@ const htpc = {
       ipcRenderer.invoke("network:discover"),
   },
 
+  updater: {
+    getState: (): Promise<import("../main/services/updater.service").UpdaterState> =>
+      ipcRenderer.invoke("updater:state"),
+    check: (): Promise<void> => ipcRenderer.invoke("updater:check"),
+    download: (): Promise<void> => ipcRenderer.invoke("updater:download"),
+    install: (): Promise<void> => ipcRenderer.invoke("updater:install"),
+    rollback: (): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke("updater:rollback"),
+    releases: (): Promise<import("../main/services/updater.service").GitHubRelease[]> =>
+      ipcRenderer.invoke("updater:releases"),
+    pin: (versionTag: string): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke("updater:pin", versionTag),
+    schedule: (): Promise<void> => ipcRenderer.invoke("updater:schedule"),
+    onState: (cb: (state: import("../main/services/updater.service").UpdaterState) => void) => {
+      const handler = (_: Electron.IpcRendererEvent, s: import("../main/services/updater.service").UpdaterState) => cb(s);
+      ipcRenderer.on("updater:state", handler);
+      return () => ipcRenderer.removeListener("updater:state", handler);
+    },
+    onProgress: (cb: (progress: { percent: number; speed?: number }) => void) => {
+      const handler = (_: Electron.IpcRendererEvent, p: { percent: number; speed?: number }) => cb(p);
+      ipcRenderer.on("updater:progress", handler);
+      return () => ipcRenderer.removeListener("updater:progress", handler);
+    },
+  },
+
   oauth: {
     start: (authUrl: string, redirectPatterns: string[]): Promise<import("../main/services/oauth-webview").OAuthResult> =>
       ipcRenderer.invoke("oauth:start", authUrl, redirectPatterns),

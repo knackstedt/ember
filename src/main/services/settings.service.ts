@@ -37,6 +37,9 @@ const DEFAULTS: AppSettings = {
   },
   disabledScanSources: [],
   corruptedFilesPolicy: "warn",
+  updateCheckFrequency: "week",
+  updateAutoDownload: true,
+  updateAutoInstall: false,
 };
 
 let cachedSettings: AppSettings | null = null;

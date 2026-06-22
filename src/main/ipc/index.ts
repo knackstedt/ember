@@ -10,6 +10,16 @@ import {
   setSetting,
 } from "../services/settings.service";
 import {
+  getUpdaterState,
+  checkForUpdates,
+  downloadUpdate,
+  installUpdate,
+  rollbackToPrevious,
+  fetchReleases,
+  downloadAndInstallVersion,
+  scheduleChecks,
+} from "../services/updater.service";
+import {
   launchGame,
   launchMovie,
   launchTrack,
@@ -2830,5 +2840,41 @@ export function registerIpcHandlers(window: BrowserWindow): void {
 
   ipcMain.handle("db:query", async (_e, table: string, odataQuery: string) => {
     return executeODataQuery(table, odataQuery);
+  });
+
+  /* ------------------------------------------------------------------ */
+  /*  Updater                                                            */
+  /* ------------------------------------------------------------------ */
+
+  ipcMain.handle("updater:state", async () => {
+    return getUpdaterState();
+  });
+
+  ipcMain.handle("updater:check", async () => {
+    return checkForUpdates();
+  });
+
+  ipcMain.handle("updater:download", async () => {
+    return downloadUpdate();
+  });
+
+  ipcMain.handle("updater:install", async () => {
+    return installUpdate();
+  });
+
+  ipcMain.handle("updater:rollback", async () => {
+    return rollbackToPrevious();
+  });
+
+  ipcMain.handle("updater:releases", async () => {
+    return fetchReleases();
+  });
+
+  ipcMain.handle("updater:pin", async (_e, versionTag: string) => {
+    return downloadAndInstallVersion(versionTag);
+  });
+
+  ipcMain.handle("updater:schedule", async () => {
+    return scheduleChecks();
   });
 }
