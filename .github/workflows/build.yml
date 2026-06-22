@@ -85,8 +85,13 @@ jobs:
       - name: Build distribution
         run: bun run dist -- --publish never
 
+      - name: Package plugins
+        run: bun scripts/package-plugins.ts
+
       - name: List release artifacts
         run: ls -lah release/
+      - name: List plugin artifacts
+        run: ls -lah release/plugins/ 2>/dev/null || echo "No plugins directory"
 
       - name: Upload workflow artifacts
         uses: actions/upload-artifact@v4
@@ -97,6 +102,7 @@ jobs:
             release/*.deb
             release/*.rpm
             release/*.tar.gz
+            release/plugins/*.tar.zst
           if-no-files-found: error
 
       - name: Publish GitHub Release
@@ -110,3 +116,4 @@ jobs:
             release/*.tar.gz
             release/latest-linux*.yml
             release/*.blockmap
+            release/plugins/*.tar.zst

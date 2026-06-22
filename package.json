@@ -11,7 +11,7 @@
     "dev": "bun scripts/dev.ts",
     "prebuild": "bun scripts/setup-video-decoder.ts",
     "build": "electron-vite build",
-    "predist": "bun scripts/setup-libretro.ts && bun scripts/setup-video-decoder.ts && bun scripts/package-plugins.ts",
+    "predist": "bun scripts/setup-libretro.ts && bun scripts/setup-video-decoder.ts",
     "dist": "electron-builder",
     "dist:x64:tar.gz": "electron-builder --linux tar.gz --x64",
     "dist:x64:appimage": "electron-builder --linux AppImage --x64",
