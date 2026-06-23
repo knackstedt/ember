@@ -20,6 +20,7 @@ import {
 import { useMusicPlayerStore } from "../../store/musicPlayer.store";
 import { useFocusZoneStore } from "../../store/focusZone.store";
 import { getTrackDisplayName } from "../lib/track-title";
+import { scaledImageUrl } from "../../lib/image-url";
 import { MusicVisualizer, PRESETS, DEFAULT_PRESET_NAME } from "./MusicVisualizer";
 
 function fmt(s: number): string {
@@ -381,7 +382,7 @@ export const MusicPlayerFull: React.FC<MusicPlayerFullProps> = React.memo(({
               style={{ background: "var(--surface-1)" }}
             >
               {track.albumArtUrl ? (
-                <img src={track.albumArtUrl} alt={getTrackDisplayName(track)} className="w-full h-full object-cover" />
+                <img src={scaledImageUrl(track.albumArtUrl, 256, 256)} alt={getTrackDisplayName(track)} className="w-full h-full object-cover" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-6xl select-none" style={{ color: "var(--text-secondary)" }}>
                   ♪
@@ -662,7 +663,7 @@ export const MusicPlayerFull: React.FC<MusicPlayerFullProps> = React.memo(({
                         style={{ background: "var(--surface-0)" }}
                       >
                         {t.albumArtUrl ? (
-                          <img src={t.albumArtUrl} alt={getTrackDisplayName(t)} className="w-full h-full object-cover" />
+                          <img src={scaledImageUrl(t.albumArtUrl, 32, 32)} alt={getTrackDisplayName(t)} className="w-full h-full object-cover" />
                         ) : (
                           <span style={{ color: "var(--text-secondary)" }}>♪</span>
                         )}

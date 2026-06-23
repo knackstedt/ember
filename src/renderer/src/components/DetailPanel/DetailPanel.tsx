@@ -2,6 +2,7 @@ import React, { useState, useRef, KeyboardEvent } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
+import { scaledImageUrl } from "../../lib/image-url";
 
 interface DetailPanelProps {
   open: boolean;
@@ -77,7 +78,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
             {backdropUrl && (
               <div className="relative h-48 overflow-hidden flex-shrink-0">
                 <img
-                  src={backdropUrl}
+                  src={scaledImageUrl(backdropUrl, 480, 192)}
                   alt=""
                   className="w-full h-full object-cover"
                 />
@@ -88,7 +89,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
             <div className="flex gap-4 p-4 flex-shrink-0">
               {coverUrl && (
                 <img
-                  src={coverUrl}
+                  src={scaledImageUrl(coverUrl, 96, 144)}
                   alt={title}
                   className="w-24 h-36 object-cover rounded-[var(--radius-card)] flex-shrink-0"
                   style={{ boxShadow: "var(--shadow-card)" }}

@@ -2,6 +2,7 @@ import React, { useMemo } from "react";
 import { useMoviesStore } from "../../../store/media.store";
 import { Movie } from "@shared/types";
 import { Film, Clapperboard, Play } from "lucide-react";
+import { scaledImageUrl } from "../../../lib/image-url";
 
 function timeAgo(ts: number): string {
   const diff = Date.now() - ts;
@@ -69,7 +70,7 @@ export const RecentMoviesWidget: React.FC<{ title?: string; maxItems?: number }>
           >
             <div className="relative flex-shrink-0">
               {m.coverUrl ? (
-                <img src={m.coverUrl} alt="" className="w-8 h-11 object-cover rounded-lg" loading="lazy" />
+                <img src={scaledImageUrl(m.coverUrl, 32, 44)} alt="" className="w-8 h-11 object-cover rounded-lg" loading="lazy" />
               ) : (
                 <div className="w-8 h-11 rounded-lg flex items-center justify-center" style={{ background: "var(--surface-0)" }}>
                   <Clapperboard size={14} className="opacity-40" />

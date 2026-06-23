@@ -2,6 +2,7 @@ import React from "react";
 import { useMusicPlayerStore } from "../../../store/musicPlayer.store";
 import { Music, Pause, Play, SkipBack, SkipForward, Volume2 } from "lucide-react";
 import { getTrackDisplayName } from "../../../music/lib/track-title";
+import { scaledImageUrl } from "../../../lib/image-url";
 
 export const NowPlayingWidget: React.FC<{ title?: string }> = ({ title }) => {
   const queue = useMusicPlayerStore((s) => s.queue);
@@ -47,8 +48,8 @@ export const NowPlayingWidget: React.FC<{ title?: string }> = ({ title }) => {
         <div className="relative flex-shrink-0">
           {current.albumArtUrl ? (
             <>
-              <img src={current.albumArtUrl} alt="" className="w-14 h-14 object-cover rounded-xl" />
-              <div className="absolute inset-0 rounded-xl opacity-20 blur-md -z-10" style={{ backgroundImage: `url(${current.albumArtUrl})`, backgroundSize: "cover", transform: "scale(1.2)" }} />
+              <img src={scaledImageUrl(current.albumArtUrl, 56, 56)} alt="" className="w-14 h-14 object-cover rounded-xl" />
+              <div className="absolute inset-0 rounded-xl opacity-20 blur-md -z-10" style={{ backgroundImage: `url(${scaledImageUrl(current.albumArtUrl, 56, 56)})`, backgroundSize: "cover", transform: "scale(1.2)" }} />
             </>
           ) : (
             <div className="w-14 h-14 rounded-xl flex items-center justify-center" style={{ background: "var(--surface-1)" }}>

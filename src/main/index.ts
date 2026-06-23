@@ -1,7 +1,8 @@
-import { app, BrowserWindow, shell, protocol, Menu, powerMonitor } from "electron";
+import { app, BrowserWindow, shell, protocol, Menu, powerMonitor, nativeImage } from "electron";
 import { EventEmitter } from "events";
 import path, { join } from "path";
 import { readFileSync, createReadStream, statSync, lstatSync, readlinkSync, unlinkSync, writeFileSync, existsSync, mkdirSync, readdirSync } from "fs";
+import { createHash } from "crypto";
 import { initDb, terminateDbWorker } from "./db";
 import { registerIpcHandlers, destroyWorker as destroyLibretroWorker } from "./ipc";
 import { destroyMpvWorker } from "./services/mpv-worker.service";
@@ -525,6 +526,45 @@ async function createWindow(): Promise<void> {
   });
 }
 
+function getCachedScaledPath(originalPath: string, targetWidth: number, targetHeight: number): string | undefined {
+  const ext = originalPath.toLowerCase().slice(originalPath.lastIndexOf("."));
+  if (ext === ".svg") return undefined;
+
+  const cacheDir = join(app.getPath("userData"), "cache", "images");
+  const hash = createHash("sha256").update(`${originalPath}:${targetWidth}:${targetHeight}`).digest("hex");
+  const cacheExt = ext === ".png" ? ".png" : ".jpg";
+  const cachePath = join(cacheDir, `${hash}${cacheExt}`);
+
+  if (existsSync(cachePath)) return cachePath;
+
+  try {
+    const image = nativeImage.createFromPath(originalPath);
+    const size = image.getSize();
+
+    if (size.width <= targetWidth && size.height <= targetHeight) {
+      return undefined;
+    }
+
+    const scale = Math.min(targetWidth / size.width, targetHeight / size.height);
+    const newWidth = Math.max(1, Math.round(size.width * scale));
+    const newHeight = Math.max(1, Math.round(size.height * scale));
+
+    const resized = image.resize({ width: newWidth, height: newHeight, quality: "best" });
+
+    mkdirSync(cacheDir, { recursive: true });
+    if (cacheExt === ".png") {
+      writeFileSync(cachePath, resized.toPNG());
+    } else {
+      writeFileSync(cachePath, resized.toJPEG(90));
+    }
+
+    return cachePath;
+  } catch (err) {
+    log.error("ember:scale", `Failed to scale ${originalPath}: ${err}`);
+    return undefined;
+  }
+}
+
 protocol.registerSchemesAsPrivileged([
   {
     scheme: "ember",
@@ -747,6 +787,22 @@ app.whenReady().then(async () => {
     }
 
     const ext = filePath.toLowerCase().slice(filePath.lastIndexOf("."));
+
+    let servePath = filePath;
+    const targetW = parseInt(url.searchParams.get("w") ?? "0", 10);
+    const targetH = parseInt(url.searchParams.get("h") ?? "0", 10);
+    if (targetW > 0 && targetH > 0 && (ext === ".jpg" || ext === ".jpeg" || ext === ".png" || ext === ".webp")) {
+      const scaled = getCachedScaledPath(filePath, targetW, targetH);
+      if (scaled) {
+        servePath = scaled;
+        try {
+          stats = statSync(servePath);
+        } catch {
+          return new Response("Not Found", { status: 404 });
+        }
+      }
+    }
+
     let contentType = "application/octet-stream";
     if (ext === ".jpg" || ext === ".jpeg") contentType = "image/jpeg";
     else if (ext === ".png") contentType = "image/png";
@@ -777,7 +833,7 @@ app.whenReady().then(async () => {
         const start = parseInt(match[1], 10);
         const end = match[2] ? parseInt(match[2], 10) : stats.size - 1;
         const length = end - start + 1;
-        const stream = createReadStream(filePath, { start, end });
+        const stream = createReadStream(servePath, { start, end });
         if (request.signal) {
           request.signal.addEventListener("abort", () => stream.destroy(), { once: true });
         }
@@ -794,7 +850,7 @@ app.whenReady().then(async () => {
       }
     }
 
-    const stream = createReadStream(filePath);
+    const stream = createReadStream(servePath);
     if (request.signal) {
       request.signal.addEventListener("abort", () => stream.destroy(), { once: true });
     }

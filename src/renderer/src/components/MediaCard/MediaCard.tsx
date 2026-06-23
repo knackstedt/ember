@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
+import { scaledImageUrl } from "../../lib/image-url";
 
 export interface MediaCardProps {
   id: string;
@@ -124,7 +125,7 @@ export const MediaCard: React.FC<MediaCardProps> = React.memo(({
             </div>
           ) : (
             <img
-              src={coverUrl}
+              src={scaledImageUrl(coverUrl, 400, 600)}
               alt={title}
               className="w-full h-full object-cover"
               loading="lazy"

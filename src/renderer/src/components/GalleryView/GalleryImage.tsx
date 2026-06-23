@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { scaledImageUrl } from "../../lib/image-url";
 import "./GalleryView.css";
 
 export interface GalleryImageProps {
@@ -32,7 +33,7 @@ export const GalleryImage: React.FC<GalleryImageProps> = React.memo(({
     >
       {src && !failed && (
         <img
-          src={src}
+          src={scaledImageUrl(src, 600, 600)}
           alt={alt}
           className="gallery-img"
           loading={loading}

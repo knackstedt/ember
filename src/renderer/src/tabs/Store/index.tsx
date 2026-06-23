@@ -18,6 +18,7 @@ import {
   Loader,
   Gamepad2,
 } from "lucide-react";
+import { scaledImageUrl } from "../../lib/image-url";
 import { useToastStore } from "../../store/toast.store";
 
 interface BrowserTab {
@@ -539,7 +540,7 @@ export const StoreTab: React.FC = () => {
                     }}
                   >
                     {g.coverUrl ? (
-                      <img src={g.coverUrl} alt="" className="w-10 h-10 rounded object-cover bg-white/5" />
+                      <img src={scaledImageUrl(g.coverUrl, 40, 40)} alt="" className="w-10 h-10 rounded object-cover bg-white/5" />
                     ) : (
                       <div className="w-10 h-10 rounded bg-white/5 flex items-center justify-center">
                         <Gamepad2 size={16} className="text-white/30" />

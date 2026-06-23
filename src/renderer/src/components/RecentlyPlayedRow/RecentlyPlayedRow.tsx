@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { motion } from "framer-motion";
+import { scaledImageUrl } from "../../lib/image-url";
 
 export interface RecentlyPlayedItem {
   id: string;
@@ -64,7 +65,7 @@ const RecentCard: React.FC<{
           </div>
         ) : (
           <img
-            src={item.coverUrl}
+            src={scaledImageUrl(item.coverUrl, 120, 180)}
             alt={item.title}
             className="w-full h-full object-cover"
             loading="lazy"

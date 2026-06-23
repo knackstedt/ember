@@ -9,6 +9,7 @@ import {
   SkipBack,
 } from "lucide-react";
 import { useMusicPlayerStore } from "../../store/musicPlayer.store";
+import { scaledImageUrl } from "../../lib/image-url";
 import { useFocusZoneStore } from "../../store/focusZone.store";
 
 const BLADE_WIDTH = 280;
@@ -195,7 +196,7 @@ export const QueueBlade: React.FC = () => {
                 >
                   {currentTrack.albumArtUrl ? (
                     <img
-                      src={currentTrack.albumArtUrl}
+                      src={scaledImageUrl(currentTrack.albumArtUrl, 40, 40)}
                       alt={currentTrack.title}
                       className="w-full h-full object-cover"
                     />

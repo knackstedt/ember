@@ -12,6 +12,7 @@ import {
   GalleryView,
 } from "../../../../shared/types";
 import { Toggle, Field } from "./shared";
+import { scaledImageUrl } from "../../lib/image-url";
 
 const BG_TYPE_LABELS: Record<BackgroundType, string> = {
   theme: "Theme Default",
@@ -98,7 +99,7 @@ export const AppearanceTab: React.FC = () => {
               >
                 {t.thumbnailUrl ? (
                   <img
-                    src={t.thumbnailUrl}
+                    src={scaledImageUrl(t.thumbnailUrl, 200, 48)}
                     alt={t.name}
                     className="w-full h-12 rounded object-cover"
                     loading="lazy"

@@ -18,6 +18,7 @@ import {
   useIsNeonGrid,
 } from "../../components/GalleryView";
 import { MediaCard } from "../../components/MediaCard/MediaCard";
+import { scaledImageUrl } from "../../lib/image-url";
 import { DetailPanel } from "../../components/DetailPanel/DetailPanel";
 import { OskInput } from "../../components/OnScreenKeyboard/OnScreenKeyboard";
 import { RecentlyPlayedRow } from "../../components/RecentlyPlayedRow/RecentlyPlayedRow";
@@ -445,7 +446,7 @@ export const MoviesTab: React.FC = () => {
           <div
             className="w-12 h-[72px] flex-shrink-0 rounded overflow-hidden bg-cover bg-center"
             style={{
-              backgroundImage: movie.coverUrl ? `url(${movie.coverUrl})` : undefined,
+              backgroundImage: movie.coverUrl ? `url(${scaledImageUrl(movie.coverUrl, 48, 72)})` : undefined,
               backgroundColor: !movie.coverUrl ? "#1a1a2e" : undefined,
               filter: movie.missing ? "grayscale(80%)" : undefined,
               opacity: movie.missing ? 0.6 : undefined,
@@ -555,7 +556,7 @@ export const MoviesTab: React.FC = () => {
           >
             {movie.coverUrl ? (
               <img
-                src={movie.coverUrl}
+                src={scaledImageUrl(movie.coverUrl, 600, 400)}
                 alt={movie.title}
                 className="w-full h-full object-cover opacity-80"
                 loading="lazy"

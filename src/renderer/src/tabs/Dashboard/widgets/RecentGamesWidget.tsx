@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useGamesStore } from "../../../store/games.store";
 import { Game, GamePlatform } from "@shared/types";
 import { Clock, Play, Gamepad2 } from "lucide-react";
+import { scaledImageUrl } from "../../../lib/image-url";
 
 const PLATFORM_COLORS: Record<GamePlatform, string> = {
   steam: "#1b2838",
@@ -111,7 +112,7 @@ export const RecentGamesWidget: React.FC<{ title?: string; maxItems?: number }> 
           >
             <div className="relative flex-shrink-0">
               {g.coverUrl ? (
-                <img src={g.coverUrl} alt="" className="w-8 h-10 object-cover rounded-lg" loading="lazy" />
+                <img src={scaledImageUrl(g.coverUrl, 32, 40)} alt="" className="w-8 h-10 object-cover rounded-lg" loading="lazy" />
               ) : (
                 <div className="w-8 h-10 rounded-lg flex items-center justify-center" style={{ background: "var(--surface-0)" }}>
                   <Gamepad2 size={14} className="opacity-40" />

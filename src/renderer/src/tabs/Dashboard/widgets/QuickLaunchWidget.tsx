@@ -2,6 +2,7 @@ import React, { useMemo } from "react";
 import { useGamesStore } from "../../../store/games.store";
 import { Game, GamePlatform } from "@shared/types";
 import { Play, Gamepad2 } from "lucide-react";
+import { scaledImageUrl } from "../../../lib/image-url";
 
 const PLATFORM_COLORS: Record<GamePlatform, string> = {
   steam: "#1b2838", gog: "#86328a", lutris: "#ff9900", heroic: "#e0e0e0",
@@ -62,7 +63,7 @@ export const QuickLaunchWidget: React.FC<{ title?: string; maxItems?: number }> 
           >
             <div className="relative w-full aspect-[3/4] max-h-16">
               {g.coverUrl ? (
-                <img src={g.coverUrl} alt="" className="w-full h-full object-cover rounded-lg" loading="lazy" />
+                <img src={scaledImageUrl(g.coverUrl, 48, 64)} alt="" className="w-full h-full object-cover rounded-lg" loading="lazy" />
               ) : (
                 <div className="w-full h-full rounded-lg flex items-center justify-center" style={{ background: "var(--surface-0)" }}>
                   <Gamepad2 size={14} className="opacity-40" />

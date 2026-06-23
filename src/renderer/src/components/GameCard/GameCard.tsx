@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { GamePlatform } from "../../../../shared/types";
 import { PLATFORM_ICONS } from "./icons";
 import { Tooltip } from "../Tooltip/Tooltip";
+import { scaledImageUrl } from "../../lib/image-url";
 import "./GameCard.css";
 
 export interface GameCardProps {
@@ -224,7 +225,7 @@ export const GameCard: React.FC<GameCardProps> = React.memo(({
               ) : (
                 <img
                   className="gc-cover-img"
-                  src={coverUrl}
+                  src={scaledImageUrl(coverUrl, 400, 600)}
                   alt={title}
                   loading="lazy"
                   decoding="async"

@@ -17,6 +17,7 @@ import {
   useIsNeonGrid,
 } from "../../components/GalleryView";
 import { GameCard } from "../../components/GameCard/GameCard";
+import { scaledImageUrl } from "../../lib/image-url";
 import { DetailPanel } from "../../components/DetailPanel/DetailPanel";
 import { ImageLightbox } from "../../components/ImageLightbox/ImageLightbox";
 import { CoreSelector } from "../../components/CoreSelector/CoreSelector";
@@ -728,7 +729,7 @@ export const GamingTab: React.FC = () => {
         <div
           className="w-12 h-[72px] flex-shrink-0 rounded overflow-hidden bg-cover bg-center"
           style={{
-            backgroundImage: game.coverUrl ? `url(${game.coverUrl})` : undefined,
+            backgroundImage: game.coverUrl ? `url(${scaledImageUrl(game.coverUrl, 48, 72)})` : undefined,
             backgroundColor: !game.coverUrl ? "#1a1a2e" : undefined,
             filter: game.missing ? "grayscale(80%)" : undefined,
             opacity: game.missing ? 0.6 : undefined,
@@ -819,7 +820,7 @@ export const GamingTab: React.FC = () => {
           >
             {game.coverUrl ? (
               <img
-                src={game.coverUrl}
+                src={scaledImageUrl(game.coverUrl, 600, 400)}
                 alt={game.title}
                 className="w-full h-full object-cover opacity-80"
                 loading="lazy"
@@ -1350,7 +1351,7 @@ export const GamingTab: React.FC = () => {
                       {screenshotUrls.map((url, i) => (
                         <img
                           key={i}
-                          src={url}
+                          src={scaledImageUrl(url, 220, 112)}
                           alt=""
                           className="h-28 flex-shrink-0 rounded-[var(--radius-card)] object-cover cursor-pointer hover:brightness-110 transition-[filter]"
                           style={{ maxWidth: 220 }}

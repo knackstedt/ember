@@ -13,6 +13,7 @@ import {
 import { useMusicPlayerStore } from "../../store/musicPlayer.store";
 import { useFocusZoneStore } from "../../store/focusZone.store";
 import { getTrackDisplayName } from "../lib/track-title";
+import { scaledImageUrl } from "../../lib/image-url";
 
 const MINI_HEIGHT = 56;
 
@@ -154,7 +155,7 @@ export const MusicPlayerBar: React.FC<MusicPlayerBarProps> = React.memo(({ onExp
         style={{ background: "var(--surface-0)" }}
       >
         {track.albumArtUrl ? (
-          <img src={track.albumArtUrl} alt={getTrackDisplayName(track)} className="w-full h-full object-cover" />
+          <img src={scaledImageUrl(track.albumArtUrl, 36, 36)} alt={getTrackDisplayName(track)} className="w-full h-full object-cover" />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-sm select-none" style={{ color: "var(--text-secondary)" }}>
             ♪

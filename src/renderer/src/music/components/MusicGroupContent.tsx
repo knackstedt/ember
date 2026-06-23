@@ -5,6 +5,7 @@ import {
 } from "../../components/VirtualGrid/VirtualGrid";
 import { ListView } from "../../components/GalleryView";
 import { MediaCard } from "../../components/MediaCard/MediaCard";
+import { scaledImageUrl } from "../../lib/image-url";
 import type { MusicViewMode } from "../types";
 
 export interface MusicGroup {
@@ -69,7 +70,7 @@ const GroupListItem: React.FC<{
       <div
         className="w-12 h-12 flex-shrink-0 rounded overflow-hidden bg-cover bg-center flex items-center justify-center text-sm"
         style={{
-          backgroundImage: group.coverUrl ? `url(${group.coverUrl})` : undefined,
+          backgroundImage: group.coverUrl ? `url(${scaledImageUrl(group.coverUrl, 48, 48)})` : undefined,
           backgroundColor: !group.coverUrl ? "var(--surface-1)" : undefined,
         }}
       >

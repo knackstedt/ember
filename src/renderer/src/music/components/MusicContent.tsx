@@ -12,6 +12,7 @@ import { useCoverCacheStore } from "../../store/coverCache.store";
 import { useMusicStore } from "../../store/media.store";
 import { getSourceBadge } from "../../lib/source-badge";
 import { getTrackDisplayName } from "../lib/track-title";
+import { scaledImageUrl } from "../../lib/image-url";
 
 interface MusicContentProps {
   items: MusicTrack[];
@@ -98,7 +99,7 @@ const MusicListItem: React.FC<{
       <div
         className="w-12 h-12 flex-shrink-0 rounded overflow-hidden bg-cover bg-center"
         style={{
-          backgroundImage: coverUrl ? `url(${coverUrl})` : undefined,
+          backgroundImage: coverUrl ? `url(${scaledImageUrl(coverUrl, 48, 48)})` : undefined,
           backgroundColor: !coverUrl ? "var(--surface-1)" : undefined,
           filter: track.missing ? "grayscale(80%)" : undefined,
           opacity: track.missing ? 0.6 : undefined,

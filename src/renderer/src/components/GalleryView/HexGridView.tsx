@@ -1,4 +1,5 @@
 import React, { useRef, useCallback, useLayoutEffect, useEffect, CSSProperties, RefObject } from "react";
+import { scaledImageUrl } from "../../lib/image-url";
 import { Virtualizer, VirtualizerHandle } from "virtua";
 import { NavAction } from "../../hooks/useGridFocus";
 import { PLATFORM_ICONS } from "../GameCard/icons";
@@ -179,7 +180,7 @@ const HexCell = React.memo(function HexCellInner({ hex, isFocused, cellWidth, he
         >
           {hasCover && (
             <img
-              src={hex.coverUrl}
+              src={scaledImageUrl(hex.coverUrl, 400, 400)}
               alt=""
               style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
               onError={() => setImgError(true)}

@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { scaledImageUrl } from "../../lib/image-url";
 
 export interface BookshelfSpineProps {
   coverUrl?: string;
@@ -29,7 +30,7 @@ export const BookshelfSpine: React.FC<BookshelfSpineProps> = React.memo(({
       >
         {hasCover && (
           <img
-            src={coverUrl}
+            src={scaledImageUrl(coverUrl, 200, 600)}
             alt={title}
             className="w-full h-full object-cover"
             loading="lazy"

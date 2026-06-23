@@ -3,6 +3,7 @@ import { useMusicStore } from "../../../store/media.store";
 import { useMusicPlayerStore } from "../../../store/musicPlayer.store";
 import { MusicTrack } from "@shared/types";
 import { Disc, Music, Play } from "lucide-react";
+import { scaledImageUrl } from "../../../lib/image-url";
 import { getTrackDisplayName } from "../../../music/lib/track-title";
 
 function timeAgo(ts: number): string {
@@ -68,7 +69,7 @@ export const RecentMusicWidget: React.FC<{ title?: string; maxItems?: number }> 
           >
             <div className="relative flex-shrink-0">
               {t.albumArtUrl ? (
-                <img src={t.albumArtUrl} alt="" className="w-8 h-8 object-cover rounded-lg" loading="lazy" />
+                <img src={scaledImageUrl(t.albumArtUrl, 32, 32)} alt="" className="w-8 h-8 object-cover rounded-lg" loading="lazy" />
               ) : (
                 <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "var(--surface-0)" }}>
                   <Music size={12} className="opacity-40" />
