@@ -340,6 +340,15 @@ export function mpvWorkerAvailable(): boolean {
   }
 }
 
+export function destroyMpvWorker(): void {
+  if (worker && !worker.killed) {
+    try {
+      worker.kill("SIGTERM");
+    } catch { /* ignore */ }
+    worker = null;
+  }
+}
+
 export function registerMpvIpcHandlers(): void {
   ipcMain.handle("mpv:create", async (_e, id: string) => mpvCreate(id));
   ipcMain.handle("mpv:open", async (_e, id: string, path: string) =>

@@ -169,6 +169,15 @@ export function getDb(): Surreal {
   return db;
 }
 
+export function terminateDbWorker(): void {
+  if (worker) {
+    try {
+      worker.terminate();
+    } catch { /* ignore */ }
+    worker = null;
+  }
+}
+
 async function runMigrations(db: Surreal): Promise<void> {
   await db.query(`
     DEFINE TABLE IF NOT EXISTS setting SCHEMAFULL;

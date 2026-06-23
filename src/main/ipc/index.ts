@@ -331,7 +331,7 @@ function ensureLibretroWorker(): ChildProcess {
   return worker;
 }
 
-async function destroyWorker(): Promise<void> {
+export async function destroyWorker(): Promise<void> {
   if (!libretroWorker) return;
   const dyingWorker = libretroWorker;
   libretroWorker = null;

@@ -2,8 +2,9 @@ import { app, BrowserWindow, shell, protocol, Menu, powerMonitor } from "electro
 import { EventEmitter } from "events";
 import path, { join } from "path";
 import { readFileSync, createReadStream, statSync, lstatSync, readlinkSync, unlinkSync, writeFileSync, existsSync, mkdirSync, readdirSync } from "fs";
-import { initDb } from "./db";
-import { registerIpcHandlers } from "./ipc";
+import { initDb, terminateDbWorker } from "./db";
+import { registerIpcHandlers, destroyWorker as destroyLibretroWorker } from "./ipc";
+import { destroyMpvWorker } from "./services/mpv-worker.service";
 import { initInputSystem, destroyInputSystem, clearFailureCooldowns, triggerRescan } from "./input/evdev";
 import { getSettings, setSetting } from "./services/settings.service";
 import type { TabId } from "../shared/types";
@@ -400,6 +401,11 @@ async function createWindow(): Promise<void> {
   mainWindow.on("move", persistBounds);
   mainWindow.on("close", persistBounds);
 
+  mainWindow.on("closed", () => {
+    clearInterval(devToolsInterval);
+    mainWindow = null;
+  });
+
   const tryOpenDevTools = (source: string) => {
     if (!isDev) {
       log.info("devtools", `skipping (${source}): isDev=false (isPackaged=${app.isPackaged}, NODE_ENV=${process.env.NODE_ENV ?? "undefined"})`);
@@ -440,7 +446,7 @@ async function createWindow(): Promise<void> {
   // Retry a few times in case earlier attempts raced with renderer init
   let devToolsRetries = 0;
   const devToolsInterval = setInterval(() => {
-    if (!mainWindow || mainWindow.webContents.isDevToolsOpened() || devToolsRetries >= 10) {
+    if (!mainWindow || mainWindow.isDestroyed() || mainWindow.webContents.isDevToolsOpened() || devToolsRetries >= 10) {
       clearInterval(devToolsInterval);
       return;
     }
@@ -816,6 +822,9 @@ app.whenReady().then(async () => {
 app.on("before-quit", async (e) => {
   stopRemoteAvailabilityWorker();
   markCleanShutdown();
+  terminateDbWorker();
+  destroyMpvWorker();
+  await destroyLibretroWorker();
   // Give renderers a brief moment to fire any pending beforeunload / IPC saves
   const windows = BrowserWindow.getAllWindows();
   if (windows.length > 0) {
@@ -839,10 +848,17 @@ app.on("before-quit", async (e) => {
 app.on("window-all-closed", async () => {
   stopRemoteAvailabilityWorker();
   await destroyInputSystem();
+  terminateDbWorker();
+  destroyMpvWorker();
+  await destroyLibretroWorker();
   try {
     await shutdownPlugins();
   } catch (err) {
     log.warn("plugins", `Shutdown error: ${err}`);
   }
-  if (process.platform !== "darwin") app.quit();
+  if (process.platform !== "darwin") {
+    app.quit();
+    // Safety net: if anything still keeps the event loop alive, force exit
+    setTimeout(() => app.exit(0), 1000);
+  }
 });
