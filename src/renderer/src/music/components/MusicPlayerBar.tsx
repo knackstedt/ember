@@ -52,6 +52,10 @@ export const MusicPlayerBar: React.FC<MusicPlayerBarProps> = React.memo(({ onExp
   const focusedButtonRef = useRef(focusedButton);
   focusedButtonRef.current = focusedButton;
 
+  const volumeRef = useRef(volume);
+  volumeRef.current = volume;
+  const volumeWrapRef = useRef<HTMLDivElement>(null);
+
   const track = queue[currentIndex];
   if (!track) return null;
 
@@ -62,6 +66,18 @@ export const MusicPlayerBar: React.FC<MusicPlayerBarProps> = React.memo(({ onExp
       setFocusedButton("play");
     }
   }, [activeZone]);
+
+  useEffect(() => {
+    const el = volumeWrapRef.current;
+    if (!el) return;
+    const handler = (e: WheelEvent) => {
+      e.preventDefault();
+      const step = Math.sign(e.deltaY) * -0.05;
+      setVolume(Math.max(0, Math.min(1, volumeRef.current + step)));
+    };
+    el.addEventListener("wheel", handler, { passive: false });
+    return () => el.removeEventListener("wheel", handler);
+  }, [setVolume]);
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -212,12 +228,8 @@ export const MusicPlayerBar: React.FC<MusicPlayerBarProps> = React.memo(({ onExp
           <SkipForward size={14} />
         </button>
         <div
+          ref={volumeWrapRef}
           className="flex items-center gap-1"
-          onWheel={(e) => {
-            e.preventDefault();
-            const step = Math.sign(e.deltaY) * -0.05;
-            setVolume(Math.max(0, Math.min(1, volume + step)));
-          }}
         >
           <button
             onClick={() => setVolume(Math.max(0, volume - 0.05))}
