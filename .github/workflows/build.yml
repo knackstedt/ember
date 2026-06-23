@@ -59,11 +59,21 @@ jobs:
 
       - name: Install system dependencies
         run: |
+          sudo dpkg --add-architecture arm64
           sudo apt-get update
           sudo apt-get install -y \
             gcc-aarch64-linux-gnu \
             libc6-dev-arm64-cross \
             libasound2-dev \
+            libasound2-dev:arm64 \
+            libavcodec-dev \
+            libavformat-dev \
+            libavutil-dev \
+            libswscale-dev \
+            libavcodec-dev:arm64 \
+            libavformat-dev:arm64 \
+            libavutil-dev:arm64 \
+            libswscale-dev:arm64 \
             rpm
 
       - name: Install Bun
