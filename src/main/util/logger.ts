@@ -384,5 +384,6 @@ export function createLogger(
     level: "trace" | "debug" | "info" | "warn" | "error" | "fatal" =
         process.env.NODE_ENV === "test" ? "warn" : "info"
 ): Logger {
-    return new ConsoleLogger(levelIntMap[level] ?? 3);
+    const effectiveLevel = process.env.EMBER_LOG_LEVEL || level;
+    return new ConsoleLogger(levelIntMap[effectiveLevel] ?? 3);
 }

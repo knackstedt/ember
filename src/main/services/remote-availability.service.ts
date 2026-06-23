@@ -62,7 +62,7 @@ async function checkBatch<T extends { id: string; filePath?: string; romPath?: s
           if (nextMissing) {
             log.info("remote:availability", `marked missing: ${path}`);
           } else {
-            log.info("remote:availability", `restored: ${path}`);
+            log.debug("remote:availability", `restored: ${path}`);
           }
         } catch (err) {
           log.warn("remote:availability", `check failed for ${path}: ${err}`);

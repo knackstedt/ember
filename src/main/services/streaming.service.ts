@@ -289,7 +289,7 @@ export async function seedBuiltinServices(): Promise<void> {
     if (!existingIds.has(svc.id)) {
       try {
         await StreamingServiceRepo.upsert(svc);
-        log.info("streaming:seed", `added builtin ${svc.id}`);
+        // log.info("streaming:seed", `added builtin ${svc.id}`);
       } catch (err) {
         log.error("streaming:seed", `failed to add ${svc.id}: ${err}`);
       }

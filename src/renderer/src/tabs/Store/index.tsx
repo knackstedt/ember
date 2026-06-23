@@ -489,8 +489,8 @@ export const StoreTab: React.FC = () => {
               ref={(el) => attachWebview(tab.id, el as any)}
               src={tab.url}
               className="w-full h-full"
-              allowpopups={false}
-              nodeintegration={false}
+              allowpopups="false"
+              nodeintegration="false"
               webpreferences="contextIsolation=yes,nodeIntegration=no,sandbox=yes"
             />
           </div>
