@@ -33,7 +33,7 @@ interface OpenVGDBGame {
   romRegionID: number;
   romLanguageID: number;
   romTemp: string | null;
-  rom romType: string | null;
+  romType: string | null;
   gameName: string;
   gameDescription: string;
   gameGenre: string;
