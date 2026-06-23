@@ -317,7 +317,7 @@ export const OnScreenKeyboard: React.FC<OnScreenKeyboardProps> = ({
 
       {/* Controller button hints bar */}
       <div
-        className="mt-3 flex items-center justify-between px-1 text-[10px] uppercase tracking-wider"
+        className="mt-3 flex items-center justify-between px-1 text-[12px] uppercase tracking-wider"
         style={{ color: "var(--text-secondary)", opacity: 0.5 }}
       >
         <div className="flex gap-3">

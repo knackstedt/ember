@@ -139,7 +139,7 @@ export const QueueBlade: React.FC = () => {
         </span>
         {bladeCollapsed && queue.length > 0 && (
           <span
-            className="text-[10px] select-none"
+            className="text-[12px] select-none"
             style={{
               writingMode: "vertical-rl",
               textOrientation: "mixed",

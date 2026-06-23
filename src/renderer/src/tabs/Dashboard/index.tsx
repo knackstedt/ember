@@ -444,7 +444,7 @@ export function DashboardTab(): React.ReactElement {
                   >
                     <div className="flex items-center gap-1">
                       <GripVertical size={12} className="opacity-50" />
-                      <span className="text-[10px] font-medium opacity-70 truncate">
+                      <span className="text-[12px] font-medium opacity-70 truncate">
                         {widget.title ?? widget.type}
                       </span>
                     </div>
@@ -488,7 +488,7 @@ export function DashboardTab(): React.ReactElement {
         <div className="absolute bottom-4 right-4 flex flex-col items-end gap-2 z-20">
           {!editMode && (
             <span
-              className="text-[10px] opacity-40 flex items-center gap-1 px-2 py-0.5 rounded"
+              className="text-[12px] opacity-40 flex items-center gap-1 px-2 py-0.5 rounded"
               style={{ background: "var(--surface-2)" }}
             >
               <Gamepad2 size={10} />

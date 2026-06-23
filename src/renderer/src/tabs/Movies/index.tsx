@@ -467,7 +467,7 @@ export const MoviesTab: React.FC = () => {
             </div>
             {source.badge && (
               <span
-                className="text-[10px] mt-0.5 w-fit px-1.5 py-0.5 rounded"
+                className="text-[12px] mt-0.5 w-fit px-1.5 py-0.5 rounded"
                 style={{ background: source.badgeColor ?? "var(--surface-1)", color: "#fff" }}
               >
                 {source.badge}
@@ -528,7 +528,7 @@ export const MoviesTab: React.FC = () => {
           )}
           {resolution && (
             <span
-              className="absolute bottom-2 left-2 px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide"
+              className="absolute bottom-2 left-2 px-1.5 py-0.5 rounded text-[12px] font-semibold uppercase tracking-wide"
               style={{ backgroundColor: "rgba(0,0,0,0.6)", color: "#fff" }}
             >
               {resolution}
@@ -582,17 +582,17 @@ export const MoviesTab: React.FC = () => {
               {movie.title}
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-[9px]" style={{ color: "var(--accent)" }}>
+              <span className="text-[12px]" style={{ color: "var(--accent)" }}>
                 {movie.releaseYear}
               </span>
               <div className="flex items-center gap-1">
                 {resolution && (
-                  <span className="text-[8px] px-1 rounded" style={{ background: "rgba(0,0,0,0.5)", color: "#fff" }}>
+                  <span className="text-[12px] px-1 rounded" style={{ background: "rgba(0,0,0,0.5)", color: "#fff" }}>
                     {resolution}
                   </span>
                 )}
                 {source.badge && (
-                  <span className="text-[8px] px-1 rounded" style={{ background: source.badgeColor, color: "#fff" }}>
+                  <span className="text-[12px] px-1 rounded" style={{ background: source.badgeColor, color: "#fff" }}>
                     {source.badge}
                   </span>
                 )}

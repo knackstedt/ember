@@ -566,7 +566,7 @@ export const SourcesTab: React.FC = () => {
                         {source.name}
                       </span>
                       <span
-                        className="px-1.5 py-0.5 rounded text-[10px] font-medium"
+                        className="px-1.5 py-0.5 rounded text-[12px] font-medium"
                         style={{
                           background: "var(--accent)",
                           color: "var(--surface-base)",
@@ -575,7 +575,7 @@ export const SourcesTab: React.FC = () => {
                         {PROTOCOL_LABELS[source.protocol] ?? source.protocol}
                       </span>
                       <span
-                        className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px]"
+                        className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[12px]"
                         style={{ color: "var(--text-secondary)", background: "var(--surface-0)" }}
                         title={MODE_LABELS[source.credentialMode]}
                       >
@@ -592,7 +592,7 @@ export const SourcesTab: React.FC = () => {
                       {source.mediaTypes.map((t) => (
                         <span
                           key={t}
-                          className="px-1 py-0.5 rounded text-[10px]"
+                          className="px-1 py-0.5 rounded text-[12px]"
                           style={{
                             background: "var(--surface-0)",
                             color: "var(--text-secondary)",

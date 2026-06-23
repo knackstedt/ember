@@ -21,7 +21,7 @@ export const WeatherWidget: React.FC<{
   return (
     <div className="flex flex-col h-full min-h-0 gap-1.5 overflow-hidden">
       {title && (
-        <div className="flex items-center gap-1 text-[10px] font-medium opacity-50 uppercase tracking-wider">
+        <div className="flex items-center gap-1 text-[12px] font-medium opacity-50 uppercase tracking-wider">
           <Thermometer size={10} />
           {title}
         </div>
@@ -35,20 +35,20 @@ export const WeatherWidget: React.FC<{
             </div>
             <div className="flex flex-col">
               <span className="text-2xl font-bold tabular-nums leading-none">{condition.temp}°</span>
-              <span className="text-[10px] opacity-50">{condition.label}</span>
+              <span className="text-[12px] opacity-50">{condition.label}</span>
             </div>
           </div>
-          <div className="flex flex-col gap-0 text-[10px] opacity-50 text-right">
+          <div className="flex flex-col gap-0 text-[12px] opacity-50 text-right">
             <span>{location}</span>
             <span>Feels {condition.feel}°</span>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
-          <span className="flex items-center gap-0.5 text-[10px] opacity-50">
+          <span className="flex items-center gap-0.5 text-[12px] opacity-50">
             <Wind size={10} /> {condition.wind} km/h
           </span>
-          <span className="flex items-center gap-0.5 text-[10px] opacity-50">
+          <span className="flex items-center gap-0.5 text-[12px] opacity-50">
             <Droplets size={10} /> {condition.humidity}%
           </span>
         </div>
@@ -56,7 +56,7 @@ export const WeatherWidget: React.FC<{
         <div className="flex-1 flex items-stretch gap-1.5 min-h-0">
           {condition.forecast.map((temp, i) => (
             <div key={i} className="flex-1 flex flex-col items-center justify-center gap-0.5 p-1 rounded-lg" style={{ background: "var(--surface-1)" }}>
-              <span className="text-[9px] opacity-40">{forecastLabels[i]}</span>
+              <span className="text-[12px] opacity-40">{forecastLabels[i]}</span>
               <span className="text-sm font-semibold">{temp}°</span>
             </div>
           ))}

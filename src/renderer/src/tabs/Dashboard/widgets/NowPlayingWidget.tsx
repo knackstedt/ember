@@ -37,7 +37,7 @@ export const NowPlayingWidget: React.FC<{ title?: string }> = ({ title }) => {
   return (
     <div className="flex flex-col h-full min-h-0 gap-1.5 overflow-hidden">
       {title && (
-        <div className="flex items-center gap-1 text-[10px] font-medium opacity-50 uppercase tracking-wider">
+        <div className="flex items-center gap-1 text-[12px] font-medium opacity-50 uppercase tracking-wider">
           <Volume2 size={10} />
           {title}
         </div>
@@ -59,15 +59,15 @@ export const NowPlayingWidget: React.FC<{ title?: string }> = ({ title }) => {
 
         <div className="text-center min-w-0 px-1">
           <div className="font-medium text-xs truncate">{getTrackDisplayName(current)}</div>
-          <div className="text-[10px] opacity-50 truncate">{current.artist ?? "Unknown artist"}</div>
-          {current.album && <div className="text-[9px] opacity-30 truncate">{current.album}</div>}
+          <div className="text-[12px] opacity-50 truncate">{current.artist ?? "Unknown artist"}</div>
+          {current.album && <div className="text-[12px] opacity-30 truncate">{current.album}</div>}
         </div>
 
         <div className="w-full flex flex-col gap-0.5 px-1">
           <div className="w-full rounded-full overflow-hidden" style={{ height: 3, background: "var(--surface-1)" }}>
             <div className="h-full rounded-full" style={{ width: `${progressPct}%`, background: "var(--accent)", transition: "width 0.3s linear" }} />
           </div>
-          <div className="flex justify-between text-[9px] opacity-30 tabular-nums">
+          <div className="flex justify-between text-[12px] opacity-30 tabular-nums">
             <span>{formatTime(position)}</span>
             <span>{formatTime(duration)}</span>
           </div>

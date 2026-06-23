@@ -80,7 +80,7 @@ export const GamingNavRail: React.FC<GamingNavRailProps> = React.memo(({
             title={item.label}
           >
             <Icon size={20} />
-            <span className="text-[10px] font-medium leading-tight">{item.label}</span>
+            <span className="text-[12px] font-medium leading-tight">{item.label}</span>
           </motion.button>
         );
       })}

@@ -46,7 +46,7 @@ export const FavoriteGamesWidget: React.FC<{ title?: string; maxItems?: number }
   return (
     <div className="flex flex-col h-full min-h-0 gap-1.5 overflow-hidden">
       {title && (
-        <div className="flex items-center gap-1 text-[10px] font-medium opacity-50 uppercase tracking-wider">
+        <div className="flex items-center gap-1 text-[12px] font-medium opacity-50 uppercase tracking-wider">
           <Star size={10} />
           {title}
         </div>
@@ -90,13 +90,13 @@ export const FavoriteGamesWidget: React.FC<{ title?: string; maxItems?: number }
             <div className="flex-1 min-w-0 flex flex-col gap-0">
               <div className="truncate font-medium text-xs">{g.title}</div>
               <div className="flex items-center gap-1">
-                <span className="text-[8px] px-1 py-0.5 rounded font-medium uppercase" style={{ background: PLATFORM_COLORS[g.platform] ?? "#7f8c8d", color: "#fff" }}>
+                <span className="text-[12px] px-1 py-0.5 rounded font-medium uppercase" style={{ background: PLATFORM_COLORS[g.platform] ?? "#7f8c8d", color: "#fff" }}>
                   {g.platform}
                 </span>
                 <Star size={8} style={{ color: "var(--accent)" }} className="opacity-60" />
               </div>
               {g.playTime && g.playTime > 0 && (
-                <span className="text-[9px] opacity-30">{formatPlayTime(g.playTime)} played</span>
+                <span className="text-[12px] opacity-30">{formatPlayTime(g.playTime)} played</span>
               )}
             </div>
           </button>

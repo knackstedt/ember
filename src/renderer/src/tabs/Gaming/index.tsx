@@ -846,11 +846,11 @@ export const GamingTab: React.FC = () => {
               {game.title}
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-[9px]" style={{ color: "var(--accent)" }}>
+              <span className="text-[12px]" style={{ color: "var(--accent)" }}>
                 {game.platform}
               </span>
                             {b && (
-                <span className="text-[8px] px-1 rounded" style={{ background: b.color, color: "#fff" }}>
+                <span className="text-[12px] px-1 rounded" style={{ background: b.color, color: "#fff" }}>
                   {b.label}
                 </span>
               )}
@@ -1524,7 +1524,7 @@ export const GamingTab: React.FC = () => {
                           outline: "none",
                         }}
                       />
-                      <p className="text-[10px] mt-1" style={{ color: "var(--text-secondary)" }}>
+                      <p className="text-[12px] mt-1" style={{ color: "var(--text-secondary)" }}>
                         Use {"{exe}"} as placeholder for the executable path. Leave empty for default.
                       </p>
                     </div>
@@ -1548,7 +1548,7 @@ export const GamingTab: React.FC = () => {
                           outline: "none",
                         }}
                       />
-                      <p className="text-[10px] mt-1" style={{ color: "var(--text-secondary)" }}>
+                      <p className="text-[12px] mt-1" style={{ color: "var(--text-secondary)" }}>
                         Use {"{exe}"} as placeholder for the executable path. Leave empty for default.
                       </p>
                     </div>
@@ -1731,7 +1731,7 @@ function GameSessionSettings({ game }: { game: Game }) {
                 outline: "none",
               }}
             />
-            <p className="text-[10px] mt-1" style={{ color: "var(--text-secondary)" }}>
+            <p className="text-[12px] mt-1" style={{ color: "var(--text-secondary)" }}>
               Overrides the default launch command for this game.
             </p>
           </div>
@@ -1842,7 +1842,7 @@ function GameSessionSettings({ game }: { game: Game }) {
                   }}
                 >
                   <span
-                    className="px-1.5 py-0.5 rounded text-[10px] font-medium uppercase"
+                    className="px-1.5 py-0.5 rounded text-[12px] font-medium uppercase"
                     style={{
                       background: "color-mix(in srgb, var(--accent) 15%, transparent)",
                       color: "var(--accent)",

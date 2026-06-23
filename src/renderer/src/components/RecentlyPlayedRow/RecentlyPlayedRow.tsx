@@ -74,7 +74,7 @@ const RecentCard: React.FC<{
         )}
         <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-black/70 to-transparent" />
         <div className="absolute bottom-1 left-1.5 right-1.5">
-          <span className="text-[10px] font-semibold leading-tight text-white line-clamp-2 block">
+          <span className="text-[12px] font-semibold leading-tight text-white line-clamp-2 block">
             {item.title}
           </span>
         </div>

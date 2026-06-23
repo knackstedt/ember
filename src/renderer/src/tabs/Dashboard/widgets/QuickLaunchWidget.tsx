@@ -42,7 +42,7 @@ export const QuickLaunchWidget: React.FC<{ title?: string; maxItems?: number }> 
   return (
     <div className="flex flex-col h-full min-h-0 gap-1.5 overflow-hidden">
       {title && (
-        <div className="flex items-center gap-1 text-[10px] font-medium opacity-50 uppercase tracking-wider">
+        <div className="flex items-center gap-1 text-[12px] font-medium opacity-50 uppercase tracking-wider">
           <Play size={10} />
           {title}
         </div>
@@ -72,8 +72,8 @@ export const QuickLaunchWidget: React.FC<{ title?: string; maxItems?: number }> 
                 <Play size={14} style={{ color: "#fff" }} />
               </div>
             </div>
-            <span className="text-[8px] truncate w-full text-center opacity-80">{g.title}</span>
-            <span className="text-[7px] px-1 py-0.5 rounded font-medium uppercase" style={{ background: PLATFORM_COLORS[g.platform] ?? "#7f8c8d", color: "#fff" }}>
+            <span className="text-[12px] truncate w-full text-center opacity-80">{g.title}</span>
+            <span className="text-[12px] px-1 py-0.5 rounded font-medium uppercase" style={{ background: PLATFORM_COLORS[g.platform] ?? "#7f8c8d", color: "#fff" }}>
               {g.platform}
             </span>
           </button>

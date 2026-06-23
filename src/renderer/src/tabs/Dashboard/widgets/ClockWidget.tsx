@@ -44,7 +44,7 @@ export const ClockWidget: React.FC<ClockWidgetProps> = ({
       />
 
       {title && (
-        <div className="flex items-center gap-1 text-[10px] font-medium opacity-50 uppercase tracking-wider z-10">
+        <div className="flex items-center gap-1 text-[12px] font-medium opacity-50 uppercase tracking-wider z-10">
           <Clock size={10} />
           {title}
         </div>
@@ -65,13 +65,13 @@ export const ClockWidget: React.FC<ClockWidgetProps> = ({
             {pad(seconds)}
           </span>
           {ampm && (
-            <span className="text-[10px] opacity-50 uppercase leading-none">{ampm}</span>
+            <span className="text-[12px] opacity-50 uppercase leading-none">{ampm}</span>
           )}
         </span>
       </div>
 
       {showDate && (
-        <div className="flex items-center gap-1 text-[10px] opacity-60 z-10">
+        <div className="flex items-center gap-1 text-[12px] opacity-60 z-10">
           <Calendar size={10} />
           <span>{dayName}, {dateStr} {yearStr}</span>
         </div>

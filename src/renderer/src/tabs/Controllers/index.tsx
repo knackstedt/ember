@@ -113,7 +113,7 @@ function SignalStrengthBar({ pct }: { pct?: number }) {
           style={{ width: `${pct}%`, background: color }}
         />
       </div>
-      <span className="text-[10px] font-mono" style={{ color: "var(--text-secondary)" }}>
+      <span className="text-[12px] font-mono" style={{ color: "var(--text-secondary)" }}>
         {pct}%
       </span>
     </div>
@@ -1016,7 +1016,7 @@ export const ControllersTab: React.FC = () => {
                       {aliases[aliasId] ?? dev.name}
                     </span>
                     <span
-                      className="text-[10px] capitalize"
+                      className="text-[12px] capitalize"
                       style={{ color: "var(--text-secondary)" }}
                     >
                       {dev.type}
@@ -1058,7 +1058,7 @@ export const ControllersTab: React.FC = () => {
               )}
               <div className="flex gap-2 mt-1">
                 <span
-                  className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono"
+                  className="inline-flex items-center px-1.5 py-0.5 rounded text-[12px] font-mono"
                   style={{
                     background:
                       eventRates.inputHz > 30
@@ -1073,7 +1073,7 @@ export const ControllersTab: React.FC = () => {
                   {eventRates.inputHz} Hz
                 </span>
                 <span
-                  className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono"
+                  className="inline-flex items-center px-1.5 py-0.5 rounded text-[12px] font-mono"
                   style={{
                     background: "var(--surface-0)",
                     color: "var(--text-secondary)",
@@ -1348,7 +1348,7 @@ export const ControllersTab: React.FC = () => {
                         }}
                       >
                         <span
-                          className="text-[10px] font-medium uppercase"
+                          className="text-[12px] font-medium uppercase"
                           style={{ color: "var(--text-secondary)" }}
                         >
                           {selectedDevice && getButtonLabel(selectedDevice.type, code)}
@@ -1378,7 +1378,7 @@ export const ControllersTab: React.FC = () => {
                         return (
                           <div key={axis} className="flex items-center gap-3">
                             <span
-                              className="text-[10px] font-mono uppercase w-20 shrink-0"
+                              className="text-[12px] font-mono uppercase w-20 shrink-0"
                               style={{ color: "var(--text-secondary)" }}
                             >
                               {axis}
@@ -1393,7 +1393,7 @@ export const ControllersTab: React.FC = () => {
                               />
                             </div>
                             <span
-                              className="text-[10px] font-mono w-10 text-right shrink-0"
+                              className="text-[12px] font-mono w-10 text-right shrink-0"
                               style={{ color: "var(--text-secondary)" }}
                             >
                               {typeof value === "number" ? value.toFixed(2) : value}
@@ -1406,7 +1406,7 @@ export const ControllersTab: React.FC = () => {
                       return (
                         <div key={axis} className="flex items-center gap-3">
                           <span
-                            className="text-[10px] font-mono uppercase w-20 shrink-0"
+                            className="text-[12px] font-mono uppercase w-20 shrink-0"
                             style={{ color: "var(--text-secondary)" }}
                           >
                             {axis}
@@ -1437,7 +1437,7 @@ export const ControllersTab: React.FC = () => {
                             />
                           </div>
                           <span
-                            className="text-[10px] font-mono w-10 text-right shrink-0"
+                            className="text-[12px] font-mono w-10 text-right shrink-0"
                             style={{ color: "var(--text-secondary)" }}
                           >
                             {typeof value === "number" ? value.toFixed(2) : value}
@@ -1642,7 +1642,7 @@ export const ControllersTab: React.FC = () => {
                             {name}
                           </span>
                           <span
-                            className="text-[10px]"
+                            className="text-[12px]"
                             style={{ color: "var(--text-secondary)" }}
                           >
                             button &middot; raw {rawCode}
@@ -1667,7 +1667,7 @@ export const ControllersTab: React.FC = () => {
                             {info.name}
                           </span>
                           <span
-                            className="text-[10px]"
+                            className="text-[12px]"
                             style={{ color: "var(--text-secondary)" }}
                           >
                             axis &middot; raw {rawCode} &middot; range{" "}

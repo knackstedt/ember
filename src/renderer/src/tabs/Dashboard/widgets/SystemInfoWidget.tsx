@@ -51,7 +51,7 @@ export const SystemInfoWidget: React.FC<{ title?: string }> = ({ title }) => {
   return (
     <div className="flex flex-col h-full min-h-0 gap-1.5 overflow-hidden">
       {title && (
-        <div className="flex items-center gap-1 text-[10px] font-medium opacity-50 uppercase tracking-wider">
+        <div className="flex items-center gap-1 text-[12px] font-medium opacity-50 uppercase tracking-wider">
           <Monitor size={10} />
           {title}
         </div>
@@ -64,7 +64,7 @@ export const SystemInfoWidget: React.FC<{ title?: string }> = ({ title }) => {
           </div>
           <div className="flex-1 min-w-0 flex flex-col gap-0">
             <span className="truncate font-medium opacity-90 text-[11px]">{info?.cpu?.model ?? "Loading…"}</span>
-            <span className="opacity-40 text-[10px]">{info?.cpu?.cores ?? "--"} cores</span>
+            <span className="opacity-40 text-[12px]">{info?.cpu?.cores ?? "--"} cores</span>
           </div>
         </div>
 
@@ -83,7 +83,7 @@ export const SystemInfoWidget: React.FC<{ title?: string }> = ({ title }) => {
           </div>
           <div className="flex-1 min-w-0 flex flex-col gap-0">
             <span className="truncate opacity-90 text-[11px] capitalize">{info?.os?.platform} {info?.os?.release}</span>
-            <span className="opacity-40 text-[10px]">{info?.os?.arch ?? "--"}</span>
+            <span className="opacity-40 text-[12px]">{info?.os?.arch ?? "--"}</span>
           </div>
         </div>
 
@@ -94,7 +94,7 @@ export const SystemInfoWidget: React.FC<{ title?: string }> = ({ title }) => {
           <div className="flex-1 min-w-0 flex flex-col gap-0">
             <span className="opacity-90 text-[11px]">Uptime: {fmtUptime()}</span>
             {info?.app?.version && (
-              <span className="opacity-40 text-[10px]">Ember v{info.app.version}</span>
+              <span className="opacity-40 text-[12px]">Ember v{info.app.version}</span>
             )}
           </div>
         </div>

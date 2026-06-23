@@ -61,7 +61,7 @@ export const WebviewWidget: React.FC<{
       <div className="flex flex-col items-center justify-center h-full min-h-0 gap-1.5 text-sm opacity-40">
         <Settings size={20} />
         <span className="text-xs">No URL configured</span>
-        <span className="text-[9px] opacity-50">Open Edit Layout and click the settings icon</span>
+        <span className="text-[12px] opacity-50">Open Edit Layout and click the settings icon</span>
       </div>
     );
   }

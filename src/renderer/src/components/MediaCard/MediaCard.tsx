@@ -179,7 +179,7 @@ export const MediaCard: React.FC<MediaCardProps> = React.memo(({
             </div>
             {progress < 0.95 && (
               <span
-                className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide"
+                className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded text-[12px] font-semibold uppercase tracking-wide"
                 style={{
                   backgroundColor: "var(--accent)",
                   color: "var(--surface-base)",
@@ -215,7 +215,7 @@ export const MediaCard: React.FC<MediaCardProps> = React.memo(({
         )}
         {resolution && (
           <span
-            className="absolute bottom-2 left-2 px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide"
+            className="absolute bottom-2 left-2 px-1.5 py-0.5 rounded text-[12px] font-semibold uppercase tracking-wide"
             style={{
               backgroundColor: "rgba(0,0,0,0.6)",
               color: "#fff",

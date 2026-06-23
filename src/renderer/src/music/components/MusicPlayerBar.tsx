@@ -174,7 +174,7 @@ export const MusicPlayerBar: React.FC<MusicPlayerBarProps> = React.memo(({ onExp
 
       {/* Mini progress */}
       <div className="flex-1 min-w-0 flex items-center gap-2">
-        <span className="text-[10px] tabular-nums flex-shrink-0" style={{ color: "var(--text-secondary)" }}>
+        <span className="text-[12px] tabular-nums flex-shrink-0" style={{ color: "var(--text-secondary)" }}>
           {fmt(position)}
         </span>
         <div
@@ -192,7 +192,7 @@ export const MusicPlayerBar: React.FC<MusicPlayerBarProps> = React.memo(({ onExp
             style={{ background: "var(--accent)", width: `${duration ? (position / duration) * 100 : 0}%` }}
           />
         </div>
-        <span className="text-[10px] tabular-nums flex-shrink-0" style={{ color: "var(--text-secondary)" }}>
+        <span className="text-[12px] tabular-nums flex-shrink-0" style={{ color: "var(--text-secondary)" }}>
           {fmt(duration)}
         </span>
       </div>

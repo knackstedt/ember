@@ -43,7 +43,7 @@ export const NewsWidget: React.FC<{ title?: string }> = ({ title }) => {
   return (
     <div className="flex flex-col h-full min-h-0 gap-1.5 overflow-hidden">
       {title && (
-        <div className="flex items-center gap-1 text-[10px] font-medium opacity-50 uppercase tracking-wider">
+        <div className="flex items-center gap-1 text-[12px] font-medium opacity-50 uppercase tracking-wider">
           <Newspaper size={10} />
           {title}
         </div>
@@ -57,13 +57,13 @@ export const NewsWidget: React.FC<{ title?: string }> = ({ title }) => {
           >
             <div className="flex flex-col gap-0 flex-1 min-w-0">
               <div className="flex items-center gap-1">
-                <span className="text-[7px] px-1 py-0.5 rounded font-medium uppercase flex-shrink-0" style={{ background: TAG_COLORS[item.tag] ?? "var(--surface-0)", color: "#000", opacity: 0.8 }}>
+                <span className="text-[12px] px-1 py-0.5 rounded font-medium uppercase flex-shrink-0" style={{ background: TAG_COLORS[item.tag] ?? "var(--surface-0)", color: "#000", opacity: 0.8 }}>
                   {item.tag}
                 </span>
-                <span className="text-[8px] opacity-30 flex-shrink-0">{item.source}</span>
+                <span className="text-[12px] opacity-30 flex-shrink-0">{item.source}</span>
               </div>
               <span className="text-[11px] font-medium truncate leading-snug">{item.headline}</span>
-              <span className="text-[8px] opacity-30">{item.time}</span>
+              <span className="text-[12px] opacity-30">{item.time}</span>
             </div>
             <ExternalLink size={9} className="opacity-0 group-hover:opacity-30 transition-opacity flex-shrink-0 mt-0.5" />
           </button>

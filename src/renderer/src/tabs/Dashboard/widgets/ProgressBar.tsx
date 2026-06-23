@@ -21,7 +21,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
   return (
     <div className="flex flex-col gap-0.5 w-full min-h-0">
       {(label || valueLabel) && (
-        <div className="flex items-center justify-between text-[9px] opacity-60">
+        <div className="flex items-center justify-between text-[12px] opacity-60">
           <span className="truncate">{label}</span>
           <span className="truncate">{valueLabel}</span>
         </div>

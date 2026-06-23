@@ -37,7 +37,7 @@ export const RecentMusicWidget: React.FC<{ title?: string; maxItems?: number }> 
   return (
     <div className="flex flex-col h-full min-h-0 gap-1.5 overflow-hidden">
       {title && (
-        <div className="flex items-center gap-1 text-[10px] font-medium opacity-50 uppercase tracking-wider">
+        <div className="flex items-center gap-1 text-[12px] font-medium opacity-50 uppercase tracking-wider">
           <Disc size={10} />
           {title}
         </div>
@@ -81,8 +81,8 @@ export const RecentMusicWidget: React.FC<{ title?: string; maxItems?: number }> 
             <div className="flex-1 min-w-0 flex flex-col gap-0">
               <div className="truncate font-medium text-xs">{getTrackDisplayName(t)}</div>
               <div className="flex items-center gap-1">
-                <span className="text-[9px] opacity-40 truncate">{t.artist ?? "Unknown"}</span>
-                <span className="text-[9px] opacity-30">{timeAgo(t.lastPlayed!)}</span>
+                <span className="text-[12px] opacity-40 truncate">{t.artist ?? "Unknown"}</span>
+                <span className="text-[12px] opacity-30">{timeAgo(t.lastPlayed!)}</span>
               </div>
             </div>
           </button>

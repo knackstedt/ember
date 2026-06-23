@@ -49,7 +49,7 @@ function RingStat({
         </div>
       </div>
       <span className="text-lg font-bold tabular-nums leading-none">{value}</span>
-      <span className="text-[9px] opacity-50 uppercase tracking-wider">{label}</span>
+      <span className="text-[12px] opacity-50 uppercase tracking-wider">{label}</span>
     </div>
   );
 }
@@ -93,7 +93,7 @@ export const StatsWidget: React.FC<{ title?: string }> = ({ title }) => {
   return (
     <div className="flex flex-col h-full min-h-0 gap-2 overflow-hidden">
       {title && (
-        <div className="text-[10px] font-medium opacity-50 uppercase tracking-wider">
+        <div className="text-[12px] font-medium opacity-50 uppercase tracking-wider">
           {title}
         </div>
       )}
@@ -103,7 +103,7 @@ export const StatsWidget: React.FC<{ title?: string }> = ({ title }) => {
         <RingStat value={music.length} pct={total > 0 ? (music.length / total) * 100 : 0} label="Tracks" icon={Music} color="#86efac" />
         <RingStat value={tv.length} pct={total > 0 ? (tv.length / total) * 100 : 0} label="Shows" icon={Tv} color="#c4b5fd" />
       </div>
-      <div className="flex items-center justify-between gap-2 pt-1 border-t text-[10px] opacity-50" style={{ borderColor: "var(--border-default)" }}>
+      <div className="flex items-center justify-between gap-2 pt-1 border-t text-[12px] opacity-50" style={{ borderColor: "var(--border-default)" }}>
         <span className="truncate">{gamesPlayed} played</span>
         <span className="truncate">{totalPlaytime}h gaming</span>
         <span className="truncate">{mediaHours}h music/video</span>

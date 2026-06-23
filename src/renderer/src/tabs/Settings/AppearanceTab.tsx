@@ -402,7 +402,7 @@ export const AppearanceTab: React.FC = () => {
                 {GALLERY_VIEW_LABELS[v]}
               </span>
               {v === "theme-default" && (
-                <span className="text-[10px] text-center" style={{ color: "var(--text-secondary)" }}>
+                <span className="text-[12px] text-center" style={{ color: "var(--text-secondary)" }}>
                   Follows theme
                 </span>
               )}

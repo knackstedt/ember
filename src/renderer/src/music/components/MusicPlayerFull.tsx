@@ -494,7 +494,7 @@ export const MusicPlayerFull: React.FC<MusicPlayerFullProps> = React.memo(({
               >
                 <Repeat size={18} />
                 {repeat === "one" && (
-                  <span className="absolute bottom-0.5 right-0.5 text-[9px] font-bold" style={{ color: "var(--accent)" }}>
+                  <span className="absolute bottom-0.5 right-0.5 text-[12px] font-bold" style={{ color: "var(--accent)" }}>
                     1
                   </span>
                 )}

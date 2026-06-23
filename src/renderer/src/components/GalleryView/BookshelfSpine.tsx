@@ -66,7 +66,7 @@ export const BookshelfSpine: React.FC<BookshelfSpineProps> = React.memo(({
           }}
         >
           <span
-            className="text-[10px] font-bold text-white/80 tracking-wide"
+            className="text-[12px] font-bold text-white/80 tracking-wide"
             style={{
               writingMode: "vertical-rl",
               textOrientation: "mixed",
@@ -90,9 +90,9 @@ export const BookshelfSpine: React.FC<BookshelfSpineProps> = React.memo(({
             background: "linear-gradient(to top, rgba(0,0,0,0.92), transparent)",
           }}
         >
-          <div className="text-[10px] font-bold text-white truncate">{title}</div>
+          <div className="text-[12px] font-bold text-white truncate">{title}</div>
           {subtitle && (
-            <div className="text-[9px] text-white/50 truncate">{subtitle}</div>
+            <div className="text-[12px] text-white/50 truncate">{subtitle}</div>
           )}
         </div>
       )}

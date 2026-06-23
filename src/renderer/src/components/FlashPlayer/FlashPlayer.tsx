@@ -952,7 +952,7 @@ export const FlashPlayer: React.FC = () => {
                   AI Upscaling (Experimental)
                 </span>
                 <span
-                  className="text-[10px] px-1.5 py-0.5 rounded font-medium"
+                  className="text-[12px] px-1.5 py-0.5 rounded font-medium"
                   style={{
                     background: "#ffaa0020",
                     color: "#ffaa00",
@@ -962,7 +962,7 @@ export const FlashPlayer: React.FC = () => {
                   Coming Soon
                 </span>
               </div>
-              <p className="text-[10px] mt-1" style={{ color: "var(--text-secondary)" }}>
+              <p className="text-[12px] mt-1" style={{ color: "var(--text-secondary)" }}>
                 AI-powered upscaling will be available in a future update.
               </p>
             </div>
