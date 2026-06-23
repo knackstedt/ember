@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Download, Trash2, RefreshCw, Power, Globe, Package, CheckCircle, AlertCircle } from "lucide-react";
 import { DiscoveredPlugin } from "../../../shared/types";
+import { FlameLoader } from "../../components/FlameLoader";
 
 export const PluginsTab: React.FC = () => {
   const [installed, setInstalled] = useState<DiscoveredPlugin[]>([]);
@@ -12,11 +13,14 @@ export const PluginsTab: React.FC = () => {
   const [actionId, setActionId] = useState<string | null>(null);
 
   const loadInstalled = useCallback(async () => {
+    setLoading(true);
     try {
       const list = await window.htpc.plugins.managedList();
       setInstalled(list as DiscoveredPlugin[]);
     } catch (err) {
       setError(`Failed to list plugins: ${err}`);
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -35,7 +39,8 @@ export const PluginsTab: React.FC = () => {
 
   useEffect(() => {
     loadInstalled();
-  }, [loadInstalled]);
+    discover();
+  }, [loadInstalled, discover]);
 
   const handleInstall = async (plugin: DiscoveredPlugin) => {
     setActionId(plugin.id);
@@ -138,59 +143,83 @@ export const PluginsTab: React.FC = () => {
         </div>
       </section>
 
-      {/* Installed plugins */}
-      {installed.length > 0 && (
-        <section className="flex flex-col gap-3">
-          <h3 className="text-sm font-semibold uppercase tracking-wide" style={{ color: "var(--text-secondary)" }}>
-            Installed
-          </h3>
-          <div className="flex flex-col gap-2">
-            {installed.map((plugin) => (
-              <PluginCard
-                key={plugin.id}
-                plugin={plugin}
-                isUpdateAvailable={isUpdateAvailable(
-                  discovered.find((d) => d.id === plugin.id) ?? plugin,
-                )}
-                actionId={actionId}
-                onInstall={() =>
-                  handleUpdate(discovered.find((d) => d.id === plugin.id) ?? plugin)
-                }
-                onUninstall={() => handleUninstall(plugin.id)}
-                onToggleEnabled={(enabled) => handleToggleEnabled(plugin.id, enabled)}
-              />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Discovered plugins */}
-      <AnimatePresence>
-        {discovered.length > 0 && (
-          <motion.section
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            className="flex flex-col gap-3"
+      <AnimatePresence mode="wait">
+        {(loading || discovering) && installed.length === 0 && discovered.length === 0 ? (
+          <motion.div
+            key="loader"
+            className="flex items-center justify-center py-8"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.25 }}
           >
-            <h3 className="text-sm font-semibold uppercase tracking-wide" style={{ color: "var(--text-secondary)" }}>
-              Available
-            </h3>
-            <div className="flex flex-col gap-2">
-              {discovered
-                .filter((d) => !d.installed)
-                .map((plugin) => (
-                  <PluginCard
-                    key={plugin.id}
-                    plugin={plugin}
-                    actionId={actionId}
-                    onInstall={() => handleInstall(plugin)}
-                    onUninstall={() => handleUninstall(plugin.id)}
-                    onToggleEnabled={(enabled) => handleToggleEnabled(plugin.id, enabled)}
-                  />
-                ))}
-            </div>
-          </motion.section>
+            <FlameLoader width={120} height={200} />
+          </motion.div>
+        ) : (
+          <motion.div
+            key="list"
+            className="flex flex-col gap-8"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.25 }}
+          >
+            {/* Installed plugins */}
+            {installed.length > 0 && (
+              <section className="flex flex-col gap-3">
+                <h3 className="text-sm font-semibold uppercase tracking-wide" style={{ color: "var(--text-secondary)" }}>
+                  Installed
+                </h3>
+                <div className="flex flex-col gap-2">
+                  {installed.map((plugin) => (
+                    <PluginCard
+                      key={plugin.id}
+                      plugin={plugin}
+                      isUpdateAvailable={isUpdateAvailable(
+                        discovered.find((d) => d.id === plugin.id) ?? plugin,
+                      )}
+                      actionId={actionId}
+                      onInstall={() =>
+                        handleUpdate(discovered.find((d) => d.id === plugin.id) ?? plugin)
+                      }
+                      onUninstall={() => handleUninstall(plugin.id)}
+                      onToggleEnabled={(enabled) => handleToggleEnabled(plugin.id, enabled)}
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* Discovered plugins */}
+            <AnimatePresence>
+              {discovered.length > 0 && (
+                <motion.section
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  className="flex flex-col gap-3"
+                >
+                  <h3 className="text-sm font-semibold uppercase tracking-wide" style={{ color: "var(--text-secondary)" }}>
+                    Available
+                  </h3>
+                  <div className="flex flex-col gap-2">
+                    {discovered
+                      .filter((d) => !d.installed)
+                      .map((plugin) => (
+                        <PluginCard
+                          key={plugin.id}
+                          plugin={plugin}
+                          actionId={actionId}
+                          onInstall={() => handleInstall(plugin)}
+                          onUninstall={() => handleUninstall(plugin.id)}
+                          onToggleEnabled={(enabled) => handleToggleEnabled(plugin.id, enabled)}
+                        />
+                      ))}
+                  </div>
+                </motion.section>
+              )}
+            </AnimatePresence>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>

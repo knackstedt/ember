@@ -4,9 +4,11 @@ import {
   ManagedPackage,
   PackageOperationProgress,
 } from "../../../../shared/types";
+import { FlameLoader } from "../../components/FlameLoader";
 
 export const DependenciesTab: React.FC = () => {
   const [packages, setPackages] = useState<ManagedPackage[]>([]);
+  const [loading, setLoading] = useState(true);
   const [packageSearch, setPackageSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<
     "all" | "core" | "emulator" | "dependency" | "media-codec" | "other"
@@ -53,11 +55,14 @@ export const DependenciesTab: React.FC = () => {
   }, []);
 
   const loadPackages = async () => {
+    setLoading(true);
     try {
       const pkgs = await window.htpc.packages.list();
       setPackages(pkgs);
     } catch (err) {
       console.error("Failed to load packages:", err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -237,202 +242,229 @@ export const DependenciesTab: React.FC = () => {
               border: "1px solid var(--border-default)",
             }}
           >
-            {filteredPackages.length === 0 ? (
-              <p
-                className="text-sm text-center py-4"
-                style={{ color: "var(--text-secondary)" }}
-              >
-                No packages found matching your search.
-              </p>
-            ) : (
-              filteredPackages.map((pkg) => {
-                const progress = operationProgress.get(pkg.id);
-                const isOp =
-                  progress &&
-                  progress.status !== "success" &&
-                  progress.status !== "error";
+            <AnimatePresence mode="wait">
+              {loading && packages.length === 0 ? (
+                <motion.div
+                  key="loader"
+                  className="flex items-center justify-center py-8"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.25 }}
+                >
+                  <FlameLoader width={120} height={200} />
+                </motion.div>
+              ) : filteredPackages.length === 0 ? (
+                <motion.p
+                  key="empty"
+                  className="text-sm text-center py-4"
+                  style={{ color: "var(--text-secondary)" }}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  No packages found matching your search.
+                </motion.p>
+              ) : (
+                <motion.div
+                  key="list"
+                  className="flex flex-col gap-2"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.25 }}
+                >
+                  {filteredPackages.map((pkg) => {
+                    const progress = operationProgress.get(pkg.id);
+                    const isOp =
+                      progress &&
+                      progress.status !== "success" &&
+                      progress.status !== "error";
 
-                return (
-                  <div
-                    key={pkg.id}
-                    className="flex flex-col gap-2 p-3 rounded"
-                    style={{
-                      background: "var(--surface-1)",
-                      border: "1px solid var(--border-default)",
-                    }}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div
-                          className="text-sm font-medium"
-                          style={{ color: "var(--text-primary)" }}
-                        >
-                          {pkg.displayName}
-                        </div>
-                        <div
-                          className="text-xs"
-                          style={{ color: "var(--text-secondary)" }}
-                        >
-                          {pkg.name} · {pkg.category} · {pkg.manager}
-                          {pkg.version && ` · v${pkg.version}`}
-                        </div>
-                        {pkg.description && (
+                    return (
+                      <div
+                        key={pkg.id}
+                        className="flex flex-col gap-2 p-3 rounded"
+                        style={{
+                          background: "var(--surface-1)",
+                          border: "1px solid var(--border-default)",
+                        }}
+                      >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
                           <div
-                            className="text-xs mt-1"
-                            style={{ color: "var(--text-secondary)" }}
+                            className="text-sm font-medium"
+                            style={{ color: "var(--text-primary)" }}
                           >
-                            {pkg.description}
+                            {pkg.displayName}
                           </div>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          className="p-1.5 rounded"
-                          disabled={isOp}
-                          style={{
-                            background: pkg.isPinned
-                              ? "var(--accent)20"
-                              : "var(--surface-0)",
-                            color: pkg.isPinned
-                              ? "var(--accent)"
-                              : "var(--text-secondary)",
-                            border: "1px solid var(--border-default)",
-                            opacity: isOp ? 0.5 : 1,
-                            cursor: isOp ? "not-allowed" : "pointer",
-                          }}
-                          onClick={() => !isOp && handleTogglePin(pkg)}
-                          title={pkg.isPinned ? "Unpin" : "Pin"}
-                        >
-                          <svg
-                            width="16"
-                            height="16"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          >
-                            <line x1="12" y1="17" x2="12" y2="22" />
-                            <path d="M5 17h14v-5a3 3 0 0 0-3-3h-4a3 3 0 0 0-3 3v5z" />
-                            <path d="M12 9V2l-2 2" />
-                          </svg>
-                        </button>
-                        <button
-                          className="p-1.5 rounded"
-                          disabled={isOp}
-                          style={{
-                            background: pkg.autoUpdate
-                              ? "var(--accent)20"
-                              : "var(--surface-0)",
-                            color: pkg.autoUpdate
-                              ? "var(--accent)"
-                              : "var(--text-secondary)",
-                            border: "1px solid var(--border-default)",
-                            opacity: isOp ? 0.5 : 1,
-                            cursor: isOp ? "not-allowed" : "pointer",
-                          }}
-                          onClick={() => !isOp && handleToggleAutoUpdate(pkg)}
-                          title={
-                            pkg.autoUpdate
-                              ? "Disable auto-update"
-                              : "Enable auto-update"
-                          }
-                        >
-                          <svg
-                            width="16"
-                            height="16"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          >
-                            <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3" />
-                          </svg>
-                        </button>
-                        {pkg.isInstalled ? (
-                          <motion.button
-                            className="px-3 py-1.5 rounded text-xs font-medium"
-                            style={{
-                              background: "#ff444415",
-                              color: "#ff4444",
-                              border: "1px solid #ff444430",
-                              opacity: isOp ? 0.5 : 1,
-                              cursor: isOp ? "not-allowed" : "pointer",
-                            }}
-                            onClick={() =>
-                              !isOp && handleUninstallPackage(pkg)
-                            }
-                            whileTap={{ scale: isOp ? 1 : 0.96 }}
-                          >
-                            {isOp ? "Removing..." : "Uninstall"}
-                          </motion.button>
-                        ) : (
-                          <motion.button
-                            className="px-3 py-1.5 rounded text-xs font-medium"
-                            style={{
-                              background: "var(--accent)15",
-                              color: "var(--accent)",
-                              border: "1px solid var(--accent)40",
-                              opacity: isOp ? 0.5 : 1,
-                              cursor: isOp ? "not-allowed" : "pointer",
-                            }}
-                            onClick={() =>
-                              !isOp && handleInstallPackage(pkg)
-                            }
-                            whileTap={{ scale: isOp ? 1 : 0.96 }}
-                          >
-                            {isOp ? "Installing..." : "Install"}
-                          </motion.button>
-                        )}
-                      </div>
-                    </div>
-                    {progress && progress.status !== "success" && (
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center justify-between">
-                          <span
+                          <div
                             className="text-xs"
                             style={{ color: "var(--text-secondary)" }}
                           >
-                            {progress.message}
-                          </span>
-                          {progress.percent !== undefined && (
+                            {pkg.name} · {pkg.category} · {pkg.manager}
+                            {pkg.version && ` · v${pkg.version}`}
+                          </div>
+                          {pkg.description && (
+                            <div
+                              className="text-xs mt-1"
+                              style={{ color: "var(--text-secondary)" }}
+                            >
+                              {pkg.description}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            className="p-1.5 rounded"
+                            disabled={isOp}
+                            style={{
+                              background: pkg.isPinned
+                                ? "var(--accent)20"
+                                : "var(--surface-0)",
+                              color: pkg.isPinned
+                                ? "var(--accent)"
+                                : "var(--text-secondary)",
+                              border: "1px solid var(--border-default)",
+                              opacity: isOp ? 0.5 : 1,
+                              cursor: isOp ? "not-allowed" : "pointer",
+                            }}
+                            onClick={() => !isOp && handleTogglePin(pkg)}
+                            title={pkg.isPinned ? "Unpin" : "Pin"}
+                          >
+                            <svg
+                              width="16"
+                              height="16"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <line x1="12" y1="17" x2="12" y2="22" />
+                              <path d="M5 17h14v-5a3 3 0 0 0-3-3h-4a3 3 0 0 0-3 3v5z" />
+                              <path d="M12 9V2l-2 2" />
+                            </svg>
+                          </button>
+                          <button
+                            className="p-1.5 rounded"
+                            disabled={isOp}
+                            style={{
+                              background: pkg.autoUpdate
+                                ? "var(--accent)20"
+                                : "var(--surface-0)",
+                              color: pkg.autoUpdate
+                                ? "var(--accent)"
+                                : "var(--text-secondary)",
+                              border: "1px solid var(--border-default)",
+                              opacity: isOp ? 0.5 : 1,
+                              cursor: isOp ? "not-allowed" : "pointer",
+                            }}
+                            onClick={() => !isOp && handleToggleAutoUpdate(pkg)}
+                            title={
+                              pkg.autoUpdate
+                                ? "Disable auto-update"
+                                : "Enable auto-update"
+                            }
+                          >
+                            <svg
+                              width="16"
+                              height="16"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3" />
+                            </svg>
+                          </button>
+                          {pkg.isInstalled ? (
+                            <motion.button
+                              className="px-3 py-1.5 rounded text-xs font-medium"
+                              style={{
+                                background: "#ff444415",
+                                color: "#ff4444",
+                                border: "1px solid #ff444430",
+                                opacity: isOp ? 0.5 : 1,
+                                cursor: isOp ? "not-allowed" : "pointer",
+                              }}
+                              onClick={() =>
+                                !isOp && handleUninstallPackage(pkg)
+                              }
+                              whileTap={{ scale: isOp ? 1 : 0.96 }}
+                            >
+                              {isOp ? "Removing..." : "Uninstall"}
+                            </motion.button>
+                          ) : (
+                            <motion.button
+                              className="px-3 py-1.5 rounded text-xs font-medium"
+                              style={{
+                                background: "var(--accent)15",
+                                color: "var(--accent)",
+                                border: "1px solid var(--accent)40",
+                                opacity: isOp ? 0.5 : 1,
+                                cursor: isOp ? "not-allowed" : "pointer",
+                              }}
+                              onClick={() =>
+                                !isOp && handleInstallPackage(pkg)
+                              }
+                              whileTap={{ scale: isOp ? 1 : 0.96 }}
+                            >
+                              {isOp ? "Installing..." : "Install"}
+                            </motion.button>
+                          )}
+                        </div>
+                      </div>
+                      {progress && progress.status !== "success" && (
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center justify-between">
                             <span
                               className="text-xs"
                               style={{ color: "var(--text-secondary)" }}
                             >
-                              {progress.percent}%
+                              {progress.message}
                             </span>
+                            {progress.percent !== undefined && (
+                              <span
+                                className="text-xs"
+                                style={{ color: "var(--text-secondary)" }}
+                              >
+                                {progress.percent}%
+                              </span>
+                            )}
+                          </div>
+                          {progress.percent !== undefined && (
+                            <div
+                              className="h-1 rounded"
+                              style={{
+                                background: "var(--surface-0)",
+                                border: "1px solid var(--border-default)",
+                              }}
+                            >
+                              <div
+                                className="h-full rounded transition-all"
+                                style={{
+                                  width: `${progress.percent}%`,
+                                  background:
+                                    progress.status === "error"
+                                      ? "#ff4444"
+                                      : "var(--accent)",
+                                }}
+                              />
+                            </div>
                           )}
                         </div>
-                        {progress.percent !== undefined && (
-                          <div
-                            className="h-1 rounded"
-                            style={{
-                              background: "var(--surface-0)",
-                              border: "1px solid var(--border-default)",
-                            }}
-                          >
-                            <div
-                              className="h-full rounded transition-all"
-                              style={{
-                                width: `${progress.percent}%`,
-                                background:
-                                  progress.status === "error"
-                                    ? "#ff4444"
-                                    : "var(--accent)",
-                              }}
-                            />
-                          </div>
-                        )}
+                      )}
                       </div>
-                    )}
-                  </div>
-                );
-              })
-            )}
+                    );
+                  })}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
       </section>

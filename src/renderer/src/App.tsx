@@ -273,12 +273,25 @@ export default function App(): React.ReactElement {
       const pct = p.total > 0 ? Math.round((p.current / p.total) * 100) : 0;
       const label = p.message ?? `${p.current} / ${p.total}`;
       if (!scanToastIds.has(p.scanner)) {
+        // Skip no-op start events and finished events that never had progress.
+        // This prevents sticky 0/0 toasts when the initial scanning event is
+        // lost before the listener is registered.
+        if (
+          (p.status === "scanning" && p.current === 0 && p.total === 0) ||
+          p.status === "done"
+        ) {
+          return;
+        }
         const id = push({
-          type: "progress",
+          type: p.status === "error" ? "error" : "progress",
           message: `${p.scanner}: ${label}`,
           progress: pct,
         });
         scanToastIds.set(p.scanner, id);
+        if (p.status === "error") {
+          setTimeout(() => dismiss(id), 8000);
+          scanToastIds.delete(p.scanner);
+        }
       } else {
         const id = scanToastIds.get(p.scanner)!;
         if (p.status === "done") {
