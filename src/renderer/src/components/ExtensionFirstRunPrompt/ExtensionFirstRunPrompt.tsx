@@ -17,6 +17,7 @@ const RECOMMENDED: Array<{
   description: string;
   sourceUrl: string;
   version: string;
+  serviceIds?: string[];
 }> = [
   {
     id: "youtube-auto-hd",
@@ -37,7 +38,8 @@ const RECOMMENDED: Array<{
 export const ExtensionFirstRunPrompt: React.FC<Props> = ({ service, partition, onClose }) => {
   const settings = useSettingsStore((s) => s.settings);
   const updateSettings = useSettingsStore((s) => s.update);
-  const toast = useToastStore((s) => s.show);
+  const push = useToastStore((s) => s.push);
+  const toast = (message: string, type: "info" | "success" | "error") => push({ message, type });
 
   const serviceRecommended = RECOMMENDED.filter(
     (r) => !r.serviceIds || r.serviceIds.includes(service.id),

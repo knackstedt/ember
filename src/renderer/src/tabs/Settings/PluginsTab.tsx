@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Download, Trash2, RefreshCw, Power, Globe, Package, CheckCircle, AlertCircle } from "lucide-react";
-import { DiscoveredPlugin } from "../../../shared/types";
+import { DiscoveredPlugin } from "@shared/types";
 import { FlameLoader } from "../../components/FlameLoader";
 
 export const PluginsTab: React.FC = () => {

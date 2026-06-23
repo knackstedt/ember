@@ -26,6 +26,18 @@ import {
   PackageOperationProgress,
   AudioTags,
   ReorganizeResult,
+  StreamingAdapterConfig,
+  StreamingSearchResult,
+  StreamingTrack,
+  StreamingAlbum,
+  StreamingPlaylist,
+  StreamingDevice,
+  CurrentlyPlaying,
+  RemoteTestResult,
+  DiscoveredDevice,
+  UpdaterState,
+  GitHubRelease,
+  OAuthResult,
 } from "../shared/types";
 import { GameMetadata } from "../shared/metadata";
 
@@ -703,6 +715,8 @@ const htpc = {
       ipcRenderer.invoke("db:list-corrupt"),
     deleteCorrupt: (): Promise<{ games: number; movies: number; music: number }> =>
       ipcRenderer.invoke("db:delete-corrupt"),
+    query: <T = any>(table: string, odataQuery: string): Promise<{ results: T[]; count?: number }> =>
+      ipcRenderer.invoke("db:query", table, odataQuery),
   },
 
   openDirectory: (): Promise<string | null> =>
@@ -856,11 +870,11 @@ const htpc = {
         ipcRenderer.invoke("streaming:extensions:apply", partition, extensions),
     },
     adapter: {
-      authenticate: (serviceId: string): Promise<import("../main/services/streaming/adapters/base.adapter").StreamingAdapterConfig> =>
+      authenticate: (serviceId: string): Promise<StreamingAdapterConfig> =>
         ipcRenderer.invoke("streaming:adapter:authenticate", serviceId),
       disconnect: (serviceId: string): Promise<{ success: boolean }> =>
         ipcRenderer.invoke("streaming:adapter:disconnect", serviceId),
-      search: (serviceId: string, query: string, types?: ("track" | "album" | "artist" | "playlist")[]): Promise<import("../main/services/streaming/adapters/base.adapter").StreamingSearchResult[]> =>
+      search: (serviceId: string, query: string, types?: ("track" | "album" | "artist" | "playlist")[]): Promise<StreamingSearchResult[]> =>
         ipcRenderer.invoke("streaming:adapter:search", serviceId, query, types),
       play: (serviceId: string, uri?: string): Promise<{ success: boolean }> =>
         ipcRenderer.invoke("streaming:adapter:play", serviceId, uri),
@@ -870,15 +884,15 @@ const htpc = {
         ipcRenderer.invoke("streaming:adapter:next", serviceId),
       previous: (serviceId: string): Promise<{ success: boolean }> =>
         ipcRenderer.invoke("streaming:adapter:previous", serviceId),
-      currentlyPlaying: (serviceId: string): Promise<import("../main/services/streaming/adapters/base.adapter").CurrentlyPlaying | null> =>
+      currentlyPlaying: (serviceId: string): Promise<CurrentlyPlaying | null> =>
         ipcRenderer.invoke("streaming:adapter:currentlyPlaying", serviceId),
-      getDevices: (serviceId: string): Promise<import("../main/services/streaming/adapters/base.adapter").StreamingDevice[]> =>
+      getDevices: (serviceId: string): Promise<StreamingDevice[]> =>
         ipcRenderer.invoke("streaming:adapter:getDevices", serviceId),
-      getTrack: (serviceId: string, id: string): Promise<import("../main/services/streaming/adapters/base.adapter").StreamingTrack | null> =>
+      getTrack: (serviceId: string, id: string): Promise<StreamingTrack | null> =>
         ipcRenderer.invoke("streaming:adapter:getTrack", serviceId, id),
-      getAlbum: (serviceId: string, id: string): Promise<import("../main/services/streaming/adapters/base.adapter").StreamingAlbum | null> =>
+      getAlbum: (serviceId: string, id: string): Promise<StreamingAlbum | null> =>
         ipcRenderer.invoke("streaming:adapter:getAlbum", serviceId, id),
-      getPlaylist: (serviceId: string, id: string): Promise<import("../main/services/streaming/adapters/base.adapter").StreamingPlaylist | null> =>
+      getPlaylist: (serviceId: string, id: string): Promise<StreamingPlaylist | null> =>
         ipcRenderer.invoke("streaming:adapter:getPlaylist", serviceId, id),
     },
     mediaKeys: (action: "play" | "pause" | "next" | "previous") => {
@@ -1004,11 +1018,6 @@ const htpc = {
     return () => ipcRenderer.removeListener("game:stopped", handler);
   },
 
-  db: {
-    query: <T = any>(table: string, odataQuery: string): Promise<{ results: T[]; count?: number }> =>
-      ipcRenderer.invoke("db:query", table, odataQuery),
-  },
-
   devtools: {
     isOpen: (): Promise<boolean> => ipcRenderer.invoke("devtools:is-open"),
     onChange: (cb: (open: boolean) => void) => {
@@ -1041,11 +1050,11 @@ const htpc = {
       ipcRenderer.invoke("rclone:getAllServePorts"),
     checkAuth: (source: import("../shared/types").RemoteSource): Promise<boolean> =>
       ipcRenderer.invoke("rclone:checkAuth", source),
-    testConnection: (source: import("../shared/types").RemoteSource): Promise<import("../main/services/rclone-manager").RemoteTestResult> =>
+    testConnection: (source: import("../shared/types").RemoteSource): Promise<RemoteTestResult> =>
       ipcRenderer.invoke("rclone:testConnection", source),
-    testCredentials: (source: import("../shared/types").RemoteSource): Promise<import("../main/services/rclone-manager").RemoteTestResult> =>
+    testCredentials: (source: import("../shared/types").RemoteSource): Promise<RemoteTestResult> =>
       ipcRenderer.invoke("rclone:testCredentials", source),
-    testPath: (source: import("../shared/types").RemoteSource): Promise<import("../main/services/rclone-manager").RemoteTestResult> =>
+    testPath: (source: import("../shared/types").RemoteSource): Promise<RemoteTestResult> =>
       ipcRenderer.invoke("rclone:testPath", source),
   },
 
@@ -1057,25 +1066,25 @@ const htpc = {
   },
 
   network: {
-    discover: (): Promise<import("../main/services/network-discovery").DiscoveredDevice[]> =>
+    discover: (): Promise<DiscoveredDevice[]> =>
       ipcRenderer.invoke("network:discover"),
   },
 
   updater: {
-    getState: (): Promise<import("../main/services/updater.service").UpdaterState> =>
+    getState: (): Promise<UpdaterState> =>
       ipcRenderer.invoke("updater:state"),
     check: (): Promise<void> => ipcRenderer.invoke("updater:check"),
     download: (): Promise<void> => ipcRenderer.invoke("updater:download"),
     install: (): Promise<void> => ipcRenderer.invoke("updater:install"),
     rollback: (): Promise<{ success: boolean; error?: string }> =>
       ipcRenderer.invoke("updater:rollback"),
-    releases: (): Promise<import("../main/services/updater.service").GitHubRelease[]> =>
+    releases: (): Promise<GitHubRelease[]> =>
       ipcRenderer.invoke("updater:releases"),
     pin: (versionTag: string): Promise<{ success: boolean; error?: string }> =>
       ipcRenderer.invoke("updater:pin", versionTag),
     schedule: (): Promise<void> => ipcRenderer.invoke("updater:schedule"),
-    onState: (cb: (state: import("../main/services/updater.service").UpdaterState) => void) => {
-      const handler = (_: Electron.IpcRendererEvent, s: import("../main/services/updater.service").UpdaterState) => cb(s);
+    onState: (cb: (state: UpdaterState) => void) => {
+      const handler = (_: Electron.IpcRendererEvent, s: UpdaterState) => cb(s);
       ipcRenderer.on("updater:state", handler);
       return () => ipcRenderer.removeListener("updater:state", handler);
     },
@@ -1087,7 +1096,7 @@ const htpc = {
   },
 
   oauth: {
-    start: (authUrl: string, redirectPatterns: string[]): Promise<import("../main/services/oauth-webview").OAuthResult> =>
+    start: (authUrl: string, redirectPatterns: string[]): Promise<OAuthResult> =>
       ipcRenderer.invoke("oauth:start", authUrl, redirectPatterns),
   },
 

@@ -7,7 +7,7 @@ export const NowPlayingWidget: React.FC<{ title?: string }> = ({ title }) => {
   const queue = useMusicPlayerStore((s) => s.queue);
   const currentIndex = useMusicPlayerStore((s) => s.currentIndex);
   const playing = useMusicPlayerStore((s) => s.playing);
-  const progress = useMusicPlayerStore((s) => s.progress);
+  const position = useMusicPlayerStore((s) => s.position);
   const duration = useMusicPlayerStore((s) => s.duration);
   const pause = useMusicPlayerStore((s) => s.pause);
   const resume = useMusicPlayerStore((s) => s.resume);
@@ -23,7 +23,7 @@ export const NowPlayingWidget: React.FC<{ title?: string }> = ({ title }) => {
     return `${m}:${String(s % 60).padStart(2, "0")}`;
   };
 
-  const progressPct = duration > 0 ? Math.min((progress / duration) * 100, 100) : 0;
+  const progressPct = duration > 0 ? Math.min((position / duration) * 100, 100) : 0;
 
   if (!current) {
     return (
@@ -68,7 +68,7 @@ export const NowPlayingWidget: React.FC<{ title?: string }> = ({ title }) => {
             <div className="h-full rounded-full" style={{ width: `${progressPct}%`, background: "var(--accent)", transition: "width 0.3s linear" }} />
           </div>
           <div className="flex justify-between text-[9px] opacity-30 tabular-nums">
-            <span>{formatTime(progress)}</span>
+            <span>{formatTime(position)}</span>
             <span>{formatTime(duration)}</span>
           </div>
         </div>

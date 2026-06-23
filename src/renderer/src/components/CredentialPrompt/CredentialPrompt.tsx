@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { KeyRound, X, AlertTriangle } from "lucide-react";
-import { RemoteSource } from "../../../shared/types";
+import { RemoteSource } from "../../../../shared/types";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
 
 export const CredentialPrompt: React.FC = () => {

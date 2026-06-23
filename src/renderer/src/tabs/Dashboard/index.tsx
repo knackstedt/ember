@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Responsive, Layout, useContainerWidth } from "react-grid-layout";
+import { Responsive, Layout, LayoutItem, useContainerWidth } from "react-grid-layout";
 import { useSettingsStore } from "../../store/settings.store";
 import {
   Plus,
@@ -12,7 +12,7 @@ import {
   Gamepad2,
 } from "lucide-react";
 import { useInputStore } from "../../store/input.store";
-import { DashboardWidget, DashboardWidgetType, DashboardLayout } from "../../../shared/types";
+import { DashboardWidget, DashboardWidgetType, DashboardLayout } from "@shared/types";
 import { WidgetRenderer } from "./DashboardWidget";
 import { AddWidgetDialog } from "./AddWidgetDialog";
 import { WidgetConfigDialog } from "./WidgetConfigDialog";
@@ -62,7 +62,7 @@ export function DashboardTab(): React.ReactElement {
   const savedLayout = settings?.dashboardLayout ?? getDefaultLayout();
 
   const [widgets, setWidgets] = useState<DashboardWidget[]>(savedLayout.widgets);
-  const [gridLayout, setGridLayout] = useState<Layout[]>(savedLayout.grid);
+  const [gridLayout, setGridLayout] = useState<Layout>(savedLayout.grid);
   const [editMode, setEditMode] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -125,7 +125,7 @@ export function DashboardTab(): React.ReactElement {
 
   // Persist layout changes
   const persist = useCallback(
-    (nextWidgets: DashboardWidget[], nextGrid: Layout[]) => {
+    (nextWidgets: DashboardWidget[], nextGrid: Layout) => {
       const nextLayout: DashboardLayout = {
         widgets: nextWidgets,
         grid: nextGrid.map((l) => ({
@@ -209,7 +209,7 @@ export function DashboardTab(): React.ReactElement {
     };
   }, []);
 
-  function getGridItem(id: string): Layout | undefined {
+  function getGridItem(id: string): LayoutItem | undefined {
     return gridLayoutRef.current.find((l) => l.i === id);
   }
 
@@ -237,7 +237,7 @@ export function DashboardTab(): React.ReactElement {
         : { x: 1, y: 0 };
 
     // Find nearest widget in direction
-    let best: Layout | null = null;
+    let best: LayoutItem | null = null;
     let bestDist = Infinity;
 
     for (const item of items) {
@@ -323,7 +323,7 @@ export function DashboardTab(): React.ReactElement {
     }
 
     const newWidget: DashboardWidget = { id, type, title: defaultTitle(type) };
-    const newLayout: Layout = {
+    const newLayout: LayoutItem = {
       i: id,
       x,
       y,
@@ -374,7 +374,7 @@ export function DashboardTab(): React.ReactElement {
     [updateWidgetConfig],
   );
 
-  function handleLayoutChange(newLayout: Layout[]) {
+  function handleLayoutChange(newLayout: Layout) {
     setGridLayout(newLayout);
     gridLayoutRef.current = newLayout;
     persist(widgetsRef.current, newLayout);
@@ -388,7 +388,7 @@ export function DashboardTab(): React.ReactElement {
   return (
     <div className="flex flex-col h-full overflow-hidden" ref={layoutRef}>
       {/* Grid */}
-      <div ref={containerRef} className="flex-1 min-h-0 overflow-auto p-4 relative">
+      <div ref={containerRef as React.LegacyRef<HTMLDivElement>} className="flex-1 min-h-0 overflow-auto p-4 relative">
         <Responsive
           className={`layout ${editMode ? "dashboard-edit" : ""}`}
           width={width}
@@ -402,7 +402,7 @@ export function DashboardTab(): React.ReactElement {
             handles: editMode ? ["s", "w", "e", "n", "sw", "nw", "se", "ne"] : [],
           }}
           onLayoutChange={handleLayoutChange}
-          onDragStart={(_l, _o, n) => setDraggingId(n.i)}
+          onDragStart={(_l, _o, n) => n && setDraggingId(n.i)}
           onDragStop={() => setDraggingId(null)}
           margin={[12, 12]}
           containerPadding={[0, 0]}

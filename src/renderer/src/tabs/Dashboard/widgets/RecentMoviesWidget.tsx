@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
 import { useMoviesStore } from "../../../store/media.store";
-import { Movie } from "../../../../shared/types";
+import { Movie } from "@shared/types";
 import { Film, Clapperboard, Play } from "lucide-react";
 
 function timeAgo(ts: number): string {
@@ -29,7 +29,7 @@ export const RecentMoviesWidget: React.FC<{ title?: string; maxItems?: number }>
 
   const play = async (m: Movie) => {
     try {
-      await window.htpc.movies.play(m);
+      await window.htpc.movies.launch(m);
     } catch (err: any) {
       console.error("[dashboard] failed to play movie:", err);
     }

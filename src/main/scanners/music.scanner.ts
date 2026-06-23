@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, statSync } from "fs";
 import { join, extname } from "path";
 import { createHash } from "crypto";
+// @ts-expect-error music-metadata is ESM-only; Node 20.19+ supports require(esm) at runtime
 import { loadMusicMetadata } from "music-metadata";
 import { getXdgMusicDir } from "./xdg";
 import { MusicTrack } from "../../shared/types";

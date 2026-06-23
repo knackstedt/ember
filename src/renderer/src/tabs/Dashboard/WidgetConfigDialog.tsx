@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { DashboardWidget } from "../../../shared/types";
+import { DashboardWidget } from "@shared/types";
 import { normalizeWebUrl } from "../../../../shared/path-utils";
 import { X, Globe, Hash, Type } from "lucide-react";
 

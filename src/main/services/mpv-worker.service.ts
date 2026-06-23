@@ -97,7 +97,7 @@ function ensureWorker(): ChildProcess {
 
   const nodeExec = findNodeExecutable();
   const isSystemNode = nodeExec !== process.execPath;
-  const env: Record<string, string> = { ...process.env };
+  const env: Record<string, string | undefined> = { ...process.env };
   if (!isSystemNode) {
     // Only set ELECTRON_RUN_AS_NODE when we're actually using Electron.
     env.ELECTRON_RUN_AS_NODE = "1";

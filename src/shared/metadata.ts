@@ -106,6 +106,7 @@ export interface MetadataSearchOptions {
   steamAppId?: number;
   romPath?: string;
   romHash?: string;
+  romHashType?: "crc32" | "md5" | "sha1";
 }
 
 export interface MetadataFetchOptions {

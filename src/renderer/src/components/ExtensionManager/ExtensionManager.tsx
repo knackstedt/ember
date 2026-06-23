@@ -38,7 +38,8 @@ const RECOMMENDED_EXTENSIONS: Omit<StreamingExtension, "installedVersion" | "ins
 export const ExtensionManager: React.FC<Props> = ({ service, partition, onClose }) => {
   const settings = useSettingsStore((s) => s.settings);
   const updateSettings = useSettingsStore((s) => s.update);
-  const toast = useToastStore((s) => s.show);
+  const push = useToastStore((s) => s.push);
+  const toast = (message: string, type: "info" | "success" | "error") => push({ message, type });
   const [customUrl, setCustomUrl] = useState("");
   const [customName, setCustomName] = useState("");
   const [customId, setCustomId] = useState("");
@@ -129,7 +130,7 @@ export const ExtensionManager: React.FC<Props> = ({ service, partition, onClose 
         await window.htpc.streaming.extensions.download(ext.id, ext.sourceUrl, ext.version);
       if (result.success && result.extension) {
         const next = allExtensions.map((e) =>
-          e.id === ext.id ? { ...result.extension, enabled: e.enabled } : e,
+          e.id === ext.id ? { ...result.extension!, enabled: e.enabled } : e,
         );
         await updateSettings({ streamingExtensions: next });
 

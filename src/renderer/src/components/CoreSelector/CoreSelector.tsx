@@ -6,7 +6,7 @@ interface CoreInfo {
   name: string;
   version: string;
   extensions: string;
-  needFullpath: boolean;
+  need_fullpath: boolean;
   path: string;
 }
 
@@ -32,7 +32,7 @@ export const CoreSelector: React.FC<CoreSelectorProps> = ({ game, onSelectCore }
         if (detectedCores.length > 0) {
           const compatible = detectedCores.map((d) => {
             const core = allCores.find((c) => c.path === d.corePath);
-            return core ?? { id: -1, name: d.coreName, version: "", extensions: d.extensions.join("|"), needFullpath: false, path: d.corePath };
+            return core ?? { id: -1, name: d.coreName, version: "", extensions: d.extensions.join("|"), need_fullpath: false, path: d.corePath };
           });
           setCores(compatible);
           // Pre-select the best (first) core

@@ -5,6 +5,9 @@
     "src/preload/**/*",
     "src/shared/**/*"
   ],
+  "exclude": [
+    "**/__tests__"
+  ],
   "compilerOptions": {
     "composite": true,
     "target": "ES2022",

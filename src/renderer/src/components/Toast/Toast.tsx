@@ -1,11 +1,12 @@
 import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Info, Check, X, Loader } from "lucide-react";
+import { Info, Check, X, Loader, AlertTriangle } from "lucide-react";
 import { useToastStore, Toast, ToastType } from "../../store/toast.store";
 
 const TYPE_META: Record<ToastType, { icon: React.ReactNode; accent: string }> = {
   info: { icon: <Info size={16} />, accent: "var(--accent)" },
   success: { icon: <Check size={16} />, accent: "#22c55e" },
+  warning: { icon: <AlertTriangle size={16} />, accent: "#f59e0b" },
   error: { icon: <X size={16} />, accent: "#ef4444" },
   progress: { icon: <Loader size={16} />, accent: "var(--accent)" },
 };
@@ -87,7 +88,7 @@ function ToastItem({ toast }: { toast: Toast }) {
 }
 
 export function ToastContainer() {
-  const toasts = useToastStore((s) => s.toasts);
+  const toasts = useToastStore((s) => s.toasts).filter((t) => t.type !== "progress");
 
   return (
     <div className="fixed bottom-6 right-6 z-[9999] flex flex-col gap-2 items-end pointer-events-none">

@@ -375,7 +375,8 @@ export type FlashCanvasSize =
   | "550x400"
   | "640x480"
   | "800x600"
-  | "1024x768";
+  | "1024x768"
+  | "custom";
 
 export interface FlashControllerMap {
   south: string;
@@ -456,18 +457,32 @@ export type BackgroundType =
   | "solid"
   | "gradient";
 
+export type MatrixPreset =
+  | "cyberpunk"
+  | "ocean-blue"
+  | "fire-red"
+  | "monochrome"
+  | "matrix"
+  | "purple-haze"
+  | "neon-pink"
+  | "digital-rain";
+
+export type BackgroundSettings =
+  | { type: "theme" }
+  | { type: "matrix-preset"; matrixPreset?: MatrixPreset }
+  | { type: "daily"; dailySource?: DailyBackgroundSource; dailyCustomUrl?: string }
+  | { type: "image"; imagePath?: string; imageFit?: ImageFitMode }
+  | { type: "solid"; solidColor?: string }
+  | { type: "gradient"; gradient?: string };
+
 export type ImageFitMode = "cover" | "contain" | "stretch" | "center" | "repeat";
 
 export type UpdateCheckFrequency = "day" | "week" | "off";
 
 export interface AppSettings {
   theme: ThemeName;
-  background: BackgroundType;
-  backgroundImage?: string;
-  backgroundFit?: ImageFitMode;
-  backgroundOpacity?: number;
+  background: BackgroundSettings;
   customCss?: string;
-  dailyBackground?: DailyBackgroundSettings;
   language?: string;
   region?: string;
   showClock?: boolean;
@@ -496,6 +511,8 @@ export interface AppSettings {
   emulatorShaders?: Record<string, string>;
   /** Default emulator shader when no platform-specific preset is set */
   defaultEmulatorShader?: string;
+  /** Dolphin post-processing effect */
+  dolphinPostProcessing?: string;
   /** Extra directories to scan for ROMs */
   romPaths?: string[];
   /** Extra directories to scan for games (PC / native / Dolphin) */
@@ -534,6 +551,7 @@ export interface AppSettings {
   /** MusicBrainz / TheAudioDB settings */
   musicbrainzEnabled?: boolean;
   theaudiodbApiKey?: string;
+  acoustidApiKey?: string;
   /** TMDB API key */
   tmdbApiKey?: string;
   /** Fanart.tv API key */
@@ -725,17 +743,24 @@ export interface Playlist {
   updatedAt: number;
 }
 
+export type CollectionItemType = "game" | "movie" | "music" | "tv" | "mixed";
+export type CollectionType = "manual" | "smart";
+export type SortOrder = string;
+export type SortDirection = "asc" | "desc";
+
 export interface Collection {
   id: string;
   name: string;
   icon?: string;
   color?: string;
   description?: string;
-  itemType: "game" | "movie" | "music" | "tv" | "mixed";
-  type: "manual" | "smart";
+  itemType: CollectionItemType;
+  type: CollectionType;
   filter?: SmartFilterGroup;
-  sortOrder?: string;
-  sortDirection?: "asc" | "desc";
+  sortOrder?: SortOrder;
+  sortDirection?: SortDirection;
+  createdAt?: number;
+  updatedAt?: number;
 }
 
 export interface CollectionItem {
@@ -767,18 +792,19 @@ export type SmartFilterOperator =
   | "in"
   | "notIn";
 
-export interface SmartFilterCondition {
+export type FilterOperator = SmartFilterOperator | "exists";
+
+export interface SmartFilterRule {
   field: string;
-  operator: SmartFilterOperator;
-  value: string | number | boolean | string[];
+  operator: string;
+  value?: unknown;
 }
 
-export type SmartFilterGroupLogic = "AND" | "OR";
+export type SmartFilterGroupLogic = "and" | "or";
 
 export interface SmartFilterGroup {
   logic: SmartFilterGroupLogic;
-  conditions: SmartFilterCondition[];
-  groups?: SmartFilterGroup[];
+  rules: (SmartFilterRule | SmartFilterGroup)[];
 }
 
 export interface VideoDecoderMetadata {
@@ -876,11 +902,129 @@ export interface ManagedPackage {
   sourceUrl?: string;
 }
 
+export type PackageManager = "apt" | "flatpak" | "buildbot" | "appimage" | "winehq" | "proton-ge";
+
 export interface PackageOperationProgress {
   packageId: string;
   operation: "install" | "uninstall" | "update";
-  status: "running" | "success" | "error";
+  status: "pending" | "running" | "success" | "error";
   message?: string;
   percent?: number;
+}
+
+export interface StreamingAdapterConfig {
+  clientId?: string;
+  accessToken?: string;
+  refreshToken?: string;
+  tokenExpiry?: number;
+  extra?: string;
+}
+
+export interface StreamingSearchResult {
+  id: string;
+  name: string;
+  type: "track" | "album" | "artist" | "playlist";
+  uri?: string;
+  thumbnailUrl?: string;
+  artist?: string;
+  album?: string;
+  duration?: number;
+}
+
+export interface StreamingTrack {
+  id: string;
+  name: string;
+  uri: string;
+  artist?: string;
+  album?: string;
+  duration?: number;
+  thumbnailUrl?: string;
+  trackNumber?: number;
+}
+
+export interface StreamingAlbum {
+  id: string;
+  name: string;
+  uri: string;
+  artist?: string;
+  thumbnailUrl?: string;
+  tracks: StreamingTrack[];
+  year?: number;
+}
+
+export interface StreamingPlaylist {
+  id: string;
+  name: string;
+  uri: string;
+  thumbnailUrl?: string;
+  owner?: string;
+  tracks: StreamingTrack[];
+  trackCount: number;
+}
+
+export interface StreamingDevice {
+  id: string;
+  name: string;
+  type: "computer" | "smartphone" | "speaker" | "tv" | "game_console" | "automobile" | "cast_video" | "cast_audio" | "unknown";
+  isActive: boolean;
+  volumePercent?: number;
+}
+
+export interface CurrentlyPlaying {
+  track?: StreamingTrack;
+  isPlaying: boolean;
+  progressMs?: number;
+  device?: StreamingDevice;
+}
+
+export interface RemoteTestResult {
+  success: boolean;
+  message: string;
+}
+
+export interface DiscoveredDevice {
+  name: string;
+  ip: string;
+  protocol?: "smb" | "sftp" | "ftp" | "webdav" | "http" | "nfs" | "unknown";
+  port?: number;
+  source: "mdns" | "avahi" | "nmblookup";
+}
+
+export type UpdaterStatus =
+  | "idle"
+  | "checking"
+  | "available"
+  | "downloading"
+  | "downloaded"
+  | "installing"
+  | "error"
+  | "rollback";
+
+export interface UpdaterState {
+  status: UpdaterStatus;
+  currentVersion: string;
+  availableVersion?: string;
+  progress?: number;
+  error?: string;
+  lastChecked?: number;
+  downloadSpeed?: number;
+}
+
+export interface GitHubRelease {
+  tag_name: string;
+  name: string;
+  published_at: string;
+  assets: Array<{
+    name: string;
+    browser_download_url: string;
+    size: number;
+  }>;
+}
+
+export interface OAuthResult {
+  success: boolean;
+  token?: string;
+  refreshToken?: string;
+  error?: string;
 }
 

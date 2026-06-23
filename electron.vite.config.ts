@@ -1,14 +1,17 @@
 import { resolve } from "path";
+// @ts-expect-error electron-vite is ESM-only; Node 20.19+ supports require(esm) at runtime
 import { defineConfig, externalizeDepsPlugin } from "electron-vite";
 import react from "@vitejs/plugin-react";
-import type { Plugin } from "vite";
 import {
   copyFileSync,
   existsSync,
   mkdirSync,
   readdirSync,
   readFileSync,
+  readlinkSync,
   statSync,
+  symlinkSync,
+  unlinkSync,
 } from "fs";
 
 function getMimeType(fileName: string): string {
@@ -28,13 +31,13 @@ function getMimeType(fileName: string): string {
   return mime[ext] || "application/octet-stream";
 }
 
-function ruffleStaticPlugin(): Plugin {
+function ruffleStaticPlugin(): any {
   const ruffleDir = resolve("node_modules/@ruffle-rs/ruffle");
 
   return {
     name: "ruffle-static",
-    configureServer(server) {
-      server.middlewares.use("/ruffle", (req, res, next) => {
+    configureServer(server: any) {
+      server.middlewares.use("/ruffle", (req: any, res: any, next: any) => {
         try {
           decodeURI(req.url ?? "");
         } catch {
@@ -57,7 +60,7 @@ function ruffleStaticPlugin(): Plugin {
         res.end(readFileSync(filePath));
       });
     },
-    writeBundle(options) {
+    writeBundle(options: any) {
       const outDir = options.dir;
       if (!outDir) return;
       const destDir = resolve(outDir, "ruffle");
@@ -86,13 +89,13 @@ function copyDirRecursive(src: string, dest: string): void {
   }
 }
 
-function libretroStaticPlugin(): Plugin {
+function libretroStaticPlugin(): any {
   const arches = ["x64", "arm64"];
 
   return {
     name: "libretro-static",
-    configureServer(server) {
-      server.middlewares.use("/libretro-frontend.node", (req, res, next) => {
+    configureServer(server: any) {
+      server.middlewares.use("/libretro-frontend.node", (req: any, res: any, next: any) => {
         try {
           decodeURI(req.url ?? "");
         } catch {
@@ -111,7 +114,7 @@ function libretroStaticPlugin(): Plugin {
         res.end(readFileSync(addonPath));
       });
     },
-    writeBundle(options) {
+    writeBundle(options: any) {
       const outDir = options.dir;
       if (!outDir) return;
       for (const arch of arches) {
@@ -124,12 +127,12 @@ function libretroStaticPlugin(): Plugin {
   };
 }
 
-function videoDecoderStaticPlugin(): Plugin {
+function videoDecoderStaticPlugin(): any {
   const arches = ["x64", "arm64"];
 
   return {
     name: "video-decoder-static",
-    writeBundle(options) {
+    writeBundle(options: any) {
       const outDir = options.dir;
       if (!outDir) return;
       for (const arch of arches) {
@@ -155,13 +158,13 @@ function videoDecoderStaticPlugin(): Plugin {
   };
 }
 
-function pluginStaticPlugin(): Plugin {
+function pluginStaticPlugin(): any {
   const pluginsDir = resolve(process.env.HOME || process.env.USERPROFILE || "", ".config/htpc/plugins");
 
   return {
     name: "plugin-static",
-    configureServer(server) {
-      server.middlewares.use("/plugin", (req, res, next) => {
+    configureServer(server: any) {
+      server.middlewares.use("/plugin", (req: any, res: any, next: any) => {
         try {
           decodeURI(req.url ?? "");
         } catch {

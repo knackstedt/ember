@@ -18,6 +18,7 @@ export interface DiscoveredDevice {
 async function discoverMdns(): Promise<DiscoveredDevice[]> {
   try {
     // Dynamic import to avoid bundling issues if package missing
+    // @ts-ignore multicast-dns has no type declarations
     const mdns = await import("multicast-dns");
     const devices: DiscoveredDevice[] = [];
     const seen = new Set<string>();

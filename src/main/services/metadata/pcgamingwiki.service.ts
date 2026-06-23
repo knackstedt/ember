@@ -20,21 +20,23 @@ interface PCGWSearchResult {
   };
 }
 
+interface PCGWPage {
+  pageid: number;
+  title: string;
+  extract?: string;
+  categories?: { title: string }[];
+  revisions?: {
+    slots?: {
+      main?: {
+        '*': string; // wikitext content
+      };
+    };
+  }[];
+}
+
 interface PCGWPageInfo {
   query?: {
-    pages?: Record<string, {
-      pageid: number;
-      title: string;
-      extract?: string;
-      categories?: { title: string }[];
-      revisions?: {
-        slots?: {
-          main?: {
-            '*': string; // wikitext content
-          };
-        };
-      }[];
-    }>;
+    pages?: Record<string, PCGWPage>;
   };
 }
 
@@ -177,7 +179,7 @@ async function searchPage(title: string): Promise<number | null> {
   }
 }
 
-async function getPageInfo(pageId: number): Promise<PCGWPageInfo['query']['pages'][string] | null> {
+async function getPageInfo(pageId: number): Promise<PCGWPage | null> {
   try {
     const data = await pcgwRequest({
       action: 'query',
@@ -196,7 +198,7 @@ async function getPageInfo(pageId: number): Promise<PCGWPageInfo['query']['pages
   }
 }
 
-function mapPCGWToMetadata(infobox: PCGWInfoboxData, page?: PCGWPageInfo['query']['pages'][string]): GameMetadata {
+function mapPCGWToMetadata(infobox: PCGWInfoboxData, page?: PCGWPage): GameMetadata {
   const source: MetadataSource = {
     name: 'PCGamingWiki',
     type: 'supplementary',

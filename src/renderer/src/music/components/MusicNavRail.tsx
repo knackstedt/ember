@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import type { MusicNavItem } from "../types";
 
-const NAV_ITEMS: { id: MusicNavItem; label: string; Icon: React.ComponentType<{ size?: number }> }[] = [
+const NAV_ITEMS: { id: MusicNavItem; label: string; Icon: React.ComponentType<{ size?: number | string | undefined }> }[] = [
   { id: "all", label: "All", Icon: Music },
   { id: "genre", label: "Genres", Icon: AudioLines },
   { id: "artists", label: "Artists", Icon: Mic2 },

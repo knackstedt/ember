@@ -262,13 +262,13 @@ function startFfmpeg(id: string, path: string, seekMs: number = 0) {
 
   ensureAudioPlayback(state);
 
-  proc.stderr.on("data", (d: Buffer) => {
+  proc.stderr!.on("data", (d: Buffer) => {
     const msg = d.toString("utf8").trim();
     if (msg) console.error("[ffmpeg-decoder] stderr:", msg);
   });
 
   // Video pipe (fd 1 -> proc.stdout)
-  proc.stdout.on("data", (chunk: Buffer) => {
+  proc.stdout!.on("data", (chunk: Buffer) => {
     if (state.procGeneration !== myGeneration) return;
     if (state.paused) return;
     state.frameChunks.push(chunk);
@@ -297,7 +297,7 @@ function startFfmpeg(id: string, path: string, seekMs: number = 0) {
     // This avoids jitter from irregular OS pipe chunk delivery timing.
   });
 
-  proc.stdout.on("end", () => {
+  proc.stdout!.on("end", () => {
     if (state.process === proc) state.playing = false;
   });
 

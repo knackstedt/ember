@@ -71,6 +71,7 @@ const PLATFORM_FORMATS: Record<
   dos: undefined,
   windows: undefined,
   desktop: undefined,
+  itch: undefined,
   unknown: undefined,
 };
 

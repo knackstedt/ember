@@ -23,7 +23,7 @@ export type GamingPlayStatusFilter = "all" | "played" | "unplayed";
 
 export type GamingCompletionFilter = "all" | "completed" | "incomplete";
 
-import type { GamePlatform } from "../../../shared/types";
+import type { GamePlatform } from "@shared/types";
 
 /** Platforms that belong to each grouped nav category */
 export const NAV_PLATFORM_GROUPS: Record<GamingNavItem, GamePlatform[]> = {

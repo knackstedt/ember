@@ -28,11 +28,11 @@ const VIDEO_EXTS = new Set([
 
 const TV_PATTERN = /[Ss](\d+)[Ee](\d+)/;
 
-let movieThumbCache;
+let movieThumbCache: string;
 try { movieThumbCache = join(app.getPath("userData"), "thumbnails", "movies"); } catch { movieThumbCache = join(process.cwd(), "thumbnails", "movies"); }
 mkdirSync(movieThumbCache, { recursive: true });
 
-let showThumbCache;
+let showThumbCache: string;
 try { showThumbCache = join(app.getPath("userData"), "thumbnails", "tv"); } catch { showThumbCache = join(process.cwd(), "thumbnails", "tv"); }
 mkdirSync(showThumbCache, { recursive: true });
 

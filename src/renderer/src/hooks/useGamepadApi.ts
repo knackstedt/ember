@@ -8,6 +8,7 @@ import {
   postGamepadState,
   getControllerWorker,
 } from "./useControllerWorker";
+import { useInputStore } from "../store/input.store";
 
 /**
  * Gamepad API fallback — polls navigator.getGamepads() and forwards state

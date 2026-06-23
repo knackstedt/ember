@@ -17,7 +17,7 @@ const MODEL = "Xenova/all-MiniLM-L6-v2";
 
 const CACHE_DIR = join(app.getPath("userData"), "transformers-cache");
 
-type PipelineFn = (task: string, model: string, opts?: object) => Promise<unknown>;
+type PipelineFn = (input: string | string[], opts?: Record<string, unknown>) => Promise<unknown>;
 
 let embedder: unknown | null = null;
 let modelLoading = false;
@@ -547,7 +547,7 @@ export async function aiGroupItems(
 ): Promise<AiGroup[]> {
   if (items.length === 0) return [];
   if (groupCount <= 1) {
-    return [{ label: "All", itemIds: items.map((i) => i.id), centerItemId: items[0].id }];
+    return [{ id: "all", label: "All", itemIds: items.map((i) => i.id), centerItemId: items[0].id }];
   }
 
   const texts = items.map(itemToText);
@@ -604,7 +604,10 @@ export async function aiGroupItems(
 
   // If too few clusters, split the largest
   while (clusters.length < groupCount && clusters.some((c) => c.members.length > 2)) {
-    const largest = clusters.reduce((big, c, i) => (c.members.length > big.members.length ? { ...c, index: i } : big), { ...clusters[0], index: 0 });
+    const largest = clusters.reduce(
+      (big, c, i) => (c.members.length > big.members.length ? { ...c, index: i } : big),
+      { ...clusters[0], index: 0 },
+    ) as { centroid: Float32Array; members: number[]; index: number };
     // Find two items in the cluster that are farthest apart
     let maxDist = -1;
     let splitA = -1;

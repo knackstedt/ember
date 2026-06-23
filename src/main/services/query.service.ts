@@ -1,3 +1,4 @@
+// @ts-ignore @dotglitch/odatav4 is ESM-only; Node 20.19+ supports require(esm) at runtime
 import { createQuery, SQLLang, renderQuery } from "@dotglitch/odatav4";
 import { getDb } from "../db";
 import { createLogger } from "../util/logger";
@@ -85,7 +86,7 @@ export async function executeODataQuery<T = any>(
 
     return { results: normalized as T[], count };
   } catch (err) {
-    log.error("query", `OData query failed for ${table}: ${odataQuery}`, err);
+    log.error("query", `OData query failed for ${table}: ${odataQuery}: ${err}`);
     throw err;
   }
 }

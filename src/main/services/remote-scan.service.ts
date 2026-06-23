@@ -1,10 +1,11 @@
 import { createHash } from "crypto";
 import { extname, basename } from "path";
+// @ts-ignore music-metadata is ESM-only; Node 20.19+ supports require(esm) at runtime
 import { loadMusicMetadata } from "music-metadata";
 import { promisify } from "util";
 import { exec } from "child_process";
 import { RemoteSource } from "../../shared/types";
-import { Movie, MusicTrack, Game } from "../../shared/types";
+import { Movie, MusicTrack, Game, GamePlatform } from "../../shared/types";
 import { createLogger } from "../util/logger";
 import { getRemoteFileList, startServe, getServePort, restartServe, listRemotes } from "./rclone-manager";
 import { MovieRepo, MusicRepo, GameRepo } from "../db/repository";
@@ -70,7 +71,7 @@ async function walkRemote(
 /*  Helpers: verify/restart serve before file operations               */
 /* ------------------------------------------------------------------ */
 
-async function ensureServe(source: RemoteSource): Promise<number | null> {
+async function ensureServe(source: RemoteSource): Promise<number | null | undefined> {
   let port = await getServePort(source.id);
   if (port) return port;
   log.info("remote:scan", `restarting serve for ${source.id}`);
@@ -389,7 +390,7 @@ export async function scanRemoteRoms(
     const remotePath = files[i];
     onProgress?.(i, total);
     const ext = extname(remotePath).toLowerCase();
-    const platform = PLATFORM_EXTS[ext] ?? "unknown";
+    const platform = (PLATFORM_EXTS[ext] ?? "unknown") as GamePlatform;
     const emberPath = `ember://remote/${source.id}${remotePath}`;
     const id = createHash("md5").update(emberPath).digest("hex").slice(0, 16);
     const title = basename(remotePath, ext).replace(/[._]/g, " ").trim();
@@ -492,7 +493,7 @@ export function queueRemoteSourceScan(
     log.info("remote:scan:queue", `starting scan for ${source.name} (${source.mediaTypes.join(", ")})`);
 
     try {
-      let port = await getServePort(source.id);
+      let port: number | null | undefined = await getServePort(source.id);
       if (!port) {
         log.info("remote:scan:queue", `starting serve for ${source.id}`);
         port = await startServe(source);

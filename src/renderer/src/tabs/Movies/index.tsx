@@ -1035,7 +1035,7 @@ export const MoviesTab: React.FC = () => {
                         onColumnCountChange={setColumnCount}
                         renderHex={renderSkeletonHex}
                         focusedIndex={focusedIndex}
-                        bindItem={bindItem}
+                        bindItem={bindItem as any}
                         scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
                       />
                     );
@@ -1136,7 +1136,7 @@ export const MoviesTab: React.FC = () => {
                         onColumnCountChange={setColumnCount}
                         renderHex={renderSkeletonHex}
                         focusedIndex={focusedIndex}
-                        bindItem={bindItem}
+                        bindItem={bindItem as any}
                         scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
                       />
                     );

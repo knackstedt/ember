@@ -22,7 +22,7 @@ export const GeneralTab: React.FC = () => {
           <Toggle
             label="Start on Boot"
             description="Automatically launch HTPC when your system starts"
-            value={settings.startOnBoot}
+            value={settings.startOnBoot ?? false}
             onChange={(v) => update({ startOnBoot: v })}
           />
         </div>
@@ -39,7 +39,7 @@ export const GeneralTab: React.FC = () => {
           <Toggle
             label="Hardware Acceleration"
             description="Use GPU acceleration for smoother UI rendering (requires restart)"
-            value={settings.hardwareAcceleration}
+            value={settings.hardwareAcceleration ?? false}
             onChange={(v) => update({ hardwareAcceleration: v })}
           />
         </div>

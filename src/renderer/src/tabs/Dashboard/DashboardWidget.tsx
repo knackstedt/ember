@@ -1,5 +1,5 @@
 import React from "react";
-import { DashboardWidget } from "../../../shared/types";
+import { DashboardWidget } from "@shared/types";
 import {
   ClockWidget,
   SystemInfoWidget,

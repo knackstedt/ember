@@ -37,6 +37,7 @@ const OPERATOR_LABELS: Record<FilterOperator, string> = {
   lte: "<=",
   contains: "contains",
   in: "in",
+  notIn: "not in",
   startsWith: "starts with",
   endsWith: "ends with",
   exists: "exists",
@@ -87,7 +88,7 @@ const TV_FIELDS = [
   { field: "rating", label: "Rating", type: "number" },
 ];
 
-function getFields(itemType: CollectionItemType) {
+function getFields(itemType: CollectionItemType): { field: string; label: string; type: string }[] {
   switch (itemType) {
     case "game":
       return GAME_FIELDS;

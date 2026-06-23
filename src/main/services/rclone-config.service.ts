@@ -58,6 +58,7 @@ function obscurePassword(password: string): string {
 
 async function resolveMdnsHostname(hostname: string): Promise<string | null> {
   try {
+    // @ts-ignore multicast-dns has no type declarations
     const mdns = await import("multicast-dns");
     return new Promise((resolve) => {
       const m = mdns.default();

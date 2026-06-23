@@ -252,7 +252,7 @@ export const VirtualCursor: React.FC<VirtualCursorProps> = ({
   }, [visible, hoverStyle, expanded, hue, posRef]);
 
   useEffect(() => {
-    lastPosRef.current = { x: posRef.current.x, y: posRef.current.y };
+    if (posRef.current) lastPosRef.current = { x: posRef.current.x, y: posRef.current.y };
   }, [posRef]);
 
   return (

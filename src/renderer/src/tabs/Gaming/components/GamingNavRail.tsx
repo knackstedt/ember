@@ -19,7 +19,7 @@ import {
   WindowsLogo,
 } from "./PlatformLogos";
 
-const NAV_ITEMS: { id: GamingNavItem; label: string; Icon: React.ComponentType<{ size?: number }> }[] = [
+const NAV_ITEMS: { id: GamingNavItem; label: string; Icon: React.ComponentType<{ size?: number | string | undefined }> }[] = [
   { id: "all", label: "All", Icon: LayoutGrid },
   { id: "favorites", label: "Favorites", Icon: Star },
   { id: "couch-coop", label: "Co-op", Icon: Users },

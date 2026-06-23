@@ -18,24 +18,19 @@ interface DatXmlHeader {
   author?: string;
 }
 
+interface DatXmlRom {
+  name: string;
+  size: string;
+  crc?: string;
+  md5?: string;
+  sha1?: string;
+  serial?: string;
+}
+
 interface DatXmlGame {
   name: string;
   description?: string;
-  rom: {
-    name: string;
-    size: string;
-    crc?: string;
-    md5?: string;
-    sha1?: string;
-    serial?: string;
-  } | {
-    name: string;
-    size: string;
-    crc?: string;
-    md5?: string;
-    sha1?: string;
-    serial?: string;
-  }[];
+  rom?: DatXmlRom | DatXmlRom[];
 }
 
 interface DatXmlData {
@@ -86,7 +81,7 @@ function parseDatXml(xmlContent: string): DatXmlData {
 
     // Parse ROMs
     const romMatches = gameContent.matchAll(/<rom[^>]*name="([^"]*)"[^>]*\/>/g);
-    const roms: DatXmlGame['rom'][] = [];
+    const roms: DatXmlRom[] = [];
 
     for (const romMatch of romMatches) {
       const romAttrs = romMatch[0];

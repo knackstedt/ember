@@ -410,7 +410,7 @@ export async function launchGame(game: Game): Promise<void> {
       // Wait for the actual game process to appear in /proc, then track its lifetime
       (async () => {
         log.info("launcher", `Waiting for Steam game ${game.steamAppId} to start…`);
-        const gamePid = await waitForSteamGamePid(game.steamAppId);
+        const gamePid = await waitForSteamGamePid(game.steamAppId!);
         if (gamePid === null) {
           const reason = `Timed out waiting for Steam game ${game.steamAppId} process; it may not have started.`;
           log.warn("launcher", reason);

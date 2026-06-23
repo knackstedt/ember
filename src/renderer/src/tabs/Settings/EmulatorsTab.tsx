@@ -227,7 +227,7 @@ export const EmulatorsTab: React.FC = () => {
               <select
                 value={settings.emulatorShaders?.[platform] ?? ""}
                 onChange={(e) => {
-                  const next = { ...settings.emulatorShaders, [platform]: e.target.value || undefined };
+                  const next = { ...settings.emulatorShaders, [platform]: e.target.value };
                   update({ emulatorShaders: next });
                 }}
                 className="w-full text-sm px-2 py-1.5 rounded"

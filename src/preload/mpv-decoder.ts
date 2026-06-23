@@ -37,8 +37,8 @@ function getState(id: string): MpvDecoderState {
   if (!state) {
     state = {
       decoder: null,
-      sab: null,
-      sabView: null,
+      ab: null,
+      abView: null,
       canvasId: null,
       renderer: null,
       metadata: null,
@@ -55,7 +55,7 @@ function getState(id: string): MpvDecoderState {
 let addonCache: { VideoDecoder: any } | null | undefined = undefined;
 
 function loadAddon(): { VideoDecoder: any } | null {
-  if (addonCache !== undefined) return addonCache;
+  if (addonCache !== undefined) return addonCache ?? null;
   const arch = process.arch === "arm64" ? "arm64" : "x64";
   const candidates = [
     join(process.resourcesPath, `video-decoder.linux-${arch}-gnu.node`),
@@ -68,7 +68,7 @@ function loadAddon(): { VideoDecoder: any } | null {
       try {
         (process as any).dlopen(m, p);
         addonCache = m.exports ?? null;
-        return addonCache;
+        return addonCache ?? null;
       } catch (e) {
         console.warn("[mpv-decoder] dlopen failed:", e);
       }

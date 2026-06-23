@@ -41,6 +41,7 @@ export const MusicPlayerBar: React.FC<MusicPlayerBarProps> = React.memo(({ onExp
     resume,
     next,
     prev,
+    seek,
     setVolume,
   } = useMusicPlayerStore();
 

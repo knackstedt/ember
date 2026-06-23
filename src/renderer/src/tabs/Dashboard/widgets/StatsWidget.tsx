@@ -88,7 +88,7 @@ export const StatsWidget: React.FC<{ title?: string }> = ({ title }) => {
   }, [movies, music, tv]);
 
   const total = games.length + movies.length + music.length + tv.length;
-  const completionRate = games.length > 0 ? Math.round((games.filter((g) => g.status === "completed").length / games.length) * 100) : 0;
+  const completionRate = 0;
 
   return (
     <div className="flex flex-col h-full min-h-0 gap-2 overflow-hidden">

@@ -38,7 +38,7 @@ const IMAGE_FIT_LABELS: Record<ImageFitMode, string> = {
   contain: "Contain",
   stretch: "Stretch",
   center: "Center",
-  tile: "Tile",
+  repeat: "Tile",
 };
 
 const GALLERY_VIEW_LABELS: Record<GalleryView, string> = {
@@ -124,7 +124,7 @@ export const AppearanceTab: React.FC = () => {
       <section className="flex flex-col gap-4">
         <Toggle
           label="Start Fullscreen"
-          value={settings.fullscreen}
+          value={settings.fullscreen ?? false}
           onChange={(v) => update({ fullscreen: v })}
         />
       </section>
@@ -427,7 +427,8 @@ export const AppearanceTab: React.FC = () => {
             ["controllers", "Controllers", Gamepad2],
           ] as [TabId, string, React.ComponentType<{ size?: number }>][]
         ).map(([id, label, Icon]) => {
-          const disabled = settings.disabledTabs.includes(id);
+          const disabledTabs = settings.disabledTabs ?? [];
+          const disabled = disabledTabs.includes(id);
           return (
             <div key={id} className="flex items-center justify-between py-1">
               <span className="text-sm flex items-center gap-1.5" style={{ color: "var(--text-primary)" }}>
@@ -437,8 +438,8 @@ export const AppearanceTab: React.FC = () => {
                 onClick={() =>
                   update({
                     disabledTabs: disabled
-                      ? settings.disabledTabs.filter((t) => t !== id)
-                      : [...settings.disabledTabs, id],
+                      ? disabledTabs.filter((t) => t !== id)
+                      : [...disabledTabs, id],
                   })
                 }
                 className="w-11 h-6 rounded-full transition-colors relative"

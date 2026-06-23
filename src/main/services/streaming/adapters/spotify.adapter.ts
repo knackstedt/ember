@@ -376,7 +376,7 @@ export class SpotifyAdapter implements BaseStreamingAdapter {
       thumbnailUrl: data.images?.[0]?.url,
       owner: data.owner?.display_name || data.owner?.id,
       trackCount: data.tracks?.total ?? 0,
-      tracks: data.tracks?.items?.map((item) => {
+      tracks: (data.tracks?.items?.map((item): StreamingTrack | null => {
         const t = item.track;
         if (!t) return null;
         return {
@@ -389,7 +389,7 @@ export class SpotifyAdapter implements BaseStreamingAdapter {
           thumbnailUrl: t.album?.images?.[0]?.url,
           trackNumber: t.track_number,
         };
-      }).filter((t): t is StreamingTrack => !!t),
+      }).filter((t) => t !== null) ?? []) as StreamingTrack[],
     };
   }
 

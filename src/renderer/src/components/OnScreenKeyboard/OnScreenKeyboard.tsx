@@ -109,7 +109,7 @@ export const OnScreenKeyboard: React.FC<OnScreenKeyboardProps> = ({
       // Axis navigation (left stick + dpad axes)
       if (ev.type === "axis") {
         const navAxes = ["left_x", "left_y", "dpad_x", "dpad_y"];
-        if (!navAxes.includes(ev.axis)) return;
+        if (!ev.axis || !navAxes.includes(ev.axis)) return;
         const now = Date.now();
         if (now - axisNavCooldownRef.current < AXIS_NAV_COOLDOWN_MS) return;
 
@@ -121,17 +121,17 @@ export const OnScreenKeyboard: React.FC<OnScreenKeyboardProps> = ({
         let next: [number, number] | null = null;
 
         if (ev.axis === "left_y" || ev.axis === "dpad_y") {
-          if (ev.value < -AXIS_NAV_THRESHOLD) {
+          if (ev.value! < -AXIS_NAV_THRESHOLD) {
             const newRow = Math.max(0, row - 1);
             next = [newRow, Math.min(col, getRowLen(newRow) - 1)];
-          } else if (ev.value > AXIS_NAV_THRESHOLD) {
+          } else if (ev.value! > AXIS_NAV_THRESHOLD) {
             const newRow = Math.min(r.length - 1, row + 1);
             next = [newRow, Math.min(col, getRowLen(newRow) - 1)];
           }
         } else if (ev.axis === "left_x" || ev.axis === "dpad_x") {
-          if (ev.value < -AXIS_NAV_THRESHOLD) {
+          if (ev.value! < -AXIS_NAV_THRESHOLD) {
             next = [row, Math.max(0, col - 1)];
-          } else if (ev.value > AXIS_NAV_THRESHOLD) {
+          } else if (ev.value! > AXIS_NAV_THRESHOLD) {
             next = [row, Math.min(getRowLen(row) - 1, col + 1)];
           }
         }
@@ -336,25 +336,45 @@ export const OnScreenKeyboard: React.FC<OnScreenKeyboardProps> = ({
 };
 
 interface OskInputProps {
-  value: string;
-  onChange: (v: string) => void;
+  value?: string;
+  initialValue?: string;
+  onChange?: (v: string) => void;
   onSubmit?: (v: string) => void;
   placeholder?: string;
   className?: string;
   style?: React.CSSProperties;
   showOskFromGamepad?: boolean;
+  open?: boolean;
+  onClose?: () => void;
 }
 
 export const OskInput: React.FC<OskInputProps> = ({
-  value,
+  value: controlledValue,
+  initialValue = "",
   onChange,
   onSubmit,
   placeholder,
   className,
   style,
   showOskFromGamepad = false,
+  open,
+  onClose,
 }) => {
+  const [internalValue, setInternalValue] = useState(initialValue);
   const [showOsk, setShowOsk] = useState(false);
+
+  const isOpen = open !== undefined ? open : showOsk;
+  const value = controlledValue !== undefined ? controlledValue : internalValue;
+
+  const handleChange = (v: string) => {
+    if (onChange) onChange(v);
+    setInternalValue(v);
+  };
+
+  const handleClose = () => {
+    if (onClose) onClose();
+    setShowOsk(false);
+  };
 
   return (
     <>
@@ -362,7 +382,7 @@ export const OskInput: React.FC<OskInputProps> = ({
         type="text"
         className={className}
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => handleChange(e.target.value)}
         onKeyDown={(e) => e.key === "Enter" && onSubmit?.(value)}
         onFocus={() => {
           if (showOskFromGamepad) setShowOsk(true);
@@ -380,11 +400,11 @@ export const OskInput: React.FC<OskInputProps> = ({
         }}
       />
       <AnimatePresence>
-        {showOsk && (
+        {isOpen && (
           <OnScreenKeyboard
             value={value}
-            onChange={onChange}
-            onClose={() => setShowOsk(false)}
+            onChange={handleChange}
+            onClose={handleClose}
             onSubmit={onSubmit}
             label={placeholder}
           />

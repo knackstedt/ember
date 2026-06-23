@@ -13,7 +13,7 @@ export interface CoreInfo {
   name: string;
   version: string;
   extensions: string;
-  needFullpath: boolean;
+  need_fullpath: boolean;
   path: string;
 }
 

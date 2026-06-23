@@ -17,6 +17,7 @@
     "dist:x64:appimage": "electron-builder --linux AppImage --x64",
     "preview": "electron-vite preview",
     "lint": "eslint src",
+    "tsc": "tsc --noEmit --project tsconfig.web.json",
     "test": "bun test",
     "test:watch": "bun test --watch",
     "retag": "VERSION=$(jq -r '.version' package.json) && git push origin :refs/tags/v${VERSION} 2>/dev/null || true && git tag -d v${VERSION} 2>/dev/null || true && git tag v${VERSION} && git push origin v${VERSION} --force"

@@ -5,7 +5,7 @@ export interface VirtualGridHandle {
   scrollToItem(index: number): void;
 }
 
-interface VirtualGridProps<T> {
+export interface VirtualGridProps<T> {
   items: T[];
   /** Fixed column count. Ignored when minItemWidth is set. */
   columnCount?: number;

@@ -44,7 +44,7 @@ async function writeMp3Tags(
     const mod = await import("node-id3");
     const NodeID3 = (mod as any).default ?? mod;
 
-    const id3Tags: Record<string, string | number | undefined> = {};
+    const id3Tags: Record<string, string | number | object | undefined> = {};
     if (tags.title !== undefined) id3Tags.title = tags.title;
     if (tags.artist !== undefined) id3Tags.artist = tags.artist;
     if (tags.album !== undefined) id3Tags.album = tags.album;

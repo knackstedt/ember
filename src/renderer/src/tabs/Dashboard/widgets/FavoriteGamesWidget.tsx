@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
 import { useGamesStore } from "../../../store/games.store";
-import { Game, GamePlatform } from "../../../../shared/types";
+import { Game, GamePlatform } from "@shared/types";
 import { Star, Play, Gamepad2 } from "lucide-react";
 
 const PLATFORM_COLORS: Record<GamePlatform, string> = {

@@ -48,7 +48,7 @@ export const NeonGridView = React.forwardRef(function NeonGridViewInner<T>(
     <VirtualGrid
       ref={forwardedRef}
       {...rest}
-      renderItem={neonRenderItem}
+      renderItem={neonRenderItem as (item: unknown, index: number) => React.ReactNode}
     />
   );
 }) as <T>(

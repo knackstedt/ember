@@ -1,4 +1,4 @@
-import { open, read, close } from "fs/promises";
+import { open, FileHandle } from "fs/promises";
 import { GamePlatform } from "./types";
 
 /**
@@ -13,7 +13,7 @@ import { GamePlatform } from "./types";
  *   CHCD / CHTR / CHT2 → psx or ps2 (CD-ROM; defaults to psx, uses path heuristics for ps2)
  */
 export async function detectChdPlatform(filePath: string): Promise<GamePlatform | null> {
-  let fd: number | null = null;
+  let fd: FileHandle | null = null;
   try {
     fd = await open(filePath, "r");
   } catch {
@@ -81,7 +81,7 @@ export async function detectChdPlatform(filePath: string): Promise<GamePlatform 
   } finally {
     if (fd) {
       try {
-        await close(fd);
+        await fd.close();
       } catch {
         /* ignore */
       }

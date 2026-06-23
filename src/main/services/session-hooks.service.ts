@@ -128,7 +128,7 @@ export async function runSessionHooks(
     if (timing === "before-start-blocking") {
       const result = runHookSync(hook, baseEnv);
       if (!result.ok) {
-        const reason = result.error ?? `exited with code ${result.code}` ?? `killed by ${result.signal}`;
+        const reason = result.error ?? (result.code !== undefined ? `exited with code ${result.code}` : `killed by ${result.signal}`);
         notifyHookError(game.title, timing, reason);
         throw new Error(`Blocking hook failed for "${game.title}": ${reason}`);
       }
@@ -136,7 +136,7 @@ export async function runSessionHooks(
       // Fire-and-forget for non-blocking hooks
       void runHook(hook, baseEnv).then((result) => {
         if (!result.ok) {
-          const reason = result.error ?? `exited with code ${result.code}` ?? `killed by ${result.signal}`;
+          const reason = result.error ?? (result.code !== undefined ? `exited with code ${result.code}` : `killed by ${result.signal}`);
           log.warn("session-hooks", `Non-blocking hook [${timing}] failed for "${game.title}": ${reason}`);
           notifyHookError(game.title, timing, reason);
         }

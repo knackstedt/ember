@@ -6,7 +6,7 @@ import { createLogger } from "../util/logger";
 
 const log = createLogger("info");
 
-let rcloneBinaryPath: string | null | undefined = undefined;
+let rcloneBinaryPath: string | null = null;
 let rcdProcess: ChildProcess | null = null;
 let rcdPort = 5572;
 
@@ -24,7 +24,7 @@ function getBundledBinaryPath(): string {
 }
 
 export function resolveRcloneBinary(): string | null {
-  if (rcloneBinaryPath !== undefined) return rcloneBinaryPath;
+  if (rcloneBinaryPath !== null) return rcloneBinaryPath;
 
   // 1. Try bundled binary
   const bundled = getBundledBinaryPath();

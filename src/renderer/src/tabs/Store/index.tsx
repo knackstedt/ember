@@ -50,7 +50,7 @@ export const StoreTab: React.FC = () => {
   const [libraryGames, setLibraryGames] = useState<any[]>([]);
   const [showLibrary, setShowLibrary] = useState(false);
   const webviewRefs = useRef<Record<string, Electron.WebviewTag | null>>({});
-  const addToast = useToastStore((s) => s.add);
+  const addToast = useToastStore((s) => s.push);
 
   const activeTab = useMemo(
     () => tabs.find((t) => t.id === activeTabId) ?? tabs[0],
@@ -91,13 +91,13 @@ export const StoreTab: React.FC = () => {
     try {
       const result = await window.htpc.store.itch.login();
       if (result.success) {
-        addToast("Logged in to itch.io");
+        addToast({ type: "success", message: "Logged in to itch.io" });
         await refreshItchStatus();
       } else {
-        addToast(result.error ?? "itch.io login failed", "error");
+        addToast({ type: "error", message: result.error ?? "itch.io login failed" });
       }
     } catch (err: any) {
-      addToast(err.message ?? "itch.io login failed", "error");
+      addToast({ type: "error", message: err.message ?? "itch.io login failed" });
     } finally {
       setItchLoading(false);
     }
@@ -108,14 +108,14 @@ export const StoreTab: React.FC = () => {
     try {
       const result = await window.htpc.store.itch.logout();
       if (result.success) {
-        addToast("Logged out from itch.io");
+        addToast({ type: "success", message: "Logged out from itch.io" });
         setItchAuth({ authenticated: false });
         setLibraryGames([]);
       } else {
-        addToast(result.error ?? "Logout failed", "error");
+        addToast({ type: "error", message: result.error ?? "Logout failed" });
       }
     } catch (err: any) {
-      addToast(err.message ?? "Logout failed", "error");
+      addToast({ type: "error", message: err.message ?? "Logout failed" });
     } finally {
       setItchLoading(false);
     }
@@ -281,7 +281,7 @@ export const StoreTab: React.FC = () => {
       // Parse itch.io game page URL to extract game identifier
       const match = gameUrl.match(/itch\.io\/([^/]+)\/([^/]+)/);
       if (!match) {
-        addToast("Not a recognized itch.io game URL", "error");
+        addToast({ type: "error", message: "Not a recognized itch.io game URL" });
         return;
       }
       const [, _author, gameSlug] = match;
@@ -290,15 +290,15 @@ export const StoreTab: React.FC = () => {
         // Try to install via butler using the URL slug
         const result = await window.htpc.store.itch.install(gameSlug, gameSlug);
         if (result.success) {
-          addToast(`Installed ${gameSlug}`);
+          addToast({ type: "success", message: `Installed ${gameSlug}` });
           await refreshLibrary();
           // Trigger a game scan so the new game appears in Gaming tab
           await window.htpc.games.scan();
         } else {
-          addToast(result.error ?? "Install failed", "error");
+          addToast({ type: "error", message: result.error ?? "Install failed" });
         }
       } catch (err: any) {
-        addToast(err.message ?? "Install failed", "error");
+        addToast({ type: "error", message: err.message ?? "Install failed" });
       } finally {
         setItchLoading(false);
       }
@@ -489,8 +489,8 @@ export const StoreTab: React.FC = () => {
               ref={(el) => attachWebview(tab.id, el as any)}
               src={tab.url}
               className="w-full h-full"
-              allowpopups=""
-              nodeintegration="false"
+              allowpopups={false}
+              nodeintegration={false}
               webpreferences="contextIsolation=yes,nodeIntegration=no,sandbox=yes"
             />
           </div>
@@ -533,7 +533,7 @@ export const StoreTab: React.FC = () => {
                           platform: "itch",
                           execPath: g.execPath,
                         }).then((res) => {
-                          if (!res.success) addToast(res.error ?? "Launch failed", "error");
+                          if (!res.success) addToast({ type: "error", message: res.error ?? "Launch failed" });
                         });
                       }
                     }}

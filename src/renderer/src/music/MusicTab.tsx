@@ -429,7 +429,7 @@ export const MusicTab: React.FC = () => {
         const idx = options.indexOf(sortBy);
         setSortBy(options[(idx + 1) % options.length]);
       }
-      if (index === 2) setOskOpen(true);
+      if (index === 2) setShowSearchOsk(true);
       if (index === 3 && activeNav === "playlists") {
         handleCreatePlaylist();
       }

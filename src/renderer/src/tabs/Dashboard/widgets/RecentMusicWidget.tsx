@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import { useMusicStore } from "../../../store/media.store";
 import { useMusicPlayerStore } from "../../../store/musicPlayer.store";
-import { MusicTrack } from "../../../../shared/types";
+import { MusicTrack } from "@shared/types";
 import { Disc, Music, Play } from "lucide-react";
 import { getTrackDisplayName } from "../../../music/lib/track-title";
 

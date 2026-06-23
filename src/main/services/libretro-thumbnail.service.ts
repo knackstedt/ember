@@ -755,7 +755,7 @@ export async function loadLibretroThumbnail(
         await updateGameCover(id, procedural, "procedural");
         return procedural;
       }
-      const broken = generateBrokenThumbnail(id, game.slug ?? id, game.platform ?? "libretro");
+      const broken = generateBrokenThumbnail(id, game.title ?? id, game.platform ?? "libretro");
       if (broken) {
         await updateGameCover(id, broken, "broken");
         return broken;
@@ -775,7 +775,7 @@ export async function loadLibretroThumbnail(
       return procedural;
     }
 
-    const broken = generateBrokenThumbnail(id, game.slug ?? id, game.platform ?? "libretro");
+    const broken = generateBrokenThumbnail(id, game.title ?? id, game.platform ?? "libretro");
     if (broken) {
       await updateGameCover(id, broken, "broken");
       return broken;

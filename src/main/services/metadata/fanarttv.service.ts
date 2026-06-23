@@ -166,7 +166,7 @@ export const FanartTVProvider: MetadataProvider = {
 
       // Try TheGamesDB ID
       if (!game && options.theGamesDbId) {
-        game = await getByTheGamesDbId(options.theGamesDbId, apiKey);
+        game = await getByTheGamesDbId(String(options.theGamesDbId), apiKey);
       }
 
       if (!game) return null;

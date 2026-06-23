@@ -818,6 +818,7 @@ export async function installPackage(
     window.webContents.send("libretro:cores:changed");
     const platforms = def.platforms ?? [];
     if (platforms.length > 0) {
+      // @ts-ignore
       import("./libretro-thumbnail.service")
         .then(({ requeueThumbnailsForPlatforms }) => requeueThumbnailsForPlatforms(platforms))
         .then((count) => {

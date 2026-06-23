@@ -25,7 +25,7 @@ import {
   SCAN_SOURCE_LABELS,
   ScanSourceId,
 } from "../../../../shared/scan-sources";
-import { RemoteSource, CredentialMode, StreamingService } from "../../../shared/types";
+import { RemoteSource, CredentialMode, StreamingService } from "@shared/types";
 
 const MODE_ICONS: Record<CredentialMode, typeof Shield> = {
   "auto-key": Shield,
@@ -324,26 +324,26 @@ export const SourcesTab: React.FC = () => {
         </h2>
         <PathList
           label="Movie Paths"
-          paths={settings.moviePaths}
+          paths={settings.moviePaths ?? []}
           onChange={(p) => update({ moviePaths: p })}
           placeholder={xdgDefaults?.videosDir}
           hint={xdgDefaults?.videosDir}
         />
         <PathList
           label="Music Paths"
-          paths={settings.musicPaths}
+          paths={settings.musicPaths ?? []}
           onChange={(p) => update({ musicPaths: p })}
           placeholder={xdgDefaults?.musicDir}
           hint={xdgDefaults?.musicDir}
         />
         <PathList
           label="ROM Paths"
-          paths={settings.romPaths}
+          paths={settings.romPaths ?? []}
           onChange={(p) => update({ romPaths: p })}
         />
         <PathList
           label="Game Paths"
-          paths={settings.gamePaths}
+          paths={settings.gamePaths ?? []}
           onChange={(p) => update({ gamePaths: p })}
         />
         {xdgDefaults && (

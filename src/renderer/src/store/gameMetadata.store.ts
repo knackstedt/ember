@@ -135,7 +135,7 @@ export const useGameMetadataStore = create<GameMetadataState>((set, get) => ({
       console.log(`[GameMetadata] Received metadata for ${gameId}:`, metadata ? `sources: ${metadata.sources?.map(s => s.name).join(', ') || 'none'}` : 'null');
 
       if (metadata) {
-        const fields = Object.keys(metadata).filter(k => (metadata as Record<string, unknown>)[k] !== undefined && (metadata as Record<string, unknown>)[k] !== null);
+        const fields = Object.keys(metadata).filter(k => (metadata as unknown as Record<string, unknown>)[k] !== undefined && (metadata as unknown as Record<string, unknown>)[k] !== null);
         console.log(`[GameMetadata] Caching metadata for ${gameId}, fields:`, fields.join(', '));
         set((s) => {
           const newCache = new Map(s.metadataCache);

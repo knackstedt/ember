@@ -172,7 +172,8 @@ export async function detectAllCoresForRom(romPath: string, availableCores: Core
   const ext = (romPath.match(/\.[^.]+$/)?.[0] ?? "").toLowerCase();
   let platform = PLATFORM_EXTS[ext];
   if (!platform && ext === ".chd") {
-    platform = (await detectChdPlatform(romPath)) ?? undefined;
+    const detected = await detectChdPlatform(romPath);
+    if (detected) platform = detected;
   }
   if (!platform) return [];
 

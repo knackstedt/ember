@@ -1,7 +1,7 @@
 import React from "react";
 
 interface LogoProps {
-  size?: number;
+  size?: number | string | undefined;
 }
 
 function makeLogo(path: string, viewBox = "0 0 24 24"): React.FC<LogoProps> {
