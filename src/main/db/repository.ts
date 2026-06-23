@@ -181,8 +181,11 @@ export const GameRepo = {
 
   async deleteMissing(): Promise<number> {
     const db = getDb();
-    const rows = await db.query<[any[]]>(`DELETE FROM game WHERE missing = true`);
-    return (rows[0] ?? []).length;
+    const rows = await db.query<[number, []]>(`
+      SELECT value count() FROM game WHERE missing = true GROUP ALL;
+      DELETE FROM game WHERE missing = true;
+    `);
+    return rows[0] ?? 0;
   },
 
   async countBySource(source: ScanSourceId): Promise<number> {
@@ -207,8 +210,11 @@ export const GameRepo = {
       prefixConditions.length > 0
         ? `(${sourceCondition}) OR (${prefixConditions.join(" OR ")})`
         : sourceCondition;
-    const rows = await db.query<[any[]]>(`DELETE FROM game WHERE ${where}`, { source });
-    return (rows[0] ?? []).length;
+    const rows = await db.query<[number, []]>(`
+      SELECT value count() FROM game WHERE ${where} GROUP ALL;
+      DELETE FROM game WHERE ${where};
+    `, { source });
+    return rows[0] ?? 0;
   },
 
   async listCorrupt(): Promise<Game[]> {
@@ -223,8 +229,11 @@ export const GameRepo = {
 
   async deleteCorrupt(): Promise<number> {
     const db = getDb();
-    const rows = await db.query<[any[]]>(`DELETE FROM game WHERE corrupt = true`);
-    return (rows[0] ?? []).length;
+    const rows = await db.query<[number, []]>(`
+      SELECT value count() FROM game WHERE corrupt = true GROUP ALL;
+      DELETE FROM game WHERE corrupt = true;
+    `);
+    return rows[0] ?? 0;
   },
 };
 
@@ -327,8 +336,11 @@ export const MovieRepo = {
 
   async deleteMissing(): Promise<number> {
     const db = getDb();
-    const rows = await db.query<[any[]]>(`DELETE FROM movie WHERE missing = true`);
-    return (rows[0] ?? []).length;
+    const rows = await db.query<[number, []]>(`
+      SELECT value count() FROM movie WHERE missing = true GROUP ALL;
+      DELETE FROM movie WHERE missing = true;
+    `);
+    return rows[0] ?? 0;
   },
 
   async listCorrupt(): Promise<Movie[]> {
@@ -343,8 +355,11 @@ export const MovieRepo = {
 
   async deleteCorrupt(): Promise<number> {
     const db = getDb();
-    const rows = await db.query<[any[]]>(`DELETE FROM movie WHERE corrupt = true`);
-    return (rows[0] ?? []).length;
+    const rows = await db.query<[number, []]>(`
+      SELECT value count() FROM movie WHERE corrupt = true GROUP ALL;
+      DELETE FROM movie WHERE corrupt = true;
+    `);
+    return rows[0] ?? 0;
   },
 };
 
@@ -410,8 +425,11 @@ export const MusicRepo = {
 
   async deleteMissing(): Promise<number> {
     const db = getDb();
-    const rows = await db.query<[any[]]>(`DELETE FROM music_track WHERE missing = true`);
-    return (rows[0] ?? []).length;
+    const rows = await db.query<[number, []]>(`
+      SELECT value count() FROM music_track WHERE missing = true GROUP ALL;
+      DELETE FROM music_track WHERE missing = true;
+    `);
+    return rows[0] ?? 0;
   },
 
   async listCorrupt(): Promise<MusicTrack[]> {
@@ -426,8 +444,11 @@ export const MusicRepo = {
 
   async deleteCorrupt(): Promise<number> {
     const db = getDb();
-    const rows = await db.query<[any[]]>(`DELETE FROM music_track WHERE corrupt = true`);
-    return (rows[0] ?? []).length;
+    const rows = await db.query<[number, []]>(`
+      SELECT value count() FROM music_track WHERE corrupt = true GROUP ALL;
+      DELETE FROM music_track WHERE corrupt = true;
+    `);
+    return rows[0] ?? 0;
   },
 };
 
