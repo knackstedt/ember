@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.4.3](https://github.com/knackstedt/ember/compare/v0.4.2...v0.4.3) (2026-06-23)
+
+
+### Features
+
+* **build:** add Ubuntu Ports repository for ARM64 cross-compilation dependencies ([f4a1e44](https://github.com/knackstedt/ember/commit/f4a1e4467965b130b4ecc33fa55166211f74b9c3))
+* **cleanup:** add worker cleanup on app shutdown and window close ([710d1f3](https://github.com/knackstedt/ember/commit/710d1f3e51789ff7c25893f88b801697a97e9631))
+
 ### [0.4.2](https://github.com/knackstedt/ember/compare/v0.4.1...v0.4.2) (2026-06-23)
 
 
