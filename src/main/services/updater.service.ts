@@ -68,7 +68,9 @@ let isAppImage = false;
 
 function saveState() {
   try {
-    writeFileSync(UPDATE_STATE_FILE, JSON.stringify(state));
+    // Don't persist error status across restarts to avoid showing unexplained errors
+    const toSave = state.status === "error" ? { ...state, status: "idle" as UpdaterStatus, error: undefined } : state;
+    writeFileSync(UPDATE_STATE_FILE, JSON.stringify(toSave));
   } catch (e) {
     log.warn("updater", `Failed to save state: ${e}`);
   }
@@ -382,10 +384,12 @@ export async function downloadAndInstallVersion(
     unlinkSync(downloadPath);
     return { success: false, error: "Unsupported package format" };
   } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e) || "Download and install failed";
     state.status = "error";
-    state.error = String(e);
+    state.error = msg;
     emitState();
-    return { success: false, error: String(e) };
+    log.error("updater", `Download/install failed: ${msg}`);
+    return { success: false, error: msg };
   }
 }
 
@@ -461,11 +465,13 @@ export function initUpdater() {
 
   autoUpdater.on("checking-for-update", () => {
     state.status = "checking";
+    state.error = undefined;
     emitState();
   });
 
   autoUpdater.on("update-available", (info) => {
     state.status = "available";
+    state.error = undefined;
     state.availableVersion = info.version;
     state.lastChecked = Date.now();
     emitState();
@@ -494,12 +500,14 @@ export function initUpdater() {
 
   autoUpdater.on("update-not-available", () => {
     state.status = "idle";
+    state.error = undefined;
     state.lastChecked = Date.now();
     emitState();
   });
 
   autoUpdater.on("download-progress", (progress: any) => {
     state.status = "downloading";
+    state.error = undefined;
     state.progress = Math.round(progress.percent);
     state.downloadSpeed = progress.bytesPerSecond;
     emitState();
@@ -508,6 +516,7 @@ export function initUpdater() {
 
   autoUpdater.on("update-downloaded", (info) => {
     state.status = "downloaded";
+    state.error = undefined;
     state.availableVersion = info.version;
     emitState();
 
@@ -522,10 +531,11 @@ export function initUpdater() {
   });
 
   autoUpdater.on("error", (err) => {
+    const msg = err?.message || String(err) || "Unknown updater error";
     state.status = "error";
-    state.error = err.message;
+    state.error = msg;
     emitState();
-    log.error("updater", `Updater error: ${err.message}`);
+    log.error("updater", `Updater error: ${msg}`);
   });
 
   scheduleChecks();
@@ -560,9 +570,11 @@ export async function checkForUpdates(): Promise<void> {
       }
       emitState();
     } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e) || "Update check failed";
       state.status = "error";
-      state.error = String(e);
+      state.error = msg;
       emitState();
+      log.error("updater", `Manual check failed: ${msg}`);
     }
     return;
   }
@@ -572,10 +584,11 @@ export async function checkForUpdates(): Promise<void> {
     emitState();
     await autoUpdater.checkForUpdates();
   } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e) || "Update check failed";
     state.status = "error";
-    state.error = String(e);
+    state.error = msg;
     emitState();
-    log.error("updater", `Check failed: ${e}`);
+    log.error("updater", `Check failed: ${msg}`);
   }
 }
 
@@ -592,10 +605,11 @@ export async function downloadUpdate(): Promise<void> {
     await backupCurrentVersion();
     await autoUpdater.downloadUpdate();
   } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e) || "Update download failed";
     state.status = "error";
-    state.error = String(e);
+    state.error = msg;
     emitState();
-    log.error("updater", `Download failed: ${e}`);
+    log.error("updater", `Download failed: ${msg}`);
   }
 }
 
@@ -612,10 +626,11 @@ export async function installUpdate(): Promise<void> {
     writeUpdateMarker(state.availableVersion ?? "");
     autoUpdater.quitAndInstall(false, true);
   } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e) || "Update install failed";
     state.status = "error";
-    state.error = String(e);
+    state.error = msg;
     emitState();
-    log.error("updater", `Install failed: ${e}`);
+    log.error("updater", `Install failed: ${msg}`);
   }
 }
 
