@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.4.5](https://github.com/knackstedt/ember/compare/v0.4.4...v0.4.5) (2026-06-23)
+
+
+### Features
+
+* **build:** consolidate Rust build scripts into unified build-rust.ts ([72ce0f2](https://github.com/knackstedt/ember/commit/72ce0f21cf2b65ecf0f61b37ce4eca7f38ad1825))
+* **db:** add graceful database worker shutdown with timeout handling ([0a14e19](https://github.com/knackstedt/ember/commit/0a14e19f405406ea1429f7b9e668091bd149b93c))
+* **music:** add wheel event handler for volume control with passive:false flag ([83986a3](https://github.com/knackstedt/ember/commit/83986a3ea446c39c60f2b284f175d513abbce56b))
+* **server:** add abort signal handling for file stream cleanup ([ba7ae50](https://github.com/knackstedt/ember/commit/ba7ae508b6e6fd39361b5fa1788400ba081327f7))
+* **thumbnails:** add native mpv-based thumbnail worker with HDR tone-mapping and complexity detection ([c62ad97](https://github.com/knackstedt/ember/commit/c62ad97c3a20fd01c035db5863ba041c31364e38))
+* tsc fixes ([4850660](https://github.com/knackstedt/ember/commit/48506600304796350e92d3b8e8451d69941b0c08))
+* **ui:** add FlameLoader component and improve scanning toast handling ([84a6791](https://github.com/knackstedt/ember/commit/84a679150cfc696e21fe0dd33e401f4fc8c9b286))
+* **updater:** add backup directory existence check before rollback ([74dd03d](https://github.com/knackstedt/ember/commit/74dd03d93499b0af5d51f2ba47630df2360060bb))
+* **updater:** improve error handling and state management ([82f455f](https://github.com/knackstedt/ember/commit/82f455f51003b747d5981b1e1ac64d61a8c1b678))
+* **video:** improve native decoder stability and add track/speed persistence ([fd4c10b](https://github.com/knackstedt/ember/commit/fd4c10b15f9e4e28062f20b30019942d142083cf))
+
+
+### Bug Fixes
+
+* **db:** use SELECT count() before DELETE to get accurate row counts ([072483a](https://github.com/knackstedt/ember/commit/072483a5e9d2d30497daaa292ecb72dd7380824a))
+
 ### [0.4.4](https://github.com/knackstedt/ember/compare/v0.4.3...v0.4.4) (2026-06-23)
 
 ### [0.4.3](https://github.com/knackstedt/ember/compare/v0.4.2...v0.4.3) (2026-06-23)
