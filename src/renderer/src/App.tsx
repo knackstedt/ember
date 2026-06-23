@@ -8,6 +8,8 @@ import {
   Store,
   Settings,
   Maximize,
+  Power,
+  Loader,
   LayoutDashboard,
 } from "lucide-react";
 import { useSettingsStore } from "./store/settings.store";
@@ -155,6 +157,15 @@ export default function App(): React.ReactElement {
   activeTabRef.current = activeTab;
   const [evdevGamepadActive, setEvdevGamepadActive] = useState(false);
   const evdevGamepadActiveRef = useRef(false);
+
+  /* Tab bar keyboard/controller focus state (-1 = unfocused) */
+  const [tabBarFocusIndex, setTabBarFocusIndex] = useState(-1);
+  const tabBarFocusIndexRef = useRef(tabBarFocusIndex);
+  tabBarFocusIndexRef.current = tabBarFocusIndex;
+
+  /* Power dialog state */
+  const [powerDialogOpen, setPowerDialogOpen] = useState(false);
+  const [powerActionLoading, setPowerActionLoading] = useState(false);
 
   /* Command palette context refs */
   const selectedGameRef = useRef<string | null>(null);
@@ -891,14 +902,14 @@ export default function App(): React.ReactElement {
         }
       } else if (e.type === "keydown" && e.key === "Tab" && !e.shiftKey) {
         e.preventDefault();
-        const tabs = visibleTabIdsRef.current;
-        const idx = tabs.indexOf(activeTabRef.current);
-        setActiveTab(tabs[(idx + 1) % tabs.length]);
+        const totalItems = visibleTabs.length + 2; // tabs + fullscreen + power
+        const next = (tabBarFocusIndexRef.current + 1) % totalItems;
+        setTabBarFocusIndex(next);
       } else if (e.type === "keydown" && e.key === "Tab" && e.shiftKey) {
         e.preventDefault();
-        const tabs = visibleTabIdsRef.current;
-        const idx = tabs.indexOf(activeTabRef.current);
-        setActiveTab(tabs[(idx - 1 + tabs.length) % tabs.length]);
+        const totalItems = visibleTabs.length + 2;
+        const next = (tabBarFocusIndexRef.current - 1 + totalItems) % totalItems;
+        setTabBarFocusIndex(next);
       } else if (e.type === "keydown" && e.key === "F1" && e.ctrlKey) {
         // Ctrl+F1 — rescan all libraries
         e.preventDefault();
@@ -962,6 +973,100 @@ export default function App(): React.ReactElement {
     };
   }, []);
 
+  /* Power dialog: suspend nav and handle Escape / controller nav */
+  const [powerDialogFocusIndex, setPowerDialogFocusIndex] = useState(0);
+  useEffect(() => {
+    useInputStore.getState().setNavSuspended(powerDialogOpen);
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !powerActionLoading) {
+        setPowerDialogOpen(false);
+      }
+    };
+    if (powerDialogOpen) {
+      window.addEventListener("keydown", handler, true);
+    }
+    return () => {
+      window.removeEventListener("keydown", handler, true);
+    };
+  }, [powerDialogOpen, powerActionLoading]);
+
+  useEffect(() => {
+    if (powerDialogOpen) {
+      setPowerDialogFocusIndex(0);
+    }
+  }, [powerDialogOpen]);
+
+  useEffect(() => {
+    if (!powerDialogOpen) return;
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { action?: string } | undefined;
+      const action = detail?.action;
+      if (!action) return;
+      e.stopImmediatePropagation();
+      if (action === "left") {
+        setPowerDialogFocusIndex((prev) => Math.max(0, prev - 1));
+      } else if (action === "right") {
+        setPowerDialogFocusIndex((prev) => Math.min(2, prev + 1));
+      } else if (action === "confirm") {
+        if (powerDialogFocusIndex === 0) {
+          setPowerDialogOpen(false);
+        } else if (powerDialogFocusIndex === 1) {
+          setPowerActionLoading(true);
+          void window.htpc.app.quit();
+        } else if (powerDialogFocusIndex === 2) {
+          setPowerActionLoading(true);
+          void window.htpc.app.shutdown();
+        }
+      } else if (action === "cancel") {
+        setPowerDialogOpen(false);
+      }
+    };
+    window.addEventListener("htpc:nav", handler, true);
+    return () => window.removeEventListener("htpc:nav", handler, true);
+  }, [powerDialogOpen, powerDialogFocusIndex]);
+
+  /* Capture-phase nav listener for tab bar focus */
+  useEffect(() => {
+    const handler = (e: Event) => {
+      if (useInputStore.getState().navSuspended) return;
+      const idx = tabBarFocusIndexRef.current;
+      if (idx < 0) return;
+
+      const detail = (e as CustomEvent).detail as { action?: string } | undefined;
+      const action = detail?.action;
+      if (!action) return;
+
+      const totalItems = visibleTabs.length + 2;
+
+      if (action === "left") {
+        e.stopImmediatePropagation();
+        setTabBarFocusIndex((prev) => (prev - 1 + totalItems) % totalItems);
+      } else if (action === "right") {
+        e.stopImmediatePropagation();
+        setTabBarFocusIndex((prev) => (prev + 1) % totalItems);
+      } else if (action === "confirm") {
+        e.stopImmediatePropagation();
+        const tabCount = visibleTabs.length;
+        if (idx < tabCount) {
+          setActiveTab(visibleTabs[idx].id);
+          setTabBarFocusIndex(-1);
+        } else if (idx === tabCount) {
+          const current = useSettingsStore.getState().settings?.fullscreen ?? false;
+          void useSettingsStore.getState().update({ fullscreen: !current });
+          setTabBarFocusIndex(-1);
+        } else if (idx === tabCount + 1) {
+          setPowerDialogOpen(true);
+          setTabBarFocusIndex(-1);
+        }
+      } else if (action === "cancel") {
+        e.stopImmediatePropagation();
+        setTabBarFocusIndex(-1);
+      }
+    };
+    window.addEventListener("htpc:nav", handler, true);
+    return () => window.removeEventListener("htpc:nav", handler, true);
+  }, [visibleTabs.length]);
+
   if (loading) {
     return (
       <div
@@ -1023,13 +1128,19 @@ export default function App(): React.ReactElement {
           className="flex items-center gap-1 px-4 pt-3 pb-0 flex-shrink-0"
           style={{ borderBottom: "1px solid var(--border-default)" }}
         >
-          {visibleTabs.map((tab) => {
+          {visibleTabs.map((tab, idx) => {
             const isActive = tab.id === activeTab;
+            const isFocused = tabBarFocusIndex === idx;
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className="relative flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium rounded-t-lg transition-colors focus:outline-none"
+                tabIndex={0}
+                onClick={() => {
+                  setActiveTab(tab.id);
+                  setTabBarFocusIndex(-1);
+                }}
+                onFocus={() => setTabBarFocusIndex(idx)}
+                className={`relative flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium rounded-t-lg transition-colors ${isFocused ? "tab-bar-focus" : ""}`}
                 style={{
                   color: isActive
                     ? "var(--text-primary)"
@@ -1037,6 +1148,12 @@ export default function App(): React.ReactElement {
                   background: isActive
                     ? "var(--surface-1)"
                     : "transparent",
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.background = "var(--surface-0)";
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.background = isActive ? "var(--surface-1)" : "transparent";
                 }}
               >
                 <tab.Icon size={16} />
@@ -1058,7 +1175,8 @@ export default function App(): React.ReactElement {
 
           <div className="ml-auto flex items-center gap-2 pb-1">
             <button
-              className="px-3 py-1.5 rounded text-xs"
+              tabIndex={0}
+              className={`px-3 py-1.5 rounded text-xs transition-colors ${tabBarFocusIndex === visibleTabs.length ? "tab-bar-focus" : ""}`}
               style={{
                 color: "var(--text-secondary)",
                 background: "transparent",
@@ -1067,9 +1185,35 @@ export default function App(): React.ReactElement {
                 const current = useSettingsStore.getState().settings?.fullscreen ?? false;
                 void useSettingsStore.getState().update({ fullscreen: !current });
               }}
+              onFocus={() => setTabBarFocusIndex(visibleTabs.length)}
               title="Fullscreen"
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.background = "var(--surface-0)";
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+              }}
             >
               <Maximize size={16} />
+            </button>
+            <button
+              tabIndex={0}
+              className={`px-3 py-1.5 rounded text-xs transition-colors ${tabBarFocusIndex === visibleTabs.length + 1 ? "tab-bar-focus" : ""}`}
+              style={{
+                color: "var(--text-secondary)",
+                background: "transparent",
+              }}
+              onClick={() => setPowerDialogOpen(true)}
+              onFocus={() => setTabBarFocusIndex(visibleTabs.length + 1)}
+              title="Power"
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.background = "var(--surface-0)";
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+              }}
+            >
+              <Power size={16} />
             </button>
           </div>
         </nav>
@@ -1113,6 +1257,99 @@ export default function App(): React.ReactElement {
 
       {/* Game launch overlay */}
       <GameLaunchOverlay />
+
+      {/* Power dialog */}
+      <AnimatePresence>
+        {powerDialogOpen && (
+          <motion.div
+            className="fixed inset-0 z-[100] flex items-center justify-center"
+            style={{ background: "rgba(0,0,0,0.6)" }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => {
+              if (!powerActionLoading) setPowerDialogOpen(false);
+            }}
+          >
+            <motion.div
+              className="flex flex-col gap-4 p-6 rounded-[var(--radius-card)]"
+              style={{
+                background: "var(--surface-1)",
+                border: "1px solid var(--border-default)",
+                minWidth: 320,
+              }}
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              transition={{ type: "spring", damping: 30, stiffness: 400 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h2
+                className="text-lg font-semibold"
+                style={{ color: "var(--text-primary)" }}
+              >
+                Power Options
+              </h2>
+              <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+                What would you like to do?
+              </p>
+              <div className="flex gap-3 justify-end">
+                <button
+                  className={`px-4 py-2 rounded-[var(--radius-card)] text-sm transition-colors ${powerDialogFocusIndex === 0 ? "tab-bar-focus" : ""}`}
+                  style={{
+                    background: powerDialogFocusIndex === 0 ? "var(--accent)" : "transparent",
+                    color: powerDialogFocusIndex === 0 ? "var(--surface-base)" : "var(--text-primary)",
+                    border: `1px solid ${powerDialogFocusIndex === 0 ? "var(--accent)" : "var(--border-default)"}`,
+                    opacity: powerActionLoading ? 0.6 : 1,
+                  }}
+                  onClick={() => setPowerDialogOpen(false)}
+                  disabled={powerActionLoading}
+                >
+                  Cancel
+                </button>
+                <button
+                  className={`px-4 py-2 rounded-[var(--radius-card)] text-sm transition-colors ${powerDialogFocusIndex === 1 ? "tab-bar-focus" : ""}`}
+                  style={{
+                    background: powerDialogFocusIndex === 1 ? "var(--accent)" : "transparent",
+                    color: powerDialogFocusIndex === 1 ? "var(--surface-base)" : "var(--text-primary)",
+                    border: `1px solid ${powerDialogFocusIndex === 1 ? "var(--accent)" : "var(--border-default)"}`,
+                    opacity: powerActionLoading ? 0.6 : 1,
+                  }}
+                  onClick={async () => {
+                    setPowerActionLoading(true);
+                    await window.htpc.app.quit();
+                  }}
+                  disabled={powerActionLoading}
+                >
+                  {powerActionLoading && (
+                    <Loader size={14} className="animate-spin inline mr-1.5" />
+                  )}
+                  Exit Ember
+                </button>
+                <button
+                  className={`px-4 py-2 rounded-[var(--radius-card)] text-sm transition-colors ${powerDialogFocusIndex === 2 ? "tab-bar-focus" : ""}`}
+                  style={{
+                    background: powerDialogFocusIndex === 2 ? "#ff4444" : "transparent",
+                    color: powerDialogFocusIndex === 2 ? "#fff" : "var(--text-primary)",
+                    border: `1px solid ${powerDialogFocusIndex === 2 ? "#ff4444" : "var(--border-default)"}`,
+                    opacity: powerActionLoading ? 0.6 : 1,
+                  }}
+                  onClick={async () => {
+                    setPowerActionLoading(true);
+                    await window.htpc.app.shutdown();
+                  }}
+                  disabled={powerActionLoading}
+                >
+                  {powerActionLoading && (
+                    <Loader size={14} className="animate-spin inline mr-1.5" />
+                  )}
+                  Shut Down Computer
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

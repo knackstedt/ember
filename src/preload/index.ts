@@ -355,6 +355,7 @@ const htpc = {
       ipcRenderer.invoke("app:fullscreen", value),
     quit: (): Promise<void> => ipcRenderer.invoke("app:quit"),
     restart: (): Promise<void> => ipcRenderer.invoke("app:restart"),
+    shutdown: (): Promise<void> => ipcRenderer.invoke("app:shutdown"),
     getXdgDefaults: (): Promise<{
       videosDir: string;
       musicDir: string;

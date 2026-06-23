@@ -527,6 +527,18 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     }
   });
 
+  ipcMain.handle("app:shutdown", () => {
+    try {
+      spawn("systemctl", ["poweroff"], { detached: true, stdio: "ignore" });
+    } catch {
+      try {
+        spawn("shutdown", ["-h", "now"], { detached: true, stdio: "ignore" });
+      } catch {
+        // Fallback not available
+      }
+    }
+  });
+
   ipcMain.handle("games:scan", async (_e, extraPaths?: string[]) => {
     await performGameScan(window, extraPaths);
     // Also scan remote sources configured for ROMs
