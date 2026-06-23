@@ -52,8 +52,8 @@ export const FlameLoader: React.FC<FlameLoaderProps> = ({
         const rCanvas = rCanvasRef.current;
         if (!pCanvas || !rCanvas) return;
 
-        const pCtx = pCanvas.getContext("2d");
-        const rCtx = rCanvas.getContext("2d");
+        const pCtx = pCanvas.getContext("2d")!;
+        const rCtx = rCanvas.getContext("2d")!;
         if (!pCtx || !rCtx) return;
 
         const CX = width / 2;
