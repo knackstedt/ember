@@ -694,6 +694,9 @@ app.whenReady().then(async () => {
           const end = match[2] ? parseInt(match[2], 10) : stats.size - 1;
           const length = end - start + 1;
           const stream = createReadStream(filePath, { start, end });
+          if (request.signal) {
+            request.signal.addEventListener("abort", () => stream.destroy(), { once: true });
+          }
           return new Response(stream as any, {
             status: 206,
             headers: {
@@ -707,6 +710,9 @@ app.whenReady().then(async () => {
         }
       }
       const stream = createReadStream(filePath);
+      if (request.signal) {
+        request.signal.addEventListener("abort", () => stream.destroy(), { once: true });
+      }
       return new Response(stream as any, {
         status: 200,
         headers: {
@@ -771,6 +777,9 @@ app.whenReady().then(async () => {
         const end = match[2] ? parseInt(match[2], 10) : stats.size - 1;
         const length = end - start + 1;
         const stream = createReadStream(filePath, { start, end });
+        if (request.signal) {
+          request.signal.addEventListener("abort", () => stream.destroy(), { once: true });
+        }
         return new Response(stream as any, {
           status: 206,
           headers: {
@@ -785,6 +794,9 @@ app.whenReady().then(async () => {
     }
 
     const stream = createReadStream(filePath);
+    if (request.signal) {
+      request.signal.addEventListener("abort", () => stream.destroy(), { once: true });
+    }
     return new Response(stream as any, {
       status: 200,
       headers: {
