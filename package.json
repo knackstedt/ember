@@ -22,7 +22,7 @@
     "retag": "VERSION=$(jq -r '.version' package.json) && git push origin :refs/tags/v${VERSION} 2>/dev/null || true && git tag -d v${VERSION} 2>/dev/null || true && git tag v${VERSION} && git push origin v${VERSION} --force"
   },
   "dependencies": {
-    "@dotglitch/odatav4": "^4.7.1",
+    "@dotglitch/odatav4": "^5.0.1",
     "@fontsource/mukta-vaani": "^5.2.8",
     "@ruffle-rs/ruffle": "^0.2.0",
     "@surrealdb/node": "^3.0.0",
