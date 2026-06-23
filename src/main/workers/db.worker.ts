@@ -10,7 +10,7 @@ let initDone = false;
 
 interface DbRequest {
   id: number;
-  type: "init" | "query";
+  type: "init" | "query" | "shutdown";
   dataDir?: string;
   sql?: string;
   params?: Record<string, unknown>;
@@ -39,6 +39,18 @@ async function initDb(dataDir: string) {
 }
 
 parentPort?.on("message", async (req: DbRequest) => {
+  if (req.type === "shutdown") {
+    try {
+      if (db) {
+        await db.close();
+      }
+    } catch (err) {
+      log.error("db-worker", `Shutdown close error: ${err}`);
+    }
+    parentPort?.postMessage({ id: req.id, type: "shutdown", result: true } as DbResponse);
+    parentPort?.close();
+    return;
+  }
   try {
     let result: unknown;
     if (req.type === "init") {

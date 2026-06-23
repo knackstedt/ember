@@ -43,7 +43,7 @@ class WorkerSurreal implements Surreal {
       }
     });
     this.worker.on("error", (err) => {
-      log.error("db", "DB worker error:", err);
+      log.error("db", `DB worker error: ${err}`);
       for (const pending of this.pending.values()) {
         pending.reject(err);
       }
@@ -169,13 +169,29 @@ export function getDb(): Surreal {
   return db;
 }
 
-export function terminateDbWorker(): void {
-  if (worker) {
-    try {
-      worker.terminate();
-    } catch { /* ignore */ }
-    worker = null;
-  }
+let terminating = false;
+
+export async function terminateDbWorker(): Promise<void> {
+  if (!worker || terminating) return;
+  terminating = true;
+  try {
+    const exitPromise = new Promise<void>((resolve) => {
+      worker!.once("exit", () => resolve());
+    });
+    worker.postMessage({ id: -1, type: "shutdown" });
+    await Promise.race([exitPromise, new Promise<void>((r) => setTimeout(r, 2000))]);
+  } catch { /* ignore */ }
+  try {
+    await Promise.race([
+      worker.terminate(),
+      new Promise<void>((_, reject) =>
+        setTimeout(() => reject(new Error("DB worker terminate timeout")), 2000),
+      ),
+    ]);
+  } catch { /* ignore */ }
+  worker = null;
+  db = null;
+  terminating = false;
 }
 
 async function runMigrations(db: Surreal): Promise<void> {

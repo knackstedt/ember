@@ -13,7 +13,7 @@ import { getWindowState, saveWindowState } from "./services/window-state.service
 import { createLogger } from "./util/logger";
 import { getXdgVideosDir } from "./scanners/xdg";
 import { MovieRepo, RemoteSourceRepo } from "./db/repository";
-import { getServePort } from "./services/rclone-manager";
+import { getServePort, shutdownRcloneManager } from "./services/rclone-manager";
 import { startRemoteAvailabilityWorker, stopRemoteAvailabilityWorker } from "./services/remote-availability.service";
 import { bootPlugins, shutdownPlugins } from "./plugins/loader";
 import { installBundledPlugins } from "./services/plugin-manager.service";
@@ -590,6 +590,8 @@ app.whenReady().then(async () => {
 
       const proxyUrl = `http://localhost:${port}/${proxyPath.split("/").map(encodeURIComponent).join("/")}`;
       log.info("ember:protocol", `proxy ${request.url} -> ${proxyUrl} (method=${request.method})`);
+      let timeout: ReturnType<typeof setTimeout> | null = null;
+      const controller = new AbortController();
       try {
         // Forward range requests and other headers for video streaming
         const headers = new Headers();
@@ -599,8 +601,7 @@ app.whenReady().then(async () => {
           forwarded.push(`${key}: ${value}`);
         }
         log.debug("ember:protocol", `forwarding headers: ${forwarded.join(", ")}`);
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 30000);
+        timeout = setTimeout(() => controller.abort(), 30000);
         if (request.signal) {
           request.signal.addEventListener("abort", () => controller.abort(), { once: true });
         }
@@ -643,7 +644,7 @@ app.whenReady().then(async () => {
           headers: respHeaders,
         });
       } catch (err) {
-        clearTimeout(timeout);
+        if (timeout) clearTimeout(timeout);
         log.error("ember:protocol", `proxy fetch failed for ${proxyUrl}: ${err}`);
         return new Response("Remote unavailable", { status: 504 });
       }
@@ -834,8 +835,10 @@ app.whenReady().then(async () => {
 app.on("before-quit", async (e) => {
   stopRemoteAvailabilityWorker();
   markCleanShutdown();
-  terminateDbWorker();
+  await destroyInputSystem();
+  await terminateDbWorker();
   destroyMpvWorker();
+  await shutdownRcloneManager();
   await destroyLibretroWorker();
   // Give renderers a brief moment to fire any pending beforeunload / IPC saves
   const windows = BrowserWindow.getAllWindows();
@@ -860,8 +863,9 @@ app.on("before-quit", async (e) => {
 app.on("window-all-closed", async () => {
   stopRemoteAvailabilityWorker();
   await destroyInputSystem();
-  terminateDbWorker();
+  await terminateDbWorker();
   destroyMpvWorker();
+  await shutdownRcloneManager();
   await destroyLibretroWorker();
   try {
     await shutdownPlugins();
