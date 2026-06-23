@@ -183,9 +183,9 @@ impl MpvRenderer {
         mpv_err(unsafe { (mpv_api.mpv_command)(self.mpv, args.as_mut_ptr()) })
             .map_err(|e| format!("mpv loadfile failed: {}", e))?;
 
-        // Poll for metadata (max 30s — 4K HEVC files on network shares
+        // Poll for metadata (max 120s — 4K HEVC files on network shares
         // can take a long time to open and decode the first frame).
-        for i in 0..3000 {
+        for i in 0..12000 {
             if let Some(w) = self.get_property_int("width")? {
                 if w > 0 {
                     self.video_width = w as u32;

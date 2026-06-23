@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, statSync, mkdirSync, unlinkSync } from "fs";
 import { join, extname, basename, resolve } from "path";
 import { createHash } from "crypto";
-import { exec } from "child_process";
+import { exec, execSync, spawn } from "child_process";
 import { promisify } from "util";
 import { app } from "electron";
 import { getXdgVideosDir } from "./xdg";
@@ -52,6 +52,19 @@ export async function checkFfmpeg(): Promise<boolean> {
     ffmpegAvailable = false;
   }
   return ffmpegAvailable;
+}
+
+function findNodeExecutable(): string {
+  for (const cmd of ["node", "bun"]) {
+    try {
+      const path = execSync(`which ${cmd}`, {
+        encoding: "utf8",
+        stdio: ["pipe", "pipe", "ignore"],
+      }).trim();
+      if (path && existsSync(path)) return path;
+    } catch { /* ignore */ }
+  }
+  return process.execPath;
 }
 
 interface FfprobeStream {
@@ -131,16 +144,49 @@ function summarizeExecError(err: unknown): string {
   return msg.slice(0, 200);
 }
 
+async function resolveThumbnailPath(filePath: string): Promise<string> {
+  if (!filePath.startsWith("ember://remote/")) return filePath;
+  const url = new URL(filePath);
+  const segments = url.pathname.split("/").filter(Boolean).map(decodeURIComponent);
+  const sourceId = segments[0];
+  let proxyPath = segments.slice(1).join("/");
+  try {
+    const { getServePort } = await import("../services/rclone-manager");
+    const { RemoteSourceRepo } = await import("../db/repository.js");
+    const port = await getServePort(sourceId);
+    if (port) {
+      try {
+        const sources = await RemoteSourceRepo.list();
+        const source = sources.find((s: any) => s.id === sourceId);
+        const basePath = (source?.remotePath || "/").replace(/^\//, "");
+        if (basePath && proxyPath.toLowerCase().startsWith(basePath.toLowerCase() + "/")) {
+          proxyPath = proxyPath.slice(basePath.length + 1);
+        } else if (basePath && proxyPath.toLowerCase() === basePath.toLowerCase()) {
+          proxyPath = "";
+        }
+      } catch {
+        /* ignore */
+      }
+      return `http://localhost:${port}/${proxyPath.split("/").map(encodeURIComponent).join("/")}`;
+    }
+  } catch { /* ignore */ }
+  return filePath;
+}
+
 async function extractEmbeddedVideoCover(
   filePath: string,
   dest: string,
 ): Promise<boolean> {
   if (!(await checkFfmpeg())) return false;
   // Cover extraction requires parsing the container to locate the embedded
-  // picture stream. Over HTTP this is unreliable (especially for MKV where
-  // ffmpeg may need range-request support), so skip it and fall back to a
-  // frame thumbnail which works fine for remote files.
-  if (filePath.startsWith("http://") || filePath.startsWith("https://")) {
+  // picture stream. Over HTTP/ember this is unreliable (especially for MKV
+  // where ffmpeg may need range-request support), so skip it and fall back
+  // to a frame thumbnail which works fine for remote files.
+  if (
+    filePath.startsWith("http://") ||
+    filePath.startsWith("https://") ||
+    filePath.startsWith("ember://")
+  ) {
     return false;
   }
   try {
@@ -179,16 +225,108 @@ async function extractEmbeddedVideoCover(
   }
 }
 
+async function tryNativeThumbnail(
+  filePath: string,
+  dest: string,
+  seekMs: number,
+): Promise<boolean> {
+  const workerScript = join(__dirname, "thumbnail-worker.js");
+  if (!existsSync(workerScript)) {
+    log.warn("video.scanner", `thumbnail-worker not found at ${workerScript}`);
+    return false;
+  }
+
+  const nodeExec = findNodeExecutable();
+  const isElectron = nodeExec === process.execPath;
+  const env: Record<string, string | undefined> = { ...process.env };
+  if (isElectron) {
+    env.ELECTRON_RUN_AS_NODE = "1";
+  }
+
+  try {
+    const exitCode = await new Promise<number>((resolve, reject) => {
+      const child = spawn(
+        nodeExec,
+        [workerScript, filePath, String(seekMs), dest, "480"],
+        { env, stdio: ["ignore", "pipe", "pipe"] },
+      );
+
+      let stderr = "";
+      child.stderr.on("data", (data: Buffer) => {
+        stderr += data.toString();
+      });
+
+      child.on("error", (err) => reject(err));
+      child.on("close", (code) => {
+        if (code !== 0 && stderr) {
+          reject(new Error(stderr.trim()));
+        } else {
+          resolve(code ?? -1);
+        }
+      });
+
+      // Hard timeout — must exceed Rust mpv_renderer open() timeout (120s).
+      setTimeout(() => {
+        try { child.kill("SIGTERM"); } catch { /* ignore */ }
+        reject(new Error("thumbnail-worker timed out"));
+      }, 130000);
+    });
+
+    if (exitCode === 0 && existsSync(dest) && statSync(dest).size > 0) {
+      return true;
+    }
+    try {
+      unlinkSync(dest);
+    } catch {
+      /* ignore */
+    }
+    return false;
+  } catch (err) {
+    if (isConnectionError(err)) throw err;
+    log.warn(
+      "video.scanner",
+      `native thumbnail attempt failed for ${filePath} at ${seekMs}ms: ${summarizeExecError(err)}`,
+    );
+    return false;
+  }
+}
+
 async function generateFrameThumbnail(
   filePath: string,
   dest: string,
   duration?: number,
 ): Promise<boolean> {
+  let seekSec = 30;
+  if (duration && duration > 0) {
+    seekSec = Math.max(5, Math.min(Math.round(duration * 0.05), 300));
+  }
+  const seekMs = seekSec * 1000;
+
+  // Use native mpv/libmpv thumbnail worker for consistent colorimetry.
+  if (await tryNativeThumbnail(filePath, dest, seekMs)) return true;
+  if (await tryNativeThumbnail(filePath, dest, 1000)) return true;
+  log.warn(
+    "video.scanner",
+    `native thumbnail failed for ${filePath}, falling back to ffmpeg`,
+  );
+
   if (!(await checkFfmpeg())) return false;
-  const tryCapture = async (seek: string): Promise<boolean> => {
+
+  const hh = String(Math.floor(seekSec / 3600)).padStart(2, "0");
+  const mm = String(Math.floor((seekSec % 3600) / 60)).padStart(2, "0");
+  const ss = String(seekSec % 60).padStart(2, "0");
+  const primarySeek = `${hh}:${mm}:${ss}`;
+
+  const tryCapture = async (
+    seek: string,
+    filter?: string,
+  ): Promise<boolean> => {
     try {
+      const vf = filter
+        ? `-vf "${filter}"`
+        : '-vf "scale=480:-1"';
       await execAsync(
-        `ffmpeg -hide_banner -loglevel error -ss ${seek} -i "${filePath.replace(/"/g, '\\"')}" -frames:v 1 -q:v 2 -vf "scale=480:-1" -pix_fmt yuvj420p -y "${dest}"`,
+        `ffmpeg -hide_banner -loglevel error -ss ${seek} -i "${filePath.replace(/"/g, '\\"')}" -frames:v 1 -q:v 2 ${vf} -pix_fmt yuvj420p -y "${dest}"`,
         { timeout: 30000 },
       );
       if (existsSync(dest) && statSync(dest).size > 0) return true;
@@ -200,20 +338,22 @@ async function generateFrameThumbnail(
       return false;
     } catch (err) {
       if (isConnectionError(err)) throw err;
+      log.warn(
+        "video.scanner",
+        `ffmpeg thumbnail attempt failed for ${filePath} at ${seek}${filter ? " (HDR tone-map)" : ""}: ${summarizeExecError(err)}`,
+      );
       return false;
     }
   };
-  let seekSec = 30;
-  if (duration && duration > 0) {
-    seekSec = Math.max(5, Math.min(Math.round(duration * 0.1), 300));
-  }
-  const hh = String(Math.floor(seekSec / 3600)).padStart(2, "0");
-  const mm = String(Math.floor((seekSec % 3600) / 60)).padStart(2, "0");
-  const ss = String(seekSec % 60).padStart(2, "0");
-  const primarySeek = `${hh}:${mm}:${ss}`;
+
+  // Primary seek with HDR tone mapping (matches mpv's default hable).
+  if (await tryCapture(primarySeek, "zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=hable,zscale=t=bt709:m=bt709:r=tv,scale=480:-1")) return true;
+  if (await tryCapture("00:00:01", "zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=hable,zscale=t=bt709:m=bt709:r=tv,scale=480:-1")) return true;
+
+  // Fallback without HDR filters (for ffmpeg builds lacking zscale).
   if (await tryCapture(primarySeek)) return true;
-  // Fallback: seek early and let ffmpeg decode to the target (slower but more accurate)
   if (await tryCapture("00:00:01")) return true;
+
   log.error(
     "video.scanner",
     `generateFrameThumbnail failed for ${filePath}`,
@@ -237,11 +377,12 @@ export async function generateMovieThumbnail(
       /* ignore */
     }
   }
-  const hasEmbedded = await extractEmbeddedVideoCover(filePath, dest);
+  const resolvedPath = await resolveThumbnailPath(filePath);
+  const hasEmbedded = await extractEmbeddedVideoCover(resolvedPath, dest);
   if (hasEmbedded) {
     return `ember://thumbnails/movies/${id}.jpg`;
   }
-  const generated = await generateFrameThumbnail(filePath, dest, duration);
+  const generated = await generateFrameThumbnail(resolvedPath, dest, duration);
   if (generated) {
     return `ember://thumbnails/movies/${id}.jpg`;
   }
@@ -267,11 +408,12 @@ export async function generateShowThumbnail(
   const firstEp = episodes
     .sort((a, b) => a.season - b.season || a.ep - b.ep)[0];
   if (!firstEp) return undefined;
-  const hasEmbedded = await extractEmbeddedVideoCover(firstEp.path, dest);
+  const resolvedPath = await resolveThumbnailPath(firstEp.path);
+  const hasEmbedded = await extractEmbeddedVideoCover(resolvedPath, dest);
   if (hasEmbedded) {
     return `ember://thumbnails/tv/${id}.jpg`;
   }
-  const generated = await generateFrameThumbnail(firstEp.path, dest);
+  const generated = await generateFrameThumbnail(resolvedPath, dest);
   if (generated) {
     return `ember://thumbnails/tv/${id}.jpg`;
   }

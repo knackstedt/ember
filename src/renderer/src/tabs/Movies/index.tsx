@@ -55,6 +55,7 @@ import { useToastStore } from "../../store/toast.store";
 import { AiGroup } from "../../../../shared/types";
 import { DynamicFacetFilters, FacetField } from "../../components/DynamicFacetFilters/DynamicFacetFilters";
 import { getSourceBadge } from "../../lib/source-badge";
+import { coerceResolution } from "../../lib/resolution-badge";
 
 type SubTab = "local" | "streaming" | "ai-groups";
 
@@ -387,6 +388,7 @@ export const MoviesTab: React.FC = () => {
   const renderItem = useCallback(
     (movie: Movie, index: number) => {
       const source = getSourceBadge(movie.sourceLocation);
+      const resolution = coerceResolution(movie.resolution);
       return (
         <div className="p-1.5 w-full h-full flex flex-col min-w-0" {...bindItem(movie, index)}>
           <MediaCard
@@ -397,6 +399,7 @@ export const MoviesTab: React.FC = () => {
             coverUrl={movie.coverUrl}
             badge={source.badge}
             badgeColor={source.badgeColor}
+            resolution={resolution}
             isFavorite={movie.isFavorite}
             isFocused={index === focusedIndex}
             isLoading={regeneratingIds.has(movie.id)}
@@ -414,12 +417,14 @@ export const MoviesTab: React.FC = () => {
   const renderHex = useCallback(
     (movie: Movie, index: number) => {
       const source = getSourceBadge(movie.sourceLocation);
+      const resolution = coerceResolution(movie.resolution);
       return {
         coverUrl: movie.coverUrl,
         title: movie.title,
         subtitle: movie.releaseYear ? String(movie.releaseYear) : undefined,
         badge: source.badge,
         badgeColor: source.badgeColor,
+        resolution,
         isFavorite: movie.isFavorite,
         isLoading: regeneratingIds.has(movie.id),
         progress: movie.watchProgress,
@@ -434,6 +439,7 @@ export const MoviesTab: React.FC = () => {
   const renderListItem = useCallback(
     (movie: Movie, index: number) => {
       const source = getSourceBadge(movie.sourceLocation);
+      const resolution = coerceResolution(movie.resolution);
       return (
         <div className="flex items-center gap-3 w-full h-full px-3" {...bindItem(movie, index)}>
           <div
@@ -457,6 +463,7 @@ export const MoviesTab: React.FC = () => {
               {movie.releaseYear && movie.director ? " · " : ""}
               {movie.director ? movie.director : ""}
               {movie.runtime ? ` · ${Math.round(movie.runtime / 60)}min` : ""}
+              {resolution ? ` · ${resolution}` : ""}
             </div>
             {source.badge && (
               <span
@@ -491,6 +498,7 @@ export const MoviesTab: React.FC = () => {
 
   const renderDeckCard = useCallback(
     (movie: Movie, _index: number, { isHovered, isFocused }: { isHovered: boolean; isFocused: boolean }) => {
+      const resolution = coerceResolution(movie.resolution);
       return (
         <div className="w-full h-full relative">
           <GalleryImage
@@ -518,6 +526,14 @@ export const MoviesTab: React.FC = () => {
               }}
             />
           )}
+          {resolution && (
+            <span
+              className="absolute bottom-2 left-2 px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide"
+              style={{ backgroundColor: "rgba(0,0,0,0.6)", color: "#fff" }}
+            >
+              {resolution}
+            </span>
+          )}
         </div>
       );
     },
@@ -527,6 +543,7 @@ export const MoviesTab: React.FC = () => {
   const renderNeonCard = useCallback(
     (movie: Movie, index: number) => {
       const source = getSourceBadge(movie.sourceLocation);
+      const resolution = coerceResolution(movie.resolution);
       return (
         <div className="p-1 w-full h-full flex flex-col min-w-0" {...bindItem(movie, index)}>
           <div
@@ -568,11 +585,18 @@ export const MoviesTab: React.FC = () => {
               <span className="text-[9px]" style={{ color: "var(--accent)" }}>
                 {movie.releaseYear}
               </span>
-              {source.badge && (
-                <span className="text-[8px] px-1 rounded" style={{ background: source.badgeColor, color: "#fff" }}>
-                  {source.badge}
-                </span>
-              )}
+              <div className="flex items-center gap-1">
+                {resolution && (
+                  <span className="text-[8px] px-1 rounded" style={{ background: "rgba(0,0,0,0.5)", color: "#fff" }}>
+                    {resolution}
+                  </span>
+                )}
+                {source.badge && (
+                  <span className="text-[8px] px-1 rounded" style={{ background: source.badgeColor, color: "#fff" }}>
+                    {source.badge}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </div>

@@ -215,6 +215,7 @@ export default defineConfig({
           "workers/db.worker": resolve("src/main/workers/db.worker.ts"),
           "libretro-worker": resolve("src/main/libretro-worker.ts"),
           "mpv-worker": resolve("src/main/mpv-worker.ts"),
+          "thumbnail-worker": resolve("src/main/thumbnail-worker.ts"),
         },
         output: {
           entryFileNames: "[name].js",

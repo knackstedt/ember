@@ -9,6 +9,7 @@ export interface HexCellData {
   subtitle?: string;
   badge?: string;
   badgeColor?: string;
+  resolution?: string;
   isFavorite?: boolean;
   isLoading?: boolean;
   missing?: boolean;
@@ -69,6 +70,7 @@ function hexDataEqual(a: HexCellData, b: HexCellData): boolean {
     a.subtitle === b.subtitle &&
     a.badge === b.badge &&
     a.badgeColor === b.badgeColor &&
+    a.resolution === b.resolution &&
     a.isFavorite === b.isFavorite &&
     a.isLoading === b.isLoading &&
     a.missing === b.missing &&
@@ -259,6 +261,26 @@ const HexCell = React.memo(function HexCellInner({ hex, isFocused, cellWidth, he
             >
               <div className="w-7 h-7 rounded-full border-[3px] border-white/30 border-t-white animate-spin" />
             </div>
+          )}
+          {hex.resolution && (
+            <span
+              style={{
+                position: "absolute",
+                bottom: "6%",
+                left: "8%",
+                padding: "1px 6px",
+                borderRadius: 4,
+                fontSize: 9,
+                fontWeight: 700,
+                textTransform: "uppercase",
+                backgroundColor: "rgba(0,0,0,0.55)",
+                color: "#fff",
+                letterSpacing: "0.05em",
+                zIndex: 3,
+              }}
+            >
+              {hex.resolution}
+            </span>
           )}
 
 
