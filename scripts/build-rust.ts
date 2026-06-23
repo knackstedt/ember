@@ -1,10 +1,27 @@
-import { existsSync, copyFileSync, mkdirSync, statSync, readdirSync, symlinkSync, unlinkSync, readlinkSync } from "fs";
+import { existsSync, copyFileSync, statSync, readdirSync, symlinkSync, unlinkSync, readlinkSync } from "fs";
 import { resolve } from "path";
 
 const ARCHS = [
   { target: "x86_64-unknown-linux-gnu", arch: "x64" },
   // { target: "aarch64-unknown-linux-gnu", arch: "arm64" },
 ] as const;
+
+const CRATES = [
+  {
+    name: "libretro-frontend",
+    rustDir: "native/libretro-frontend",
+    artifactName: "liblibretro_frontend.so",
+    destPrefix: "libretro-frontend",
+    symlinkOutDirs: false,
+  },
+  {
+    name: "video-decoder",
+    rustDir: "native/video-decoder",
+    artifactName: "libvideo_decoder.so",
+    destPrefix: "video-decoder",
+    symlinkOutDirs: true,
+  },
+];
 
 /** Return the newest mtime of any .rs file under dir, or 0 if none found. */
 function newestRustMtime(dir: string): number {
@@ -35,8 +52,8 @@ function fileMtime(path: string): number {
   }
 }
 
-async function build(target: string, cwd: string): Promise<number> {
-  console.log(`Building video-decoder for ${target}...`);
+async function build(target: string, cwd: string, name: string): Promise<number> {
+  console.log(`Building ${name} for ${target}...`);
   const env: Record<string, string> = { ...process.env };
   if (target === "aarch64-unknown-linux-gnu") {
     env.PKG_CONFIG_ALLOW_CROSS = "1";
@@ -54,14 +71,13 @@ async function build(target: string, cwd: string): Promise<number> {
   return proc.exitCode ?? 1;
 }
 
-function findArtifact(rustDir: string, target: string): string | undefined {
-  // Check target-specific dir first, then fallback to default release dir.
+function findArtifact(rustDir: string, target: string, artifactName: string): string | undefined {
   const dirs = [
     resolve(rustDir, `target/${target}/release`),
     resolve(rustDir, "target/release"),
   ];
   for (const dir of dirs) {
-    const candidate = resolve(dir, "libvideo_decoder.so");
+    const candidate = resolve(dir, artifactName);
     if (existsSync(candidate)) {
       return candidate;
     }
@@ -70,31 +86,38 @@ function findArtifact(rustDir: string, target: string): string | undefined {
 }
 
 async function main() {
-  const rustDir = resolve("native/video-decoder");
-  console.log("Setting up video-decoder native addon...\n");
+  console.log("Building all Rust native addons...\n");
 
-  const srcMtime = newestRustMtime(resolve(rustDir, "src"));
+  for (const crate of CRATES) {
+    const rustDir = resolve(crate.rustDir);
+    const srcMtime = newestRustMtime(resolve(rustDir, "src"));
 
-  for (const { target, arch } of ARCHS) {
-    const dest = resolve(`resources/video-decoder.linux-${arch}-gnu.node`);
-    const destMtime = fileMtime(dest);
+    for (const { target, arch } of ARCHS) {
+      const dest = resolve(`resources/${crate.destPrefix}.linux-${arch}-gnu.node`);
+      const destMtime = fileMtime(dest);
 
-    // Skip if the addon exists and is newer than all Rust source files.
-    if (destMtime > 0 && destMtime >= srcMtime) {
-      console.log(`Skipping ${arch}: ${dest} is up-to-date.`);
-      continue;
-    }
+      if (destMtime > 0 && destMtime >= srcMtime) {
+        console.log(`Skipping ${crate.name} ${arch}: ${dest} is up-to-date.`);
+        continue;
+      }
 
-    const exitCode = await build(target, rustDir);
+      const exitCode = await build(target, rustDir, crate.name);
+      if (exitCode !== 0) {
+        console.warn(`Warning: failed to build ${crate.name} for ${target} (exit ${exitCode}).`);
+        continue;
+      }
 
-    if (exitCode === 0) {
-      const src = findArtifact(rustDir, target);
-      if (src) {
-        copyFileSync(src, dest);
-        console.log(`Copied ${src} -> ${dest}`);
-        // Symlink into build output directories so dev-mode workers find it
-        // without duplicating the binary on every rebuild.
-        const fileName = `video-decoder.linux-${arch}-gnu.node`;
+      const src = findArtifact(rustDir, target, crate.artifactName);
+      if (!src) {
+        console.warn(`Warning: build succeeded but artifact not found for ${crate.name} ${target}`);
+        continue;
+      }
+
+      copyFileSync(src, dest);
+      console.log(`Copied ${src} -> ${dest}`);
+
+      if (crate.symlinkOutDirs) {
+        const fileName = `${crate.destPrefix}.linux-${arch}-gnu.node`;
         for (const outDir of ["out/main", "out/renderer"]) {
           const dir = resolve(outDir);
           if (!existsSync(dir)) continue;
@@ -120,17 +143,11 @@ async function main() {
             console.log(`Copied ${dest} -> ${outDest}`);
           }
         }
-      } else {
-        console.warn(`Warning: build succeeded but artifact not found for ${target}`);
       }
-    } else {
-      console.warn(
-        `Warning: failed to build video-decoder for ${target} (exit ${exitCode}).`
-      );
     }
   }
 
-  console.log("\nDone. Video decoder native addon is ready.");
+  console.log("\nDone. All Rust native addons are ready.");
 }
 
 main().catch((err) => {
