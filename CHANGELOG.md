@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.4.2](https://github.com/knackstedt/ember/compare/v0.4.1...v0.4.2) (2026-06-23)
+
+
+### Features
+
+* **plugins:** add bundled plugin installation and dev plugin discovery ([e275ffa](https://github.com/knackstedt/ember/commit/e275ffa85b5fe15948951d1a77a78b5365619bed))
+
 ### [0.4.1](https://github.com/knackstedt/ember/compare/v0.4.0...v0.4.1) (2026-06-23)
 
 ## [0.4.0](https://github.com/knackstedt/ember/compare/v0.3.0...v0.4.0) (2026-06-22)
