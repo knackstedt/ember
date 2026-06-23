@@ -78,7 +78,7 @@ import {
   GameMetadata,
 } from "../services/metadata";
 import { listPlugins, reloadPlugins, callPluginHook } from "../plugins/loader";
-import { discoverPlugins, discoverAllReleases } from "../services/plugin-discovery.service";
+import { discoverPlugins, discoverAllReleases, discoverDevPlugins } from "../services/plugin-discovery.service";
 import {
   installPlugin,
   uninstallPlugin,
@@ -146,6 +146,7 @@ import {
   testRemoteCredentials,
   testRemotePath,
 } from "../services/rclone-manager";
+import { isRcloneAvailable } from "../services/rclone.service";
 import {
   queueRemoteSourceScan,
   scanAllRemoteSources,
@@ -196,6 +197,8 @@ import {
   enrichTracks,
 } from "../services/music-enrichment.service";
 import {
+  getItchStatus,
+  listInstalledItchGames,
   launchItchGame,
 } from "../services/itch.service";
 import {
@@ -390,6 +393,8 @@ function sendToWindow(win: BrowserWindow, channel: string, ...args: any[]) {
     win.webContents.send(channel, ...args);
   }
 }
+
+const isDev = !app.isPackaged || process.env.NODE_ENV === "development";
 
 export function registerIpcHandlers(window: BrowserWindow): void {
   const sendRemoteProgress = (progress: {
@@ -2040,6 +2045,9 @@ export function registerIpcHandlers(window: BrowserWindow): void {
   });
 
   ipcMain.handle("plugins:discover-all", async () => {
+    if (isDev) {
+      return discoverDevPlugins();
+    }
     return await discoverAllReleases();
   });
 
@@ -2698,8 +2706,53 @@ export function registerIpcHandlers(window: BrowserWindow): void {
   /*  Store / itch.io                                                    */
   /* ------------------------------------------------------------------ */
 
+  ipcMain.handle("store:itch:status", async () => {
+    return getItchStatus();
+  });
+
+  ipcMain.handle("store:itch:library", async () => {
+    const games = listInstalledItchGames();
+    return games.map((g) => ({
+      id: g.id,
+      title: g.title,
+      coverUrl: g.coverUrl,
+      developer: g.developer,
+      installed: true,
+      installPath: g.execPath ? dirname(g.execPath) : undefined,
+      execPath: g.execPath,
+    }));
+  });
+
   ipcMain.handle("store:itch:launch", async (_e, game: Game) => {
     return launchItchGame(game);
+  });
+
+  ipcMain.handle("store:itch:login", async () => {
+    return { success: false, error: "itch.io login is not implemented. Please log in via the official itch app." };
+  });
+
+  ipcMain.handle("store:itch:logout", async () => {
+    return { success: false, error: "itch.io logout is not implemented." };
+  });
+
+  ipcMain.handle("store:itch:install", async () => {
+    return { success: false, error: "itch.io install is not implemented." };
+  });
+
+  ipcMain.handle("store:itch:uninstall", async () => {
+    return { success: false, error: "itch.io uninstall is not implemented." };
+  });
+
+  ipcMain.handle("store:itch:update", async () => {
+    return { success: false, error: "itch.io update is not implemented." };
+  });
+
+  ipcMain.handle("store:itch:updates", async () => {
+    return [];
+  });
+
+  ipcMain.handle("store:itch:download", async () => {
+    return { success: false, error: "itch.io download is not implemented." };
   });
 
   ipcMain.handle("store:providers:list", async () => {
@@ -2757,6 +2810,10 @@ export function registerIpcHandlers(window: BrowserWindow): void {
   /* ------------------------------------------------------------------ */
   /*  Remote Sources (rclone)                                            */
   /* ------------------------------------------------------------------ */
+
+  ipcMain.handle("rclone:available", async () => {
+    return isRcloneAvailable();
+  });
 
   ipcMain.handle("rclone:list", async () => {
     return listRemotes();

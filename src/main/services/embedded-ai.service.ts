@@ -1,3 +1,5 @@
+import { app } from "electron";
+import { join } from "path";
 import {
   SmartFilterGroup,
   SmartFilterRule,
@@ -12,6 +14,8 @@ import {
 /* ------------------------------------------------------------------ */
 
 const MODEL = "Xenova/all-MiniLM-L6-v2";
+
+const CACHE_DIR = join(app.getPath("userData"), "transformers-cache");
 
 type PipelineFn = (task: string, model: string, opts?: object) => Promise<unknown>;
 
@@ -33,7 +37,10 @@ async function getEmbedder(): Promise<PipelineFn | null> {
   modelLoading = true;
   try {
     const { pipeline } = await import("@xenova/transformers");
-    embedder = await pipeline("feature-extraction", MODEL, { quantized: true });
+    embedder = await pipeline("feature-extraction", MODEL, {
+      quantized: true,
+      cache_dir: CACHE_DIR,
+    });
     return embedder as PipelineFn;
   } catch (err) {
     modelError = err as Error;

@@ -106,12 +106,7 @@ export const PluginsTab: React.FC = () => {
           Plugins
         </h2>
         <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-          Install plugins from GitHub releases to add emulator support and other features.
-          Plugins are downloaded as{" "}
-          <code className="px-1 py-0.5 rounded text-xs" style={{ background: "var(--surface-1)", fontFamily: "var(--font-mono)" }}>
-            ember-plugin-&lt;name&gt;-&lt;version&gt;.tar.gz
-          </code>{" "}
-          release assets.
+          Install plugins to add emulator support and other features.
         </p>
 
         {error && (
@@ -179,7 +174,7 @@ export const PluginsTab: React.FC = () => {
             className="flex flex-col gap-3"
           >
             <h3 className="text-sm font-semibold uppercase tracking-wide" style={{ color: "var(--text-secondary)" }}>
-              Available from GitHub
+              Available
             </h3>
             <div className="flex flex-col gap-2">
               {discovered

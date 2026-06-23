@@ -103,6 +103,7 @@ export const SourcesTab: React.FC = () => {
   const [servingIds, setServingIds] = useState<Set<string>>(new Set());
   const [checkingMissing, setCheckingMissing] = useState(false);
   const [deletingMissing, setDeletingMissing] = useState<Record<string, boolean>>({});
+  const [rcloneAvailable, setRcloneAvailable] = useState<boolean | null>(null);
 
   /* ── Data Feed state ── */
   const [streamingServices, setStreamingServices] = useState<StreamingService[]>([]);
@@ -186,6 +187,9 @@ export const SourcesTab: React.FC = () => {
 
   useEffect(() => {
     loadRemoteSources();
+    window.htpc.rclone.available()
+      .then(setRcloneAvailable)
+      .catch(() => setRcloneAvailable(false));
   }, []);
 
   const handleRemoveRemote = async (id: string) => {
@@ -504,6 +508,20 @@ export const SourcesTab: React.FC = () => {
             </motion.button>
           </div>
         </div>
+
+        {rcloneAvailable === false && (
+          <div
+            className="flex items-center gap-2 p-3 rounded-[var(--radius-card)] text-sm"
+            style={{
+              background: "#3a1515",
+              color: "#ff9999",
+              border: "1px solid #ff444430",
+            }}
+          >
+            <AlertTriangle size={16} />
+            <span>rclone is not available. Remote sources require the rclone binary (bundled or in PATH).</span>
+          </div>
+        )}
 
         {remoteLoading ? (
           <div className="text-sm" style={{ color: "var(--text-secondary)" }}>

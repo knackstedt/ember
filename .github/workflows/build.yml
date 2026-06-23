@@ -74,6 +74,7 @@ jobs:
             libavformat-dev:arm64 \
             libavutil-dev:arm64 \
             libswscale-dev:arm64 \
+            zstd \
             rpm
 
       - name: Install Bun
@@ -98,6 +99,9 @@ jobs:
       - name: Package plugins
         run: bun scripts/package-plugins.ts
 
+      - name: Generate plugin index
+        run: bun scripts/generate-plugin-index.ts
+
       - name: List release artifacts
         run: ls -lah release/
       - name: List plugin artifacts
@@ -113,6 +117,7 @@ jobs:
             release/*.rpm
             release/*.tar.gz
             release/plugins/*.tar.zst
+            release/plugins/plugins-index.json*
           if-no-files-found: error
 
       - name: Publish GitHub Release
@@ -127,3 +132,4 @@ jobs:
             release/latest-linux*.yml
             release/*.blockmap
             release/plugins/*.tar.zst
+            release/plugins/plugins-index.json*

@@ -1019,6 +1019,8 @@ const htpc = {
   },
 
   rclone: {
+    available: (): Promise<boolean> =>
+      ipcRenderer.invoke("rclone:available"),
     list: (): Promise<import("../shared/types").RemoteSource[]> =>
       ipcRenderer.invoke("rclone:list"),
     add: (source: Omit<import("../shared/types").RemoteSource, "id">, creds: Record<string, string | undefined>): Promise<import("../shared/types").RemoteSource> =>

@@ -857,6 +857,7 @@ export interface DiscoveredPlugin {
   installed: boolean;
   installedVersion?: string;
   enabled: boolean;
+  devPath?: string;
 }
 
 export interface ManagedPackage {

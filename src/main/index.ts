@@ -15,6 +15,7 @@ import { MovieRepo, RemoteSourceRepo } from "./db/repository";
 import { getServePort } from "./services/rclone-manager";
 import { startRemoteAvailabilityWorker, stopRemoteAvailabilityWorker } from "./services/remote-availability.service";
 import { bootPlugins, shutdownPlugins } from "./plugins/loader";
+import { installBundledPlugins } from "./services/plugin-manager.service";
 import {
   initUpdater,
   checkPostUpdateCrash,
@@ -482,6 +483,12 @@ async function createWindow(): Promise<void> {
   });
 
   registerIpcHandlers(mainWindow);
+
+  try {
+    await installBundledPlugins();
+  } catch (err) {
+    log.warn("plugins", `Failed to install bundled plugins: ${err}`);
+  }
 
   try {
     await bootPlugins();

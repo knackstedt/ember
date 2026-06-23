@@ -12,6 +12,26 @@ const log = createLogger("info");
 const ITCH_CONFIG_DIR = join(homedir(), ".config", "itch");
 const ITCH_DB_PATH = join(ITCH_CONFIG_DIR, "db.json");
 
+export function getItchStatus(): { authenticated: boolean; username?: string; error?: string } {
+  if (!existsSync(ITCH_DB_PATH)) {
+    return { authenticated: false };
+  }
+  try {
+    const db = JSON.parse(readFileSync(ITCH_DB_PATH, "utf-8"));
+    const me = db.me ?? db.user;
+    if (me) {
+      const username = me.username ?? me.displayName ?? me.name;
+      return { authenticated: true, username };
+    }
+    if (Object.keys(db.caves ?? {}).length > 0) {
+      return { authenticated: true };
+    }
+    return { authenticated: false };
+  } catch (err: any) {
+    return { authenticated: false, error: err.message };
+  }
+}
+
 /** List installed itch games from the itch app DB */
 export function listInstalledItchGames(): Game[] {
   const games: Game[] = [];

@@ -1,5 +1,5 @@
 import { join } from "path";
-import { existsSync, mkdirSync, createWriteStream, rmSync, readdirSync, readFileSync, writeFileSync, renameSync } from "fs";
+import { existsSync, mkdirSync, createWriteStream, rmSync, readdirSync, readFileSync, writeFileSync, renameSync, cpSync } from "fs";
 import { spawnSync } from "child_process";
 import { app } from "electron";
 import { DiscoveredPlugin } from "../../shared/types";
@@ -65,10 +65,38 @@ function buildExtractArgs(archivePath: string): string[] {
   }
 }
 
+async function installDevPlugin(plugin: DiscoveredPlugin): Promise<void> {
+  if (!plugin.devPath) throw new Error("devPath is required for dev plugin install");
+
+  const pluginDir = getPluginDir(plugin.id);
+
+  log.info("plugin-manager", `Installing dev plugin ${plugin.id} from ${plugin.devPath}`);
+
+  // Remove existing installation
+  if (existsSync(pluginDir)) {
+    rmSync(pluginDir, { recursive: true, force: true });
+  }
+
+  // Copy from dev directory
+  cpSync(plugin.devPath, pluginDir, { recursive: true, force: true });
+
+  // Write state
+  writePluginState(plugin.id, { enabled: true, installedAt: new Date().toISOString() });
+
+  // Reload plugins
+  await reloadPlugins();
+
+  log.info("plugin-manager", `Installed dev plugin ${plugin.id}`);
+}
+
 export async function installPlugin(
   plugin: DiscoveredPlugin,
   onProgress?: (downloaded: number, total: number) => void,
 ): Promise<void> {
+  if (plugin.devPath) {
+    return installDevPlugin(plugin);
+  }
+
   const pluginDir = getPluginDir(plugin.id);
   const tempDir = join(PLUGINS_DIR, `.tmp-${plugin.id}-${Date.now()}`);
 
@@ -229,6 +257,50 @@ export async function setPluginEnabled(id: string, enabled: boolean): Promise<vo
 
 export function isPluginEnabled(id: string): boolean {
   return readPluginState(id)?.enabled ?? true;
+}
+
+function getBundledPluginsDir(): string {
+  if (process.resourcesPath) {
+    return join(process.resourcesPath, "plugins");
+  }
+  return join(process.cwd(), "plugins");
+}
+
+export async function installBundledPlugins(): Promise<void> {
+  const bundledDir = getBundledPluginsDir();
+  if (!existsSync(bundledDir)) {
+    log.info("plugin-manager", "No bundled plugins directory found");
+    return;
+  }
+
+  let installed = 0;
+  for (const entry of readdirSync(bundledDir)) {
+    const manifestPath = join(bundledDir, entry, "manifest.json");
+    if (!existsSync(manifestPath)) continue;
+
+    let manifest: { id?: string; version?: string };
+    try {
+      manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
+    } catch {
+      continue;
+    }
+
+    const pluginId = manifest.id ?? entry;
+    const pluginDir = getPluginDir(pluginId);
+
+    if (existsSync(pluginDir)) {
+      continue;
+    }
+
+    log.info("plugin-manager", `Installing bundled plugin ${pluginId}`);
+    cpSync(join(bundledDir, entry), pluginDir, { recursive: true, force: true });
+    writePluginState(pluginId, { enabled: true, installedAt: new Date().toISOString() });
+    installed++;
+  }
+
+  if (installed > 0) {
+    log.info("plugin-manager", `Installed ${installed} bundled plugin(s)`);
+  }
 }
 
 export async function listManagedPlugins(): Promise<DiscoveredPlugin[]> {
