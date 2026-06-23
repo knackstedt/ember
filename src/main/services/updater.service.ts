@@ -179,6 +179,14 @@ export async function rollbackToPrevious(): Promise<{
   const fmt = getPackageFormat();
 
   if (fmt === "appimage") {
+    if (!existsSync(BACKUP_DIR)) {
+      return {
+        success: false,
+        error:
+          "No backup found. Try downloading the previous version manually.",
+      };
+    }
+
     const backups = readdirSync(BACKUP_DIR)
       .filter((f) => f.endsWith(".AppImage"))
       .map((f) => ({
