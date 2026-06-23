@@ -28,7 +28,7 @@ function checkCommand(cmd: string): boolean {
 
 function packagePlugin(pluginDir: string, manifest: PluginManifest): string {
   const slug = manifest.id.replace(/[^a-z0-9-]/g, "-");
-  const outName = `ember-plugin-${slug}-${manifest.version}.tar.zst`;
+  const outName = `~plugin-${slug}-${manifest.version}.tar.zst`;
   const outPath = join(OUT_DIR, outName);
 
   // Ensure assets directory exists (plugins may reference it even if empty)

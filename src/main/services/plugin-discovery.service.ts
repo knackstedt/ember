@@ -34,7 +34,7 @@ interface GitHubRelease {
 }
 
 function parsePluginAssetName(name: string): { id: string; version: string } | null {
-  const match = name.match(/^ember-plugin-([a-z0-9-]+)-v?(\d+\.\d+\.\d+(?:-[\w.]+)?)\.(tar\.(?:gz|zst|zstd)|zip)$/);
+  const match = name.match(/^~plugin-([a-z0-9-]+)-v?(\d+\.\d+\.\d+(?:-[\w.]+)?)\.(tar\.(?:gz|zst|zstd)|zip)$/);
   if (!match) return null;
   return { id: match[1], version: match[2] };
 }
