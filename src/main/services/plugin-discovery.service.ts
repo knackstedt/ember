@@ -17,7 +17,7 @@ function getBundledPluginsDir(): string {
   return join(process.cwd(), "plugins");
 }
 
-const DEFAULT_PLUGIN_REPO = "dotglitch/ember";
+const DEFAULT_PLUGIN_REPO = "knackstedt/ember";
 
 interface GitHubReleaseAsset {
   name: string;
@@ -85,8 +85,8 @@ async function parsePluginIndex(
   release: GitHubRelease,
   repo: string,
 ): Promise<DiscoveredPlugin[]> {
-  const zstAsset = release.assets.find((a) => a.name === "plugins-index.json.zst");
-  const jsonAsset = release.assets.find((a) => a.name === "plugins-index.json");
+  const zstAsset = release.assets.find((a) => a.name === "ember-plugins.json.zst");
+  const jsonAsset = release.assets.find((a) => a.name === "ember-plugins.json");
   const indexAsset = zstAsset ?? jsonAsset;
   if (!indexAsset) {
     log.info("plugin-discovery", "No plugin index found in release");

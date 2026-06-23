@@ -9,5 +9,5 @@
   "assetsPath": "assets",
   "hooks": ["onPluginInstall", "onPluginStart", "onGameStart"],
   "platforms": ["dos"],
-  "sourceUrl": "https://github.com/dotglitch/ember-plugins"
+  "sourceUrl": "https://github.com/knackstedt/ember"
 }

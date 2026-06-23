@@ -109,7 +109,7 @@ jobs:
             release/*.rpm
             release/*.tar.gz
             release/plugins/*.tar.zst
-            release/plugins/plugins-index.json*
+            release/plugins/ember-plugins.json*
           if-no-files-found: error
 
       - name: Publish GitHub Release

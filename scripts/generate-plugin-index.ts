@@ -61,11 +61,11 @@ function main() {
 
   // Minified JSON
   const json = JSON.stringify(entries);
-  const jsonPath = join(OUT_DIR, "plugins-index.json");
+  const jsonPath = join(OUT_DIR, "ember-plugins.json");
   writeFileSync(jsonPath, json);
 
   // zstd compress
-  const zstPath = join(OUT_DIR, "plugins-index.json.zst");
+  const zstPath = join(OUT_DIR, "ember-plugins.json.zst");
   const result = spawnSync("zstd", ["-f", "--rm", "-o", zstPath, jsonPath], {
     stdio: ["ignore", "inherit", "inherit"],
   });
