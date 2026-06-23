@@ -39,7 +39,7 @@ function deriveSubtitleUrls(videoSrc: string): string[] {
 }
 
 export const VideoPlayer: React.FC = () => {
-  const { src, title, movieId, watchProgress, close } = useVideoPlayerStore();
+  const { src, title, movieId, watchProgress, subtitleTrackId, audioTrackId, playbackSpeed, close } = useVideoPlayerStore();
   const updateMovieProgress = useMoviesStore((s) => s.updateProgress);
   const lastEvent = useInputStore((s) => s.lastEvent);
 
@@ -263,6 +263,26 @@ export const VideoPlayer: React.FC = () => {
     }
   }, [useNative, native.state.ready]);
 
+  // Apply saved subtitle/audio track and playback speed when native decoder is ready.
+  useEffect(() => {
+    if (!useNative || !native.state.ready || !movieId) return;
+    if (subtitleTrackId !== null && native.state.subtitleTracks.length > 0) {
+      const hasTrack = native.state.subtitleTracks.some((t) => t.id === subtitleTrackId);
+      if (hasTrack) {
+        native.controls.selectSubtitleTrack(subtitleTrackId);
+      }
+    }
+    if (audioTrackId !== null && native.state.audioTracks.length > 0) {
+      const hasTrack = native.state.audioTracks.some((t) => t.id === audioTrackId);
+      if (hasTrack) {
+        native.controls.selectAudioTrack(audioTrackId);
+      }
+    }
+    if (playbackSpeed !== null && playbackSpeed !== 1) {
+      native.controls.setSpeed(playbackSpeed);
+    }
+  }, [useNative, native.state.ready, movieId]);
+
   // Native video progress save (best-effort)
   useEffect(() => {
     if (!useNative || !src) return;
@@ -484,10 +504,10 @@ export const VideoPlayer: React.FC = () => {
   const handleSubtitleChange = (idx: number): void => {
     if (useNative) {
       const track = native.state.subtitleTracks[idx];
-      if (track) {
-        native.controls.selectSubtitleTrack(track.id);
-      } else {
-        native.controls.selectSubtitleTrack(null);
+      const trackId = track ? track.id : null;
+      native.controls.selectSubtitleTrack(trackId);
+      if (movieId) {
+        void window.htpc.movies.setSubtitleTrack(movieId, trackId);
       }
       return;
     }
@@ -501,7 +521,11 @@ export const VideoPlayer: React.FC = () => {
 
   const handleAudioChange = (id: number): void => {
     if (useNative) {
-      native.controls.selectAudioTrack(id >= 0 ? id : null);
+      const trackId = id >= 0 ? id : null;
+      native.controls.selectAudioTrack(trackId);
+      if (movieId) {
+        void window.htpc.movies.setAudioTrack(movieId, trackId);
+      }
     }
   };
 
@@ -514,6 +538,9 @@ export const VideoPlayer: React.FC = () => {
   const handleSpeedChange = (speed: number): void => {
     if (useNative) {
       native.controls.setSpeed(speed);
+      if (movieId) {
+        void window.htpc.movies.setPlaybackSpeed(movieId, speed);
+      }
     }
   };
 

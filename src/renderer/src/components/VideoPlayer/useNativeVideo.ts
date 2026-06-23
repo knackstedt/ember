@@ -79,12 +79,7 @@ function stableId(src: string | null): string {
 }
 
 export function shouldUseNativeDecoder(src: string | null): boolean {
-  if (!src) return false;
-  const lower = src.toLowerCase();
-  const unsupportedExts = [".mkv", ".avi", ".wmv", ".ts", ".m2ts", ".vob", ".iso", ".mpeg", ".mpg"];
-  if (unsupportedExts.some((ext) => lower.endsWith(ext))) return true;
-  if (lower.includes("x265") || lower.includes("hevc") || lower.includes("h265")) return true;
-  return false;
+  return !!src;
 }
 
 export function useNativeVideo(
@@ -269,7 +264,6 @@ export function useNativeVideo(
 
         play();
       } catch (err: any) {
-        console.error("[NativeVideo] init failed:", err);
         updateState({ error: err.message || String(err), ready: false });
       }
     }
@@ -321,18 +315,12 @@ export function useNativeVideo(
 
       if (elapsed >= frameInterval) {
         lastFramePresentRef.current = now - (elapsed % frameInterval);
-
-        const frame = window.htpc.videoDecoder.renderNextFrame(decoderId);
-        if (!frame) {
-          playingRef.current = false;
-          updateState({ playing: false });
-          return;
-        }
+        window.htpc.videoDecoder.renderNextFrame(decoderId);
       }
 
-      // Check for mpv EOF events.
+      // Check for mpv EOF / error events.
       const mpvEvent = window.htpc.videoDecoder.getMpvEvent?.(decoderId);
-      if (mpvEvent === "end-file") {
+      if (mpvEvent === "end-file" || mpvEvent === "error") {
         playingRef.current = false;
         updateState({ playing: false });
         return;
@@ -412,6 +400,7 @@ export function useNativeVideo(
       }
       try {
         await window.htpc.videoDecoder.seek(decoderId, ms);
+        updateState({ currentTime: time });
         if (playingRef.current) {
           pump();
         } else {
@@ -494,7 +483,14 @@ export function useNativeVideo(
     async (idx: number) => {
       try {
         await window.htpc.videoDecoder.setChapter(decoderId, idx);
-        updateState({ currentChapter: idx });
+        // mpv automatically seeks to the chapter start; fetch the new time.
+        const timeMs = window.htpc.videoDecoder.getCurrentTime(decoderId);
+        if (typeof timeMs === "number") {
+          pausedAtRef.current = timeMs;
+          updateState({ currentChapter: idx, currentTime: timeMs / 1000 });
+        } else {
+          updateState({ currentChapter: idx });
+        }
       } catch (err: any) {
         console.error("[NativeVideo] selectChapter failed:", err);
       }

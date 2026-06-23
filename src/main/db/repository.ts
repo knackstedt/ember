@@ -277,6 +277,29 @@ export const MovieRepo = {
     }
   },
 
+  async setSubtitleTrack(id: string, trackId: number | null): Promise<void> {
+    const db = getDb();
+    if (trackId === null) {
+      await db.query(`UPDATE movie:⟨${escapeId(id)}⟩ SET subtitleTrackId = none`);
+    } else {
+      await db.query(`UPDATE movie:⟨${escapeId(id)}⟩ SET subtitleTrackId = $trackId`, { trackId });
+    }
+  },
+
+  async setAudioTrack(id: string, trackId: number | null): Promise<void> {
+    const db = getDb();
+    if (trackId === null) {
+      await db.query(`UPDATE movie:⟨${escapeId(id)}⟩ SET audioTrackId = none`);
+    } else {
+      await db.query(`UPDATE movie:⟨${escapeId(id)}⟩ SET audioTrackId = $trackId`, { trackId });
+    }
+  },
+
+  async setPlaybackSpeed(id: string, speed: number): Promise<void> {
+    const db = getDb();
+    await db.query(`UPDATE movie:⟨${escapeId(id)}⟩ SET playbackSpeed = $speed`, { speed });
+  },
+
   async setCoverUrl(id: string, url: string): Promise<void> {
     const db = getDb();
     await db.query(`UPDATE movie:⟨${escapeId(id)}⟩ SET coverUrl = $url`, { url });

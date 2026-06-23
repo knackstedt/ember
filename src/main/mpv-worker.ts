@@ -446,7 +446,8 @@ function handleCommand(req: any) {
 
     process.send!({ reqId, type: "response", result });
   } catch (err: any) {
-    process.send!({ reqId, type: "response", error: err?.message ?? String(err) });
+    const msg = err?.message ?? String(err);
+    process.send!({ reqId, type: "response", error: msg });
   }
 }
 

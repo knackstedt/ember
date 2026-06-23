@@ -39,18 +39,16 @@ pub struct MpvRenderer {
     duration_ms: i64,
     frame_rate: f64,
     eof_reached: Arc<AtomicBool>,
+    shutdown_flag: Option<Arc<AtomicBool>>,
     event_thread: Option<JoinHandle<()>>,
     subtitle_tracks: Vec<SubtitleTrack>,
 }
 
 impl MpvRenderer {
     pub fn new() -> Result<Self, String> {
-        eprintln!("[mpv_renderer] MpvRenderer::new() starting");
         let mpv_api = api::get_api()?;
-        eprintln!("[mpv_renderer] api loaded");
 
         let mpv = unsafe { (mpv_api.mpv_create)() };
-        eprintln!("[mpv_renderer] mpv_create returned");
         if mpv.is_null() {
             return Err("mpv_create failed".to_string());
         }
@@ -61,7 +59,6 @@ impl MpvRenderer {
         // back to CPU memory for WebGL upload.
         // config=no prevents mpv from reading the user's ~/.config/mpv/mpv.conf,
         // which could set an unexpectedly low volume, unwanted filters, etc.
-        eprintln!("[mpv_renderer] setting options...");
         unsafe {
             (mpv_api.mpv_set_option_string)(mpv, c"vo".as_ptr(), c"libmpv".as_ptr());
             (mpv_api.mpv_set_option_string)(mpv, c"hwdec".as_ptr(), c"auto".as_ptr());
@@ -76,11 +73,9 @@ impl MpvRenderer {
             // Raise ceiling so we have headroom for quiet files.
             (mpv_api.mpv_set_option_string)(mpv, c"volume-max".as_ptr(), c"200".as_ptr());
         }
-        eprintln!("[mpv_renderer] options set, calling mpv_initialize...");
 
         mpv_err(unsafe { (mpv_api.mpv_initialize)(mpv) })
             .map_err(|e| format!("mpv_initialize failed: {}", e))?;
-        eprintln!("[mpv_renderer] mpv_initialize OK");
 
         // Explicitly set volume property after init — set_option_string before
         // initialize is unreliable for some properties.
@@ -95,7 +90,7 @@ impl MpvRenderer {
             )
         };
         if ret < 0 {
-            eprintln!("[mpv_renderer] Warning: mpv_set_property(volume) failed: {}", ret);
+            // Silently ignore volume set failure; mpv still works.
         }
 
         let api_type = CString::new("sw").unwrap();
@@ -111,22 +106,25 @@ impl MpvRenderer {
         ];
 
         let mut render_ctx: *mut api::mpv_render_context = ptr::null_mut();
-        eprintln!("[mpv_renderer] calling mpv_render_context_create...");
         let ret = unsafe { (mpv_api.mpv_render_context_create)(&mut render_ctx, mpv, params.as_mut_ptr()) };
         if ret < 0 {
             unsafe { (mpv_api.mpv_terminate_destroy)(mpv) };
             return Err(format!("mpv_render_context_create failed: {}", ret));
         }
-        eprintln!("[mpv_renderer] mpv_render_context_create OK");
 
         let eof_reached = Arc::new(AtomicBool::new(false));
         let eof_clone = Arc::clone(&eof_reached);
+        let shutdown = Arc::new(AtomicBool::new(false));
+        let shutdown_clone = Arc::clone(&shutdown);
 
         let mpv_ptr = mpv as usize;
         let event_thread = thread::spawn(move || {
             let mpv = mpv_ptr as *mut api::mpv_handle;
             let mpv_api = api::get_api().expect("libmpv API should be loaded");
             loop {
+                if shutdown_clone.load(Ordering::Relaxed) {
+                    break;
+                }
                 let event = unsafe { (mpv_api.mpv_wait_event)(mpv, 0.1) };
                 if event.is_null() {
                     continue;
@@ -154,9 +152,6 @@ impl MpvRenderer {
                 }
             }
         });
-        eprintln!("[mpv_renderer] event thread spawned");
-
-        eprintln!("[mpv_renderer] MpvRenderer::new() complete");
         Ok(Self {
             mpv,
             render_ctx,
@@ -167,6 +162,7 @@ impl MpvRenderer {
             duration_ms: 0,
             frame_rate: 30.0,
             eof_reached,
+            shutdown_flag: Some(shutdown),
             event_thread: Some(event_thread),
             subtitle_tracks: Vec::new(),
         })
@@ -202,7 +198,7 @@ impl MpvRenderer {
                 }
             }
             if i > 0 && i % 100 == 0 {
-                eprintln!("[mpv] still waiting for metadata... {} ms", i * 10);
+                // Still polling for metadata...
             }
             std::thread::sleep(std::time::Duration::from_millis(10));
         }
@@ -237,8 +233,11 @@ impl MpvRenderer {
             Some((s, w, h)) => (Some(s), w, h),
             None => (None, width, height),
         };
-        let render_w = if self.render_width > 0 { self.render_width } else { req_w };
-        let render_h = if self.render_height > 0 { self.render_height } else { req_h };
+        // setRenderSize is for downsampling (smaller canvas = less CPU).
+        // Never render larger than the source video — the SAB slot is sized
+        // for the source resolution and upscaling wastes CPU anyway.
+        let render_w = if self.render_width > 0 { self.render_width.min(req_w) } else { req_w };
+        let render_h = if self.render_height > 0 { self.render_height.min(req_h) } else { req_h };
 
         if let Some(sab) = sab_ref {
             let slot_idx = sab.next_write_slot();
@@ -334,6 +333,11 @@ impl MpvRenderer {
     }
 
     pub fn close(&mut self) {
+        // Signal the event thread to exit before we destroy mpv handles.
+        if let Some(ref shutdown) = self.shutdown_flag {
+            shutdown.store(true, Ordering::Relaxed);
+        }
+
         let mpv_api = api::get_api().expect("libmpv API should be loaded");
 
         // 1. Free the render context first.
@@ -438,7 +442,7 @@ impl MpvRenderer {
 
     pub fn select_subtitle_track(&mut self, id: i64) -> Result<(), String> {
         let mpv_api = api::get_api()?;
-        let sid = format!("{}", id);
+        let sid = if id < 0 { "no".to_string() } else { format!("{}", id) };
         let name_c = CString::new("sid").unwrap();
         let value_c = CString::new(sid).unwrap();
         let mut args = [
@@ -510,7 +514,7 @@ impl MpvRenderer {
 
     pub fn select_audio_track(&mut self, id: i64) -> Result<(), String> {
         let mpv_api = api::get_api()?;
-        let aid = format!("{}", id);
+        let aid = if id < 0 { "no".to_string() } else { format!("{}", id) };
         let name_c = CString::new("aid").unwrap();
         let value_c = CString::new(aid).unwrap();
         let mut args = [

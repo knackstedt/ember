@@ -558,6 +558,12 @@ const htpc = {
         console.warn(`[preload] movies:progress:set:sync sendSync took ${elapsed.toFixed(1)}ms`);
       }
     },
+    setSubtitleTrack: (id: string, trackId: number | null): Promise<void> =>
+      ipcRenderer.invoke("movies:subtitleTrack:set", id, trackId),
+    setAudioTrack: (id: string, trackId: number | null): Promise<void> =>
+      ipcRenderer.invoke("movies:audioTrack:set", id, trackId),
+    setPlaybackSpeed: (id: string, speed: number): Promise<void> =>
+      ipcRenderer.invoke("movies:playbackSpeed:set", id, speed),
     fetchMetadata: (title: string): Promise<unknown> =>
       ipcRenderer.invoke("movies:metadata", title),
     hide: (id: string, value: boolean): Promise<void> =>

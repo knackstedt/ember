@@ -185,6 +185,9 @@ export interface Movie {
   lastPlayed?: number;
   rating?: number;
   watchProgress?: number;
+  subtitleTrackId?: number | null;
+  audioTrackId?: number | null;
+  playbackSpeed?: number;
   hidden?: boolean;
   /** Whether the movie source is local or remote */
   sourceLocation?: SourceLocation;

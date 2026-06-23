@@ -1574,9 +1574,9 @@ export function registerIpcHandlers(window: BrowserWindow): void {
       if (defined.tags === undefined) defined.tags = [];
       if (defined.hidden === undefined) defined.hidden = false;
       if (defined.sourceLocation === undefined) defined.sourceLocation = "local";
-      // Preserve existing playback progress and lastPlayed
-      const existing = await db.query<[{ watchProgress?: number; lastPlayed?: number }[]]>(
-        `SELECT watchProgress, lastPlayed FROM movie:⟨${defined.id}⟩`,
+      // Preserve existing playback progress, track selections, speed, and lastPlayed
+      const existing = await db.query<[{ watchProgress?: number; subtitleTrackId?: number | null; audioTrackId?: number | null; playbackSpeed?: number; lastPlayed?: number }[]]>(
+        `SELECT watchProgress, subtitleTrackId, audioTrackId, playbackSpeed, lastPlayed FROM movie:⟨${defined.id}⟩`,
       );
       const existingRecord = existing[0]?.[0];
       if (
@@ -1584,6 +1584,15 @@ export function registerIpcHandlers(window: BrowserWindow): void {
         existingRecord?.watchProgress !== null
       ) {
         defined.watchProgress = existingRecord.watchProgress;
+      }
+      if (existingRecord?.subtitleTrackId !== undefined) {
+        defined.subtitleTrackId = existingRecord.subtitleTrackId;
+      }
+      if (existingRecord?.audioTrackId !== undefined) {
+        defined.audioTrackId = existingRecord.audioTrackId;
+      }
+      if (existingRecord?.playbackSpeed !== undefined && existingRecord.playbackSpeed !== null) {
+        defined.playbackSpeed = existingRecord.playbackSpeed;
       }
       if (
         existingRecord?.lastPlayed !== undefined &&
@@ -1689,6 +1698,18 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     if (elapsed > 20) {
       log.warn("ipc", `movies:progress:set:sync handler took ${elapsed.toFixed(1)}ms`);
     }
+  });
+
+  ipcMain.handle("movies:subtitleTrack:set", async (_e, id: string, trackId: number | null) => {
+    await MovieRepo.setSubtitleTrack(id, trackId);
+  });
+
+  ipcMain.handle("movies:audioTrack:set", async (_e, id: string, trackId: number | null) => {
+    await MovieRepo.setAudioTrack(id, trackId);
+  });
+
+  ipcMain.handle("movies:playbackSpeed:set", async (_e, id: string, speed: number) => {
+    await MovieRepo.setPlaybackSpeed(id, speed);
   });
 
   ipcMain.handle("movies:metadata", async (_e, title: string) => {

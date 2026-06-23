@@ -144,16 +144,15 @@ function ensureWorker(): ChildProcess {
         });
       }
     } else if (msg.type === "event") {
-      log.info("mpv-worker", `event ${msg.event} for ${msg.decoderId}`);
-      if (msg.event === "end-file") {
-        // Notify renderer that playback ended.
-        const win = BrowserWindow.getAllWindows().find((w) => !w.isDestroyed());
-        if (win) {
-          win.webContents.send("mpv:event", {
-            id: msg.decoderId,
-            event: msg.event,
-          });
-        }
+      log.info("mpv-worker", `event ${msg.event} for ${msg.decoderId}${msg.message ? ": " + msg.message : ""}`);
+      // Notify renderer of all events (end-file, error, etc.).
+      const win = BrowserWindow.getAllWindows().find((w) => !w.isDestroyed());
+      if (win) {
+        win.webContents.send("mpv:event", {
+          id: msg.decoderId,
+          event: msg.event,
+          message: msg.message,
+        });
       }
     }
   });
@@ -173,7 +172,6 @@ function ensureWorker(): ChildProcess {
   });
 
   w.on("exit", (code: number | null, signal: NodeJS.Signals | null) => {
-    log.warn("mpv", `Worker exited code=${code} signal=${signal}`);
     const isCurrent = worker === w;
     if (isCurrent) {
       worker = null;
@@ -195,7 +193,17 @@ function sendCommand(cmd: string, decoderId: string, args?: any[]): Promise<any>
   return new Promise((resolve, reject) => {
     const reqId = ++workerReqId;
     workerPending.set(reqId, { resolve, reject });
-    w.send!({ reqId, decoderId, type: "cmd", cmd, args });
+    const ok = w.send!({ reqId, decoderId, type: "cmd", cmd, args });
+    if (!ok) {
+      log.warn("mpv", `[sendCommand] IPC channel full or closed for reqId=${reqId}`);
+    }
+    // Timeout after 10s so renderer doesn't hang forever.
+    setTimeout(() => {
+      if (workerPending.has(reqId)) {
+        workerPending.delete(reqId);
+        reject(new Error(`MPV worker command ${cmd} timed out`));
+      }
+    }, 10000);
   });
 }
 

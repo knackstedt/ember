@@ -731,7 +731,15 @@ export const MoviesTab: React.FC = () => {
     enabled: !!selected,
     onConfirm: () => {
       if (selected?.filePath) {
-        openVideo(resolveMediaUrl(selected.filePath)!, selected.title, selected.id, selected.watchProgress);
+        openVideo(
+          resolveMediaUrl(selected.filePath)!,
+          selected.title,
+          selected.id,
+          selected.watchProgress,
+          selected.subtitleTrackId,
+          selected.audioTrackId,
+          selected.playbackSpeed,
+        );
         setSelected(null);
       }
     },
@@ -759,6 +767,9 @@ export const MoviesTab: React.FC = () => {
                     movie.title,
                     movie.id,
                     movie.watchProgress,
+                    movie.subtitleTrackId,
+                    movie.audioTrackId,
+                    movie.playbackSpeed,
                   );
               }}
             />

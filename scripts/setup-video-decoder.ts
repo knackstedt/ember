@@ -3,7 +3,7 @@ import { resolve } from "path";
 
 const ARCHS = [
   { target: "x86_64-unknown-linux-gnu", arch: "x64" },
-  { target: "aarch64-unknown-linux-gnu", arch: "arm64" },
+  // { target: "aarch64-unknown-linux-gnu", arch: "arm64" },
 ] as const;
 
 /** Return the newest mtime of any .rs file under dir, or 0 if none found. */
