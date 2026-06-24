@@ -39,9 +39,11 @@ export const useVideoPlayerStore = create<VideoPlayerStore>((set) => ({
       audioTrackId: audioTrackId ?? null,
       playbackSpeed: playbackSpeed ?? null,
     });
+    window.htpc.triggerGC();
   },
 
   close() {
     set({ src: null, title: "", movieId: null, watchProgress: null, subtitleTrackId: null, audioTrackId: null, playbackSpeed: null });
+    window.htpc.triggerGC();
   },
 }));

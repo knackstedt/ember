@@ -320,6 +320,10 @@ async function scanInMainThread(
 
   await markStaleGamesMissing(db, enrichedGames);
 
+  if (typeof (global as any).gc === "function") {
+    (global as any).gc();
+  }
+
   return enrichedGames;
 }
 
@@ -378,6 +382,10 @@ export async function performGameScan(
             }
 
             await markStaleGamesMissing(db, enrichedGames);
+
+            if (typeof (global as any).gc === "function") {
+              (global as any).gc();
+            }
 
             worker.terminate();
             resolve(enrichedGames);

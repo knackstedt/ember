@@ -1102,6 +1102,14 @@ const htpc = {
     },
   },
 
+  triggerGC: (): void => {
+    if (typeof (global as any).gc === "function") {
+      (global as any).gc();
+    }
+    // Also ask main process to collect
+    void ipcRenderer.invoke("gc:trigger");
+  },
+
   oauth: {
     start: (authUrl: string, redirectPatterns: string[]): Promise<OAuthResult> =>
       ipcRenderer.invoke("oauth:start", authUrl, redirectPatterns),

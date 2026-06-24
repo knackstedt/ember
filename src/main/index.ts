@@ -261,6 +261,8 @@ if (!isDev) {
   app.on("before-quit", releaseInstanceLock);
 }
 
+app.commandLine.appendSwitch("js-flags", "--expose-gc");
+
 if (isDev) {
   app.commandLine.appendSwitch("remote-debugging-port", "9222");
 } else {

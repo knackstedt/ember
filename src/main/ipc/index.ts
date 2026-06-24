@@ -527,6 +527,12 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     }
   });
 
+  ipcMain.handle("gc:trigger", () => {
+    if (typeof (global as any).gc === "function") {
+      (global as any).gc();
+    }
+  });
+
   ipcMain.handle("app:shutdown", () => {
     try {
       spawn("systemctl", ["poweroff"], { detached: true, stdio: "ignore" });

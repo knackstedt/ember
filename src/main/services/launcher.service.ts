@@ -358,6 +358,10 @@ export async function launchGame(game: Game): Promise<void> {
   // Fire non-blocking pre-start hooks (fire-and-forget)
   void runSessionHooks(game, "before-start");
 
+  if (typeof (global as any).gc === "function") {
+    (global as any).gc();
+  }
+
   let cmd: string;
   let args: string[];
 
