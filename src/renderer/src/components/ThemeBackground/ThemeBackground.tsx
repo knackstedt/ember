@@ -310,6 +310,26 @@ function useThemeCanvas(
     let w = (canvas.width = window.innerWidth);
     let h = (canvas.height = window.innerHeight);
 
+    let frameId = 0;
+    let currentDraw: (() => void) | null = null;
+
+    const schedule = () => {
+      if (!currentDraw || document.hidden) {
+        frameId = 0;
+        animRef.current = 0;
+        return;
+      }
+      frameId = requestAnimationFrame(currentDraw);
+      animRef.current = frameId;
+    };
+
+    const onVis = () => {
+      if (!document.hidden && !frameId && currentDraw) {
+        schedule();
+      }
+    };
+    document.addEventListener("visibilitychange", onVis);
+
     if (theme === "dark-oled") {
       const drawStars = (): void => {
         ctx.clearRect(0, 0, w, h);
@@ -334,7 +354,10 @@ function useThemeCanvas(
       };
       drawStars();
       window.addEventListener("resize", onResize);
-      return () => window.removeEventListener("resize", onResize);
+      return () => {
+        window.removeEventListener("resize", onResize);
+        document.removeEventListener("visibilitychange", onVis);
+      };
     }
 
     const onResize = (): void => {
@@ -355,6 +378,7 @@ function useThemeCanvas(
       }));
 
       const draw = (): void => {
+        currentDraw = draw;
         ctx.clearRect(0, 0, w, h);
         for (const orb of orbs) {
           orb.x += orb.vx;
@@ -379,14 +403,16 @@ function useThemeCanvas(
           ctx.arc(orb.x, orb.y, orb.r, 0, Math.PI * 2);
           ctx.fill();
         }
-        animRef.current = requestAnimationFrame(draw);
+        schedule();
       };
-      draw();
+      currentDraw = draw;
+      schedule();
     } else if (theme === "neon-cyberpunk") {
       let scanY = 0;
       const CYCLE_FRAMES = 480;
 
       const draw = (): void => {
+        currentDraw = draw;
         ctx.clearRect(0, 0, w, h);
         scanY = (scanY + h / CYCLE_FRAMES) % h;
 
@@ -404,9 +430,10 @@ function useThemeCanvas(
         ctx.lineTo(w, Math.round(scanY));
         ctx.stroke();
 
-        animRef.current = requestAnimationFrame(draw);
+        schedule();
       };
-      draw();
+      currentDraw = draw;
+      schedule();
     } else if (theme === "synthwave-sunset") {
       const hues = [300, 320, 340, 200, 260, 280];
       const orbs = Array.from({ length: 6 }, (_, i) => ({
@@ -463,9 +490,10 @@ function useThemeCanvas(
           ctx.fill();
         }
 
-        animRef.current = requestAnimationFrame(draw);
+        schedule();
       };
-      draw();
+      currentDraw = draw;
+      schedule();
     } else if (theme === "deep-ocean") {
       const bubbles = Array.from({ length: 40 }, () => ({
         x: Math.random() * w,
@@ -493,9 +521,10 @@ function useThemeCanvas(
           ctx.arc(x, b.y, b.r * 2, 0, Math.PI * 2);
           ctx.fill();
         }
-        animRef.current = requestAnimationFrame(draw);
+        schedule();
       };
-      draw();
+      currentDraw = draw;
+      schedule();
     } else if (theme === "monokai") {
       const particles = Array.from({ length: 60 }, () => ({
         x: Math.random() * w,
@@ -522,9 +551,10 @@ function useThemeCanvas(
           ctx.fillStyle = `${p.color} ${0.3 + Math.random() * 0.3})`;
           ctx.fillRect(p.x, p.y, p.size, p.size);
         }
-        animRef.current = requestAnimationFrame(draw);
+        schedule();
       };
-      draw();
+      currentDraw = draw;
+      schedule();
     } else if (theme === "warm-paper") {
       const draw = (): void => {
         ctx.clearRect(0, 0, w, h);
@@ -549,15 +579,20 @@ function useThemeCanvas(
       };
       draw();
       window.addEventListener("resize", onResizeWarm);
-      return () => window.removeEventListener("resize", onResizeWarm);
+      return () => {
+        window.removeEventListener("resize", onResizeWarm);
+        document.removeEventListener("visibilitychange", onVis);
+      };
     } else if (theme === "terminal-tui") {
       // terminal-tui uses the MatrixAnimation in the matrix container
       ctx.clearRect(0, 0, w, h);
     }
 
     return () => {
-      cancelAnimationFrame(animRef.current);
+      cancelAnimationFrame(frameId);
+      animRef.current = 0;
       window.removeEventListener("resize", onResize);
+      document.removeEventListener("visibilitychange", onVis);
     };
   }, [theme, enabled]);
 }
@@ -615,11 +650,23 @@ function MatrixBackground({ preset }: { preset: MatrixPreset }) {
       }, 250);
     }
 
+    const onVis = () => {
+      if (document.hidden) {
+        animRef.current?.dispose();
+        animRef.current = null;
+        created = false;
+      } else if (!created) {
+        createAnim();
+      }
+    };
+    document.addEventListener("visibilitychange", onVis);
+
     return () => {
       if (timeoutId) clearTimeout(timeoutId);
       ro?.disconnect();
       animRef.current?.dispose();
       animRef.current = null;
+      document.removeEventListener("visibilitychange", onVis);
     };
   }, [preset]);
 

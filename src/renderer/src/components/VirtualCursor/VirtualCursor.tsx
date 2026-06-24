@@ -197,7 +197,13 @@ export const VirtualCursor: React.FC<VirtualCursorProps> = ({
     resize();
     window.addEventListener("resize", resize);
 
+    let frameId = 0;
+
     const loop = (ts: number) => {
+      if (document.hidden || !visible) {
+        frameId = 0;
+        return;
+      }
       const dt = lastRef.current ? Math.min((ts - lastRef.current) / 1000, 0.05) : 0.016;
       lastRef.current = ts;
       flashRef.current = Math.max(0, flashRef.current - dt * 5.8);
@@ -241,13 +247,25 @@ export const VirtualCursor: React.FC<VirtualCursorProps> = ({
         }
       }
 
-      animRef.current = requestAnimationFrame(loop);
+      frameId = requestAnimationFrame(loop);
+      animRef.current = frameId;
     };
 
-    animRef.current = requestAnimationFrame(loop);
+    frameId = requestAnimationFrame(loop);
+    animRef.current = frameId;
+
+    const onVis = () => {
+      if (!document.hidden && visible && !frameId) {
+        frameId = requestAnimationFrame(loop);
+        animRef.current = frameId;
+      }
+    };
+    document.addEventListener("visibilitychange", onVis);
+
     return () => {
       window.removeEventListener("resize", resize);
-      cancelAnimationFrame(animRef.current);
+      cancelAnimationFrame(frameId);
+      document.removeEventListener("visibilitychange", onVis);
     };
   }, [visible, hoverStyle, expanded, hue, posRef]);
 
