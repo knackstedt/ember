@@ -129,6 +129,24 @@ function useVisibleTabs(settings: AppSettings | null) {
   return TABS.filter((t) => !disabled.has(t.id));
 }
 
+const LAST_TAB_KEY = "ember:last-tab";
+const LAST_TAB_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+
+function restoreLastTab(): TabId | null {
+  try {
+    const raw = localStorage.getItem(LAST_TAB_KEY);
+    if (raw) {
+      const data = JSON.parse(raw) as { tab: TabId; ts: number };
+      if (Date.now() - data.ts < LAST_TAB_TIMEOUT_MS) {
+        return data.tab;
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
 export default function App(): React.ReactElement {
   const settings = useSettingsStore((s) => s.settings);
   const loading = useSettingsStore((s) => s.loading);
@@ -151,7 +169,12 @@ export default function App(): React.ReactElement {
   const gameRunningRef = useRef(false);
 
   /* Controller cursors — always call hook, control via `enabled` */
-  const [activeTab, setActiveTab] = useState<TabId>("gaming");
+  const restoredTabRef = useRef<TabId | null>(null);
+  const [activeTab, setActiveTab] = useState<TabId>(() => {
+    const restored = restoreLastTab();
+    if (restored) restoredTabRef.current = restored;
+    return restored ?? "gaming";
+  });
   useBrowserControllerNav({ enabled: !loading && !anyEmulatorOpen && !gameRunning, evdevActive: inputDevices.length > 0 });
   const activeTabRef = useRef<TabId>(activeTab);
   activeTabRef.current = activeTab;
@@ -412,6 +435,10 @@ export default function App(): React.ReactElement {
   }, []);
 
   useEffect(() => {
+    if (restoredTabRef.current) {
+      restoredTabRef.current = null; // consume — only skip once
+      return;
+    }
     if (settings?.defaultTab && visibleTabIds.includes(settings.defaultTab)) {
       setActiveTab(settings.defaultTab);
     }
@@ -496,6 +523,21 @@ export default function App(): React.ReactElement {
     };
     window.addEventListener("htpc:switch-tab", handler);
     return () => window.removeEventListener("htpc:switch-tab", handler);
+  }, []);
+
+  /* Save current tab on app shutdown so it can be restored within 5 minutes */
+  useEffect(() => {
+    const removeSaveStateListener = window.htpc.onSaveState?.(() => {
+      try {
+        localStorage.setItem(
+          LAST_TAB_KEY,
+          JSON.stringify({ tab: activeTabRef.current, ts: Date.now() }),
+        );
+      } catch {
+        // ignore
+      }
+    });
+    return () => { removeSaveStateListener?.(); };
   }, []);
 
   /* Listen for selection changes from tabs for command palette context */
