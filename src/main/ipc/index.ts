@@ -66,6 +66,7 @@ import { performGameScan } from "../services/game-scan.service";
 import {
   createDesktopEntry,
   removeDesktopEntry,
+  removeAllDesktopEntries,
   hasDesktopEntry,
 } from "../services/desktop-entry.service";
 import { executeODataQuery } from "../services/query.service";
@@ -1535,6 +1536,10 @@ export function registerIpcHandlers(window: BrowserWindow): void {
 
   ipcMain.handle("games:desktopEntry:has", async (_e, gameId: string) => {
     return hasDesktopEntry(gameId);
+  });
+
+  ipcMain.handle("games:desktopEntry:removeAll", async () => {
+    return removeAllDesktopEntries();
   });
 
   ipcMain.handle("movies:scan", async (_e, extraPaths?: string[]) => {

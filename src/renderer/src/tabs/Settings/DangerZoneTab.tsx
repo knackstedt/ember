@@ -17,6 +17,7 @@ import {
   FolderOpen,
   Check,
   X,
+  Monitor,
 } from "lucide-react";
 import { Game, Movie, MusicTrack } from "../../../../shared/types";
 
@@ -245,6 +246,7 @@ export const DangerZoneTab: React.FC = () => {
   const { settings, update } = useSettingsStore();
   const [compressing, setCompressing] = useState(false);
   const [clearingMissing, setClearingMissing] = useState(false);
+  const [removingDesktopEntries, setRemovingDesktopEntries] = useState(false);
   const [corruptEntries, setCorruptEntries] = useState<CorruptedEntry[]>([]);
   const [corruptLoading, setCorruptLoading] = useState(true);
   const [corruptDeleting, setCorruptDeleting] = useState(false);
@@ -333,6 +335,24 @@ export const DangerZoneTab: React.FC = () => {
       });
     } finally {
       setCorruptDeleting(false);
+    }
+  };
+
+  const handleRemoveAllDesktopEntries = async () => {
+    setRemovingDesktopEntries(true);
+    try {
+      const result = await window.htpc.games.desktopEntry.removeAll();
+      useToastStore.getState().push({
+        type: "success",
+        message: `Removed ${result.count} desktop entries and launch scripts.`,
+      });
+    } catch (err) {
+      useToastStore.getState().push({
+        type: "error",
+        message: `Failed to remove desktop entries: ${String(err)}`,
+      });
+    } finally {
+      setRemovingDesktopEntries(false);
     }
   };
 
@@ -683,6 +703,18 @@ export const DangerZoneTab: React.FC = () => {
           These actions are destructive and cannot be undone. Please proceed
           with caution.
         </p>
+
+        <DangerAction
+          icon={<Monitor size={16} style={{ color: "#ff4444" }} />}
+          label="Delete All .desktop Entries"
+          description="Removes all Ember-created .desktop files and launch scripts from your system. This only affects entries created by Ember."
+          buttonText="Delete .desktop Entries"
+          buttonIcon={<Trash2 size={14} />}
+          confirmText="Remove all Ember-created .desktop entries?"
+          destructive
+          loading={removingDesktopEntries}
+          onConfirm={handleRemoveAllDesktopEntries}
+        />
 
         <DangerAction
           icon={<Trash2 size={16} style={{ color: "#ff4444" }} />}

@@ -528,6 +528,8 @@ const htpc = {
         ipcRenderer.invoke("games:desktopEntry:create", game),
       remove: (gameId: string): Promise<void> =>
         ipcRenderer.invoke("games:desktopEntry:remove", gameId),
+      removeAll: (): Promise<{ count: number }> =>
+        ipcRenderer.invoke("games:desktopEntry:removeAll"),
       has: (gameId: string): Promise<boolean> =>
         ipcRenderer.invoke("games:desktopEntry:has", gameId),
     },

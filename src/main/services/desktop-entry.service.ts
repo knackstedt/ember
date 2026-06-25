@@ -1,6 +1,6 @@
 import { app } from "electron";
 import { join, dirname } from "path";
-import { existsSync, mkdirSync, writeFileSync, chmodSync, unlinkSync } from "fs";
+import { existsSync, mkdirSync, writeFileSync, chmodSync, unlinkSync, readdirSync } from "fs";
 import { spawnSync } from "child_process";
 import { Game } from "../../shared/types";
 import { createLogger } from "../util/logger";
@@ -48,6 +48,58 @@ export function removeDesktopEntry(gameId: string): void {
   } catch {
     /* ignore */
   }
+}
+
+export function removeAllDesktopEntries(): { count: number } {
+  if (process.platform !== "linux") {
+    return { count: 0 };
+  }
+
+  const appsDir = join(app.getPath("home"), ".local", "share", "applications");
+  const scriptsDir = getScriptsDir();
+  let count = 0;
+
+  try {
+    const files = readdirSync(appsDir);
+    for (const file of files) {
+      if (file.startsWith("ember-game-") && file.endsWith(".desktop")) {
+        try {
+          unlinkSync(join(appsDir, file));
+          count++;
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+
+  try {
+    if (existsSync(scriptsDir)) {
+      const scripts = readdirSync(scriptsDir);
+      for (const file of scripts) {
+        if (file.startsWith("launch-") && file.endsWith(".sh")) {
+          try {
+            unlinkSync(join(scriptsDir, file));
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+
+  try {
+    spawnSync("update-desktop-database", [appsDir], { stdio: "ignore" });
+  } catch {
+    // ignore - desktop database may not be available
+  }
+
+  log.info("desktop-entry", `Removed ${count} desktop entries`);
+  return { count };
 }
 
 function findProjectRoot(): string {
