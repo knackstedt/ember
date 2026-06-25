@@ -121,9 +121,11 @@ setInterval(() => {
 const devEnv = { ...process.env };
 delete devEnv.ELECTRON_RUN_AS_NODE;
 const ldPath = `/lib/x86_64-linux-gnu${process.env.LD_LIBRARY_PATH ? ':' + process.env.LD_LIBRARY_PATH : ''}`;
+// Forward any extra CLI args (e.g. --launch-game=<id>) to electron-vite/Electron
+const extraArgs = process.argv.slice(2);
 const child = spawn(
   'electron-vite',
-  ['dev', '--', '--no-sandbox', '--disable-setuid-sandbox'],
+  ['dev', '--', '--no-sandbox', '--disable-setuid-sandbox', ...extraArgs],
   { stdio: 'inherit', shell: false, env: { ...devEnv, LD_LIBRARY_PATH: ldPath } }
 );
 

@@ -395,6 +395,19 @@ export default function App(): React.ReactElement {
       console.log(`[renderer] External game stopped: ${gameId}`);
     });
 
+    // Check for a pending desktop-entry launch on startup
+    void (async () => {
+      try {
+        const game = await window.htpc.games.getPendingLaunch();
+        if (game) {
+          console.log("[renderer] Pending launch detected, switching to gaming:", game.title);
+          setActiveTab("gaming");
+        }
+      } catch (err) {
+        console.error("[renderer] Failed to check pending launch:", err);
+      }
+    })();
+
     return () => { unsubScan(); unsubCores(); unsubHook(); unsubMusicMoved(); unsubToast(); unsubLibretro(); unsubGameLaunching(); unsubGameLaunchFailed(); unsubGameStarted(); unsubGameStopped(); };
   }, []);
 

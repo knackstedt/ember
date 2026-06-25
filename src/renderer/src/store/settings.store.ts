@@ -86,6 +86,7 @@ const defaults: AppSettings = {
   updateCheckFrequency: "week",
   updateAutoDownload: true,
   updateAutoInstall: false,
+  autoCreateDesktopEntries: false,
 };
 
 async function injectThemeCss(themeId: string) {

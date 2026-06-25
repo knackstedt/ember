@@ -430,6 +430,14 @@ export const SourcesTab: React.FC = () => {
         <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
           Disable sources you don't want to include in game scans. Disabling a source leaves existing games in the library until you clear them.
         </p>
+        <div className="pl-1">
+          <Toggle
+            label="Auto-create .desktop entries"
+            description="Automatically create Linux desktop entries for newly discovered games"
+            value={settings.autoCreateDesktopEntries ?? false}
+            onChange={(v) => update({ autoCreateDesktopEntries: v })}
+          />
+        </div>
         <div className="flex flex-col gap-3 pl-1">
           {allSources.map((source) => {
             const enabled = !disabledSet.has(source);

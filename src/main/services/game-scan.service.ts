@@ -18,6 +18,7 @@ import type { ScanSourceId } from "../../shared/scan-sources";
 import { createLogger } from "../util/logger";
 import { getSettings } from "./settings.service";
 import { calculateCRC32, calculateMD5, calculateSHA1, getRomHashes } from "./metadata/datfiles.service";
+import { createDesktopEntry } from "./desktop-entry.service";
 
 const log = createLogger("info");
 
@@ -300,6 +301,7 @@ async function scanInMainThread(
 
   const db = getDb();
   const existingMap = await fetchExistingGameFields(db);
+  const autoCreateDesktop = settings.autoCreateDesktopEntries ?? false;
 
   const chunkSize = 50;
   for (let i = 0; i < enrichedGames.length; i += chunkSize) {
@@ -316,6 +318,18 @@ async function scanInMainThread(
         }
       })
     );
+  }
+
+  if (autoCreateDesktop) {
+    for (const game of enrichedGames) {
+      if (!existingMap.has(game.id)) {
+        try {
+          createDesktopEntry(game);
+        } catch (err) {
+          log.warn("scan", `Failed to create desktop entry for ${game.id}: ${err}`);
+        }
+      }
+    }
   }
 
   await markStaleGamesMissing(db, enrichedGames);
@@ -379,6 +393,19 @@ export async function performGameScan(
                   }
                 })
               );
+            }
+
+            const autoCreateDesktop = settings.autoCreateDesktopEntries ?? false;
+            if (autoCreateDesktop) {
+              for (const game of enrichedGames) {
+                if (!existingMap.has(game.id)) {
+                  try {
+                    createDesktopEntry(game);
+                  } catch (err) {
+                    log.warn("scan", `Failed to create desktop entry for ${game.id}: ${err}`);
+                  }
+                }
+              }
             }
 
             await markStaleGamesMissing(db, enrichedGames);

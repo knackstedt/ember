@@ -67,6 +67,17 @@ export const GameRepo = {
     }));
   },
 
+  async getById(id: string): Promise<Game | null> {
+    const db = getDb();
+    const result = await db.query<[Game[]]>(`SELECT * FROM game:⟨${escapeId(id)}⟩`);
+    const games = (result[0] ?? []) as Game[];
+    if (games.length === 0) return null;
+    return {
+      ...games[0],
+      id: extractRecordId(games[0].id),
+    };
+  },
+
   async upsert(game: Game): Promise<void> {
     const db = getDb();
     const normalized: Record<string, unknown> = { ...game };

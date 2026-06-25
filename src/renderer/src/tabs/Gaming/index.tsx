@@ -60,6 +60,7 @@ import {
   Settings,
   Plus,
   Globe,
+  Monitor,
 } from "lucide-react";
 import { DynamicFacetFilters, FacetField } from "../../components/DynamicFacetFilters/DynamicFacetFilters";
 import type { GameVideo } from "../../../../shared/metadata";
@@ -293,6 +294,23 @@ export const GamingTab: React.FC = () => {
   const isNeonGrid = useIsNeonGrid();
 
   const [facetFilters, setFacetFilters] = useState<Record<string, string | null>>({});
+
+  // Handle desktop-entry launch requests (--launch-game CLI arg)
+  useEffect(() => {
+    void (async () => {
+      try {
+        const game = await window.htpc.games.getPendingLaunch();
+        console.log("[gaming] getPendingLaunch result:", game);
+        if (game) {
+          console.log("[gaming] Launching pending game:", game.title);
+          await window.htpc.games.clearPendingLaunch();
+          await launch(game);
+        }
+      } catch (err) {
+        console.error("[gaming] Failed to get pending launch:", err);
+      }
+    })();
+  }, []);
   const applyFacetFilter = (field: string, value: string | null) => {
     setFacetFilters((prev) => ({ ...prev, [field]: value }));
   };
@@ -474,6 +492,11 @@ export const GamingTab: React.FC = () => {
           icon: <FolderOpen size={16} />,
           disabled: !game.execPath && !game.romPath,
         },
+        {
+          id: "desktopEntry",
+          label: "Create .desktop entry",
+          icon: <Monitor size={16} />,
+        },
       ];
       if (game.romPath && !game.compressedRomPath) {
         opts.push({
@@ -570,6 +593,7 @@ export const GamingTab: React.FC = () => {
           break;
         }
         case "delete": {
+          void window.htpc.games.desktopEntry.remove(game.id);
           deleteGame(game.id);
           break;
         }
@@ -580,7 +604,40 @@ export const GamingTab: React.FC = () => {
           break;
         }
         case "remove": {
+          void window.htpc.games.desktopEntry.remove(game.id);
           hide(game.id);
+          break;
+        }
+        case "desktopEntry": {
+          const toastId = useToastStore.getState().push({
+            type: "progress",
+            message: `Creating .desktop entry for ${game.title}...`,
+            progress: 0,
+          });
+          window.htpc.games.desktopEntry
+            .has(game.id)
+            .then((has) => {
+              if (has) {
+                return window.htpc.games.desktopEntry.remove(game.id).then(() => {
+                  useToastStore.getState().update(toastId, {
+                    type: "success",
+                    message: `Removed .desktop entry for ${game.title}`,
+                  });
+                });
+              }
+              return window.htpc.games.desktopEntry.create(game).then(() => {
+                useToastStore.getState().update(toastId, {
+                  type: "success",
+                  message: `Created .desktop entry for ${game.title}`,
+                });
+              });
+            })
+            .catch((err) => {
+              useToastStore.getState().update(toastId, {
+                type: "error",
+                message: `Failed to update .desktop entry for ${game.title}: ${String(err)}`,
+              });
+            });
           break;
         }
         case "compress": {

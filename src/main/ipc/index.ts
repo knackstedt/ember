@@ -63,6 +63,11 @@ import {
 } from "../db/repository";
 import { getProtonRating } from "../services/protondb.service";
 import { performGameScan } from "../services/game-scan.service";
+import {
+  createDesktopEntry,
+  removeDesktopEntry,
+  hasDesktopEntry,
+} from "../services/desktop-entry.service";
 import { executeODataQuery } from "../services/query.service";
 import { loadFlashThumbnail, clearInFlight, setFlashThumbnailConcurrency } from "../services/flash-thumbnail.service";
 import { loadLibretroThumbnail, isLibretroPlatform, listLocalScreenshots } from "../services/libretro-thumbnail.service";
@@ -1518,6 +1523,18 @@ export function registerIpcHandlers(window: BrowserWindow): void {
 
   ipcMain.handle("games:compression:canCompress", async (_e, game: Game) => {
     return canCompress(game);
+  });
+
+  ipcMain.handle("games:desktopEntry:create", async (_e, game: Game) => {
+    createDesktopEntry(game);
+  });
+
+  ipcMain.handle("games:desktopEntry:remove", async (_e, gameId: string) => {
+    removeDesktopEntry(gameId);
+  });
+
+  ipcMain.handle("games:desktopEntry:has", async (_e, gameId: string) => {
+    return hasDesktopEntry(gameId);
   });
 
   ipcMain.handle("movies:scan", async (_e, extraPaths?: string[]) => {

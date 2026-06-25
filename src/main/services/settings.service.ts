@@ -39,6 +39,7 @@ const DEFAULTS: AppSettings = {
   updateCheckFrequency: "week",
   updateAutoDownload: true,
   updateAutoInstall: false,
+  autoCreateDesktopEntries: false,
 };
 
 let cachedSettings: AppSettings | null = null;

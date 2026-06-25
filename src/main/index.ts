@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell, protocol, Menu, powerMonitor, nativeImage } from "electron";
+import { app, BrowserWindow, shell, protocol, Menu, powerMonitor, nativeImage, ipcMain } from "electron";
 import { EventEmitter } from "events";
 import path, { join } from "path";
 import { readFileSync, createReadStream, statSync, lstatSync, readlinkSync, unlinkSync, writeFileSync, existsSync, mkdirSync, readdirSync } from "fs";
@@ -13,7 +13,8 @@ import { setFlashThumbnailConcurrency } from "./services/flash-thumbnail.service
 import { getWindowState, saveWindowState } from "./services/window-state.service";
 import { createLogger } from "./util/logger";
 import { getXdgVideosDir } from "./scanners/xdg";
-import { MovieRepo, RemoteSourceRepo } from "./db/repository";
+import { GameRepo, MovieRepo, RemoteSourceRepo } from "./db/repository";
+import { launchGame } from "./services/launcher.service";
 import { getServePort, shutdownRcloneManager } from "./services/rclone-manager";
 import { startRemoteAvailabilityWorker, stopRemoteAvailabilityWorker } from "./services/remote-availability.service";
 import { bootPlugins, shutdownPlugins } from "./plugins/loader";
@@ -34,6 +35,11 @@ const log = createLogger("info");
 const isDev = !app.isPackaged || process.env.NODE_ENV === "development";
 
 let errorDialogOpen = false;
+let pendingLaunchGame: import("../shared/types").Game | null = null;
+const pendingLaunchGameId = process.argv.find((arg) => arg.startsWith("--launch-game="))?.slice("--launch-game=".length) ?? null;
+if (pendingLaunchGameId) {
+  log.info("launch-cli", `Early capture of launch game ID: ${pendingLaunchGameId}`);
+}
 
 function showErrorDialog(title: string, detail: string): void {
   if (errorDialogOpen) return;
@@ -493,6 +499,29 @@ async function createWindow(): Promise<void> {
 
   registerIpcHandlers(mainWindow);
 
+  ipcMain.handle("games:pendingLaunch", async () => {
+    if (pendingLaunchGame) {
+      return pendingLaunchGame;
+    }
+    if (pendingLaunchGameId) {
+      try {
+        const game = await GameRepo.getById(pendingLaunchGameId);
+        if (game) {
+          pendingLaunchGame = game;
+          log.info("launch-cli", `Renderer pulled pending game: ${game.title} (${game.id})`);
+          return game;
+        }
+      } catch (err) {
+        log.error("launch-cli", `Failed to look up pending game: ${err}`);
+      }
+    }
+    return null;
+  });
+
+  ipcMain.handle("games:clearPendingLaunch", () => {
+    pendingLaunchGame = null;
+  });
+
   try {
     await installBundledPlugins();
   } catch (err) {
@@ -868,6 +897,31 @@ app.whenReady().then(async () => {
   });
 
   await createWindow();
+
+  // Resolve early-captured launch game ID now that DB is ready
+  if (pendingLaunchGameId && !pendingLaunchGame) {
+    (async () => {
+      try {
+        const game = await GameRepo.getById(pendingLaunchGameId);
+        if (!game) {
+          log.warn("launch-cli", `Game not found: ${pendingLaunchGameId}`);
+          return;
+        }
+        const libretroPlatforms = [
+          "nes", "snes", "gb", "gba", "n64", "genesis", "sms", "gamegear",
+          "pce", "psx", "nds", "dreamcast", "flash", "dos",
+        ];
+        if (libretroPlatforms.includes(game.platform) || game.platform === "flash") {
+          pendingLaunchGame = game;
+          log.info("launch-cli", `Stored pending game: ${game.title} (${game.id})`);
+        } else {
+          await launchGame(game);
+        }
+      } catch (err) {
+        log.error("launch-cli", `Failed to launch game ${pendingLaunchGameId}: ${err}`);
+      }
+    })();
+  }
 
   // Trigger background scans after the window is ready so the renderer
   // can show cached data immediately and refresh when scans complete.

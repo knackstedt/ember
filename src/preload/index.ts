@@ -523,6 +523,18 @@ const htpc = {
       ipcRenderer.invoke("games:compression:tools"),
     canCompress: (game: Game): Promise<{ ok: boolean; reason?: string }> =>
       ipcRenderer.invoke("games:compression:canCompress", game),
+    desktopEntry: {
+      create: (game: Game): Promise<void> =>
+        ipcRenderer.invoke("games:desktopEntry:create", game),
+      remove: (gameId: string): Promise<void> =>
+        ipcRenderer.invoke("games:desktopEntry:remove", gameId),
+      has: (gameId: string): Promise<boolean> =>
+        ipcRenderer.invoke("games:desktopEntry:has", gameId),
+    },
+    getPendingLaunch: (): Promise<Game | null> =>
+      ipcRenderer.invoke("games:pendingLaunch"),
+    clearPendingLaunch: (): Promise<void> =>
+      ipcRenderer.invoke("games:clearPendingLaunch"),
   },
 
   dolphin: {

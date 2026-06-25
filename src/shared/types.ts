@@ -605,6 +605,8 @@ export interface AppSettings {
   updateAutoInstall?: boolean;
   /** Pin to a specific version (prevents auto-updates to other versions) */
   updatePinnedVersion?: string;
+  /** Automatically create .desktop entries for discovered games */
+  autoCreateDesktopEntries?: boolean;
 }
 
 export type DashboardWidgetType =
