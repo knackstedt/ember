@@ -271,6 +271,7 @@ export default function App(): React.ReactElement {
       selectedMusicArtist: selectedMusicArtistRef.current,
       selectedMusicAlbum: selectedMusicAlbumRef.current,
       selectedTvId: selectedTvRef.current,
+      gameRunning,
     },
     setActiveTab,
   );

@@ -171,6 +171,15 @@ export const IPC_CHANNELS = {
     progress: "packages:progress",
     aptPassword: "packages:apt:password",
   },
+  overlay: {
+    toggle: "overlay:toggle",
+    show: "overlay:show",
+    hide: "overlay:hide",
+    close: "overlay:close",
+    getGame: "overlay:getGame",
+    stopGame: "overlay:stopGame",
+    state: "overlay:state",
+  },
   devtools: {
     isOpen: "devtools:is-open",
     changed: "devtools:changed",

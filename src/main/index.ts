@@ -15,6 +15,7 @@ import { createLogger } from "./util/logger";
 import { getXdgVideosDir } from "./scanners/xdg";
 import { GameRepo, MovieRepo, RemoteSourceRepo } from "./db/repository";
 import { launchGame } from "./services/launcher.service";
+import { initOverlayService } from "./services/overlay.service";
 import { getServePort, shutdownRcloneManager } from "./services/rclone-manager";
 import { startRemoteAvailabilityWorker, stopRemoteAvailabilityWorker } from "./services/remote-availability.service";
 import { bootPlugins, shutdownPlugins } from "./plugins/loader";
@@ -498,6 +499,7 @@ async function createWindow(): Promise<void> {
   });
 
   registerIpcHandlers(mainWindow);
+  initOverlayService(mainWindow);
 
   ipcMain.handle("games:pendingLaunch", async () => {
     if (pendingLaunchGame) {

@@ -12,6 +12,7 @@ import {
   Monitor,
   Music,
   Info,
+  Layers,
 } from "lucide-react";
 import { AppearanceTab } from "./AppearanceTab";
 import { GeneralTab } from "./GeneralTab";
@@ -24,6 +25,7 @@ import { DangerZoneTab } from "./DangerZoneTab";
 import { SystemInfoTab } from "./SystemInfoTab";
 import { MusicLibraryTab } from "./MusicLibraryTab";
 import { AboutTab } from "./AboutTab";
+import { OverlayTab } from "./OverlayTab";
 
 const SUB_TABS = [
   { id: "general", label: "General", Icon: Settings },
@@ -34,6 +36,7 @@ const SUB_TABS = [
   { id: "emulators", label: "Emulators", Icon: Gamepad2 },
   { id: "plugins", label: "Plugins", Icon: Plug },
   { id: "dependencies", label: "Dependencies", Icon: Package },
+  { id: "overlay", label: "Overlay", Icon: Layers },
   { id: "system-info", label: "System Info", Icon: Monitor },
   { id: "about", label: "About", Icon: Info },
   { id: "danger-zone", label: "Danger Zone", Icon: AlertTriangle },
@@ -50,6 +53,7 @@ const TAB_COMPONENTS: Record<SubTabId, React.FC> = {
   emulators: EmulatorsTab,
   plugins: PluginsTab,
   dependencies: DependenciesTab,
+  overlay: OverlayTab,
   "system-info": SystemInfoTab,
   about: AboutTab,
   "danger-zone": DangerZoneTab,

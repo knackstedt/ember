@@ -91,3 +91,9 @@ Both produce `libvideo_decoder.so` which is renamed to `.node` and copied into `
 - Rust: `cd native/video-decoder && cargo check --features ffmpeg` (requires `libavcodec-dev`, `libavformat-dev`, `libavutil-dev`, `libswscale-dev`)
 - Rust: `cd native/video-decoder && cargo check --features gstreamer` (requires `libgstreamer1.0-dev`, `libgstreamer-plugins-base1.0-dev`)
 - TypeScript: `npx tsc --noEmit` (passes)
+
+## Git / Commits
+
+- Do NOT create git commits, stage files, or suggest commit messages unless explicitly asked.
+- Do NOT "wrap up" work by committing changes at the end of a session.
+- Only perform git add/commit/push operations when the user directly requests them.

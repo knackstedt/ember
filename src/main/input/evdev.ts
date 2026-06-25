@@ -388,6 +388,87 @@ function detectControllerType(
 const EV_ABS = 0x03;
 const EV_KEY = 0x01;
 
+/* Button map must match the renderer's controller worker. */
+const BASE_BTN_MAP: Record<number, string> = {
+  // Old-style joystick buttons (e.g. Microntek USB GameCube adapters)
+  288: "west",
+  289: "north",
+  290: "south",
+  291: "east",
+  292: "left_trigger_btn",
+  293: "right_trigger_btn",
+  294: "z",
+  297: "start",
+  // Standard gamepad buttons
+  304: "south",
+  305: "east",
+  306: "c",
+  307: "west",
+  308: "north",
+  309: "capture",
+  310: "left_bumper",
+  311: "right_bumper",
+  312: "left_trigger_btn",
+  313: "right_trigger_btn",
+  314: "select",
+  315: "start",
+  316: "home",
+  317: "left_thumb",
+  318: "right_thumb",
+  330: "touchpad", // DualSense / DS4 touchpad click
+  // D-pad as buttons
+  544: "dpad_up",
+  545: "dpad_down",
+  546: "dpad_left",
+  547: "dpad_right",
+  // Nintendo Wii Remote buttons
+  103: "dpad_up",
+  105: "dpad_left",
+  106: "dpad_right",
+  108: "dpad_down",
+  257: "west", // 1
+  258: "north", // 2
+  407: "start", // +
+  412: "select", // -
+};
+
+const SWITCH_BTN_MAP: Record<number, string> = {
+  ...BASE_BTN_MAP,
+  307: "north",
+  308: "west",
+  312: "left_trigger",
+  313: "right_trigger",
+};
+
+const N64_BTN_MAP: Record<number, string> = {
+  ...BASE_BTN_MAP,
+  9: "z",
+  10: "z",
+  304: "east",
+  305: "south",
+  307: "c_left",
+  308: "c_down",
+  314: "c_up",
+  315: "c_right",
+};
+
+function getButtonAction(code: number, controllerType: ControllerType, name: string): string {
+  const n = name.toLowerCase();
+  let map: Record<number, string> = BASE_BTN_MAP;
+  if (controllerType === "n64") {
+    map = N64_BTN_MAP;
+  } else if (n.includes("nintendo") && n.includes("pro controller")) {
+    map = SWITCH_BTN_MAP;
+  } else if (n.includes("joy-con") || n.includes("switch")) {
+    map = SWITCH_BTN_MAP;
+  }
+  let action = map[code] ?? `btn_${code}`;
+  if ((controllerType === "ps3" || controllerType === "ps4" || controllerType === "ps5") && (action === "west" || action === "north")) {
+    action = action === "west" ? "north" : "west";
+  }
+  return action;
+}
+
 const CONTROLLER_NAME_HINTS = [
   "controller", "gamepad", "joystick", "pad", "xbox", "dualshock",
   "dualsense", "playstation", "switch", "pro controller", "wiimote",
@@ -511,7 +592,6 @@ async function readAbsMax(eventPath: string, code: number): Promise<number> {
 
 async function openDevice(
   eventPath: string,
-  window: BrowserWindow,
   info: { name: string; vendorId: number; productId: number },
   parentControllerIdx?: number,
 ): Promise<ActiveDeviceEntry | null> {
@@ -549,8 +629,8 @@ async function openDevice(
     ...extra,
   };
 
-  if (!isTouchpad && !window.isDestroyed() && !window.webContents.isDestroyed()) {
-    window.webContents.send("input:device-connected", deviceInfo);
+  if (!isTouchpad) {
+    sendToTargets("input:device-connected", deviceInfo);
   }
 
   // Pick the correct axis map for this controller model
@@ -579,7 +659,7 @@ async function openDevice(
     const compactBuf = Buffer.allocUnsafe(COMPACT_EVENT_SIZE);
 
     stream.on("data", (chunk) => {
-      if (window.isDestroyed()) {
+      if (!targetWindow || targetWindow.isDestroyed()) {
         stream.destroy();
         return;
       }
@@ -625,8 +705,10 @@ async function openDevice(
             compactBuf.writeUInt16LE(outCode, 2);
             compactBuf.writeFloatLE(value ? 1 : 0, 4);
             compactBuf.writeUInt32LE(Date.now() >>> 0, 8);
-            if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
-              window.webContents.send("input:event", compactBuf.buffer.slice(compactBuf.byteOffset, compactBuf.byteOffset + COMPACT_EVENT_SIZE));
+            sendToTargets("input:event", compactBuf.buffer.slice(compactBuf.byteOffset, compactBuf.byteOffset + COMPACT_EVENT_SIZE));
+            if (value && controllerButtonHandler) {
+              const action = getButtonAction(outCode, controllerType, info.name);
+              controllerButtonHandler(action);
             }
           } else {
             // Keyboard events — still send as rich objects (infrequent, needed by App.tsx keyboard handler)
@@ -640,9 +722,7 @@ async function openDevice(
               rawCode: code,
               timestamp: Date.now(),
             };
-            if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
-              window.webContents.send("input:event-keyboard", inputEvent);
-            }
+            sendToTargets("input:event-keyboard", inputEvent);
           }
         } else if (type === EV_ABS) {
           let outCode = code;
@@ -671,9 +751,7 @@ async function openDevice(
           compactBuf.writeUInt16LE(outCode, 2);
           compactBuf.writeFloatLE(normalized, 4);
           compactBuf.writeUInt32LE(Date.now() >>> 0, 8);
-          if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
-            window.webContents.send("input:event", compactBuf.buffer.slice(compactBuf.byteOffset, compactBuf.byteOffset + COMPACT_EVENT_SIZE));
-          }
+          sendToTargets("input:event", compactBuf.buffer.slice(compactBuf.byteOffset, compactBuf.byteOffset + COMPACT_EVENT_SIZE));
         }
       }
       remainder = buf;
@@ -689,8 +767,8 @@ async function openDevice(
       activeDevices.delete(eventPath);
       // Touchpads share a slot with their parent controller; don't
       // send disconnect for auxiliary devices.
-      if (!isTouchpad && !window.isDestroyed() && !window.webContents.isDestroyed()) {
-        window.webContents.send("input:device-disconnected", { deviceId, controllerIdx });
+      if (!isTouchpad) {
+        sendToTargets("input:device-disconnected", { deviceId, controllerIdx });
       }
     });
 
@@ -707,8 +785,8 @@ async function openDevice(
       lastActivityAt: Date.now(),
       close: () => {
         stream.destroy();
-        if (!isTouchpad && !window.isDestroyed() && !window.webContents.isDestroyed()) {
-          window.webContents.send("input:device-disconnected", { deviceId, controllerIdx });
+        if (!isTouchpad) {
+          sendToTargets("input:device-disconnected", { deviceId, controllerIdx });
         }
       },
     };
@@ -722,6 +800,25 @@ async function openDevice(
 }
 
 let targetWindow: BrowserWindow | null = null;
+let overlayWindow: BrowserWindow | null = null;
+let controllerButtonHandler: ((action: string) => void) | null = null;
+
+export function setOverlayWindow(win: BrowserWindow | null): void {
+  overlayWindow = win;
+}
+
+export function setControllerButtonHandler(handler: ((action: string) => void) | null): void {
+  controllerButtonHandler = handler;
+}
+
+function sendToTargets(channel: string, ...args: any[]): void {
+  if (targetWindow && !targetWindow.isDestroyed() && !targetWindow.webContents.isDestroyed()) {
+    targetWindow.webContents.send(channel, ...args);
+  }
+  if (overlayWindow && !overlayWindow.isDestroyed() && !overlayWindow.webContents.isDestroyed()) {
+    overlayWindow.webContents.send(channel, ...args);
+  }
+}
 
 async function scanDevices(): Promise<void> {
   if (!targetWindow || targetWindow.isDestroyed()) return;
@@ -754,7 +851,7 @@ async function scanDevices(): Promise<void> {
     }
     try {
       const handle = await withTimeout(
-        openDevice(device, targetWindow, info),
+        openDevice(device, info),
         2000,
         `openDevice(${device})`,
       );
@@ -782,7 +879,7 @@ async function scanDevices(): Promise<void> {
     }
     try {
       const handle = await withTimeout(
-        openDevice(device, targetWindow, info, parentIdx),
+        openDevice(device, info, parentIdx),
         2000,
         `openDevice(${device})`,
       );

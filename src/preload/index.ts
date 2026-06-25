@@ -40,6 +40,7 @@ import {
   OAuthResult,
 } from "../shared/types";
 import { GameMetadata } from "../shared/metadata";
+import { IPC_CHANNELS } from "../shared/ipc";
 
 import { libretroApi } from "./libretro";
 import { WebGLVideoRenderer } from "./webgl-renderer";
@@ -995,6 +996,26 @@ const htpc = {
   system: {
     getDiagnostics: (): Promise<any> =>
       ipcRenderer.invoke("system:getDiagnostics"),
+  },
+
+  overlay: {
+    toggle: (): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.overlay.toggle),
+    show: (): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.overlay.show),
+    hide: (): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.overlay.hide),
+    close: (): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.overlay.close),
+    getGame: (): Promise<import("../shared/types").Game | null> =>
+      ipcRenderer.invoke(IPC_CHANNELS.overlay.getGame),
+    stopGame: (): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.overlay.stopGame),
+    onState: (cb: (state: { visible: boolean; game: import("../shared/types").Game | null }) => void) => {
+      const handler = (_: Electron.IpcRendererEvent, state: { visible: boolean; game: import("../shared/types").Game | null }) => cb(state);
+      ipcRenderer.on(IPC_CHANNELS.overlay.state, handler);
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.overlay.state, handler);
+    },
   },
 
   onSaveState: (cb: () => void) => {

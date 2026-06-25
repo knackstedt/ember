@@ -40,6 +40,9 @@ const DEFAULTS: AppSettings = {
   updateAutoDownload: true,
   updateAutoInstall: false,
   autoCreateDesktopEntries: false,
+  overlayStyle: { mode: "glass", color: "#000000", opacity: 0.65 },
+  gameNotes: {},
+  overlayAutoShow: true,
 };
 
 let cachedSettings: AppSettings | null = null;

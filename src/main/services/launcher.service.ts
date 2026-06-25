@@ -8,6 +8,12 @@ import { GameRepo } from "../db/repository";
 import { buildWineCommand } from "./wine-detection.service";
 import { launchItchGame } from "./itch.service";
 import { runSessionHooks } from "./session-hooks.service";
+import {
+  setOverlayGame,
+  setOverlayGameProcess,
+  overlayGameStarted,
+  clearOverlayGame,
+} from "./overlay.service";
 
 const log = createLogger("info");
 
@@ -90,6 +96,7 @@ function sendGameLaunching(gameId: string, title: string): void {
 }
 
 function sendGameLaunchFailed(gameId: string, reason: string): void {
+  clearOverlayGame(gameId);
   const win = getMainWindow();
   if (win && !win.isDestroyed() && !win.webContents.isDestroyed()) {
     win.webContents.send("game:launch-failed", { gameId, reason });
@@ -353,6 +360,9 @@ export async function launchGame(game: Game): Promise<void> {
     );
   }
 
+  // Track the game so the overlay can be shown while it is running
+  setOverlayGame(game);
+
   // Run blocking pre-start hooks before anything else
   await runSessionHooks(game, "before-start-blocking");
   // Fire non-blocking pre-start hooks (fire-and-forget)
@@ -418,6 +428,7 @@ export async function launchGame(game: Game): Promise<void> {
         if (gamePid === null) {
           const reason = `Timed out waiting for Steam game ${game.steamAppId} process; it may not have started.`;
           log.warn("launcher", reason);
+          clearOverlayGame(game.id);
           sendGameLaunchFailed(game.id, reason);
           void runSessionHooks(game, "after-start");
           GameRepo.setLastPlayed(game.id, Date.now()).catch((err) => {
@@ -427,14 +438,17 @@ export async function launchGame(game: Game): Promise<void> {
         }
 
         log.info("launcher", `Detected Steam game PID ${gamePid} for AppID ${game.steamAppId}`);
+        setOverlayGameProcess(game.id, gamePid);
         startPlayTimeTracking(game.id);
         void runSessionHooks(game, "after-start");
         const foundWindow = await waitForGameWindow(gamePid, 10000);
         if (!foundWindow) {
           log.warn("launcher", `Window for Steam game ${game.steamAppId} not detected; restoring focus`);
+          clearOverlayGame(game.id);
           sendGameLaunchFailed(game.id, `Steam game started but no window was detected.`);
         } else {
           sendGameStarted(game.id);
+          void overlayGameStarted(game.id);
           minimizeWindow();
         }
 
@@ -446,6 +460,7 @@ export async function launchGame(game: Game): Promise<void> {
         } finally {
           stopPlayTimeTracking(game.id);
           sendGameStopped(game.id);
+          clearOverlayGame(game.id);
           restoreAndFocusWindow();
 
           const launchState = steamLaunchState.get(game.id);
@@ -526,6 +541,7 @@ export async function launchGame(game: Game): Promise<void> {
     case "nds":
     case "dreamcast":
       // Handled via in-renderer emulator components
+      clearOverlayGame(game.id);
       return Promise.resolve();
     case "itch": {
       sendGameLaunching(game.id, game.title);
@@ -533,11 +549,13 @@ export async function launchGame(game: Game): Promise<void> {
       if (result.success) {
         startPlayTimeTracking(game.id);
         sendGameStarted(game.id);
+        void overlayGameStarted(game.id);
         GameRepo.setLastPlayed(game.id, Date.now()).catch((err) => {
           log.warn("launcher", `Failed to set lastPlayed for ${game.id}: ${err}`);
         });
         return Promise.resolve();
       }
+      clearOverlayGame(game.id);
       const reason = result.error ?? "Failed to launch itch game";
       return Promise.reject(new Error(reason));
     }
@@ -589,6 +607,7 @@ export async function launchGame(game: Game): Promise<void> {
       if (settled) return;
       settled = true;
       activeProcesses.delete(game.id);
+      clearOverlayGame(game.id);
       log.error("launcher", `Spawn error for "${game.title}": ${err}`);
       restoreAndFocusWindow();
       reject(err);
@@ -597,6 +616,7 @@ export async function launchGame(game: Game): Promise<void> {
     proc.on("spawn", () => {
       spawnOk = true;
       startPlayTimeTracking(game.id);
+      if (proc.pid) setOverlayGameProcess(game.id, proc.pid);
       const windowPromise = waitForGameWindow(proc.pid, 10000);
       setTimeout(() => {
         if (settled) return;
@@ -611,10 +631,12 @@ export async function launchGame(game: Game): Promise<void> {
         void windowPromise.then((found) => {
           if (!found) {
             log.warn("launcher", `Window for "${game.title}" not detected; restoring focus`);
+            clearOverlayGame(game.id);
             sendGameLaunchFailed(game.id, `Game started but no window was detected.`);
             restoreAndFocusWindow();
           } else {
             sendGameStarted(game.id);
+            void overlayGameStarted(game.id);
             minimizeWindow();
           }
         });
@@ -624,6 +646,7 @@ export async function launchGame(game: Game): Promise<void> {
     proc.on("exit", (code, signal) => {
       activeProcesses.delete(game.id);
       stopPlayTimeTracking(game.id);
+      clearOverlayGame(game.id);
       const crashed = !signal && code !== 0;
       const closed = !signal && code === 0;
       if (crashed) {

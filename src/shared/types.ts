@@ -480,6 +480,15 @@ export type BackgroundSettings =
 
 export type ImageFitMode = "cover" | "contain" | "stretch" | "center" | "repeat";
 
+export interface OverlayStyle {
+  /** Visual mode for the in-game overlay */
+  mode: "glass" | "tint";
+  /** Base color for the tint mode (hex / rgba) */
+  color?: string;
+  /** Background opacity (0-1) */
+  opacity?: number;
+}
+
 export type UpdateCheckFrequency = "day" | "week" | "off";
 
 export interface AppSettings {
@@ -607,6 +616,12 @@ export interface AppSettings {
   updatePinnedVersion?: string;
   /** Automatically create .desktop entries for discovered games */
   autoCreateDesktopEntries?: boolean;
+  /** In-game overlay visual style */
+  overlayStyle?: OverlayStyle;
+  /** Per-game notes persisted in settings */
+  gameNotes?: Record<string, string>;
+  /** Automatically open the overlay when a game starts */
+  overlayAutoShow?: boolean;
 }
 
 export type DashboardWidgetType =

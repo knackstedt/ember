@@ -257,6 +257,15 @@ export default defineConfig({
         "@shared": resolve("src/shared"),
       },
     },
+    build: {
+      // @ts-expect-error electron-vite build.rollupOptions typing mismatch
+      rollupOptions: {
+        input: {
+          index: resolve("src/renderer/index.html"),
+          overlay: resolve("src/renderer/overlay.html"),
+        },
+      },
+    },
     plugins: [react(), ruffleStaticPlugin(), libretroStaticPlugin(), videoDecoderStaticPlugin(), pluginStaticPlugin()],
   },
 });

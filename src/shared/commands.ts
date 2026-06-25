@@ -32,7 +32,8 @@ export interface CommandDefinition {
     | "music-tab"
     | "tv-tab"
     | "music-album-available"
-    | "music-artist-available";
+    | "music-artist-available"
+    | "game-running";
 }
 
 export const COMMAND_DEFINITIONS: CommandDefinition[] = [
@@ -43,7 +44,7 @@ export const COMMAND_DEFINITIONS: CommandDefinition[] = [
   { id: "app.reload", label: "Reload Window", description: "Reload the application window", category: "global", defaultShortcut: "F5" },
 
   /* ─── Library Operations ─── */
-  { id: "library.rescan.all", label: "Rescan All Libraries", description: "Rescan games, movies, music and TV", category: "global", defaultShortcut: "F1" },
+  { id: "library.rescan.all", label: "Rescan All Libraries", description: "Rescan games, movies, music and TV", category: "global", defaultShortcut: "Ctrl+F1" },
   { id: "library.rescan.games", label: "Rescan Games", category: "global" },
   { id: "library.rescan.movies", label: "Rescan Movies", category: "global" },
   { id: "library.rescan.music", label: "Rescan Music", category: "global" },
@@ -74,6 +75,7 @@ export const COMMAND_DEFINITIONS: CommandDefinition[] = [
   { id: "gaming.filter.steam", label: "Filter: Steam", category: "gaming", requiresContext: "gaming-tab" },
   { id: "gaming.filter.retro", label: "Filter: Retro", category: "gaming", requiresContext: "gaming-tab" },
   { id: "gaming.emulator.stop", label: "Stop Emulator", category: "gaming", requiresContext: "emulator-open" },
+  { id: "gaming.overlay", label: "Toggle Game Overlay", description: "Show/hide the in-game overlay (works while a game is running)", category: "gaming", requiresContext: "game-running", defaultShortcut: "F1" },
   { id: "gaming.shader.clear", label: "Disable Shader", description: "Remove shader override from the selected game", category: "visual", requiresContext: "game-selected" },
   { id: "gaming.filter.clear", label: "Clear Console Filter", category: "gaming", requiresContext: "gaming-tab" },
 

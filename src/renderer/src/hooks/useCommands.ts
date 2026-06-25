@@ -30,6 +30,7 @@ export interface CommandContext {
   selectedMusicArtist: string | null;
   selectedMusicAlbum: string | null;
   selectedTvId: string | null;
+  gameRunning: boolean;
 }
 
 export function useCommands(
@@ -243,6 +244,9 @@ export function useCommands(
           closeJsnes();
           closePlugin();
           closeLibretro();
+          break;
+        case "gaming.overlay":
+          window.htpc.overlay.toggle();
           break;
         case "gaming.shader.clear": {
           if (context.selectedGameId) {
@@ -537,6 +541,8 @@ export function useCommands(
           return anyPlayerOpen;
         case "emulator-open":
           return anyEmulatorOpen;
+        case "game-running":
+          return context.gameRunning;
         case "music-playing":
           return hasPlayer || playing;
         case "video-playing":

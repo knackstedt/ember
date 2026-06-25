@@ -87,6 +87,9 @@ const defaults: AppSettings = {
   updateAutoDownload: true,
   updateAutoInstall: false,
   autoCreateDesktopEntries: false,
+  overlayStyle: { mode: "glass", color: "#000000", opacity: 0.65 },
+  gameNotes: {},
+  overlayAutoShow: true,
 };
 
 async function injectThemeCss(themeId: string) {
