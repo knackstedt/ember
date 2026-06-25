@@ -62,7 +62,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
       {open && (
         <motion.div
           ref={containerRef}
-          className="absolute top-0 bottom-0 flex flex-col overflow-hidden"
+          className="absolute top-0 bottom-0 flex flex-col overflow-hidden z-20"
           style={{
             width: "min(480px, 90%)",
             right: 0,

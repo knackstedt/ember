@@ -1018,7 +1018,7 @@ export const GamingTab: React.FC = () => {
 
   return (
     <div className="flex flex-col h-full relative">
-      <div className="flex-1 min-h-0 flex overflow-hidden">
+      <div className="flex-1 min-h-0 flex relative overflow-hidden">
         <GamingNavRail
           activeItem={activeNav}
           onSelect={(item) => {
@@ -1234,7 +1234,7 @@ export const GamingTab: React.FC = () => {
             )}
           </div>
         </div>
-      </div>
+
 
       <DetailPanel
         open={!!selected}
@@ -1656,6 +1656,7 @@ export const GamingTab: React.FC = () => {
         onClose={() => setShowCollectionManager(false)}
         itemType="game"
       />
+      </div>
     </div>
   );
 };

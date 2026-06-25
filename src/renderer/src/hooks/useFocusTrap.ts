@@ -29,7 +29,7 @@ export function useFocusTrap(
     // Focus first focusable element
     const focusable = getFocusable();
     if (focusable.length > 0) {
-      focusable[0].focus();
+      focusable[0].focus({ preventScroll: true });
     }
 
     const handler = (e: KeyboardEvent) => {

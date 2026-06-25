@@ -916,7 +916,7 @@ export const MoviesTab: React.FC = () => {
 
   return (
     <div className="flex flex-col h-full relative">
-      <div className="flex-1 min-h-0 flex overflow-hidden">
+      <div className="flex-1 min-h-0 flex relative overflow-hidden">
         <MoviesNavRail
           activeItem={activeNav}
           onSelect={(item) => {
@@ -1490,88 +1490,6 @@ export const MoviesTab: React.FC = () => {
         )}
 
       </div>
-
-      <DetailPanel
-        open={!!selected}
-        onClose={() => setSelected(null)}
-        title={selected?.title ?? ""}
-        coverUrl={selected?.coverUrl}
-        backdropUrl={selected?.backdropUrl}
-        description={selected?.description}
-        metadata={
-          selected
-            ? ([
-                selected.releaseYear
-                  ? { label: "Year", value: String(selected.releaseYear) }
-                  : null,
-                selected.director
-                  ? { label: "Director", value: selected.director }
-                  : null,
-                selected.runtime
-                  ? {
-                      label: "Runtime",
-                      value: `${Math.round(selected.runtime / 60)}min`,
-                    }
-                  : null,
-                selected.resolution
-                  ? { label: "Resolution", value: selected.resolution }
-                  : null,
-                selected.codec
-                  ? { label: "Codec", value: selected.codec }
-                  : null,
-                selected.sourceLocation
-                  ? { label: "Source", value: getSourceBadge(selected.sourceLocation).badge ?? selected.sourceLocation }
-                  : null,
-              ].filter(Boolean) as { label: string; value: string }[])
-            : []
-        }
-        tags={selected?.tags ?? []}
-        onTagsChange={
-          selected ? (newTags) => setTags(selected.id, newTags) : undefined
-        }
-        actions={
-          selected && (
-            <>
-              <motion.button
-                className="px-6 py-2.5 rounded-[var(--radius-card)] font-semibold text-sm"
-                style={{
-                  background: "var(--accent)",
-                  color: "var(--surface-base)",
-                }}
-                onClick={() => {
-                  openVideo(
-                    resolveMediaUrl(selected!.filePath)!,
-                    selected!.title,
-                    selected!.id,
-                    selected!.watchProgress,
-                  );
-                  setSelected(null);
-                }}
-                whileTap={{ scale: 0.96 }}
-              >
-                <Play size={14} /> Play
-              </motion.button>
-              <motion.button
-                className="px-6 py-2.5 rounded-[var(--radius-card)] font-semibold text-sm"
-                style={{
-                  background: "var(--surface-1)",
-                  color: "var(--text-primary)",
-                  border: "1px solid var(--border-default)",
-                }}
-                onClick={() => {
-                  const url = selected!.tmdbId
-                    ? `https://www.themoviedb.org/movie/${selected!.tmdbId}/videos`
-                    : `https://www.youtube.com/results?search_query=${encodeURIComponent(selected!.title + " official trailer")}`;
-                  void window.htpc.shell.openExternal(url);
-                }}
-                whileTap={{ scale: 0.96 }}
-              >
-                <Play size={14} /> Trailer
-              </motion.button>
-            </>
-          )
-        }
-      />
       {menu}
       <ConfirmDialog
         isOpen={confirmDelete.open}
@@ -1605,6 +1523,87 @@ export const MoviesTab: React.FC = () => {
         itemType="movie"
       />
         </div>
+        <DetailPanel
+          open={!!selected}
+          onClose={() => setSelected(null)}
+          title={selected?.title ?? ""}
+          coverUrl={selected?.coverUrl}
+          backdropUrl={selected?.backdropUrl}
+          description={selected?.description}
+          metadata={
+            selected
+              ? ([
+                  selected.releaseYear
+                    ? { label: "Year", value: String(selected.releaseYear) }
+                    : null,
+                  selected.director
+                    ? { label: "Director", value: selected.director }
+                    : null,
+                  selected.runtime
+                    ? {
+                        label: "Runtime",
+                        value: `${Math.round(selected.runtime / 60)}min`,
+                      }
+                    : null,
+                  selected.resolution
+                    ? { label: "Resolution", value: selected.resolution }
+                    : null,
+                  selected.codec
+                    ? { label: "Codec", value: selected.codec }
+                    : null,
+                  selected.sourceLocation
+                    ? { label: "Source", value: getSourceBadge(selected.sourceLocation).badge ?? selected.sourceLocation }
+                    : null,
+                ].filter(Boolean) as { label: string; value: string }[])
+              : []
+          }
+          tags={selected?.tags ?? []}
+          onTagsChange={
+            selected ? (newTags) => setTags(selected.id, newTags) : undefined
+          }
+          actions={
+            selected && (
+              <>
+                <motion.button
+                  className="px-6 py-2.5 rounded-[var(--radius-card)] font-semibold text-sm"
+                  style={{
+                    background: "var(--accent)",
+                    color: "var(--surface-base)",
+                  }}
+                  onClick={() => {
+                    openVideo(
+                      resolveMediaUrl(selected!.filePath)!,
+                      selected!.title,
+                      selected!.id,
+                      selected!.watchProgress,
+                    );
+                    setSelected(null);
+                  }}
+                  whileTap={{ scale: 0.96 }}
+                >
+                  <Play size={14} /> Play
+                </motion.button>
+                <motion.button
+                  className="px-6 py-2.5 rounded-[var(--radius-card)] font-semibold text-sm"
+                  style={{
+                    background: "var(--surface-1)",
+                    color: "var(--text-primary)",
+                    border: "1px solid var(--border-default)",
+                  }}
+                  onClick={() => {
+                    const url = selected!.tmdbId
+                      ? `https://www.themoviedb.org/movie/${selected!.tmdbId}/videos`
+                      : `https://www.youtube.com/results?search_query=${encodeURIComponent(selected!.title + " official trailer")}`;
+                    void window.htpc.shell.openExternal(url);
+                  }}
+                  whileTap={{ scale: 0.96 }}
+                >
+                  <Play size={14} /> Trailer
+                </motion.button>
+              </>
+            )
+          }
+        />
       </div>
     </div>
   );
