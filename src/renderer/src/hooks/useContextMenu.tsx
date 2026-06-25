@@ -72,7 +72,11 @@ export function useContextMenu<T>({
   // Shared timer storage so re-renders don’t lose long-press timers
   const timersRef = useRef(new WeakMap<object, number>());
 
-  // Listen for htpc:contextmenu (gamepad X / long press Enter/Space)
+  // Track DOM elements for each item so gamepad/keyboard context menu can
+  // position itself at the focused element instead of the viewport center.
+  const itemElementsRef = useRef(new WeakMap<object, HTMLElement>());
+
+  // Listen for htpc:contextmenu (gamepad Y / long press Enter/Space)
   useEffect(() => {
     const handler = (e: Event) => {
       if (!enabledRef.current) return;
@@ -82,7 +86,13 @@ export function useContextMenu<T>({
       if (!detail) return;
       const item = itemsRef.current[focusedIndexRef.current];
       if (!item) return;
-      openMenu(item, undefined, true);
+      const el = itemElementsRef.current.get(item as object);
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        openMenu(item, { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
+      } else {
+        openMenu(item, undefined, true);
+      }
     };
     window.addEventListener("htpc:contextmenu", handler);
     return () => window.removeEventListener("htpc:contextmenu", handler);
@@ -141,6 +151,10 @@ export function useContextMenu<T>({
       };
 
       return {
+        ref: (el: HTMLElement | null) => {
+          if (el) itemElementsRef.current.set(item as object, el);
+          else itemElementsRef.current.delete(item as object);
+        },
         onContextMenu: (e: React.MouseEvent) => {
           e.preventDefault();
           openMenu(item, { x: e.clientX, y: e.clientY });

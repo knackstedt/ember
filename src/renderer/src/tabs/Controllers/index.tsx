@@ -182,6 +182,22 @@ const TYPE_BUTTON_LABELS: Partial<Record<ControllerType, Record<string, React.Re
     dpad_left: "D-Pad Left",
     dpad_right: "D-Pad Right",
   },
+  gamecube: {
+    south: "A",
+    east: "B",
+    north: "X",
+    west: "Y",
+    left_bumper: "L",
+    right_bumper: "R",
+    left_trigger: "Z",
+    start: "Start",
+    left_thumb: "Stick",
+    right_thumb: "C-Stick",
+    dpad_up: "D-Pad Up",
+    dpad_down: "D-Pad Down",
+    dpad_left: "D-Pad Left",
+    dpad_right: "D-Pad Right",
+  },
   n64: {
     south: "A",
     east: "B",
@@ -733,6 +749,16 @@ export const ControllersTab: React.FC = () => {
   }, [selectedDevice]);
 
   useEffect(() => {
+    if (learningCode) {
+      useInputStore.getState().setControllersTabLocked(true);
+      useInputStore.getState().setControllersTabUnlockProgress(0);
+    } else {
+      useInputStore.getState().setControllersTabLocked(false);
+      useInputStore.getState().setControllersTabUnlockProgress(0);
+    }
+  }, [learningCode]);
+
+  useEffect(() => {
     if (!learningCode || !selectedDevice) {
       setLearningDeviceIds([]);
       return;
@@ -1259,7 +1285,7 @@ export const ControllersTab: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="text-xs" style={{ color: "var(--text-secondary)" }}>
-                      Hold <strong>X / <PSSquareIcon /></strong> for 5 seconds to unlock
+                      Hold <strong>{getButtonLabel(selectedDevice.type, "west")}</strong> for 5 seconds to unlock
                     </span>
                     <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: "var(--surface-1)" }}>
                       <motion.div
@@ -1294,12 +1320,18 @@ export const ControllersTab: React.FC = () => {
 
             {/* SVG diagram */}
             {hasDiagram && (
-              <div
-                className="rounded-[var(--radius-card)] p-4 md:p-5"
+              <button
+                className="w-full rounded-[var(--radius-card)] p-4 md:p-5 text-left"
                 style={{
                   background: "var(--surface-0)",
                   border: "1px solid var(--border-default)",
                 }}
+                tabIndex={0}
+                onClick={() => {
+                  useInputStore.getState().setControllersTabLocked(true);
+                  useInputStore.getState().setControllersTabUnlockProgress(0);
+                }}
+                title="Click to lock controller navigation"
               >
                 <DiagramForDevice
                   type={selectedDevice.type}
@@ -1314,7 +1346,7 @@ export const ControllersTab: React.FC = () => {
                   }
                   axes={liveState?.axes}
                 />
-              </div>
+              </button>
             )}
 
             {/* Live input readout */}

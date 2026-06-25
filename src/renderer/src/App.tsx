@@ -195,7 +195,7 @@ export default function App(): React.ReactElement {
   const navButtonTimersRef = useRef<Record<string, number>>({});
 
   /* Controllers tab lock state */
-  const controllersTabLockedRef = useRef(true);
+  const controllersTabLockedRef = useRef(false);
   const unlockTimerRef = useRef<number | null>(null);
   const unlockIntervalRef = useRef<number | null>(null);
 
@@ -460,13 +460,9 @@ export default function App(): React.ReactElement {
     useFocusZoneStore.getState().clearZone();
   }, [activeTab]);
 
-  /* Reset controller lock when entering / leaving the Controllers tab */
+  /* Reset controller lock timers when leaving the Controllers tab */
   useEffect(() => {
-    if (activeTab === "controllers") {
-      controllersTabLockedRef.current = true;
-      useInputStore.getState().setControllersTabLocked(true);
-      useInputStore.getState().setControllersTabUnlockProgress(0);
-    } else {
+    if (activeTab !== "controllers") {
       if (unlockTimerRef.current) {
         clearTimeout(unlockTimerRef.current);
         unlockTimerRef.current = null;
@@ -475,8 +471,8 @@ export default function App(): React.ReactElement {
         clearInterval(unlockIntervalRef.current);
         unlockIntervalRef.current = null;
       }
-      controllersTabLockedRef.current = true;
-      useInputStore.getState().setControllersTabLocked(true);
+      controllersTabLockedRef.current = false;
+      useInputStore.getState().setControllersTabLocked(false);
       useInputStore.getState().setControllersTabUnlockProgress(0);
     }
     return () => {
@@ -574,7 +570,7 @@ export default function App(): React.ReactElement {
       if (
         activeTabRef.current === "controllers" &&
         ev.source === "gamepad" &&
-        controllersTabLockedRef.current
+        useInputStore.getState().controllersTabLocked
       ) {
         if (ev.type === "button_press" && ev.action === "west") {
           if (!unlockTimerRef.current) {
