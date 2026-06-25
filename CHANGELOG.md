@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.4.6](https://github.com/knackstedt/ember/compare/v0.4.5...v0.4.6) (2026-06-25)
+
+
+### Features
+
+* **animations:** pause requestAnimationFrame loops when page is hidden to reduce CPU usage ([9b32c49](https://github.com/knackstedt/ember/commit/9b32c49a6ebd8e54aa00ece5fe1b96df2db38453))
+* **desktop:** add bulk desktop entry removal to danger zone settings ([e2248c3](https://github.com/knackstedt/ember/commit/e2248c3470db40b796fb682dc8cf903acfeac057))
+* **desktop:** add CLI game launch support and desktop entry creation ([2d7644f](https://github.com/knackstedt/ember/commit/2d7644fa7e2422e97ab70b075811964d03c87273))
+* **gc:** add manual garbage collection triggers for memory-intensive operations ([b32d893](https://github.com/knackstedt/ember/commit/b32d893ab2fa76a317df859dab1daa0b7bdac0ce))
+* **images:** add on-demand image scaling with disk cache for ember:// protocol ([4d427f2](https://github.com/knackstedt/ember/commit/4d427f242e875c6ce69ec20b667808511509f354))
+* **movies:** add navigation rail with genre/director/folder browsing ([f52ae8a](https://github.com/knackstedt/ember/commit/f52ae8aadcd2565697804a14880c5cd98b19eb92))
+* **music:** preload album art for visible queue items ([70df8b1](https://github.com/knackstedt/ember/commit/70df8b190cc41b212277d6434b821a3b534e73a9))
+* **ui:** add power dialog with system shutdown support and tab bar keyboard navigation ([7c21dd6](https://github.com/knackstedt/ember/commit/7c21dd67877d1303ed7c31c15cfb293a4724994e))
+
 ### [0.4.5](https://github.com/knackstedt/ember/compare/v0.4.4...v0.4.5) (2026-06-23)
 
 
