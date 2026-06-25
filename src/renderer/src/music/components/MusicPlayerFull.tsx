@@ -97,6 +97,7 @@ export const MusicPlayerFull: React.FC<MusicPlayerFullProps> = React.memo(({
     toggleShuffle,
     toggleRepeat,
     play,
+    loadCover,
   } = useMusicPlayerStore();
 
   const activeZone = useFocusZoneStore((s) => s.activeZone);
@@ -305,6 +306,15 @@ export const MusicPlayerFull: React.FC<MusicPlayerFullProps> = React.memo(({
       visibleItems: queue.slice(startIndex, endIndex),
     };
   }, [queue, queueScrollTop, queueContainerHeight]);
+
+  useEffect(() => {
+    if (activeTab !== "queue") return;
+    for (const t of virtualQueue.visibleItems) {
+      if (!t.albumArtUrl) {
+        void loadCover(t);
+      }
+    }
+  }, [activeTab, virtualQueue, loadCover]);
 
   const isTabFocused = (id: FullTab) => activeZone === "player" && tabBarFocused && activeTab === id;
   const isControlFocused = (btn: OverviewButton) =>
