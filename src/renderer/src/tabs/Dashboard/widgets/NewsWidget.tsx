@@ -62,7 +62,7 @@ export const NewsWidget: React.FC<{ title?: string }> = ({ title }) => {
                 </span>
                 <span className="text-[12px] opacity-30 flex-shrink-0">{item.source}</span>
               </div>
-              <span className="text-[11px] font-medium truncate leading-snug">{item.headline}</span>
+              <span className="text-[12px] font-medium truncate leading-snug">{item.headline}</span>
               <span className="text-[12px] opacity-30">{item.time}</span>
             </div>
             <ExternalLink size={9} className="opacity-0 group-hover:opacity-30 transition-opacity flex-shrink-0 mt-0.5" />

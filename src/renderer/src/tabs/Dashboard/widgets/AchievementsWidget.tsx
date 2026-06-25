@@ -57,7 +57,7 @@ export const AchievementsWidget: React.FC<{ title?: string }> = ({ title }) => {
           >
             <AchievementRing pct={(a.progress / a.total) * 100} color={a.unlocked ? "var(--accent)" : "var(--text-primary)"} />
             <div className="flex-1 min-w-0 flex flex-col gap-0">
-              <div className="text-[11px] font-medium truncate">{a.name}</div>
+              <div className="text-[12px] font-medium truncate">{a.name}</div>
               <div className="text-[12px] opacity-40 truncate">{a.desc}</div>
             </div>
             {a.unlocked && <Trophy size={10} style={{ color: "var(--accent)" }} />}

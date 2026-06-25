@@ -720,7 +720,7 @@ export const MoviesTab: React.FC = () => {
           </div>
           <div className="px-1.5 py-1">
             <div
-              className="text-[11px] font-bold truncate"
+              className="text-[12px] font-bold truncate"
               style={{ color: index === focusedIndex ? "var(--accent)" : "var(--text-primary)" }}
             >
               {movie.title}

@@ -63,7 +63,7 @@ export const SystemInfoWidget: React.FC<{ title?: string }> = ({ title }) => {
             <Cpu size={12} style={{ color: "var(--accent)" }} />
           </div>
           <div className="flex-1 min-w-0 flex flex-col gap-0">
-            <span className="truncate font-medium opacity-90 text-[11px]">{info?.cpu?.model ?? "Loading…"}</span>
+            <span className="truncate font-medium opacity-90 text-[12px]">{info?.cpu?.model ?? "Loading…"}</span>
             <span className="opacity-40 text-[12px]">{info?.cpu?.cores ?? "--"} cores</span>
           </div>
         </div>
@@ -82,7 +82,7 @@ export const SystemInfoWidget: React.FC<{ title?: string }> = ({ title }) => {
             <HardDrive size={12} style={{ color: "var(--accent)" }} />
           </div>
           <div className="flex-1 min-w-0 flex flex-col gap-0">
-            <span className="truncate opacity-90 text-[11px] capitalize">{info?.os?.platform} {info?.os?.release}</span>
+            <span className="truncate opacity-90 text-[12px] capitalize">{info?.os?.platform} {info?.os?.release}</span>
             <span className="opacity-40 text-[12px]">{info?.os?.arch ?? "--"}</span>
           </div>
         </div>
@@ -92,7 +92,7 @@ export const SystemInfoWidget: React.FC<{ title?: string }> = ({ title }) => {
             <Activity size={12} style={{ color: "var(--accent)" }} />
           </div>
           <div className="flex-1 min-w-0 flex flex-col gap-0">
-            <span className="opacity-90 text-[11px]">Uptime: {fmtUptime()}</span>
+            <span className="opacity-90 text-[12px]">Uptime: {fmtUptime()}</span>
             {info?.app?.version && (
               <span className="opacity-40 text-[12px]">Ember v{info.app.version}</span>
             )}

@@ -322,7 +322,7 @@
   left: 8px;
   padding: 2px 8px;
   border-radius: 4px;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -440,7 +440,7 @@
 .gc-subtitle {
   margin: 0;
   font-weight: 400;
-  font-size: 11px;
+  font-size: 12px;
   color: rgba(255, 255, 255, 0.7);
   white-space: nowrap;
   overflow: hidden;
@@ -451,7 +451,7 @@
 .gc-meta {
   margin: 0;
   font-weight: 400;
-  font-size: 10px;
+  font-size: 12px;
   color: rgba(255, 255, 255, 0.55);
   white-space: nowrap;
   overflow: hidden;
