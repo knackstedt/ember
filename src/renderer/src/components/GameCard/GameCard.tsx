@@ -67,58 +67,9 @@ function initials(title: string): string {
     .join("");
 }
 
-function svgDataUri(content: string): string {
-  return `data:image/svg+xml,${encodeURIComponent(content)}`;
-}
-
 function platformSvg(platform: GamePlatform): string {
   return PLATFORM_ICONS[platform] ?? PLATFORM_ICONS.unknown;
 }
-
-const TILE_CACHE = new Map<string, string>();
-
-function generateWatermarkTile(svgString: string): Promise<string> {
-  const cached = TILE_CACHE.get(svgString);
-  if (cached) return Promise.resolve(cached);
-
-  return new Promise((resolve) => {
-    const size = 512;
-    const canvas = document.createElement("canvas");
-    canvas.width = size;
-    canvas.height = size;
-    const ctx = canvas.getContext("2d")!;
-
-    // Black background = transparent in luminance mask
-    ctx.fillStyle = "#000000";
-    ctx.fillRect(0, 0, size, size);
-
-    const img = new Image();
-    img.onload = () => {
-      const iconSize = size * 0.125;
-      // Pseudo-diagonal staggered watermark layout
-      const positions = [
-        [40, 48], [240, 48], [440, 48],
-        [160, 152], [360, 152],
-        [80, 256], [280, 256],
-        [200, 360], [400, 360],
-        [120, 464], [320, 464],
-      ];
-      positions.forEach(([x, y]) => {
-        ctx.globalAlpha = 0.7;
-        ctx.drawImage(img, x - iconSize / 2, y - iconSize / 2, iconSize, iconSize);
-      });
-      ctx.globalAlpha = 1;
-
-      const pngUrl = canvas.toDataURL("image/png");
-      TILE_CACHE.set(svgString, pngUrl);
-      resolve(pngUrl);
-    };
-    img.onerror = () => resolve("");
-    img.src = svgDataUri(svgString);
-  });
-}
-
-
 
 export const GameCard: React.FC<GameCardProps> = React.memo(({
   title,
@@ -144,23 +95,11 @@ export const GameCard: React.FC<GameCardProps> = React.memo(({
   useEffect(() => {
     setImgError(false);
   }, [coverUrl]);
-  const [maskUrl, setMaskUrl] = useState<string>(() => {
-    const svg = platformSvg(platform);
-    return TILE_CACHE.get(svg) ?? "";
-  });
   const showPlaceholder = !coverUrl || imgError;
 
-  useEffect(() => {
-    let cancelled = false;
-    const svg = platformSvg(platform);
-    generateWatermarkTile(svg).then((url) => {
-      if (!cancelled) setMaskUrl(url);
-    });
-    return () => { cancelled = true; };
-  }, [platform]);
+  const platformIconUrl = platformSvg(platform);
 
   const cardStyle: React.CSSProperties = {
-    "--icon": maskUrl ? `url(${maskUrl})` : "none",
     "--inner-gradient": "linear-gradient(145deg, #60496e8c 0%, #71C4FF44 100%)",
     "--behind-glow-color": badgeColor ? badgeColor : "rgba(125, 190, 255, 0.67)",
     "--behind-glow-size": "50%",
@@ -195,8 +134,6 @@ export const GameCard: React.FC<GameCardProps> = React.memo(({
       <div className="gc-card-shell">
         <section className="gc-card">
           <div className="gc-inside">
-            <div className="gc-shine" />
-
             {isThumbnailPending && (
               <div className="gc-loading-overlay">
                 <div className="gc-spinner" />
@@ -304,6 +241,8 @@ export const GameCard: React.FC<GameCardProps> = React.memo(({
                   </div>
                 </Tooltip>
               )}
+
+              <img className="gc-platform-icon" src={`data:image/svg+xml,${encodeURIComponent(platformIconUrl)}`} alt="" />
             </div>
 
             {corrupt && (

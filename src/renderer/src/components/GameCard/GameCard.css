@@ -119,135 +119,11 @@
   pointer-events: none;
 }
 
-.gc-shine {
-  position: absolute;
-  inset: 0;
-  mask-image: var(--icon);
-  -webkit-mask-image: var(--icon);
-  mask-mode: luminance;
-  -webkit-mask-mode: luminance;
-  mask-repeat: repeat;
-  -webkit-mask-repeat: repeat;
-  transition: filter 0.8s ease;
-  filter: brightness(1.1) contrast(1.1) saturate(0.5) opacity(0.25);
-  animation: gc-holo-bg 18s linear infinite, gc-watermark-slide 90s linear infinite;
-  animation-play-state: paused, paused;
-  mix-blend-mode: screen;
-}
-
-.gc-shine,
-.gc-shine::after {
-  --space: 5%;
-  --angle: -45deg;
-  transform: translate3d(0, 0, 1px);
-  z-index: 3;
-  background: transparent;
-  background-size: cover;
-  background-position: center;
-  background-image:
-    repeating-linear-gradient(
-      0deg,
-      var(--sunpillar-clr-1) calc(var(--space) * 1),
-      var(--sunpillar-clr-2) calc(var(--space) * 2),
-      var(--sunpillar-clr-3) calc(var(--space) * 3),
-      var(--sunpillar-clr-4) calc(var(--space) * 4),
-      var(--sunpillar-clr-5) calc(var(--space) * 5),
-      var(--sunpillar-clr-6) calc(var(--space) * 6),
-      var(--sunpillar-clr-1) calc(var(--space) * 7)
-    ),
-    repeating-linear-gradient(
-      var(--angle),
-      #0e152e 0%,
-      hsl(180, 10%, 60%) 3.8%,
-      hsl(180, 29%, 66%) 4.5%,
-      hsl(180, 10%, 60%) 5.2%,
-      #0e152e 10%,
-      #0e152e 12%
-    ),
-    radial-gradient(
-      farthest-corner circle at var(--pointer-x) var(--pointer-y),
-      hsla(0, 0%, 0%, 0.1) 12%,
-      hsla(0, 0%, 0%, 0.15) 20%,
-      hsla(0, 0%, 0%, 0.25) 120%
-    );
-  background-position:
-    0 var(--background-y),
-    var(--background-x) var(--background-y),
-    center;
-  background-blend-mode: color, hard-light;
-  background-size:
-    500% 500%,
-    300% 300%,
-    200% 200%;
-  background-repeat: repeat;
-}
-
-.gc-shine::before,
-.gc-shine::after {
-  content: '';
-  background-position: center;
-  background-size: cover;
-  grid-area: 1 / 1;
-  opacity: 0.5;
-  transition: opacity 0.8s ease;
-}
-
-.gc-card:hover .gc-shine,
-.gc-card-wrapper.focused .gc-shine {
-  filter: brightness(1.2) contrast(1.5) saturate(0.8) opacity(0.3);
-  animation-play-state: running, running;
-}
-
-.gc-card:hover .gc-shine::before,
-.gc-card-wrapper.focused .gc-shine::before,
-.gc-card:hover .gc-shine::after,
-.gc-card-wrapper.focused .gc-shine::after {
-  opacity: 0.85;
-}
-
-.gc-shine::before {
-  background-image:
-    linear-gradient(
-      45deg,
-      var(--sunpillar-4),
-      var(--sunpillar-5),
-      var(--sunpillar-6),
-      var(--sunpillar-1),
-      var(--sunpillar-2),
-      var(--sunpillar-3)
-    ),
-    radial-gradient(circle at var(--pointer-x) var(--pointer-y), hsl(0, 0%, 70%) 0%, hsla(0, 0%, 30%, 0.2) 90%);
-  background-size:
-    250% 250%,
-    100% 100%;
-  background-position:
-    var(--pointer-x) var(--pointer-y),
-    center;
-  background-blend-mode: color-dodge;
-  filter: brightness(calc(2 - var(--pointer-from-center))) contrast(calc(var(--pointer-from-center) + 2))
-    saturate(calc(0.5 + var(--pointer-from-center)));
-  mix-blend-mode: luminosity;
-}
-
-.gc-shine::after {
-  overflow: hidden;
-  background-position:
-    0 var(--background-y),
-    calc(var(--background-x) * 0.4) calc(var(--background-y) * 0.5),
-    center;
-  background-size:
-    200% 300%,
-    700% 700%,
-    100% 100%;
-  mix-blend-mode: difference;
-  filter: brightness(0.8) contrast(1.5);
-}
-
 /* Cover image content */
 .gc-cover-content {
   position: relative;
   overflow: hidden;
-  transform: translateZ(2);
+  transform: translateZ(0);
   backface-visibility: hidden;
   mix-blend-mode: normal;
   z-index: 2;
@@ -300,6 +176,24 @@
   border-top-color: #fff;
   border-radius: 50%;
   animation: gc-spin 0.8s linear infinite;
+}
+
+.gc-platform-icon {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  width: 22px;
+  height: 22px;
+  opacity: 0.7;
+  z-index: 5;
+  pointer-events: none;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.8));
+  transition: opacity 0.2s ease;
+}
+
+.gc-card:hover .gc-platform-icon,
+.gc-card-wrapper.focused .gc-platform-icon {
+  opacity: 1;
 }
 
 @keyframes gc-spin {
@@ -467,28 +361,3 @@
   color: rgba(255, 255, 255, 0.45);
 }
 
-@keyframes gc-holo-bg {
-  0% {
-    background-position:
-      0 var(--background-y),
-      0 0,
-      center;
-  }
-  100% {
-    background-position:
-      0 var(--background-y),
-      90% 90%,
-      center;
-  }
-}
-
-@keyframes gc-watermark-slide {
-  0% {
-    mask-position: 0 0;
-    -webkit-mask-position: 0 0;
-  }
-  100% {
-    mask-position: 512px 512px;
-    -webkit-mask-position: 512px 512px;
-  }
-}
