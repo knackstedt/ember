@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useInputStore } from "../store/input.store";
 import { useSettingsStore } from "../store/settings.store";
+import { ControllerBrowserSettings } from "../../shared/types";
 import { getCursorManager, DeviceCursor } from "./browserControllerManager";
 import { CursorStyle } from "../components/VirtualCursor/VirtualCursor";
 import { findInputElement, useControllerOskStore } from "../store/controllerOsk.store";
@@ -356,6 +357,80 @@ export function useBrowserControllerNav({
       y: Math.max(0, Math.min(window.innerHeight, y)),
     });
 
+    const getMainSnapTarget = (x: number, y: number, distance: number, selectors: string[]): { x: number; y: number } | null => {
+      let best: { x: number; y: number; dist: number } | null = null;
+      for (const sel of selectors) {
+        try {
+          for (const el of document.querySelectorAll(sel)) {
+            const rect = el.getBoundingClientRect();
+            const cx = rect.left + rect.width / 2;
+            const cy = rect.top + rect.height / 2;
+            const d = Math.hypot(cx - x, cy - y);
+            if (d <= distance && (!best || d < best.dist)) {
+              best = { x: cx, y: cy, dist: d };
+            }
+          }
+        } catch {
+          // ignore invalid selectors
+        }
+      }
+      return best ? { x: best.x, y: best.y } : null;
+    };
+
+    const getWebviewSnapTarget = async (
+      webview: Electron.WebviewTag,
+      x: number,
+      y: number,
+      distance: number,
+      selectors: string[],
+    ): Promise<{ x: number; y: number } | null> => {
+      const bounds = webview.getBoundingClientRect();
+      const relX = Math.round(x - bounds.left);
+      const relY = Math.round(y - bounds.top);
+      try {
+        const result = await webview.executeJavaScript(`(() => {
+          const selectors = ${JSON.stringify(selectors)};
+          const x = ${relX}, y = ${relY}, distance = ${distance};
+          let best = null;
+          let bestDist = Infinity;
+          for (const sel of selectors) {
+            try {
+              for (const el of document.querySelectorAll(sel)) {
+                const rect = el.getBoundingClientRect();
+                const cx = rect.left + rect.width / 2;
+                const cy = rect.top + rect.height / 2;
+                const d = Math.hypot(cx - x, cy - y);
+                if (d <= distance && d < bestDist) {
+                  bestDist = d;
+                  best = { x: cx, y: cy };
+                }
+              }
+            } catch (e) {}
+          }
+          return best;
+        })()`);
+        if (!result) return null;
+        return { x: result.x + bounds.left, y: result.y + bounds.top };
+      } catch {
+        return null;
+      }
+    };
+
+    const snapCursor = async (
+      x: number,
+      y: number,
+      webview: Electron.WebviewTag | null,
+      settings: ControllerBrowserSettings,
+    ): Promise<{ x: number; y: number } | null> => {
+      if (!settings.snapToElement) return null;
+      const distance = settings.snapDistance ?? 50;
+      const selectors = settings.snapSelectors ?? ["button", "a", "input", "textarea", "select", "[role='button']"];
+      if (!webview) {
+        return getMainSnapTarget(x, y, distance, selectors);
+      }
+      return getWebviewSnapTarget(webview, x, y, distance, selectors);
+    };
+
     const updateManager = () => {
       const activeIds = Array.from(deviceMap.keys());
       const newCursors: DeviceCursor[] = activeIds.map((id, idx) => {
@@ -489,6 +564,28 @@ export function useBrowserControllerNav({
           pendingTimeouts.add(t);
         };
 
+        const performLeftClick = async (deviceId: string, dev: DeviceState, webview: Electron.WebviewTag | null) => {
+          const settings = useSettingsStore.getState().settings?.controllerBrowser;
+          let x = dev.posRef.current.x;
+          let y = dev.posRef.current.y;
+          if (settings?.snapToElement) {
+            const snapped = await snapCursor(x, y, webview, settings);
+            if (snapped) {
+              x = snapped.x;
+              y = snapped.y;
+              const clamped = clampToWindow(x, y);
+              x = clamped.x;
+              y = clamped.y;
+              dev.posRef.current.x = x;
+              dev.posRef.current.y = y;
+              sendMouseEvent("mouseMove", x, y);
+            }
+          }
+          dev.clickRef.current = (dev.clickRef.current || 0) + 1;
+          sendMouseEvent("mouseDown", x, y, "left", deviceId);
+          scheduleMouseUp(x, y, "left", deviceId);
+        };
+
         // When evdev devices are present, button actions are already handled
         // by the evdev path in App.tsx. Skip synthetic mouse/keyboard events
         // to avoid double-firing UI actions.
@@ -496,9 +593,7 @@ export function useBrowserControllerNav({
         if (!evdevActive) {
           if (check("south")) {
             anyInput = true;
-            dev.clickRef.current = (dev.clickRef.current || 0) + 1;
-            sendMouseEvent("mouseDown", dev.posRef.current.x, dev.posRef.current.y, "left", deviceId);
-            scheduleMouseUp(dev.posRef.current.x, dev.posRef.current.y, "left", deviceId);
+            performLeftClick(deviceId, dev, webviewUnderCursor);
           }
           if (!oskOpen) {
             if (check("east")) {
@@ -553,9 +648,7 @@ export function useBrowserControllerNav({
         // RT = left click, always allow (click-away from OSK)
         if (rtPressed && !wasRtPressed) {
           anyInput = true;
-          dev.clickRef.current = (dev.clickRef.current || 0) + 1;
-          sendMouseEvent("mouseDown", dev.posRef.current.x, dev.posRef.current.y, "left", deviceId);
-          scheduleMouseUp(dev.posRef.current.x, dev.posRef.current.y, "left", deviceId);
+          performLeftClick(deviceId, dev, webviewUnderCursor);
         }
 
         if (!oskOpen) {
