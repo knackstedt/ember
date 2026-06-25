@@ -24,6 +24,7 @@ interface MusicGroupContentProps {
   onSelect: (group: MusicGroup, index: number) => void;
   onColumnCountChange?: (count: number) => void;
   scrollRef?: React.RefObject<HTMLElement>;
+  bindItem?: (item: MusicGroup, index: number) => React.HTMLAttributes<HTMLElement>;
 }
 
 const LazyGroupCard: React.FC<{
@@ -100,6 +101,7 @@ export const MusicGroupContent: React.FC<MusicGroupContentProps> = React.memo(({
   onSelect,
   onColumnCountChange,
   scrollRef,
+  bindItem,
 }) => {
   const gridRef = useRef<VirtualGridHandle>(null);
 
@@ -113,26 +115,30 @@ export const MusicGroupContent: React.FC<MusicGroupContentProps> = React.memo(({
 
   const renderGridItem = useCallback(
     (group: MusicGroup, index: number) => (
-      <LazyGroupCard
-        group={group}
-        index={index}
-        focusedIndex={focusedIndex}
-        onSelect={() => onSelect(group, index)}
-      />
+      <div className="p-1.5 w-full h-full flex flex-col min-w-0" {...(bindItem ? bindItem(group, index) : {})}>
+        <LazyGroupCard
+          group={group}
+          index={index}
+          focusedIndex={focusedIndex}
+          onSelect={() => onSelect(group, index)}
+        />
+      </div>
     ),
-    [focusedIndex, onSelect]
+    [focusedIndex, onSelect, bindItem]
   );
 
   const renderListItem = useCallback(
     (group: MusicGroup, index: number) => (
-      <GroupListItem
-        group={group}
-        index={index}
-        focusedIndex={focusedIndex}
-        onSelect={() => onSelect(group, index)}
-      />
+      <div {...(bindItem ? bindItem(group, index) : {})}>
+        <GroupListItem
+          group={group}
+          index={index}
+          focusedIndex={focusedIndex}
+          onSelect={() => onSelect(group, index)}
+        />
+      </div>
     ),
-    [focusedIndex, onSelect]
+    [focusedIndex, onSelect, bindItem]
   );
 
   if (items.length === 0) {

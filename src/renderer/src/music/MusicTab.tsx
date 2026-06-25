@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, X, Star, StarOff, EyeOff, Tag, FolderOpen, Trash2, RotateCw } from "lucide-react";
+import { ArrowLeft, X, Star, StarOff, EyeOff, Tag, FolderOpen, Trash2, RotateCw, ListPlus, ListStart, Shuffle } from "lucide-react";
 import { useMusicStore } from "../store/media.store";
 import { useMusicPlayerStore } from "../store/musicPlayer.store";
 import { usePlaylistsStore } from "../store/playlists.store";
@@ -152,6 +152,9 @@ export const MusicTab: React.FC = () => {
   const createPlaylist = usePlaylistsStore((s) => s.create);
 
   const play = useMusicPlayerStore((s) => s.play);
+  const addToQueue = useMusicPlayerStore((s) => s.addToQueue);
+  const queueNext = useMusicPlayerStore((s) => s.queueNext);
+  const randomInsert = useMusicPlayerStore((s) => s.randomInsert);
   const hasPlayer = useMusicPlayerStore((s) => s.queue.length > 0);
 
   const globalZone = useFocusZoneStore((s) => s.activeZone);
@@ -521,6 +524,27 @@ export const MusicTab: React.FC = () => {
     await createPlaylist(name.trim());
   }, [createPlaylist]);
 
+  const getGroupTracks = useCallback((group: MusicGroup): MusicTrack[] => {
+    const source = tracks.filter((t) => !t.hidden);
+    if (activeNav === "playlists") {
+      const playlist = playlists.find((p) => p.id === group.id);
+      if (!playlist) return [];
+      const trackMap = new Map(tracks.map((t) => [t.id, t]));
+      return playlist.trackIds
+        .map((id) => trackMap.get(id))
+        .filter((t): t is MusicTrack => !!t);
+    }
+    if (activeNav === "folders") {
+      const roots = getMusicRoots(source);
+      return getTracksInFolder(source, group.id, roots);
+    }
+    const lower = group.id.toLowerCase();
+    if (activeNav === "artists") return source.filter((t) => t.artist?.toLowerCase() === lower);
+    if (activeNav === "albums") return source.filter((t) => t.album?.toLowerCase() === lower);
+    if (activeNav === "genre") return source.filter((t) => t.genre?.toLowerCase() === lower);
+    return [];
+  }, [tracks, playlists, activeNav]);
+
   const { menu, bindItem } = useContextMenu({
     items: trackItems,
     focusedIndex: contentIndex,
@@ -530,6 +554,10 @@ export const MusicTab: React.FC = () => {
         track.filePath &&
         (track.filePath.startsWith("/") || track.filePath.startsWith("file://"));
       const opts: ContextMenuOption[] = [
+        { id: "play-next", label: "Play Next", icon: <ListStart size={16} /> },
+        { id: "queue", label: "Queue", icon: <ListPlus size={16} /> },
+        { id: "random-insert", label: "Random Insert", icon: <Shuffle size={16} /> },
+        { id: "__sep1", label: "", icon: null, disabled: true },
         {
           id: "favorite",
           label: track.isFavorite ? "Unfavorite" : "Favorite",
@@ -547,6 +575,15 @@ export const MusicTab: React.FC = () => {
     },
     onAction: (track, optionId) => {
       switch (optionId) {
+        case "play-next":
+          queueNext([track]);
+          break;
+        case "queue":
+          addToQueue([track]);
+          break;
+        case "random-insert":
+          randomInsert([track]);
+          break;
         case "favorite":
           void toggleFavorite(track.id);
           break;
@@ -573,6 +610,40 @@ export const MusicTab: React.FC = () => {
       }
     },
     enabled: !showingGroups,
+  });
+
+  const { menu: groupMenu, bindItem: groupBindItem } = useContextMenu({
+    items: groups,
+    focusedIndex: contentIndex,
+    getOptions: (group): ContextMenuOption[] => {
+      const groupTracks = getGroupTracks(group);
+      if (groupTracks.length === 0) return [];
+      return [
+        { id: "play", label: "Play", icon: <ListStart size={16} /> },
+        { id: "play-next", label: "Play Next", icon: <ListStart size={16} /> },
+        { id: "queue", label: "Queue", icon: <ListPlus size={16} /> },
+        { id: "random-insert", label: "Random Insert", icon: <Shuffle size={16} /> },
+      ];
+    },
+    onAction: (group, optionId) => {
+      const groupTracks = getGroupTracks(group);
+      if (groupTracks.length === 0) return;
+      switch (optionId) {
+        case "play":
+          play(groupTracks, 0);
+          break;
+        case "play-next":
+          queueNext(groupTracks);
+          break;
+        case "queue":
+          addToQueue(groupTracks);
+          break;
+        case "random-insert":
+          randomInsert(groupTracks);
+          break;
+      }
+    },
+    enabled: showingGroups,
   });
 
   return (
@@ -679,6 +750,7 @@ export const MusicTab: React.FC = () => {
                 onSelect={handleSelectGroup}
                 onColumnCountChange={setColumnCount}
                 scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
+                bindItem={groupBindItem}
               />
             ) : (
               <MusicContent
@@ -733,6 +805,7 @@ export const MusicTab: React.FC = () => {
       />
 
       {menu}
+      {groupMenu}
 
       <ConfirmDialog
         isOpen={confirmDelete.open}

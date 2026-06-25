@@ -18,6 +18,7 @@ export interface MusicPlayerStore {
   play(tracks: MusicTrack[], startIndex?: number): void;
   addToQueue(tracks: MusicTrack[]): void;
   queueNext(tracks: MusicTrack[]): void;
+  randomInsert(tracks: MusicTrack[]): void;
   pause(): void;
   resume(): void;
   seek(seconds: number): void;
@@ -31,6 +32,7 @@ export interface MusicPlayerStore {
   updateTrackFilePath(id: string, filePath: string): void;
   setBladeCollapsed(collapsed: boolean): void;
   toggleBlade(): void;
+  clearQueue(): void;
   loadPersisted(): void;
   loadCover(track: MusicTrack): Promise<void>;
 }
@@ -166,6 +168,27 @@ export const useMusicPlayerStore = create<MusicPlayerStore>((set, get) => {
         ...tracks,
         ...queue.slice(insertAt),
       ];
+      set({ queue: newQueue });
+      saveQueueState({
+        queue: newQueue,
+        currentIndex: get().currentIndex,
+        shuffle: get().shuffle,
+        repeat: get().repeat,
+        bladeCollapsed: get().bladeCollapsed,
+      });
+    },
+
+    randomInsert(tracks) {
+      const { queue, currentIndex } = get();
+      if (queue.length === 0) {
+        get().play(tracks, 0);
+        return;
+      }
+      const newQueue = [...queue, ...tracks];
+      for (let i = newQueue.length - 1; i > currentIndex + 1; i--) {
+        const j = currentIndex + 1 + Math.floor(Math.random() * (i - currentIndex));
+        [newQueue[i], newQueue[j]] = [newQueue[j], newQueue[i]];
+      }
       set({ queue: newQueue });
       saveQueueState({
         queue: newQueue,
@@ -350,6 +373,24 @@ export const useMusicPlayerStore = create<MusicPlayerStore>((set, get) => {
         repeat: state.repeat,
         bladeCollapsed: state.bladeCollapsed,
       });
+    },
+
+    clearQueue() {
+      audio.pause();
+      audio.src = "";
+      audio.load();
+      set({
+        queue: [],
+        currentIndex: 0,
+        playing: false,
+        position: 0,
+        duration: 0,
+      });
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+      } catch {
+        // ignore
+      }
     },
 
     loadPersisted() {

@@ -9,6 +9,7 @@ import {
   VolumeX,
   Volume1,
   Volume2,
+  X,
 } from "lucide-react";
 import { useMusicPlayerStore } from "../../store/musicPlayer.store";
 import { useFocusZoneStore } from "../../store/focusZone.store";
@@ -24,7 +25,7 @@ function fmt(s: number): string {
   return `${m}:${String(sec).padStart(2, "0")}`;
 }
 
-type MiniButton = "prev" | "play" | "next" | "volDown" | "volUp" | "expand";
+type MiniButton = "prev" | "play" | "next" | "volDown" | "volUp" | "expand" | "clear";
 
 interface MusicPlayerBarProps {
   onExpand: () => void;
@@ -44,6 +45,7 @@ export const MusicPlayerBar: React.FC<MusicPlayerBarProps> = React.memo(({ onExp
     prev,
     seek,
     setVolume,
+    clearQueue,
   } = useMusicPlayerStore();
 
   const activeZone = useFocusZoneStore((s) => s.activeZone);
@@ -60,7 +62,7 @@ export const MusicPlayerBar: React.FC<MusicPlayerBarProps> = React.memo(({ onExp
   const track = queue[currentIndex];
   if (!track) return null;
 
-  const buttons: MiniButton[] = ["prev", "play", "next", "volDown", "volUp", "expand"];
+  const buttons: MiniButton[] = ["prev", "play", "next", "volDown", "volUp", "expand", "clear"];
 
   useEffect(() => {
     if (activeZone === "player") {
@@ -115,6 +117,7 @@ export const MusicPlayerBar: React.FC<MusicPlayerBarProps> = React.memo(({ onExp
             case "volDown": setVolume(Math.max(0, volume - 0.05)); break;
             case "volUp": setVolume(Math.min(1, volume + 0.05)); break;
             case "expand": onExpand(); break;
+            case "clear": clearQueue(); break;
           }
           break;
         }
@@ -127,7 +130,7 @@ export const MusicPlayerBar: React.FC<MusicPlayerBarProps> = React.memo(({ onExp
 
     window.addEventListener("htpc:nav", handler);
     return () => window.removeEventListener("htpc:nav", handler);
-  }, [activeZone, playing, volume, setZone, prev, pause, resume, next, setVolume, onExpand]);
+  }, [activeZone, playing, volume, setZone, prev, pause, resume, next, setVolume, onExpand, clearQueue]);
 
   const isFocused = (btn: MiniButton) => activeZone === "player" && focusedButton === btn;
   const focusStyle = (btn: MiniButton): React.CSSProperties =>
@@ -290,6 +293,14 @@ export const MusicPlayerBar: React.FC<MusicPlayerBarProps> = React.memo(({ onExp
           aria-label="Expand player"
         >
           <ChevronUp size={16} />
+        </button>
+        <button
+          onClick={clearQueue}
+          className="w-7 h-7 flex items-center justify-center rounded hover:bg-white/10 transition-colors"
+          style={{ color: "var(--text-secondary)", ...focusStyle("clear") }}
+          aria-label="Clear player"
+        >
+          <X size={14} />
         </button>
       </div>
     </motion.div>
