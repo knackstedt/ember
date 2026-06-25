@@ -52,16 +52,20 @@ export const PRESETS = [
 export interface MusicVisualizerProps {
   audioElement: HTMLAudioElement | null;
   presetName?: string;
+  active?: boolean;
 }
 
 export const MusicVisualizer: React.FC<MusicVisualizerProps> = React.memo(({
   audioElement,
   presetName,
+  active = true,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const visualizerRef = useRef<ReturnType<typeof butterchurn.createVisualizer> | null>(null);
   const animRef = useRef<number>(0);
   const lastFrameTimeRef = useRef<number>(0);
+  const activeRef = useRef(active);
+  activeRef.current = active;
   const [activePresetName, setActivePresetName] = useState<string>(
     PRESETS.find((p) => p.name === DEFAULT_PRESET_NAME)?.name ?? PRESETS[0]?.name ?? "",
   );
@@ -121,6 +125,7 @@ export const MusicVisualizer: React.FC<MusicVisualizerProps> = React.memo(({
     const MIN_FRAME_INTERVAL = 1000 / 60;
     const render = () => {
       animRef.current = requestAnimationFrame(render);
+      if (!activeRef.current) return;
       const now = performance.now();
       if (now - lastFrameTimeRef.current < MIN_FRAME_INTERVAL) return;
       lastFrameTimeRef.current = now;

@@ -185,6 +185,17 @@ export const MusicPlayerFull: React.FC<MusicPlayerFullProps> = React.memo(({
 
       const tab = activeTabRef.current;
 
+      if (action === "prevTab" || action === "nextTab") {
+        const tabIdx = TAB_ITEMS.findIndex((t) => t.id === tab);
+        if (action === "prevTab" && tabIdx > 0) {
+          setActiveTab(TAB_ITEMS[tabIdx - 1].id);
+        } else if (action === "nextTab" && tabIdx < TAB_ITEMS.length - 1) {
+          setActiveTab(TAB_ITEMS[tabIdx + 1].id);
+        }
+        setTabBarFocused(true);
+        return;
+      }
+
       if (tabBarFocusedRef.current) {
         const tabIdx = TAB_ITEMS.findIndex((t) => t.id === tab);
         switch (action) {
@@ -596,31 +607,37 @@ export const MusicPlayerFull: React.FC<MusicPlayerFullProps> = React.memo(({
           </div>
         )}
 
-        {activeTab === "visualizer" && (
-          <div className="h-full flex flex-col">
-            <div className="flex items-center justify-end px-4 py-2 flex-shrink-0 gap-2">
-              <select
-                value={presetIndex}
-                onChange={(e) => setPresetIndex(Number(e.target.value))}
-                className="min-w-0 px-2 py-1 text-xs font-medium rounded border-none outline-none cursor-pointer transition-colors"
-                style={{
-                  color: "var(--text-primary)",
-                  background: "var(--surface-1)",
-                }}
-                aria-label="Visualizer preset"
-              >
-                {PRESETS.map((p, i) => (
-                  <option key={p.name} value={i} style={{ background: "var(--surface-1)" }}>
-                    {p.name}{p.description ? ` — ${p.description}` : ""}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="flex-1 min-h-0">
-              <MusicVisualizer audioElement={audioElement} presetName={PRESETS[presetIndex]?.name} />
-            </div>
+        <div
+          className="h-full flex flex-col"
+          style={{
+            position: activeTab === "visualizer" ? "relative" : "absolute",
+            inset: activeTab === "visualizer" ? "auto" : 0,
+            visibility: activeTab === "visualizer" ? "visible" : "hidden",
+            pointerEvents: activeTab === "visualizer" ? "auto" : "none",
+          }}
+        >
+          <div className="flex items-center justify-end px-4 py-2 flex-shrink-0 gap-2">
+            <select
+              value={presetIndex}
+              onChange={(e) => setPresetIndex(Number(e.target.value))}
+              className="min-w-0 px-2 py-1 text-xs font-medium rounded border-none outline-none cursor-pointer transition-colors"
+              style={{
+                color: "var(--text-primary)",
+                background: "var(--surface-1)",
+              }}
+              aria-label="Visualizer preset"
+            >
+              {PRESETS.map((p, i) => (
+                <option key={p.name} value={i} style={{ background: "var(--surface-1)" }}>
+                  {p.name}{p.description ? ` — ${p.description}` : ""}
+                </option>
+              ))}
+            </select>
           </div>
-        )}
+          <div className="flex-1 min-h-0">
+            <MusicVisualizer audioElement={audioElement} presetName={PRESETS[presetIndex]?.name} active={activeTab === "visualizer"} />
+          </div>
+        </div>
 
         {activeTab === "queue" && (
           <div

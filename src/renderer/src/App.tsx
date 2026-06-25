@@ -717,13 +717,21 @@ export default function App(): React.ReactElement {
         const idx = tabs.indexOf(activeTabRef.current);
         setActiveTab(tabs[(idx + 1) % tabs.length]);
       } else if (ev.action === "left_bumper") {
-        const tabs = visibleTabIdsRef.current;
-        const idx = tabs.indexOf(activeTabRef.current);
-        setActiveTab(tabs[(idx - 1 + tabs.length) % tabs.length]);
+        if (useFocusZoneStore.getState().activeZone === "player") {
+          dispatchNavAction("prevTab");
+        } else {
+          const tabs = visibleTabIdsRef.current;
+          const idx = tabs.indexOf(activeTabRef.current);
+          setActiveTab(tabs[(idx - 1 + tabs.length) % tabs.length]);
+        }
       } else if (ev.action === "right_bumper") {
-        const tabs = visibleTabIdsRef.current;
-        const idx = tabs.indexOf(activeTabRef.current);
-        setActiveTab(tabs[(idx + 1) % tabs.length]);
+        if (useFocusZoneStore.getState().activeZone === "player") {
+          dispatchNavAction("nextTab");
+        } else {
+          const tabs = visibleTabIdsRef.current;
+          const idx = tabs.indexOf(activeTabRef.current);
+          setActiveTab(tabs[(idx + 1) % tabs.length]);
+        }
       } else if (ev.action === "west") {
         window.dispatchEvent(
           new CustomEvent("htpc:contextmenu", { detail: { source: "gamepad" } }),
@@ -860,14 +868,22 @@ export default function App(): React.ReactElement {
         }
       } else if (!isTyping && e.type === "keydown" && e.key === "q") {
         e.preventDefault();
-        const tabs = visibleTabIdsRef.current;
-        const idx = tabs.indexOf(activeTabRef.current);
-        setActiveTab(tabs[(idx - 1 + tabs.length) % tabs.length]);
+        if (useFocusZoneStore.getState().activeZone === "player") {
+          window.dispatchEvent(new CustomEvent("htpc:nav", { detail: { action: "prevTab" } }));
+        } else {
+          const tabs = visibleTabIdsRef.current;
+          const idx = tabs.indexOf(activeTabRef.current);
+          setActiveTab(tabs[(idx - 1 + tabs.length) % tabs.length]);
+        }
       } else if (!isTyping && e.type === "keydown" && e.key === "e") {
         e.preventDefault();
-        const tabs = visibleTabIdsRef.current;
-        const idx = tabs.indexOf(activeTabRef.current);
-        setActiveTab(tabs[(idx + 1) % tabs.length]);
+        if (useFocusZoneStore.getState().activeZone === "player") {
+          window.dispatchEvent(new CustomEvent("htpc:nav", { detail: { action: "nextTab" } }));
+        } else {
+          const tabs = visibleTabIdsRef.current;
+          const idx = tabs.indexOf(activeTabRef.current);
+          setActiveTab(tabs[(idx + 1) % tabs.length]);
+        }
       } else if (
         !isTyping &&
         e.type === "keydown" &&
