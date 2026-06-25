@@ -6,35 +6,35 @@ export interface SourceBadge {
 }
 
 const RCLONE_COLORS: Record<string, string> = {
-  sftp: "#4ade80",
-  ftp: "#60a5fa",
-  smb: "#f472b6",
-  webdav: "#a78bfa",
-  http: "#fb923c",
-  googledrive: "#facc15",
-  dropbox: "#38bdf8",
-  onedrive: "#818cf8",
+  sftp: "var(--badge-sftp)",
+  ftp: "var(--badge-ftp)",
+  smb: "var(--badge-smb)",
+  webdav: "var(--badge-webdav)",
+  http: "var(--badge-http)",
+  googledrive: "var(--badge-googledrive)",
+  dropbox: "var(--badge-dropbox)",
+  onedrive: "var(--badge-onedrive)",
 };
 
 export function getSourceBadge(sourceLocation?: SourceLocation): SourceBadge {
   if (!sourceLocation) return {};
 
   if (sourceLocation === "local") {
-    return { badge: "Local", badgeColor: "#4ade80" };
+    return { badge: "Local", badgeColor: "var(--badge-local)" };
   }
 
   if (sourceLocation === "remote") {
-    return { badge: "Remote", badgeColor: "#94a3b8" };
+    return { badge: "Remote", badgeColor: "var(--badge-remote)" };
   }
 
   if (sourceLocation === "online") {
-    return { badge: "Online", badgeColor: "#38bdf8" };
+    return { badge: "Online", badgeColor: "var(--badge-online)" };
   }
 
   if (sourceLocation.startsWith("rclone:")) {
     const protocol = sourceLocation.slice("rclone:".length);
     const label = protocol.toUpperCase();
-    const color = RCLONE_COLORS[protocol] ?? "#94a3b8";
+    const color = RCLONE_COLORS[protocol] ?? "var(--badge-fallback)";
     return { badge: label, badgeColor: color };
   }
 

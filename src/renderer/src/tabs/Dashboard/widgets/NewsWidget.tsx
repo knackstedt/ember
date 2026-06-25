@@ -50,7 +50,7 @@ export const NewsWidget: React.FC<{ title?: string }> = ({ title }) => {
       )}
       <div className="flex-1 flex flex-col gap-1 overflow-y-auto min-h-0">
         {MOCK_NEWS.map((item) => (
-          <button
+          <div
             key={item.id}
             className="group flex items-start gap-1.5 px-1.5 py-1 rounded-xl text-left transition-all duration-200 hover:scale-[1.01]"
             style={{ background: "var(--surface-1)" }}
@@ -66,7 +66,7 @@ export const NewsWidget: React.FC<{ title?: string }> = ({ title }) => {
               <span className="text-[12px] opacity-30">{item.time}</span>
             </div>
             <ExternalLink size={9} className="opacity-0 group-hover:opacity-30 transition-opacity flex-shrink-0 mt-0.5" />
-          </button>
+          </div>
         ))}
       </div>
     </div>

@@ -100,7 +100,6 @@ export const MediaCard: React.FC<MediaCardProps> = React.memo(({
       `}
       style={{
         backgroundColor: "var(--surface-0)",
-        willChange: "transform",
       }}
       whileHover={{ scale: 1.03, y: -2 }}
       whileTap={{ scale: 0.98 }}

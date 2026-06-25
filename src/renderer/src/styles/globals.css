@@ -7,6 +7,20 @@
   --launching-overlay: rgba(0, 0, 0, 0.55);
   --launching-spinner: var(--accent);
   --launching-text: var(--accent);
+
+  /* Source badge colors */
+  --badge-local:       #4ade80;
+  --badge-remote:      #94a3b8;
+  --badge-online:      #38bdf8;
+  --badge-sftp:        #4ade80;
+  --badge-ftp:         #60a5fa;
+  --badge-smb:         #f472b6;
+  --badge-webdav:      #a78bfa;
+  --badge-http:        #fb923c;
+  --badge-googledrive: #facc15;
+  --badge-dropbox:     #38bdf8;
+  --badge-onedrive:    #818cf8;
+  --badge-fallback:    #94a3b8;
 }
 
 /* ─── Theme: Ember ─────────────────────────────────────────── */

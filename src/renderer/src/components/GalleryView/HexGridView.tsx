@@ -145,7 +145,6 @@ const HexCell = React.memo(function HexCellInner({ hex, isFocused, cellWidth, he
         filter: isFocused
           ? "drop-shadow(0 0 10px var(--accent)) drop-shadow(0 0 4px var(--accent))"
           : undefined,
-        willChange: "transform",
         backfaceVisibility: "hidden",
       }}
       {...itemProps}
