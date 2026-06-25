@@ -1138,7 +1138,7 @@ export default function App(): React.ReactElement {
       <div className="relative z-10 flex flex-col h-full">
         {/* Tab bar */}
         <nav
-          className="flex items-center gap-1 px-4 pt-3 pb-0 flex-shrink-0"
+          className="flex items-center gap-1 px-4 flex-shrink-0"
           style={{ borderBottom: "1px solid var(--border-default)" }}
         >
           {visibleTabs.map((tab, idx) => {
@@ -1186,7 +1186,7 @@ export default function App(): React.ReactElement {
             );
           })}
 
-          <div className="ml-auto flex items-center gap-2 pb-1">
+          <div className="ml-auto flex items-center gap-2">
             <button
               tabIndex={0}
               className={`px-3 py-1.5 rounded text-xs transition-colors ${tabBarFocusIndex === visibleTabs.length ? "tab-bar-focus" : ""}`}

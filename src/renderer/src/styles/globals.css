@@ -128,7 +128,7 @@ section {
 
 .tab-bar-focus {
   outline: 2px solid var(--accent) !important;
-  outline-offset: 2px !important;
+  outline-offset: -2px !important;
 }
 
 /* GPU-accelerated scrollable containers */
