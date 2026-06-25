@@ -25,8 +25,6 @@ import { RecentlyPlayedRow } from "../../components/RecentlyPlayedRow/RecentlyPl
 import { Movie } from "../../../../shared/types";
 import { resolveMediaUrl } from "../../../../shared/path-utils";
 import { useVideoPlayerStore } from "../../store/videoPlayer.store";
-import { StreamingTile } from "../../components/StreamingTile/StreamingTile";
-import { StreamingService } from "../../../../shared/types";
 import { useGridFocus, NavAction } from "../../hooks/useGridFocus";
 import { useDetailController } from "../../hooks/useDetailController";
 import { useContextMenu } from "../../hooks/useContextMenu";
@@ -46,19 +44,20 @@ import {
   X,
   Globe,
   Trash2,
+  ArrowLeft,
 } from "lucide-react";
 import { useCollectionsStore, evaluateSmartFilter, sortByCollection } from "../../store/collections.store";
 import { CollectionsBar } from "../../components/CollectionsBar/CollectionsBar";
 import { CollectionManager } from "../../components/CollectionManager/CollectionManager";
 import { HexCellData } from "../../components/GalleryView/HexGridView";
+import { MoviesNavRail } from "./components/MoviesNavRail";
+import type { MoviesNavItem, MovieGroup } from "./types";
 import { ErrorDisplay } from "../../components/ErrorDisplay/ErrorDisplay";
 import { useToastStore } from "../../store/toast.store";
 import { AiGroup } from "../../../../shared/types";
 import { DynamicFacetFilters, FacetField } from "../../components/DynamicFacetFilters/DynamicFacetFilters";
 import { getSourceBadge } from "../../lib/source-badge";
 import { coerceResolution } from "../../lib/resolution-badge";
-
-type SubTab = "local" | "streaming" | "ai-groups";
 
 function canDeleteMovie(movie: Movie): boolean {
   return !movie.sourceLocation || movie.sourceLocation === "local";
@@ -85,14 +84,13 @@ export const MoviesTab: React.FC = () => {
   const regeneratingIds = useMoviesStore((s) => s.regeneratingIds);
   const openVideo = useVideoPlayerStore((s) => s.open);
   const [selected, setSelected] = useState<Movie | null>(null);
-  const [subTab, setSubTab] = useState<SubTab>("ai-groups");
+  const [activeNav, setActiveNav] = useState<MoviesNavItem>("all");
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [columnCount, setColumnCount] = useState(5);
   const [viewColumnCount, setViewColumnCount] = useState(5);
   const [activeCollectionId, setActiveCollectionId] = useState<string | null>(null);
   const [showCollectionManager, setShowCollectionManager] = useState(false);
   const [collectionItemIds, setCollectionItemIds] = useState<Set<string>>(new Set());
-  const [streamingServices, setStreamingServices] = useState<StreamingService[]>([]);
-  const [streamingError, setStreamingError] = useState<string | null>(null);
   const gridRef = useRef<VirtualGridHandle>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const galleryView = useGalleryView();
@@ -123,20 +121,6 @@ export const MoviesTab: React.FC = () => {
     load();
     loadCollections();
   }, []);
-
-  useEffect(() => {
-    if (subTab === "streaming") {
-      setStreamingError(null);
-      window.htpc.streaming.list("video")
-        .then((list) => {
-          setStreamingServices(list);
-        })
-        .catch(() => {
-          setStreamingServices([]);
-          setStreamingError("Failed to load streaming services.");
-        });
-    }
-  }, [subTab]);
 
   useEffect(() => {
     if (!activeCollectionId) {
@@ -173,17 +157,17 @@ export const MoviesTab: React.FC = () => {
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail as string;
-      if (["all", "ai-groups", "local", "streaming"].includes(detail)) {
-        setSubTab(detail as SubTab);
+      if (["all", "groups"].includes(detail)) {
+        setActiveNav(detail as MoviesNavItem);
       }
     };
     window.addEventListener("htpc:movies-view", handler);
     return () => window.removeEventListener("htpc:movies-view", handler);
   }, []);
 
-  /* Auto-generate AI groups when subTab switches to ai-groups and movies are loaded */
+  /* Auto-generate AI groups when activeNav switches to ai-groups and movies are loaded */
   useEffect(() => {
-    if (subTab !== "ai-groups" || movies.length === 0) return;
+    if (activeNav !== "groups" || movies.length === 0) return;
     if (aiGroups.length > 0) return;
     setAiGroupsLoading(true);
     setAiGroupsError(null);
@@ -219,31 +203,187 @@ export const MoviesTab: React.FC = () => {
     return () => {
       if (aiGroupTimeoutRef.current) clearTimeout(aiGroupTimeoutRef.current);
     };
-  }, [subTab, movies]);
+  }, [activeNav, movies]);
 
   const allGenres = useMemo(
     () => [...new Set(movies.flatMap((m) => m.genres ?? []))].sort(),
     [movies],
   );
+
+  const genreGroups = useMemo<MovieGroup[]>(() => {
+    const map = new Map<string, Movie[]>();
+    for (const m of movies) {
+      for (const g of m.genres ?? []) {
+        if (!map.has(g)) map.set(g, []);
+        map.get(g)!.push(m);
+      }
+    }
+    return Array.from(map.entries())
+      .map(([name, items]) => ({
+        id: `genre-${name}`,
+        name,
+        movieCount: items.length,
+        coverUrl: items.find((m) => m.coverUrl)?.coverUrl,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [movies]);
+
+  const directorGroups = useMemo<MovieGroup[]>(() => {
+    const map = new Map<string, Movie[]>();
+    for (const m of movies) {
+      if (!m.director) continue;
+      if (!map.has(m.director)) map.set(m.director, []);
+      map.get(m.director)!.push(m);
+    }
+    return Array.from(map.entries())
+      .map(([name, items]) => ({
+        id: `director-${name}`,
+        name,
+        movieCount: items.length,
+        coverUrl: items.find((m) => m.coverUrl)?.coverUrl,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [movies]);
+
+  /* Tree-based folder helpers matching MusicTab pattern */
+  function findCommonPrefix(paths: string[]): string {
+    if (paths.length === 0) return "";
+    const dirs = paths.map((p) => p.replace(/\\/g, "/"));
+    dirs.sort();
+    const a = dirs[0];
+    const b = dirs[dirs.length - 1];
+    let i = 0;
+    while (i < a.length && i < b.length && a[i] === b[i]) i++;
+    let prefix = a.slice(0, i);
+    const lastSlash = prefix.lastIndexOf("/");
+    if (lastSlash > 0) prefix = prefix.slice(0, lastSlash);
+    return prefix;
+  }
+
+  function getMovieRoots(moviesList: Movie[]): string[] {
+    const roots: string[] = [];
+    const localPaths = moviesList
+      .filter((m) => m.filePath && !m.filePath.startsWith("ember://"))
+      .map((m) => m.filePath!.replace(/\\/g, "/"));
+    if (localPaths.length > 0) {
+      const localPrefix = findCommonPrefix(localPaths);
+      if (localPrefix) roots.push(localPrefix);
+    }
+    const remoteRoots = new Set<string>();
+    for (const m of moviesList) {
+      if (!m.filePath || !m.filePath.startsWith("ember://remote/")) continue;
+      const match = m.filePath.match(/^ember:\/\/remote\/[^/]+/);
+      if (match) remoteRoots.add(match[0]);
+    }
+    roots.push(...Array.from(remoteRoots).sort());
+    return roots;
+  }
+
+  function getRelativeDir(filePath: string, roots: string[]): string {
+    const normalized = filePath.replace(/\\/g, "/");
+    for (const root of roots) {
+      if (normalized.startsWith(root + "/")) {
+        const rel = normalized.slice(root.length + 1);
+        const dirIdx = rel.lastIndexOf("/");
+        return dirIdx >= 0 ? rel.slice(0, dirIdx) : "";
+      }
+    }
+    return "";
+  }
+
+  function getFolderSubdirs(
+    moviesList: Movie[],
+    currentPath: string,
+    roots: string[],
+  ): MovieGroup[] {
+    const result = new Map<string, { name: string; path: string; movies: Movie[]; coverUrl?: string }>();
+    for (const m of moviesList) {
+      if (!m.filePath) continue;
+      const relDir = getRelativeDir(m.filePath, roots);
+      if (currentPath === "") {
+        const firstSlash = relDir.indexOf("/");
+        const firstDir = firstSlash >= 0 ? relDir.slice(0, firstSlash) : relDir;
+        if (!firstDir) continue;
+        if (!result.has(firstDir)) {
+          result.set(firstDir, { name: decodeURIComponent(firstDir), path: firstDir, movies: [] });
+        }
+        result.get(firstDir)!.movies.push(m);
+      } else {
+        if (relDir.startsWith(currentPath + "/")) {
+          const remainder = relDir.slice(currentPath.length + 1);
+          const firstSlash = remainder.indexOf("/");
+          const nextDir = firstSlash >= 0 ? remainder.slice(0, firstSlash) : remainder;
+          const nextPath = currentPath + "/" + nextDir;
+          if (!result.has(nextPath)) {
+            result.set(nextPath, { name: decodeURIComponent(nextDir), path: nextPath, movies: [] });
+          }
+          result.get(nextPath)!.movies.push(m);
+        }
+      }
+    }
+    return Array.from(result.values())
+      .map((g) => ({
+        id: `folder-${g.path}`,
+        name: g.name,
+        movieCount: g.movies.length,
+        coverUrl: g.movies.find((m) => m.coverUrl)?.coverUrl,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  function getMoviesInFolder(moviesList: Movie[], folderPath: string, roots: string[]): Movie[] {
+    return moviesList.filter((m) => {
+      if (!m.filePath) return false;
+      return getRelativeDir(m.filePath, roots) === folderPath;
+    });
+  }
+
+  function folderHasSubdirs(moviesList: Movie[], folderPath: string, roots: string[]): boolean {
+    for (const m of moviesList) {
+      if (!m.filePath) continue;
+      const relDir = getRelativeDir(m.filePath, roots);
+      if (folderPath === "") {
+        if (relDir !== "") return true;
+      } else {
+        if (relDir.startsWith(folderPath + "/")) return true;
+      }
+    }
+    return false;
+  }
+
+  const moviesWithPath = useMemo(() => movies.filter((m) => !m.hidden && m.filePath), [movies]);
+
+  const movieRoots = useMemo(() => getMovieRoots(moviesWithPath), [moviesWithPath]);
+
+  const folderGroups = useMemo<MovieGroup[]>(() => {
+    if (movieRoots.length === 0) return [];
+    return getFolderSubdirs(moviesWithPath, selectedGroupId ?? "", movieRoots);
+  }, [moviesWithPath, selectedGroupId, movieRoots]);
   const activeCollection = useMemo(
     () => collections.find((c) => c.id === activeCollectionId),
     [collections, activeCollectionId],
   );
 
   const items = useMemo(() => {
-    const base = filtered();
+    let base = filtered();
+    if (activeNav === "favorites") base = base.filter((m) => m.isFavorite);
+    if (activeNav === "genres" && selectedGroupId) base = base.filter((m) => m.genres?.includes(selectedGroupId));
+    if (activeNav === "directors" && selectedGroupId) base = base.filter((m) => m.director === selectedGroupId);
+    if (activeNav === "folders" && selectedGroupId) {
+      base = getMoviesInFolder(base, selectedGroupId, movieRoots);
+    }
     if (!activeCollectionId) return base;
     const result = base.filter((m) => collectionItemIds.has(m.id));
     return sortByCollection<Movie>(result, activeCollection);
-  }, [filtered, movies, searchQuery, activeGenre, activeCollectionId, collectionItemIds, activeCollection]);
+  }, [filtered, movies, searchQuery, activeGenre, activeCollectionId, collectionItemIds, activeCollection, activeNav, selectedGroupId, movieRoots]);
 
   const displayItems = useMemo(() => {
-    if (subTab !== "ai-groups" || !selectedAiGroupId) return items;
+    if (activeNav !== "groups" || !selectedAiGroupId) return items;
     const group = aiGroups.find((g) => g.id === selectedAiGroupId);
     if (!group) return items;
     const ids = new Set(group.itemIds);
     return items.filter((m) => ids.has(m.id));
-  }, [items, subTab, aiGroups, selectedAiGroupId]);
+  }, [items, activeNav, aiGroups, selectedAiGroupId]);
 
   const facetSourceItems = displayItems;
 
@@ -270,12 +410,15 @@ export const MoviesTab: React.FC = () => {
   ], []);
 
   const isRowBasedView = galleryView === "bookshelf" || galleryView === "spread-deck";
+  const showingFolderGroups = activeNav === "folders"
+    ? folderHasSubdirs(moviesWithPath, selectedGroupId ?? "", movieRoots)
+    : false;
   const { focusedIndex, setFocusedIndex } = useGridFocus({
     items: gridItems,
     columnCount: isRowBasedView ? viewColumnCount : columnCount,
     gridRef,
     onConfirm: (movie) => setSelected(movie),
-    enabled: subTab !== "streaming" && !selected,
+    enabled: (activeNav === "all" || activeNav === "favorites" || activeNav === "groups" || (!!selectedGroupId && !showingFolderGroups)) && !selected,
     getNextIndex: galleryView === "hex-grid"
       ? (current, action) => {
           const handle = gridRef.current as unknown as { getNextIndex?(i: number, a: NavAction): number | null } | null;
@@ -287,7 +430,7 @@ export const MoviesTab: React.FC = () => {
   /* Reset grid focus when the view context changes so we don’t point at a stale item */
   useEffect(() => {
     setFocusedIndex(0);
-  }, [subTab, selectedAiGroupId]);
+  }, [activeNav, selectedAiGroupId]);
 
   const movieCollections = useMemo(
     () => collections.filter((c) => c.itemType === "movie" || c.itemType === "mixed"),
@@ -772,10 +915,21 @@ export const MoviesTab: React.FC = () => {
   });
 
   return (
-    <div className="flex flex-col h-full">
-      <div style={{ padding: 16, paddingBottom: 0 }}>
+    <div className="flex flex-col h-full relative">
+      <div className="flex-1 min-h-0 flex overflow-hidden">
+        <MoviesNavRail
+          activeItem={activeNav}
+          onSelect={(item) => {
+            setActiveNav(item);
+            setSelectedGroupId(null);
+            setSelectedAiGroupId(null);
+            setActiveCollectionId(null);
+          }}
+        />
+        <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
+          <div className="flex-shrink-0 overflow-y-auto" style={{ padding: 16, paddingBottom: 0 }}>
         {/* Collapsible content — scrolls out of view */}
-        {subTab === "local" && (
+        {activeNav !== "groups" && (
           <div className="flex flex-col gap-3 mb-3">
             <RecentlyPlayedRow
               items={recentlyPlayed.map((m) => ({
@@ -814,7 +968,7 @@ export const MoviesTab: React.FC = () => {
           className="flex items-center gap-2 pb-3 flex-wrap"
           style={{ background: "var(--surface-base)" }}
         >
-          {subTab === "local" && (
+          {activeNav !== "groups" && (
             <>
               <OskInput
                 value={searchQuery}
@@ -860,10 +1014,10 @@ export const MoviesTab: React.FC = () => {
               color: "var(--surface-base)",
             }}
           >
-            {subTab === "ai-groups" ? <><Sparkles size={12} /> Groups</> : subTab}
+            {activeNav === "groups" ? <><Sparkles size={12} /> Groups</> : activeNav}
           </span>
           {/* Active filter summary chips */}
-          {subTab === "local" && activeGenre && (
+          {activeNav !== "groups" && activeGenre && (
             <motion.button
               className="px-2.5 py-0.5 rounded-full text-xs font-medium"
               style={{
@@ -877,7 +1031,7 @@ export const MoviesTab: React.FC = () => {
               Genre: {activeGenre} <X size={12} />
             </motion.button>
           )}
-          {subTab === "ai-groups" && selectedAiGroupId && (() => {
+          {activeNav === "groups" && selectedAiGroupId && (() => {
             const group = aiGroups.find((g) => g.id === selectedAiGroupId);
             return group ? (
               <motion.button
@@ -928,30 +1082,7 @@ export const MoviesTab: React.FC = () => {
         {/* Expanded filters — render below sticky bar so they stay visible */}
         {filtersExpanded && (
           <div className="flex flex-col gap-3 pb-3">
-            <div className="flex gap-3 items-center flex-shrink-0">
-              <div className="flex gap-1">
-                {(["ai-groups", "local", "streaming"] as SubTab[]).map((t) => (
-                  <button
-                    key={t}
-                    className="px-4 py-1.5 rounded-full text-sm font-medium capitalize transition-colors"
-                    style={{
-                      background:
-                        subTab === t
-                          ? "var(--accent)"
-                          : "var(--surface-1)",
-                      color:
-                        subTab === t ? "var(--surface-base)" : "var(--text-secondary)",
-                      border: "1px solid var(--border-default)",
-                    }}
-                    onClick={() => setSubTab(t)}
-                  >
-                    {t === "ai-groups" ? "✨ Groups" : t}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {subTab === "local" && (
+            {activeNav !== "groups" && (
               <>
                 <ChipFilters
                   filters={[
@@ -979,7 +1110,7 @@ export const MoviesTab: React.FC = () => {
               </>
             )}
 
-            {subTab === "ai-groups" && (
+            {activeNav === "groups" && (
               <>
                 {aiGroupsLoading && (
                   <div className="flex items-center gap-2 flex-shrink-0" style={{ color: "var(--text-secondary)" }}>
@@ -1046,9 +1177,132 @@ export const MoviesTab: React.FC = () => {
         className="flex-1 min-h-0 overflow-y-auto gpu-scroll"
         style={{ padding: 16 }}
       >
-        {/* Grid content */}
-        {subTab === "local" && (
+        {/* Genre group browsing */}
+        {activeNav === "genres" && !selectedGroupId && (
+          <div className="flex flex-wrap gap-3">
+            {genreGroups.map((group) => (
+              <motion.button
+                key={group.id}
+                className="flex flex-col items-center gap-2 p-3 rounded-[var(--radius-card)] flex-shrink-0"
+                style={{ width: 160, background: "var(--surface-1)" }}
+                onClick={() => setSelectedGroupId(group.name)}
+                whileTap={{ scale: 0.95 }}
+              >
+                {group.coverUrl ? (
+                  <img src={scaledImageUrl(group.coverUrl, 160, 160)} alt={group.name} className="w-32 h-32 object-cover rounded" loading="lazy" />
+                ) : (
+                  <div className="w-32 h-32 rounded flex items-center justify-center" style={{ background: "var(--surface-0)" }}>
+                    <span className="text-lg font-bold" style={{ color: "var(--text-secondary)" }}>{group.name.slice(0, 2).toUpperCase()}</span>
+                  </div>
+                )}
+                <span className="text-[12px] font-medium truncate w-full text-center">{group.name}</span>
+                <span className="text-[12px]" style={{ color: "var(--text-secondary)" }}>{group.movieCount} movie{group.movieCount !== 1 ? "s" : ""}</span>
+              </motion.button>
+            ))}
+          </div>
+        )}
+
+        {/* Director group browsing */}
+        {activeNav === "directors" && !selectedGroupId && (
+          <div className="flex flex-wrap gap-3">
+            {directorGroups.map((group) => (
+              <motion.button
+                key={group.id}
+                className="flex flex-col items-center gap-2 p-3 rounded-[var(--radius-card)] flex-shrink-0"
+                style={{ width: 160, background: "var(--surface-1)" }}
+                onClick={() => setSelectedGroupId(group.name)}
+                whileTap={{ scale: 0.95 }}
+              >
+                {group.coverUrl ? (
+                  <img src={scaledImageUrl(group.coverUrl, 160, 160)} alt={group.name} className="w-32 h-32 object-cover rounded" loading="lazy" />
+                ) : (
+                  <div className="w-32 h-32 rounded flex items-center justify-center" style={{ background: "var(--surface-0)" }}>
+                    <span className="text-lg font-bold" style={{ color: "var(--text-secondary)" }}>{group.name.slice(0, 2).toUpperCase()}</span>
+                  </div>
+                )}
+                <span className="text-[12px] font-medium truncate w-full text-center">{group.name}</span>
+                <span className="text-[12px]" style={{ color: "var(--text-secondary)" }}>{group.movieCount} movie{group.movieCount !== 1 ? "s" : ""}</span>
+              </motion.button>
+            ))}
+          </div>
+        )}
+
+        {/* Folder group browsing with breadcrumb */}
+        {activeNav === "folders" && (
           <>
+            {selectedGroupId && (
+              <div className="flex items-center gap-1 mb-3 text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
+                <button
+                  className="px-2 py-1 rounded hover:bg-white/10 transition-colors"
+                  style={{ color: "var(--text-primary)" }}
+                  onClick={() => setSelectedGroupId(null)}
+                >
+                  Library
+                </button>
+                {selectedGroupId.split("/").map((segment, idx) => {
+                  const path = selectedGroupId.split("/").slice(0, idx + 1).join("/");
+                  const isLast = idx === selectedGroupId.split("/").length - 1;
+                  return (
+                    <React.Fragment key={path}>
+                      <span>/</span>
+                      {isLast ? (
+                        <span style={{ color: "var(--accent)" }}>{decodeURIComponent(segment)}</span>
+                      ) : (
+                        <button
+                          className="px-1 rounded hover:bg-white/10 transition-colors"
+                          style={{ color: "var(--text-primary)" }}
+                          onClick={() => setSelectedGroupId(path)}
+                        >
+                          {decodeURIComponent(segment)}
+                        </button>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+              </div>
+            )}
+            {showingFolderGroups && (
+              <div className="flex flex-wrap gap-3">
+                {folderGroups.map((group) => (
+                  <motion.button
+                    key={group.id}
+                    className="flex flex-col items-center gap-2 p-3 rounded-[var(--radius-card)] flex-shrink-0"
+                    style={{ width: 160, background: "var(--surface-1)" }}
+                    onClick={() => setSelectedGroupId(group.id.slice("folder-".length))}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    {group.coverUrl ? (
+                      <img src={scaledImageUrl(group.coverUrl, 160, 160)} alt={group.name} className="w-32 h-32 object-cover rounded" loading="lazy" />
+                    ) : (
+                      <div className="w-32 h-32 rounded flex items-center justify-center" style={{ background: "var(--surface-0)" }}>
+                        <FolderOpen size={24} style={{ color: "var(--text-secondary)" }} />
+                      </div>
+                    )}
+                    <span className="text-[12px] font-medium truncate w-full text-center">{group.name}</span>
+                    <span className="text-[12px]" style={{ color: "var(--text-secondary)" }}>{group.movieCount} movie{group.movieCount !== 1 ? "s" : ""}</span>
+                  </motion.button>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Grid content */}
+        {(activeNav === "all" || activeNav === "favorites" || (activeNav === "folders" && !showingFolderGroups)) && (
+          <>
+            {selectedGroupId && activeNav !== "folders" && (
+              <div className="flex items-center gap-2 mb-3">
+                <motion.button
+                  className="px-3 py-1.5 rounded-[var(--radius-card)] text-xs font-medium flex items-center gap-1"
+                  style={{ background: "var(--surface-1)", color: "var(--text-primary)", border: "1px solid var(--border-default)" }}
+                  onClick={() => setSelectedGroupId(null)}
+                  whileTap={{ scale: 0.96 }}
+                >
+                  <ArrowLeft size={14} /> Back
+                </motion.button>
+                <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>{decodeURIComponent(selectedGroupId.split("/").pop() || selectedGroupId)}</span>
+              </div>
+            )}
             {loading || (scanning || remoteScanning) && items.length === 0 ? (
               (() => {
                 switch (galleryView) {
@@ -1148,7 +1402,7 @@ export const MoviesTab: React.FC = () => {
           </>
         )}
 
-        {subTab === "ai-groups" && (
+        {activeNav === "groups" && (
           <>
             {aiGroupsLoading ? (
               (() => {
@@ -1235,26 +1489,6 @@ export const MoviesTab: React.FC = () => {
           </>
         )}
 
-        {subTab === "streaming" && (
-          <div className="pt-2">
-            {streamingError ? (
-              <ErrorDisplay
-                message={streamingError}
-                onRetry={() => {
-                  setStreamingError(null);
-                  window.htpc.streaming.list("video")
-                    .then((list) => setStreamingServices(list))
-                    .catch(() => {
-                      setStreamingServices([]);
-                      setStreamingError("Failed to load streaming services.");
-                    });
-                }}
-              />
-            ) : (
-              <StreamingTile services={streamingServices} />
-            )}
-          </div>
-        )}
       </div>
 
       <DetailPanel
@@ -1370,6 +1604,8 @@ export const MoviesTab: React.FC = () => {
         onClose={() => setShowCollectionManager(false)}
         itemType="movie"
       />
+        </div>
+      </div>
     </div>
   );
 };
