@@ -24,6 +24,10 @@ import {
   RefreshCw,
   Copy,
   Bug,
+  Link2,
+  Unlink,
+  Search,
+  Trash2,
 } from "lucide-react";
 import { useInputStore } from "../../store/input.store";
 import type { LiveControllerState } from "../../store/input.store";
@@ -32,6 +36,7 @@ import {
   ControllerType,
   ButtonMapping,
   NormalizedInputEvent,
+  BluetoothDevice,
 } from "../../../../shared/types";
 import { XboxController } from "./XboxController";
 import { PS4Controller } from "./PS4Controller";
@@ -1054,6 +1059,8 @@ export const ControllersTab: React.FC = () => {
           </div>
         )}
 
+        <BluetoothQuickConnect />
+
         {lastEvent && (
           <div
             className="mt-auto p-3 rounded-[var(--radius-card)] text-xs"
@@ -1726,3 +1733,224 @@ export const ControllersTab: React.FC = () => {
     </div>
   );
 };
+
+function BluetoothQuickConnect() {
+  const [expanded, setExpanded] = useState(false);
+  const [available, setAvailable] = useState(false);
+  const [devices, setDevices] = useState<BluetoothDevice[]>([]);
+  const [scanning, setScanning] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    const avail = await window.htpc.bluetooth.available();
+    setAvailable(avail);
+    if (avail) {
+      const devs = await window.htpc.bluetooth.devices();
+      setDevices(devs);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  const handleScan = useCallback(async () => {
+    setScanning(true);
+    try {
+      const found = await window.htpc.bluetooth.scan(8);
+      setDevices(found);
+    } catch { /* ignore */ }
+    setScanning(false);
+  }, []);
+
+  const handleAction = useCallback(async (
+    action: string,
+    mac: string,
+    fn: (mac: string) => Promise<boolean>,
+  ) => {
+    setBusy(`${action}:${mac}`);
+    const ok = await fn(mac);
+    if (ok) await refresh();
+    setBusy(null);
+  }, [refresh]);
+
+  if (!available) return null;
+
+  return (
+    <div className="flex flex-col gap-2">
+      <motion.button
+        className="flex items-center gap-2 px-3 py-2 rounded-[var(--radius-card)] text-sm font-medium"
+        style={{
+          background: "var(--surface-0)",
+          border: "1px solid var(--border-default)",
+          color: "var(--text-primary)",
+        }}
+        onClick={() => {
+          setExpanded((v) => !v);
+          if (!expanded) void refresh();
+        }}
+        whileTap={{ scale: 0.98 }}
+      >
+        <Bluetooth size={16} style={{ color: "var(--accent)" }} />
+        <span className="flex-1 text-left">Bluetooth</span>
+        {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+      </motion.button>
+
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            className="flex flex-col gap-2"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+          >
+            <div className="flex items-center gap-2">
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={handleScan}
+                disabled={scanning}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-medium flex-1"
+                style={{
+                  background: scanning ? "var(--surface-1)" : "var(--accent)",
+                  color: scanning ? "var(--text-secondary)" : "var(--surface-base)",
+                  border: `1px solid ${scanning ? "var(--border-default)" : "var(--accent)"}`,
+                }}
+              >
+                {scanning ? (
+                  <>
+                    <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                    Scanning...
+                  </>
+                ) : (
+                  <>
+                    <Search size={12} />
+                    Scan
+                  </>
+                )}
+              </motion.button>
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={refresh}
+                className="flex items-center gap-1 px-2 py-1.5 rounded text-xs"
+                style={{
+                  background: "var(--surface-1)",
+                  color: "var(--text-secondary)",
+                  border: "1px solid var(--border-default)",
+                }}
+              >
+                <RefreshCw size={12} />
+              </motion.button>
+            </div>
+
+            {devices.length > 0 ? (
+              <div className="flex flex-col gap-1.5 max-h-64 overflow-y-auto">
+                {devices.map((dev) => (
+                  <div
+                    key={dev.mac}
+                    className="flex flex-col gap-1 p-2 rounded"
+                    style={{
+                      background: "var(--surface-0)",
+                      border: dev.connected
+                        ? "1px solid #4ade8040"
+                        : "1px solid var(--border-default)",
+                    }}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span
+                        className="text-xs font-medium truncate flex-1"
+                        style={{ color: "var(--text-primary)" }}
+                      >
+                        {dev.name}
+                      </span>
+                      {dev.connected && (
+                        <span
+                          className="text-[12px] px-1 py-0.5 rounded shrink-0"
+                          style={{ background: "#4ade8020", color: "#4ade80" }}
+                        >
+                          Connected
+                        </span>
+                      )}
+                      {dev.paired && !dev.connected && (
+                        <span
+                          className="text-[12px] px-1 py-0.5 rounded shrink-0"
+                          style={{ background: "var(--surface-1)", color: "var(--text-secondary)" }}
+                        >
+                          Paired
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {!dev.paired && (
+                        <motion.button
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => handleAction("pair", dev.mac, window.htpc.bluetooth.pair)}
+                          disabled={busy === `pair:${dev.mac}`}
+                          className="flex items-center gap-1 px-2 py-1 rounded text-[12px] font-medium"
+                          style={{ background: "var(--accent)", color: "var(--surface-base)" }}
+                        >
+                          <Link2 size={12} /> Pair
+                        </motion.button>
+                      )}
+                      {dev.paired && !dev.connected && (
+                        <motion.button
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => handleAction("connect", dev.mac, window.htpc.bluetooth.connect)}
+                          disabled={busy === `connect:${dev.mac}`}
+                          className="flex items-center gap-1 px-2 py-1 rounded text-[12px] font-medium"
+                          style={{ background: "#4ade80", color: "#000" }}
+                        >
+                          <Link2 size={12} /> Connect
+                        </motion.button>
+                      )}
+                      {dev.connected && (
+                        <>
+                          <motion.button
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => handleAction("reconnect", dev.mac, window.htpc.bluetooth.reconnect)}
+                            disabled={busy === `reconnect:${dev.mac}`}
+                            className="flex items-center gap-1 px-2 py-1 rounded text-[12px] font-medium"
+                            style={{ background: "var(--surface-1)", color: "var(--text-primary)", border: "1px solid var(--border-default)" }}
+                          >
+                            <RefreshCw size={12} /> Reconnect
+                          </motion.button>
+                          <motion.button
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => handleAction("disconnect", dev.mac, window.htpc.bluetooth.disconnect)}
+                            disabled={busy === `disconnect:${dev.mac}`}
+                            className="flex items-center gap-1 px-2 py-1 rounded text-[12px] font-medium"
+                            style={{ background: "#ff444420", color: "#ff6666" }}
+                          >
+                            <Unlink size={12} />
+                          </motion.button>
+                        </>
+                      )}
+                      {dev.paired && (
+                        <motion.button
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => handleAction("remove", dev.mac, window.htpc.bluetooth.remove)}
+                          disabled={busy === `remove:${dev.mac}`}
+                          className="flex items-center gap-1 px-2 py-1 rounded text-[12px] font-medium"
+                          style={{ background: "transparent", color: "var(--text-secondary)", border: "1px solid var(--border-default)" }}
+                          title="Forget device"
+                        >
+                          <Trash2 size={12} /> Forget
+                        </motion.button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div
+                className="text-xs text-center py-3"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                No devices found. Click Scan.
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}

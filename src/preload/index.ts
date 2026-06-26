@@ -38,6 +38,8 @@ import {
   UpdaterState,
   GitHubRelease,
   OAuthResult,
+  BluetoothDevice,
+  BluetoothAdapterState,
 } from "../shared/types";
 import { GameMetadata } from "../shared/metadata";
 import { IPC_CHANNELS } from "../shared/ipc";
@@ -552,6 +554,31 @@ const htpc = {
       ipcRenderer.invoke("controller:openMapping"),
     resetMappings: (): Promise<boolean> =>
       ipcRenderer.invoke("controller:resetMappings"),
+  },
+
+  bluetooth: {
+    available: (): Promise<boolean> =>
+      ipcRenderer.invoke("bluetooth:available"),
+    adapter: (): Promise<BluetoothAdapterState> =>
+      ipcRenderer.invoke("bluetooth:adapter"),
+    setPower: (on: boolean): Promise<boolean> =>
+      ipcRenderer.invoke("bluetooth:power", on),
+    devices: (): Promise<BluetoothDevice[]> =>
+      ipcRenderer.invoke("bluetooth:devices"),
+    scan: (durationSeconds?: number): Promise<BluetoothDevice[]> =>
+      ipcRenderer.invoke("bluetooth:scan", durationSeconds),
+    pair: (mac: string): Promise<boolean> =>
+      ipcRenderer.invoke("bluetooth:pair", mac),
+    connect: (mac: string): Promise<boolean> =>
+      ipcRenderer.invoke("bluetooth:connect", mac),
+    disconnect: (mac: string): Promise<boolean> =>
+      ipcRenderer.invoke("bluetooth:disconnect", mac),
+    remove: (mac: string): Promise<boolean> =>
+      ipcRenderer.invoke("bluetooth:remove", mac),
+    trust: (mac: string): Promise<boolean> =>
+      ipcRenderer.invoke("bluetooth:trust", mac),
+    reconnect: (mac: string): Promise<boolean> =>
+      ipcRenderer.invoke("bluetooth:reconnect", mac),
   },
 
   movies: {

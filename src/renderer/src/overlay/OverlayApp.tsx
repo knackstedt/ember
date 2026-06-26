@@ -18,10 +18,16 @@ import {
   Activity,
   Zap,
   MemoryStick,
+  Bluetooth,
+  RefreshCw,
+  Link2,
+  Unlink,
+  Search,
+  Trash2,
 } from "lucide-react";
 import { useInputNav } from "../hooks/useInputNav";
 import { useControllerWorker } from "../hooks/useControllerWorker";
-import { Game, AppSettings, OverlayStyle } from "../../../shared/types";
+import { Game, AppSettings, OverlayStyle, BluetoothDevice } from "../../../shared/types";
 
 /* ─── Sidebar items ─────────────────────────────────────────── */
 
@@ -326,6 +332,11 @@ function GameInfoPanel({ game }: { game: Game }) {
 function ControllersPanel() {
   const [devices, setDevices] = useState<any[]>([]);
   const [mappings, setMappings] = useState<Record<string, any[]>>({});
+  const [btAvailable, setBtAvailable] = useState(false);
+  const [btDevices, setBtDevices] = useState<BluetoothDevice[]>([]);
+  const [btScanning, setBtScanning] = useState(false);
+  const [btBusy, setBtBusy] = useState<string | null>(null);
+
   useEffect(() => {
     void window.htpc.input.devices().then((devs) => {
       setDevices(devs);
@@ -335,13 +346,69 @@ function ControllersPanel() {
         });
       });
     });
+    void window.htpc.bluetooth.available().then((avail) => {
+      setBtAvailable(avail);
+      if (avail) {
+        void window.htpc.bluetooth.devices().then(setBtDevices);
+      }
+    });
   }, []);
 
-  if (devices.length === 0) {
+  const btRefresh = useCallback(async () => {
+    if (btAvailable) {
+      const devs = await window.htpc.bluetooth.devices();
+      setBtDevices(devs);
+    }
+  }, [btAvailable]);
+
+  const btScan = useCallback(async () => {
+    setBtScanning(true);
+    try {
+      const found = await window.htpc.bluetooth.scan(8);
+      setBtDevices(found);
+    } catch { /* ignore */ }
+    setBtScanning(false);
+  }, []);
+
+  const btAction = useCallback(async (
+    action: string,
+    mac: string,
+    fn: (mac: string) => Promise<boolean>,
+  ) => {
+    setBtBusy(`${action}:${mac}`);
+    const ok = await fn(mac);
+    if (ok) await btRefresh();
+    setBtBusy(null);
+  }, [btRefresh]);
+
+  if (devices.length === 0 && (!btAvailable || btDevices.length === 0)) {
     return (
       <div className="flex flex-col items-center justify-center h-40 gap-3 opacity-70">
         <Gamepad2 size={40} />
         <div className="text-sm">No controllers detected.</div>
+        {btAvailable && (
+          <button
+            onClick={btScan}
+            disabled={btScanning}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium"
+            style={{
+              background: btScanning ? "var(--surface-2)" : "var(--accent)",
+              color: btScanning ? "var(--text-secondary)" : "var(--surface-base)",
+            }}
+          >
+            {btScanning ? (
+              <>
+                <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                Scanning...
+              </>
+            ) : (
+              <>
+                <Search size={16} />
+                Scan for Bluetooth Controllers
+              </>
+            )}
+          </button>
+        )}
       </div>
     );
   }
@@ -355,6 +422,12 @@ function ControllersPanel() {
             <span className="text-xs font-normal opacity-60 px-2 py-0.5 rounded bg-[var(--surface-2)]">
               {dev.type}
             </span>
+            {dev.connectionType === "bluetooth" && (
+              <span className="flex items-center gap-1 text-xs font-normal" style={{ color: "var(--accent)" }}>
+                <Bluetooth size={12} />
+                Bluetooth
+              </span>
+            )}
           </div>
           <div className="text-xs opacity-70">
             {dev.axisCount} axes · {dev.buttonCount} buttons · {dev.connectionType}
@@ -371,6 +444,134 @@ function ControllersPanel() {
           )}
         </div>
       ))}
+
+      {/* Bluetooth section */}
+      {btAvailable && (
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2 px-1">
+            <Bluetooth size={16} style={{ color: "var(--accent)" }} />
+            <span className="text-sm font-semibold">Bluetooth Devices</span>
+            <button
+              onClick={btScan}
+              disabled={btScanning}
+              className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium"
+              style={{
+                background: btScanning ? "var(--surface-2)" : "var(--accent)",
+                color: btScanning ? "var(--text-secondary)" : "var(--surface-base)",
+              }}
+            >
+              {btScanning ? (
+                <>
+                  <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                  Scanning...
+                </>
+              ) : (
+                <>
+                  <Search size={14} />
+                  Scan
+                </>
+              )}
+            </button>
+            <button
+              onClick={btRefresh}
+              className="flex items-center gap-1 px-2 py-1.5 rounded text-xs"
+              style={{
+                background: "var(--surface-2)",
+                color: "var(--text-secondary)",
+              }}
+            >
+              <RefreshCw size={12} />
+            </button>
+          </div>
+          {btDevices.map((dev) => (
+            <div
+              key={dev.mac}
+              className="p-3 rounded-xl flex items-center gap-3"
+              style={{
+                background: "var(--surface-0)",
+                border: dev.connected
+                  ? "1px solid #4ade8040"
+                  : "1px solid var(--border-default)",
+              }}
+            >
+              <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium truncate">{dev.name}</span>
+                  {dev.connected && (
+                    <span className="text-[12px] px-1.5 py-0.5 rounded" style={{ background: "#4ade8020", color: "#4ade80" }}>
+                      Connected
+                    </span>
+                  )}
+                  {dev.paired && !dev.connected && (
+                    <span className="text-[12px] px-1.5 py-0.5 rounded" style={{ background: "var(--surface-2)", color: "var(--text-secondary)" }}>
+                      Paired
+                    </span>
+                  )}
+                </div>
+                <span className="text-xs font-mono opacity-50">{dev.mac}</span>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                {!dev.paired && (
+                  <button
+                    onClick={() => btAction("pair", dev.mac, window.htpc.bluetooth.pair)}
+                    disabled={btBusy === `pair:${dev.mac}`}
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded text-xs font-medium"
+                    style={{ background: "var(--accent)", color: "var(--surface-base)" }}
+                  >
+                    <Link2 size={14} /> Pair
+                  </button>
+                )}
+                {dev.paired && !dev.connected && (
+                  <button
+                    onClick={() => btAction("connect", dev.mac, window.htpc.bluetooth.connect)}
+                    disabled={btBusy === `connect:${dev.mac}`}
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded text-xs font-medium"
+                    style={{ background: "#4ade80", color: "#000" }}
+                  >
+                    <Link2 size={14} /> Connect
+                  </button>
+                )}
+                {dev.connected && (
+                  <>
+                    <button
+                      onClick={() => btAction("reconnect", dev.mac, window.htpc.bluetooth.reconnect)}
+                      disabled={btBusy === `reconnect:${dev.mac}`}
+                      className="flex items-center gap-1 px-2.5 py-1.5 rounded text-xs font-medium"
+                      style={{ background: "var(--surface-2)", color: "var(--text-primary)" }}
+                    >
+                      <RefreshCw size={14} /> Reconnect
+                    </button>
+                    <button
+                      onClick={() => btAction("disconnect", dev.mac, window.htpc.bluetooth.disconnect)}
+                      disabled={btBusy === `disconnect:${dev.mac}`}
+                      className="flex items-center gap-1 px-2 py-1.5 rounded text-xs font-medium"
+                      style={{ background: "#ff444420", color: "#ff6666" }}
+                    >
+                      <Unlink size={14} />
+                    </button>
+                  </>
+                )}
+                {dev.paired && (
+                  <button
+                    onClick={() => btAction("remove", dev.mac, window.htpc.bluetooth.remove)}
+                    disabled={btBusy === `remove:${dev.mac}`}
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded text-xs font-medium"
+                    style={{ background: "transparent", color: "var(--text-secondary)", border: "1px solid var(--border-default)" }}
+                    title="Forget device"
+                  >
+                    <Trash2 size={14} /> Forget
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+          {btDevices.length === 0 && (
+            <div className="text-sm opacity-60 text-center py-4">
+              No Bluetooth devices found. Click Scan to search.
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

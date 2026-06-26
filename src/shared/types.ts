@@ -371,6 +371,30 @@ export interface ButtonMapping {
   action: string;
 }
 
+export interface BluetoothDevice {
+  mac: string;
+  name: string;
+  /** Paired with the host adapter */
+  paired: boolean;
+  /** Trusted by the host adapter */
+  trusted: boolean;
+  /** Currently connected */
+  connected: boolean;
+  /** Icon type from bluetoothctl (e.g. "input-gaming", "input-keyboard") */
+  icon?: string;
+  /** Signal strength 0-100 if available */
+  rssiPercent?: number;
+  /** Battery level 0-100 if available */
+  batteryPercent?: number;
+}
+
+export interface BluetoothAdapterState {
+  powered: boolean;
+  discovering: boolean;
+  address: string;
+  name: string;
+}
+
 export type FlashAspectRatio = "free" | "4:3" | "16:9" | "16:10";
 export type FlashUpscaleStyle = "none" | "gaussian" | "pixelate";
 export type FlashCanvasSize =

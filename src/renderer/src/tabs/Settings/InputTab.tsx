@@ -1,12 +1,13 @@
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSettingsStore } from "../../store/settings.store";
 import { KeybindEditor } from "../../components/KeybindEditor/KeybindEditor";
-import { Keyboard, Gamepad2, AlertCircle, Info, Mouse, Globe, Sliders } from "lucide-react";
+import { Keyboard, Gamepad2, AlertCircle, Info, Mouse, Globe, Sliders, Bluetooth, RefreshCw, Power, Trash2, Link2, Unlink, Search, Battery, Activity } from "lucide-react";
+import { BluetoothDevice, BluetoothAdapterState } from "../../../../shared/types";
 
 export const InputTab: React.FC = () => {
   const { settings, update } = useSettingsStore();
-  const [activeSection, setActiveSection] = useState<"keyboard" | "controller" | "browser">("keyboard");
+  const [activeSection, setActiveSection] = useState<"keyboard" | "controller" | "browser" | "bluetooth">("keyboard");
 
   if (!settings) return null;
 
@@ -125,6 +126,18 @@ export const InputTab: React.FC = () => {
           <Globe size={16} />
           Browser
         </motion.button>
+        <motion.button
+          className="flex items-center gap-2 px-4 py-2 rounded-[var(--radius-card)] text-sm font-medium transition-colors"
+          style={{
+            background: activeSection === "bluetooth" ? "var(--accent)" : "transparent",
+            color: activeSection === "bluetooth" ? "var(--surface-base)" : "var(--text-primary)",
+          }}
+          onClick={() => setActiveSection("bluetooth")}
+          whileTap={{ scale: 0.98 }}
+        >
+          <Bluetooth size={16} />
+          Bluetooth
+        </motion.button>
       </div>
       </section>
 
@@ -186,7 +199,7 @@ export const InputTab: React.FC = () => {
       </div>
 
       {/* Keybind Editor */}
-      {activeSection !== "browser" && (
+      {activeSection !== "browser" && activeSection !== "bluetooth" && (
         <section className="flex flex-col gap-4">
           <KeybindEditor
             keybinds={settings.commandKeybinds ?? {}}
@@ -340,6 +353,291 @@ export const InputTab: React.FC = () => {
           </div>
         </section>
       )}
+
+      {/* Bluetooth Settings */}
+      {activeSection === "bluetooth" && (
+        <BluetoothSection />
+      )}
     </div>
   );
 };
+
+function BluetoothSection() {
+  const [available, setAvailable] = useState(false);
+  const [adapter, setAdapter] = useState<BluetoothAdapterState | null>(null);
+  const [devices, setDevices] = useState<BluetoothDevice[]>([]);
+  const [scanning, setScanning] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    const avail = await window.htpc.bluetooth.available();
+    setAvailable(avail);
+    if (avail) {
+      const [ad, devs] = await Promise.all([
+        window.htpc.bluetooth.adapter(),
+        window.htpc.bluetooth.devices(),
+      ]);
+      setAdapter(ad);
+      setDevices(devs);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  const handlePower = useCallback(async (on: boolean) => {
+    setBusy("power");
+    setError(null);
+    const ok = await window.htpc.bluetooth.setPower(on);
+    if (!ok) setError(`Failed to power ${on ? "on" : "off"} adapter`);
+    await refresh();
+    setBusy(null);
+  }, [refresh]);
+
+  const handleScan = useCallback(async () => {
+    setScanning(true);
+    setError(null);
+    try {
+      const found = await window.htpc.bluetooth.scan(10);
+      setDevices(found);
+    } catch {
+      setError("Scan failed");
+    }
+    setScanning(false);
+  }, []);
+
+  const handleAction = useCallback(async (
+    action: string,
+    mac: string,
+    fn: (mac: string) => Promise<boolean>,
+  ) => {
+    setBusy(`${action}:${mac}`);
+    setError(null);
+    const ok = await fn(mac);
+    if (!ok) setError(`${action} failed for ${mac}`);
+    await refresh();
+    setBusy(null);
+  }, [refresh]);
+
+  if (!available) {
+    return (
+      <section className="flex flex-col gap-4">
+        <div className="flex items-start gap-3 p-3 rounded-[var(--radius-card)]" style={{ background: "var(--surface-1)" }}>
+          <AlertCircle size={16} style={{ color: "#ff9800", marginTop: 2 }} />
+          <div className="flex flex-col gap-1">
+            <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+              Bluetooth Not Available
+            </span>
+            <span className="text-sm" style={{ color: "var(--text-secondary)" }}>
+              bluetoothctl was not found. Install BlueZ to use Bluetooth controller pairing.
+            </span>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="flex flex-col gap-6">
+      {/* Adapter status */}
+      <div className="flex flex-col gap-3 p-4 rounded-[var(--radius-card)]" style={{ background: "var(--surface-1)" }}>
+        <div className="flex items-center gap-2">
+          <Bluetooth size={18} style={{ color: "var(--accent)" }} />
+          <span className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+            Bluetooth Adapter
+          </span>
+        </div>
+        {adapter && (
+          <div className="flex items-center gap-4 flex-wrap">
+            <span className="text-sm" style={{ color: "var(--text-secondary)" }}>
+              {adapter.name || "Unknown"}
+            </span>
+            <span className="text-xs font-mono px-2 py-0.5 rounded" style={{ background: "var(--surface-0)", color: "var(--text-secondary)" }}>
+              {adapter.address}
+            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-sm" style={{ color: adapter.powered ? "#4ade80" : "var(--text-secondary)" }}>
+                {adapter.powered ? "Powered On" : "Powered Off"}
+              </span>
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={() => handlePower(!adapter.powered)}
+                disabled={busy === "power"}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium"
+                style={{
+                  background: adapter.powered ? "#ff444420" : "var(--accent)",
+                  color: adapter.powered ? "#ff6666" : "var(--surface-base)",
+                  border: `1px solid ${adapter.powered ? "#ff444440" : "var(--accent)"}`,
+                }}
+              >
+                <Power size={14} />
+                {adapter.powered ? "Power Off" : "Power On"}
+              </motion.button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Scan button */}
+      <div className="flex items-center gap-3">
+        <motion.button
+          whileTap={{ scale: 0.98 }}
+          onClick={handleScan}
+          disabled={scanning || !adapter?.powered}
+          className="flex items-center gap-2 px-4 py-2 rounded text-sm font-medium"
+          style={{
+            background: scanning ? "var(--surface-1)" : "var(--accent)",
+            color: scanning ? "var(--text-secondary)" : "var(--surface-base)",
+            border: `1px solid ${scanning ? "var(--border-default)" : "var(--accent)"}`,
+            opacity: (!adapter?.powered || scanning) ? 0.6 : 1,
+          }}
+        >
+          {scanning ? (
+            <>
+              <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+              Scanning...
+            </>
+          ) : (
+            <>
+              <Search size={16} />
+              Scan for Devices
+            </>
+          )}
+        </motion.button>
+        <motion.button
+          whileTap={{ scale: 0.98 }}
+          onClick={refresh}
+          className="flex items-center gap-2 px-3 py-2 rounded text-sm"
+          style={{
+            background: "var(--surface-1)",
+            color: "var(--text-secondary)",
+            border: "1px solid var(--border-default)",
+          }}
+        >
+          <RefreshCw size={14} />
+          Refresh
+        </motion.button>
+      </div>
+
+      {error && (
+        <div className="flex items-center gap-2 p-3 rounded-[var(--radius-card)]" style={{ background: "color-mix(in srgb, #ff4444 15%, var(--surface-1))", border: "1px solid #ff444430" }}>
+          <AlertCircle size={16} style={{ color: "#ff4444" }} />
+          <span className="text-sm" style={{ color: "#ff6666" }}>{error}</span>
+        </div>
+      )}
+
+      {/* Device list */}
+      {devices.length > 0 ? (
+        <div className="flex flex-col gap-2">
+          {devices.map((dev) => (
+            <div
+              key={dev.mac}
+              className="flex items-center gap-3 p-3 rounded-[var(--radius-card)]"
+              style={{
+                background: "var(--surface-1)",
+                border: dev.connected ? "1px solid #4ade8040" : "1px solid var(--border-default)",
+              }}
+            >
+              <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium truncate" style={{ color: "var(--text-primary)" }}>
+                    {dev.name}
+                  </span>
+                  {dev.connected && (
+                    <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: "#4ade8020", color: "#4ade80" }}>
+                      Connected
+                    </span>
+                  )}
+                  {dev.paired && !dev.connected && (
+                    <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: "var(--surface-0)", color: "var(--text-secondary)" }}>
+                      Paired
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-3 text-xs" style={{ color: "var(--text-secondary)" }}>
+                  <span className="font-mono">{dev.mac}</span>
+                  {dev.icon && <span>{dev.icon}</span>}
+                  {dev.rssiPercent !== undefined && (
+                    <span className="flex items-center gap-1">
+                      <Activity size={12} /> {dev.rssiPercent}%
+                    </span>
+                  )}
+                  {dev.batteryPercent !== undefined && (
+                    <span className="flex items-center gap-1">
+                      <Battery size={12} /> {dev.batteryPercent}%
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5">
+                {!dev.paired && (
+                  <motion.button
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => handleAction("pair", dev.mac, window.htpc.bluetooth.pair)}
+                    disabled={busy === `pair:${dev.mac}`}
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded text-xs font-medium"
+                    style={{ background: "var(--accent)", color: "var(--surface-base)" }}
+                  >
+                    <Link2 size={14} /> Pair
+                  </motion.button>
+                )}
+                {dev.paired && !dev.connected && (
+                  <motion.button
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => handleAction("connect", dev.mac, window.htpc.bluetooth.connect)}
+                    disabled={busy === `connect:${dev.mac}`}
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded text-xs font-medium"
+                    style={{ background: "#4ade80", color: "#000" }}
+                  >
+                    <Link2 size={14} /> Connect
+                  </motion.button>
+                )}
+                {dev.connected && (
+                  <>
+                    <motion.button
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => handleAction("reconnect", dev.mac, window.htpc.bluetooth.reconnect)}
+                      disabled={busy === `reconnect:${dev.mac}`}
+                      className="flex items-center gap-1 px-2.5 py-1.5 rounded text-xs font-medium"
+                      style={{ background: "var(--surface-0)", color: "var(--text-primary)", border: "1px solid var(--border-default)" }}
+                    >
+                      <RefreshCw size={14} /> Reconnect
+                    </motion.button>
+                    <motion.button
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => handleAction("disconnect", dev.mac, window.htpc.bluetooth.disconnect)}
+                      disabled={busy === `disconnect:${dev.mac}`}
+                      className="flex items-center gap-1 px-2.5 py-1.5 rounded text-xs font-medium"
+                      style={{ background: "#ff444420", color: "#ff6666", border: "1px solid #ff444440" }}
+                    >
+                      <Unlink size={14} /> Disconnect
+                    </motion.button>
+                  </>
+                )}
+                {dev.paired && (
+                  <motion.button
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => handleAction("remove", dev.mac, window.htpc.bluetooth.remove)}
+                    disabled={busy === `remove:${dev.mac}`}
+                    className="flex items-center gap-1 px-2 py-1.5 rounded text-xs font-medium"
+                    style={{ background: "transparent", color: "var(--text-secondary)", border: "1px solid var(--border-default)" }}
+                    title="Forget device"
+                  >
+                    <Trash2 size={14} /> Forget
+                  </motion.button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="flex flex-col items-center justify-center h-32 gap-2 opacity-60">
+          <Bluetooth size={32} />
+          <span className="text-sm">No Bluetooth devices found. Click "Scan for Devices" to search.</span>
+        </div>
+      )}
+    </section>
+  );
+}

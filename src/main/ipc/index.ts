@@ -94,6 +94,19 @@ import {
 } from "../services/plugin-manager.service";
 import { listThemes, getTheme } from "../plugins/theme-registry";
 import { getConnectedDevices, rescanDevice } from "../input/evdev";
+import {
+  isBluetoothAvailable as btAvailable,
+  getAdapterState as btGetAdapter,
+  setAdapterPower as btSetPower,
+  listDevices as btListDevices,
+  scanDevices as btScanDevices,
+  pairDevice as btPair,
+  connectDevice as btConnect,
+  disconnectDevice as btDisconnect,
+  removeDevice as btRemove,
+  trustDevice as btTrust,
+  reconnectDevice as btReconnect,
+} from "../services/bluetooth.service";
 import { getXdgVideosDir, getXdgMusicDir } from "../scanners/xdg";
 import { getDefaultScanSources, getDefaultScanSourcesAsync } from "../scanners/defaults";
 import { isOllamaAvailable, naturalLanguageToFilter, aiGroupItems } from "../services/local-ai.service";
@@ -2091,6 +2104,52 @@ export function registerIpcHandlers(window: BrowserWindow): void {
 
   ipcMain.handle("input:device:reconnect", async (_e, deviceId: string) => {
     rescanDevice(deviceId);
+  });
+
+  /* ─── Bluetooth ─────────────────────────────────────────────── */
+
+  ipcMain.handle("bluetooth:available", async () => {
+    return btAvailable();
+  });
+
+  ipcMain.handle("bluetooth:adapter", async () => {
+    return btGetAdapter();
+  });
+
+  ipcMain.handle("bluetooth:power", async (_e, on: boolean) => {
+    return btSetPower(on);
+  });
+
+  ipcMain.handle("bluetooth:devices", async () => {
+    return btListDevices();
+  });
+
+  ipcMain.handle("bluetooth:scan", async (_e, durationSeconds?: number) => {
+    return btScanDevices(durationSeconds ?? 10);
+  });
+
+  ipcMain.handle("bluetooth:pair", async (_e, mac: string) => {
+    return btPair(mac);
+  });
+
+  ipcMain.handle("bluetooth:connect", async (_e, mac: string) => {
+    return btConnect(mac);
+  });
+
+  ipcMain.handle("bluetooth:disconnect", async (_e, mac: string) => {
+    return btDisconnect(mac);
+  });
+
+  ipcMain.handle("bluetooth:remove", async (_e, mac: string) => {
+    return btRemove(mac);
+  });
+
+  ipcMain.handle("bluetooth:trust", async (_e, mac: string) => {
+    return btTrust(mac);
+  });
+
+  ipcMain.handle("bluetooth:reconnect", async (_e, mac: string) => {
+    return btReconnect(mac);
   });
 
   ipcMain.handle("plugins:list", async () => {
