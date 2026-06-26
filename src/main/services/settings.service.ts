@@ -42,7 +42,7 @@ const DEFAULTS: AppSettings = {
   autoCreateDesktopEntries: false,
   overlayStyle: { mode: "glass", color: "#000000", opacity: 0.65 },
   gameNotes: {},
-  overlayAutoShow: true,
+  overlayAutoShow: false,
 };
 
 let cachedSettings: AppSettings | null = null;

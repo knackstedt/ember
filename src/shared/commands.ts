@@ -76,6 +76,7 @@ export const COMMAND_DEFINITIONS: CommandDefinition[] = [
   { id: "gaming.filter.retro", label: "Filter: Retro", category: "gaming", requiresContext: "gaming-tab" },
   { id: "gaming.emulator.stop", label: "Stop Emulator", category: "gaming", requiresContext: "emulator-open" },
   { id: "gaming.overlay", label: "Toggle Game Overlay", description: "Show/hide the in-game overlay (works while a game is running)", category: "gaming", requiresContext: "game-running", defaultShortcut: "F1" },
+  { id: "gaming.pause", label: "Pause/Resume Game", description: "Pause or resume the running game (SIGSTOP/SIGCONT)", category: "gaming", requiresContext: "game-running", defaultShortcut: "MediaPlayPause" },
   { id: "gaming.shader.clear", label: "Disable Shader", description: "Remove shader override from the selected game", category: "visual", requiresContext: "game-selected" },
   { id: "gaming.filter.clear", label: "Clear Console Filter", category: "gaming", requiresContext: "gaming-tab" },
 

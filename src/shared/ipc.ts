@@ -178,7 +178,11 @@ export const IPC_CHANNELS = {
     close: "overlay:close",
     getGame: "overlay:getGame",
     stopGame: "overlay:stopGame",
+    pauseGame: "overlay:pauseGame",
+    resumeGame: "overlay:resumeGame",
+    isPaused: "overlay:isPaused",
     state: "overlay:state",
+    processStats: "overlay:processStats",
   },
   devtools: {
     isOpen: "devtools:is-open",

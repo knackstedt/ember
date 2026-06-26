@@ -20,7 +20,7 @@ export const OverlayTab: React.FC = () => {
   const reset = () => {
     update({
       overlayStyle: { mode: "glass", color: "#000000", opacity: 0.65 },
-      overlayAutoShow: true,
+      overlayAutoShow: false,
     });
   };
 
@@ -117,7 +117,7 @@ export const OverlayTab: React.FC = () => {
         <Toggle
           label="Show overlay on game start"
           description="Automatically open the overlay when a game starts."
-          value={settings.overlayAutoShow ?? true}
+          value={settings.overlayAutoShow ?? false}
           onChange={(v) => update({ overlayAutoShow: v })}
         />
       </section>

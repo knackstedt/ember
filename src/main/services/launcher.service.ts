@@ -8,6 +8,7 @@ import { GameRepo } from "../db/repository";
 import { buildWineCommand } from "./wine-detection.service";
 import { launchItchGame } from "./itch.service";
 import { runSessionHooks } from "./session-hooks.service";
+import { getDescendantPids, getSiblingPids } from "../util/process-tree";
 import {
   setOverlayGame,
   setOverlayGameProcess,
@@ -21,45 +22,80 @@ const activeProcesses = new Map<string, ChildProcess>();
 const playTimeTimers = new Map<string, { startTime: number; timer: NodeJS.Timeout }>();
 const execFileAsync = promisify(execFile);
 
-async function findWindowsForPid(pid: number): Promise<number[]> {
+async function findWindowsForPid(pid: number, title?: string): Promise<number[]> {
   if (process.platform !== "linux") return [];
+  const pids = new Set([pid, ...getDescendantPids(pid), ...getSiblingPids(pid)]);
   try {
-    const { stdout } = await execFileAsync("xdotool", ["search", "--pid", String(pid)]);
-    return stdout
-      .split("\n")
-      .map((line) => parseInt(line.trim(), 10))
-      .filter((n) => !Number.isNaN(n));
+    for (const candidate of pids) {
+      const { stdout } = await execFileAsync("xdotool", ["search", "--pid", String(candidate)]);
+      const ids = stdout
+        .split("\n")
+        .map((line) => parseInt(line.trim(), 10))
+        .filter((n) => !Number.isNaN(n));
+      if (ids.length > 0) {
+        log.info("launcher", `found window(s) for PID ${candidate} (related to ${pid})`);
+        return ids;
+      }
+    }
   } catch {
     // xdotool missing or no match; fall back to xprop enumeration
   }
+
+  let clientList: string[] = [];
   try {
     const { stdout: rootStdout } = await execFileAsync("xprop", ["-root", "_NET_CLIENT_LIST"]);
     const match = rootStdout.match(/window id # (0x[0-9a-fA-F]+(?:,\s*0x[0-9a-fA-F]+)*)/);
-    if (!match) return [];
-    const ids = match[1].split(", ");
-    const found: number[] = [];
-    for (const id of ids) {
+    if (match) clientList = match[1].split(", ");
+  } catch {
+    return [];
+  }
+
+  // Match by PID
+  const found: number[] = [];
+  for (const id of clientList) {
+    try {
+      const { stdout } = await execFileAsync("xprop", ["-id", id, "_NET_WM_PID"]);
+      const pidMatch = stdout.match(/_NET_WM_PID\(CARDINAL\) = (\d+)/);
+      if (pidMatch && pids.has(Number(pidMatch[1]))) {
+        found.push(parseInt(id, 16));
+      }
+    } catch {
+      // ignore individual window failures
+    }
+  }
+  if (found.length > 0) {
+    log.info("launcher", `found window(s) via xprop for PID ${pid} tree`);
+    return found;
+  }
+
+  // Match by title/class
+  if (title && clientList.length > 0) {
+    const titleLower = title.toLowerCase();
+    for (const id of clientList) {
       try {
-        const { stdout } = await execFileAsync("xprop", ["-id", id, "_NET_WM_PID"]);
-        const pidMatch = stdout.match(/_NET_WM_PID\(CARDINAL\) = (\d+)/);
-        if (pidMatch && Number(pidMatch[1]) === pid) {
+        const { stdout } = await execFileAsync("xprop", ["-id", id, "_NET_WM_NAME", "WM_NAME", "WM_CLASS"]);
+        const haystack = stdout.toLowerCase();
+        if (haystack.includes(titleLower)) {
           found.push(parseInt(id, 16));
         }
       } catch {
         // ignore individual window failures
       }
     }
-    return found;
-  } catch {
-    return [];
+    if (found.length > 0) {
+      log.info("launcher", `found window(s) via title/class match for "${title}"`);
+      return found;
+    }
   }
+
+  return [];
 }
 
-async function waitForGameWindow(pid: number | undefined, timeoutMs = 10000): Promise<boolean> {
+async function waitForGameWindow(pid: number | undefined, timeoutMs = 10000, title?: string): Promise<boolean> {
   if (!pid) return false;
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
-    const windows = await findWindowsForPid(pid);
+    const windows = await findWindowsForPid(pid, title);
     if (windows.length > 0) return true;
     await new Promise((r) => setTimeout(r, 250));
   }
@@ -441,15 +477,16 @@ export async function launchGame(game: Game): Promise<void> {
         setOverlayGameProcess(game.id, gamePid);
         startPlayTimeTracking(game.id);
         void runSessionHooks(game, "after-start");
-        const foundWindow = await waitForGameWindow(gamePid, 10000);
-        if (!foundWindow) {
-          log.warn("launcher", `Window for Steam game ${game.steamAppId} not detected; restoring focus`);
-          clearOverlayGame(game.id);
-          sendGameLaunchFailed(game.id, `Steam game started but no window was detected.`);
-        } else {
-          sendGameStarted(game.id);
+        const foundWindow = await waitForGameWindow(gamePid, 30000, game.title);
+        sendGameStarted(game.id);
+        minimizeWindow();
+        if (foundWindow) {
           void overlayGameStarted(game.id);
-          minimizeWindow();
+        } else {
+          log.warn(
+            "launcher",
+            `Window for Steam game ${game.steamAppId} not detected; overlay will follow Ember's display`,
+          );
         }
 
         try {
@@ -617,7 +654,7 @@ export async function launchGame(game: Game): Promise<void> {
       spawnOk = true;
       startPlayTimeTracking(game.id);
       if (proc.pid) setOverlayGameProcess(game.id, proc.pid);
-      const windowPromise = waitForGameWindow(proc.pid, 10000);
+      const windowPromise = waitForGameWindow(proc.pid, 10000, game.title);
       setTimeout(() => {
         if (settled) return;
         settled = true;
@@ -628,16 +665,13 @@ export async function launchGame(game: Game): Promise<void> {
         if (isDolphin) fullscreenDolphinWindow();
         void runSessionHooks(game, "after-start", launchEnv);
         resolve();
+        sendGameStarted(game.id);
+        minimizeWindow();
         void windowPromise.then((found) => {
           if (!found) {
-            log.warn("launcher", `Window for "${game.title}" not detected; restoring focus`);
-            clearOverlayGame(game.id);
-            sendGameLaunchFailed(game.id, `Game started but no window was detected.`);
-            restoreAndFocusWindow();
+            log.warn("launcher", `Window for "${game.title}" not detected; overlay will follow Ember's display`);
           } else {
-            sendGameStarted(game.id);
             void overlayGameStarted(game.id);
-            minimizeWindow();
           }
         });
       }, 1500);

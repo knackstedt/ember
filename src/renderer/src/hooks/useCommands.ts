@@ -248,6 +248,9 @@ export function useCommands(
         case "gaming.overlay":
           window.htpc.overlay.toggle();
           break;
+        case "gaming.pause":
+          window.htpc.overlay.pause();
+          break;
         case "gaming.shader.clear": {
           if (context.selectedGameId) {
             const setEmulatorConfig = useGamesStore.getState().setEmulatorConfig;

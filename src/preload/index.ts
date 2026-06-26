@@ -1011,6 +1011,24 @@ const htpc = {
       ipcRenderer.invoke(IPC_CHANNELS.overlay.getGame),
     stopGame: (): Promise<void> =>
       ipcRenderer.invoke(IPC_CHANNELS.overlay.stopGame),
+    pause: (): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.overlay.pauseGame),
+    resume: (): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.overlay.resumeGame),
+    isPaused: (): Promise<boolean> =>
+      ipcRenderer.invoke(IPC_CHANNELS.overlay.isPaused),
+    processStats: (): Promise<{
+      cpuPercent: number;
+      memMB: number;
+      diskReadKBps: number;
+      diskWriteKBps: number;
+      netRxKBps: number;
+      netTxKBps: number;
+      processCount: number;
+      gpuPercent: number;
+      gpuMemUsedMB: number;
+      gpuMemTotalMB: number;
+    }> => ipcRenderer.invoke(IPC_CHANNELS.overlay.processStats),
     onState: (cb: (state: { visible: boolean; game: import("../shared/types").Game | null }) => void) => {
       const handler = (_: Electron.IpcRendererEvent, state: { visible: boolean; game: import("../shared/types").Game | null }) => cb(state);
       ipcRenderer.on(IPC_CHANNELS.overlay.state, handler);
