@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.4.7](https://github.com/knackstedt/ember/compare/v0.4.6...v0.4.7) (2026-06-26)
+
+
+### Features
+
+* **bluetooth:** add Bluetooth device management with scan, pair, connect, and disconnect support ([15872dc](https://github.com/knackstedt/ember/commit/15872dc53d64cb43f7404922fd43203e39d5d74c))
+* **controller:** add cursor snap-to-element for controller navigation ([d53aed4](https://github.com/knackstedt/ember/commit/d53aed4a5850bde6f3f00e9547bceb45fa290a72))
+* **controllers:** unlock controllers tab by default and improve navigation locking ([9f3c925](https://github.com/knackstedt/ember/commit/9f3c925272b159f29b38d4e7d359f3d3144da554))
+* **music:** add queue management actions and group context menus ([f1aa25b](https://github.com/knackstedt/ember/commit/f1aa25b915ccfaf2d9d96e7ebc6bbd591130b10c))
+* **music:** add tab navigation within player and optimize visualizer rendering ([28fb1c3](https://github.com/knackstedt/ember/commit/28fb1c34191eb297e501c354d205f629cabac55c))
+* **overlay:** add X11 window tracking and input grabbing for Linux overlay ([92cbcaf](https://github.com/knackstedt/ember/commit/92cbcafab0fda1129dab7a0d0d703fa9586453eb))
+* **ui:** restore last active tab on app launch within 5-minute window ([3d455f8](https://github.com/knackstedt/ember/commit/3d455f85a1735d37676693881ba43fc040c2ece5))
+
+
+### Bug Fixes
+
+* **gaming:** correct playtime display to show hours and minutes instead of minutes and seconds ([c0b36ca](https://github.com/knackstedt/ember/commit/c0b36ca494ce1924f12b7125e6ebcd78b77dd269))
+* **shutdown:** improve cleanup sequence and prevent dev server orphaning ([f27027d](https://github.com/knackstedt/ember/commit/f27027d0b2cb15036d8958f25030d22ce9c03e40))
+* **ui:** adjust tab bar padding and focus outline positioning ([b52ca1e](https://github.com/knackstedt/ember/commit/b52ca1ef6cfcd76d0d09ab1cbb05eae47d682f62))
+* **ui:** detailpanel no longer shifts grid ([10e4d87](https://github.com/knackstedt/ember/commit/10e4d87305bb7fa23f5af0e767653ec172624f71))
+
 ### [0.4.6](https://github.com/knackstedt/ember/compare/v0.4.5...v0.4.6) (2026-06-25)
 
 
