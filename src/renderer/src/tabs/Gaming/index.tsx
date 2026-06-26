@@ -1460,9 +1460,9 @@ export const GamingTab: React.FC = () => {
                       Play Time
                     </span>
                     <span style={{ color: "var(--text-primary)", fontWeight: 600 }}>
-                      {selected.playTime >= 60
-                        ? `${Math.floor(selected.playTime / 60)}h ${selected.playTime % 60}m`
-                        : `${selected.playTime}m`}
+                      {selected.playTime >= 3600
+                        ? `${Math.floor(selected.playTime / 3600)}h ${Math.floor((selected.playTime % 3600) / 60)}m`
+                        : `${Math.floor(selected.playTime / 60)}m`}
                     </span>
                   </div>
                 )}

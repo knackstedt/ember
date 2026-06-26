@@ -261,9 +261,9 @@ export const GameCard: React.FC<GameCardProps> = React.memo(({
                 <p className="gc-meta">
                   {playTime !== undefined && playTime > 0 ? (
                     <span className="gc-playtime">
-                      {playTime >= 60
-                        ? `${Math.floor(playTime / 60)}h ${playTime % 60}m`
-                        : `${playTime}m`}
+                      {playTime >= 3600
+                        ? `${Math.floor(playTime / 3600)}h ${Math.floor((playTime % 3600) / 60)}m`
+                        : `${Math.floor(playTime / 60)}m`}
                     </span>
                   ) : null}
                   {lastPlayed !== undefined && lastPlayed > 0 ? (
