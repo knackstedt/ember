@@ -130,6 +130,7 @@ const child = spawn(
 );
 
 function shutdown(signal: NodeJS.Signals) {
+  clearInterval(electronWatchInterval);
   child.kill(signal);
 
   // Give the process tree a moment to die gracefully, then force-kill
@@ -156,3 +157,47 @@ child.on('exit', (code, signal) => {
     process.exit(code ?? 0);
   }
 });
+
+// electron-vite keeps the vite dev server alive after Electron exits.
+// Watch for the Electron process exit and kill electron-vite when it does.
+function findElectronPid(): number | null {
+  try {
+    const processes = execSync('ps aux', { encoding: 'utf-8' });
+    for (const line of processes.split('\n')) {
+      if (
+        line.includes(projectDir) &&
+        line.includes('electron') &&
+        !line.includes('electron-vite') &&
+        !line.includes('scripts/dev.ts') &&
+        !line.includes('grep') &&
+        !line.includes('--type=') // Exclude renderer/GPU child processes
+      ) {
+        const parts = line.trim().split(/\s+/);
+        const pid = parseInt(parts[1], 10);
+        if (pid && !isNaN(pid) && pid !== process.pid) return pid;
+      }
+    }
+  } catch { /* ignore */ }
+  return null;
+}
+
+let electronPid: number | null = null;
+const electronWatchInterval = setInterval(() => {
+  if (!electronPid) {
+    electronPid = findElectronPid();
+    if (electronPid) console.log(`[dev] Monitoring Electron process ${electronPid}`);
+    return;
+  }
+  try {
+    process.kill(electronPid, 0);
+  } catch {
+    clearInterval(electronWatchInterval);
+    console.log('[dev] Electron process exited, shutting down dev server...');
+    child.kill('SIGTERM');
+    setTimeout(() => {
+      child.kill('SIGKILL');
+      killExisting();
+      process.exit(0);
+    }, 1000);
+  }
+}, 1000);

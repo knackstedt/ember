@@ -414,6 +414,11 @@ async function createWindow(): Promise<void> {
   mainWindow.on("closed", () => {
     clearInterval(devToolsInterval);
     mainWindow = null;
+    // Destroy any remaining windows (e.g. the in-game overlay) so that
+    // `window-all-closed` fires and the cleanup/teardown chain runs.
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) win.destroy();
+    }
   });
 
   const tryOpenDevTools = (source: string) => {
@@ -946,49 +951,49 @@ app.whenReady().then(async () => {
   });
 });
 
-app.on("before-quit", async (e) => {
+let isQuitting = false;
+
+app.on("before-quit", (e) => {
+  if (isQuitting) return; // Already in cleanup phase
+  isQuitting = true;
+  e.preventDefault(); // Prevent quit synchronously so async cleanup can run
+
   stopRemoteAvailabilityWorker();
   markCleanShutdown();
-  await destroyInputSystem();
-  await terminateDbWorker();
-  destroyMpvWorker();
-  await shutdownRcloneManager();
-  await destroyLibretroWorker();
-  // Give renderers a brief moment to fire any pending beforeunload / IPC saves
-  const windows = BrowserWindow.getAllWindows();
-  if (windows.length > 0) {
-    e.preventDefault();
-    for (const win of windows) {
-      if (!win.isDestroyed()) {
-        win.webContents.send("app:save-state");
-      }
-    }
+
+  (async () => {
     try {
+      log.info("shutdown", "destroying input system...");
+      await destroyInputSystem();
+      log.info("shutdown", "terminating db worker...");
+      await terminateDbWorker();
+      log.info("shutdown", "destroying mpv worker...");
+      destroyMpvWorker();
+      log.info("shutdown", "shutting down rclone manager...");
+      await shutdownRcloneManager();
+      log.info("shutdown", "destroying libretro worker...");
+      await destroyLibretroWorker();
+      log.info("shutdown", "shutting down plugins...");
       await shutdownPlugins();
     } catch (err) {
-      log.warn("plugins", `Shutdown error: ${err}`);
+      log.warn("shutdown", `Cleanup error: ${err}`);
     }
-    setTimeout(() => {
-      app.quit();
-    }, 300);
-  }
+    log.info("shutdown", "cleanup complete, exiting");
+    // All cleanup is done. Use SIGKILL directly — app.exit() and process.exit()
+    // don't reliably terminate Electron when Chromium's message loop is still
+    // pumping. SIGKILL is a synchronous kernel call that cannot be intercepted.
+    process.kill(process.pid, "SIGKILL");
+  })();
+
+  // Safety net: if async cleanup hangs, force-kill after 3s
+  setTimeout(() => {
+    log.warn("shutdown", "safety net: force-killing after timeout");
+    process.kill(process.pid, "SIGKILL");
+  }, 3000);
 });
 
-app.on("window-all-closed", async () => {
-  stopRemoteAvailabilityWorker();
-  await destroyInputSystem();
-  await terminateDbWorker();
-  destroyMpvWorker();
-  await shutdownRcloneManager();
-  await destroyLibretroWorker();
-  try {
-    await shutdownPlugins();
-  } catch (err) {
-    log.warn("plugins", `Shutdown error: ${err}`);
-  }
+app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
     app.quit();
-    // Safety net: if anything still keeps the event loop alive, force exit
-    setTimeout(() => app.exit(0), 1000);
   }
 });
