@@ -1663,7 +1663,7 @@ export const GamingTab: React.FC = () => {
                             void window.htpc.games.injectionConfig.set(selected.id, next);
                           }}
                         />
-                        Vulkan Layer Shader
+                        Vulkan Layer Shader (Experimental)
                       </label>
                       {selectedInjectionConfig?.vulkanShader?.enabled && (
                         <div className="flex flex-col gap-2 pl-6">

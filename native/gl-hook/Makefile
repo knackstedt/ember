@@ -1,6 +1,6 @@
 CC ?= gcc
 CFLAGS = -std=c11 -fPIC -O2 -Wall -Wno-unused-function -shared
-LDFLAGS = -ldl -lGL -lX11
+LDFLAGS = -ldl -lGL -lEGL -lX11
 TARGET = libember_gl_hook.so
 PREFIX ?= $(HOME)/.local/share/ember
 

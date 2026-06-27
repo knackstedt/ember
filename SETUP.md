@@ -143,6 +143,63 @@ Ember reads `~/.local/share/lutris/games/*.json` to discover Lutris-installed ti
 
 ---
 
+## Shader Injection (Optional)
+
+Ember can inject post-processing shaders (CRT, bloom, edge-detect, etc.) into games via two mechanisms:
+
+- **GL Hook** (`libember_gl_hook.so`) — LD_PRELOAD-based OpenGL/EGL interception for native Linux OpenGL games
+- **Vulkan Layer** (`VkLayer_ember_shader.so`) — Vulkan instance layer for native Vulkan games
+
+Both are built automatically by `bun scripts/build-native.ts` (called during `postinstall`, `predev`, `prebuild`, and `predist`). If the required headers are missing, the builds are skipped silently — shader injection simply won't be available.
+
+### C/C++ Compiler
+Required to build the GL hook and Vulkan layer.
+
+- **Debian / Ubuntu** — `sudo apt install gcc g++`
+- **Fedora** — `sudo dnf install gcc gcc-c++`
+- **Arch** — `sudo pacman -S gcc`
+
+### OpenGL / EGL Development Headers
+Required for the GL hook (OpenGL shader injection for native Linux games like MewnBase, Chronicon).
+
+- **Debian / Ubuntu**
+  ```bash
+  sudo apt install libgl-dev libegl-dev
+  ```
+- **Fedora**
+  ```bash
+  sudo dnf install mesa-libGL-devel mesa-libEGL-devel
+  ```
+- **Arch**
+  ```bash
+  sudo pacman -S mesa libglvnd
+  ```
+
+### Vulkan Development Headers
+Required for the Vulkan layer (shader injection for Vulkan games).
+
+- **Debian / Ubuntu**
+  ```bash
+  sudo apt install libvulkan-dev
+  ```
+- **Fedora**
+  ```bash
+  sudo dnf install vulkan-headers vulkan-loader-devel
+  ```
+- **Arch**
+  ```bash
+  sudo pacman -S vulkan-headers vulkan-icd-loader
+  ```
+
+### Shader Compiler (optional)
+Only needed if modifying the Vulkan layer's built-in shaders. Pre-compiled SPIR-V headers are committed to the repo, so this is not required for normal builds.
+
+- **Debian / Ubuntu** — `sudo apt install glslang-tools xxd`
+- **Fedora** — `sudo dnf install glslang vim-common`
+- **Arch** — `sudo pacman -S glslang vim`
+
+---
+
 ## Quick Install — All Required Dependencies
 
 Copy and paste the block for your distro:
@@ -150,7 +207,7 @@ Copy and paste the block for your distro:
 ### Debian / Ubuntu
 ```bash
 sudo apt update
-sudo apt install xdg-utils ffmpeg xdotool wine
+sudo apt install xdg-utils ffmpeg xdotool wine gcc g++ libgl-dev libegl-dev libvulkan-dev
 sudo usermod -aG input $USER
 # Then install bun: curl -fsSL https://bun.sh/install | bash
 # Then install Dolphin (pick one):
@@ -160,7 +217,7 @@ sudo usermod -aG input $USER
 
 ### Fedora
 ```bash
-sudo dnf install xdg-utils ffmpeg xdotool wine
+sudo dnf install xdg-utils ffmpeg xdotool wine gcc gcc-c++ mesa-libGL-devel mesa-libEGL-devel vulkan-headers vulkan-loader-devel
 sudo usermod -aG input $USER
 # Then install bun: curl -fsSL https://bun.sh/install | bash
 # Then install Dolphin (pick one):
@@ -170,7 +227,7 @@ sudo usermod -aG input $USER
 
 ### Arch
 ```bash
-sudo pacman -S xdg-utils ffmpeg xdotool wine
+sudo pacman -S xdg-utils ffmpeg xdotool wine gcc mesa libglvnd vulkan-headers vulkan-icd-loader
 sudo usermod -aG input $USER
 # Then install bun: yay -S bun-bin  (or curl install)
 # Then install Dolphin (pick one):

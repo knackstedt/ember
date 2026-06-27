@@ -16,4 +16,10 @@ native/video-decoder/Cargo.lock
 resources/*.node
 resources/rclone*
 
+# Native graphics build artifacts (built by scripts/build-native.ts)
+resources/libember_gl_hook.so
+resources/layers/
+native/gl-hook/libember_gl_hook.so
+native/vulkan-layer/VkLayer_ember_shader.so
+
 release

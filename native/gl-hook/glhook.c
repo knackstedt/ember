@@ -24,6 +24,9 @@
 #include <GL/gl.h>
 #define GL_GLEXT_PROTOTYPES
 #include <GL/glext.h>
+#include <EGL/egl.h>
+#include <pthread.h>
+#include <time.h>
 
 // GL3 framebuffer constant (not always in older headers)
 #ifndef GL_FRAMEBUFFER
@@ -37,18 +40,23 @@
 // Logging
 // ---------------------------------------------------------------------------
 
-static int g_logEnabled = 0;
+static int g_logEnabled = 1;
 
 static void glLog(const char* fmt, ...) {
     if (!g_logEnabled) return;
     va_list ap;
     va_start(ap, fmt);
-    FILE* f = fopen("/tmp/ember_gl_hook.log", "a");
-    if (f) {
-        vfprintf(f, fmt, ap);
-        fclose(f);
-    }
+    char buf[512];
+    int len = vsnprintf(buf, sizeof(buf), fmt, ap);
     va_end(ap);
+    if (len > 0) {
+        if (len > (int)sizeof(buf)) len = sizeof(buf);
+        int fd = open("/tmp/ember_gl_hook.log", O_WRONLY | O_CREAT | O_APPEND, 0644);
+        if (fd >= 0) {
+            write(fd, buf, len);
+            close(fd);
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -57,9 +65,17 @@ static void glLog(const char* fmt, ...) {
 
 static int g_initialized = 0;
 static int g_presetsInitialized = 0;
+static int g_swapBuffersCalled = 0;       // set when glXSwapBuffers or eglSwapBuffers is first called
+static time_t g_hookLoadTime = 0;         // set in constructor
+static int g_autoDisabled = 0;            // set when auto-disable triggers
 
 static void (*real_glXSwapBuffers)(Display*, GLXDrawable) = NULL;
+static EGLBoolean (*real_eglSwapBuffers)(EGLDisplay, EGLSurface) = NULL;
+static __GLXextFuncPtr (*real_glXGetProcAddressARB)(const GLubyte*) = NULL;
+static __eglMustCastToProperFunctionPointerType (*real_eglGetProcAddress)(const char*) = NULL;
 static int (*real_execve)(const char*, char* const[], char* const[]) = NULL;
+static void* (*real_dlsym)(void*, const char*) = NULL;
+static __thread int g_inDlsymHook = 0;
 
 static char g_hookPath[4096] = {0};
 
@@ -106,26 +122,42 @@ static struct {
     PFN_glActiveTexture_t        ActiveTexture;
 } gl;
 
+// Cached uniform locations (resolved once after shader link)
+static GLint loc_inputImage = -1;
+static GLint loc_intensity  = -1;
+static GLint loc_time       = -1;
+static GLint loc_resolution = -1;
+static GLint loc_preset     = -1;
+static GLint loc_params[8]  = { -1, -1, -1, -1, -1, -1, -1, -1 };
+
+static void* getGLProc(const char* name) {
+    void* p = (void*)glXGetProcAddressARB((const GLubyte*)name);
+    if (!p) {
+        p = dlsym(RTLD_DEFAULT, name);
+    }
+    return p;
+}
+
 static void loadGLFunctions() {
-    gl.CreateShader       = (PFN_glCreateShader_t)glXGetProcAddressARB((const GLubyte*)"glCreateShader");
-    gl.ShaderSource       = (PFN_glShaderSource_t)glXGetProcAddressARB((const GLubyte*)"glShaderSource");
-    gl.CompileShader      = (PFN_glCompileShader_t)glXGetProcAddressARB((const GLubyte*)"glCompileShader");
-    gl.GetShaderiv        = (PFN_glGetShaderiv_t)glXGetProcAddressARB((const GLubyte*)"glGetShaderiv");
-    gl.GetShaderInfoLog   = (PFN_glGetShaderInfoLog_t)glXGetProcAddressARB((const GLubyte*)"glGetShaderInfoLog");
-    gl.DeleteShader       = (PFN_glDeleteShader_t)glXGetProcAddressARB((const GLubyte*)"glDeleteShader");
-    gl.CreateProgram      = (PFN_glCreateProgram_t)glXGetProcAddressARB((const GLubyte*)"glCreateProgram");
-    gl.AttachShader       = (PFN_glAttachShader_t)glXGetProcAddressARB((const GLubyte*)"glAttachShader");
-    gl.LinkProgram        = (PFN_glLinkProgram_t)glXGetProcAddressARB((const GLubyte*)"glLinkProgram");
-    gl.GetProgramiv       = (PFN_glGetProgramiv_t)glXGetProcAddressARB((const GLubyte*)"glGetProgramiv");
-    gl.GetProgramInfoLog  = (PFN_glGetProgramInfoLog_t)glXGetProcAddressARB((const GLubyte*)"glGetProgramInfoLog");
-    gl.DeleteProgram      = (PFN_glDeleteProgram_t)glXGetProcAddressARB((const GLubyte*)"glDeleteProgram");
-    gl.UseProgram         = (PFN_glUseProgram_t)glXGetProcAddressARB((const GLubyte*)"glUseProgram");
-    gl.GetUniformLocation = (PFN_glGetUniformLocation_t)glXGetProcAddressARB((const GLubyte*)"glGetUniformLocation");
-    gl.Uniform1i          = (PFN_glUniform1i_t)glXGetProcAddressARB((const GLubyte*)"glUniform1i");
-    gl.Uniform1f          = (PFN_glUniform1f_t)glXGetProcAddressARB((const GLubyte*)"glUniform1f");
-    gl.Uniform2f          = (PFN_glUniform2f_t)glXGetProcAddressARB((const GLubyte*)"glUniform2f");
-    gl.BindFramebuffer    = (PFN_glBindFramebuffer_t)glXGetProcAddressARB((const GLubyte*)"glBindFramebuffer");
-    gl.ActiveTexture      = (PFN_glActiveTexture_t)glXGetProcAddressARB((const GLubyte*)"glActiveTexture");
+    gl.CreateShader       = (PFN_glCreateShader_t)getGLProc("glCreateShader");
+    gl.ShaderSource       = (PFN_glShaderSource_t)getGLProc("glShaderSource");
+    gl.CompileShader      = (PFN_glCompileShader_t)getGLProc("glCompileShader");
+    gl.GetShaderiv        = (PFN_glGetShaderiv_t)getGLProc("glGetShaderiv");
+    gl.GetShaderInfoLog   = (PFN_glGetShaderInfoLog_t)getGLProc("glGetShaderInfoLog");
+    gl.DeleteShader       = (PFN_glDeleteShader_t)getGLProc("glDeleteShader");
+    gl.CreateProgram      = (PFN_glCreateProgram_t)getGLProc("glCreateProgram");
+    gl.AttachShader       = (PFN_glAttachShader_t)getGLProc("glAttachShader");
+    gl.LinkProgram        = (PFN_glLinkProgram_t)getGLProc("glLinkProgram");
+    gl.GetProgramiv       = (PFN_glGetProgramiv_t)getGLProc("glGetProgramiv");
+    gl.GetProgramInfoLog  = (PFN_glGetProgramInfoLog_t)getGLProc("glGetProgramInfoLog");
+    gl.DeleteProgram      = (PFN_glDeleteProgram_t)getGLProc("glDeleteProgram");
+    gl.UseProgram         = (PFN_glUseProgram_t)getGLProc("glUseProgram");
+    gl.GetUniformLocation = (PFN_glGetUniformLocation_t)getGLProc("glGetUniformLocation");
+    gl.Uniform1i          = (PFN_glUniform1i_t)getGLProc("glUniform1i");
+    gl.Uniform1f          = (PFN_glUniform1f_t)getGLProc("glUniform1f");
+    gl.Uniform2f          = (PFN_glUniform2f_t)getGLProc("glUniform2f");
+    gl.BindFramebuffer    = (PFN_glBindFramebuffer_t)getGLProc("glBindFramebuffer");
+    gl.ActiveTexture      = (PFN_glActiveTexture_t)getGLProc("glActiveTexture");
 }
 
 // Shader state
@@ -519,6 +551,20 @@ static void initShaderProgram() {
     gl.DeleteShader(vert);
     gl.DeleteShader(frag);
     glLog("[Ember GL Hook] Shader program created (id=%u)\n", g_program);
+
+    // Cache uniform locations — avoids snprintf in the render loop
+    if (g_program != 0 && gl.GetUniformLocation) {
+        loc_inputImage = gl.GetUniformLocation(g_program, "u_inputImage");
+        loc_intensity  = gl.GetUniformLocation(g_program, "u_intensity");
+        loc_time       = gl.GetUniformLocation(g_program, "u_time");
+        loc_resolution = gl.GetUniformLocation(g_program, "u_resolution");
+        loc_preset     = gl.GetUniformLocation(g_program, "u_preset");
+        for (int i = 0; i < 8; i++) {
+            char name[32];
+            snprintf(name, sizeof(name), "u_params[%d]", i);
+            loc_params[i] = gl.GetUniformLocation(g_program, name);
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -536,6 +582,8 @@ struct GLState {
     GLint activeTexture;
     GLint packAlignment;
     GLint unpackAlignment;
+    GLint readBuffer;
+    GLint drawBuffer;
 };
 
 static void saveGLState(struct GLState* s) {
@@ -549,6 +597,8 @@ static void saveGLState(struct GLState* s) {
     glGetIntegerv(GL_ACTIVE_TEXTURE, &s->activeTexture);
     glGetIntegerv(GL_PACK_ALIGNMENT, &s->packAlignment);
     glGetIntegerv(GL_UNPACK_ALIGNMENT, &s->unpackAlignment);
+    glGetIntegerv(GL_READ_BUFFER, &s->readBuffer);
+    glGetIntegerv(GL_DRAW_BUFFER, &s->drawBuffer);
 }
 
 static void restoreGLState(const struct GLState* s) {
@@ -562,6 +612,40 @@ static void restoreGLState(const struct GLState* s) {
     if (gl.ActiveTexture) gl.ActiveTexture(s->activeTexture);
     glPixelStorei(GL_PACK_ALIGNMENT, s->packAlignment);
     glPixelStorei(GL_UNPACK_ALIGNMENT, s->unpackAlignment);
+    glReadBuffer(s->readBuffer);
+    glDrawBuffer(s->drawBuffer);
+}
+
+// ---------------------------------------------------------------------------
+// Shared shader render — called after backbuffer copy into g_texture
+// ---------------------------------------------------------------------------
+
+static void renderShaderQuad(int width, int height) {
+    if (!gl.UseProgram || !gl.ActiveTexture) return;
+
+    glViewport(0, 0, width, height);
+    glDisable(GL_BLEND);
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_CULL_FACE);
+
+    gl.UseProgram(g_program);
+
+    if (loc_inputImage >= 0) gl.Uniform1i(loc_inputImage, 0);
+    if (loc_intensity  >= 0) gl.Uniform1f(loc_intensity, g_intensity);
+    if (loc_time       >= 0) gl.Uniform1f(loc_time, (float)g_frameCount);
+    if (loc_resolution >= 0) gl.Uniform2f(loc_resolution, (float)width, (float)height);
+    if (loc_preset     >= 0) gl.Uniform1i(loc_preset, g_presetId);
+
+    for (int i = 0; i < 8; i++) {
+        if (loc_params[i] >= 0) gl.Uniform1f(loc_params[i], g_params[i]);
+    }
+
+    glBegin(GL_QUADS);
+    glTexCoord2f(0.0f, 0.0f); glVertex2f(-1.0f, -1.0f);
+    glTexCoord2f(1.0f, 0.0f); glVertex2f( 1.0f, -1.0f);
+    glTexCoord2f(1.0f, 1.0f); glVertex2f( 1.0f,  1.0f);
+    glTexCoord2f(0.0f, 1.0f); glVertex2f(-1.0f,  1.0f);
+    glEnd();
 }
 
 // ---------------------------------------------------------------------------
@@ -590,6 +674,13 @@ void glXSwapBuffers(Display* dpy, GLXDrawable drawable) {
         real_glXSwapBuffers = dlsym(RTLD_NEXT, "glXSwapBuffers");
     }
 
+    static int glx_first = 1;
+    if (glx_first) {
+        glx_first = 0;
+        g_swapBuffersCalled = 1;
+        glLog("[Ember GL Hook] glXSwapBuffers called (first time) pid=%d\n", getpid());
+    }
+
     if (g_presetId == 0) {
         if (real_glXSwapBuffers) real_glXSwapBuffers(dpy, drawable);
         return;
@@ -612,11 +703,18 @@ void glXSwapBuffers(Display* dpy, GLXDrawable drawable) {
         return;
     }
 
-    // Get drawable dimensions
-    unsigned int width = 0, height = 0;
-    glXQueryDrawable(dpy, drawable, GLX_WIDTH, &width);
-    glXQueryDrawable(dpy, drawable, GLX_HEIGHT, &height);
+    // Temporary passthrough mode for debugging — hook is active but no shader rendering
+    if (getenv("EMBER_GL_HOOK_PASSTHROUGH")) {
+        real_glXSwapBuffers(dpy, drawable);
+        return;
+    }
 
+    // Get dimensions from GL viewport (avoids X11 round-trip via glXQueryDrawable
+    // which can deadlock when the NVIDIA driver calls our hook internally)
+    GLint viewport[4] = {0, 0, 0, 0};
+    glGetIntegerv(GL_VIEWPORT, viewport);
+    unsigned int width = (unsigned int)viewport[2];
+    unsigned int height = (unsigned int)viewport[3];
     if (width == 0 || height == 0) {
         if (real_glXSwapBuffers) real_glXSwapBuffers(dpy, drawable);
         return;
@@ -641,52 +739,8 @@ void glXSwapBuffers(Display* dpy, GLXDrawable drawable) {
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
     glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, width, height);
 
-    // --- Render our fullscreen quad to the default back buffer ---
-    // FBO is already unbound (bound to 0 above)
-    glViewport(0, 0, width, height);
-    glDisable(GL_BLEND);
-    glDisable(GL_DEPTH_TEST);
-    glDisable(GL_CULL_FACE);
-
-    if (!gl.UseProgram || !gl.ActiveTexture) {
-        restoreGLState(&saved);
-        real_glXSwapBuffers(dpy, drawable);
-        return;
-    }
-
-    gl.UseProgram(g_program);
-
-    // Set uniforms
-    GLint loc;
-    loc = gl.GetUniformLocation(g_program, "u_inputImage");
-    gl.Uniform1i(loc, 0);
-
-    loc = gl.GetUniformLocation(g_program, "u_intensity");
-    gl.Uniform1f(loc, g_intensity);
-
-    loc = gl.GetUniformLocation(g_program, "u_time");
-    gl.Uniform1f(loc, (float)g_frameCount);
-
-    loc = gl.GetUniformLocation(g_program, "u_resolution");
-    gl.Uniform2f(loc, (float)width, (float)height);
-
-    loc = gl.GetUniformLocation(g_program, "u_preset");
-    gl.Uniform1i(loc, g_presetId);
-
-    for (int i = 0; i < 8; i++) {
-        char name[32];
-        snprintf(name, sizeof(name), "u_params[%d]", i);
-        loc = gl.GetUniformLocation(g_program, name);
-        if (loc >= 0) gl.Uniform1f(loc, g_params[i]);
-    }
-
-    // Draw fullscreen quad
-    glBegin(GL_QUADS);
-    glTexCoord2f(0.0f, 0.0f); glVertex2f(-1.0f, -1.0f);
-    glTexCoord2f(1.0f, 0.0f); glVertex2f( 1.0f, -1.0f);
-    glTexCoord2f(1.0f, 1.0f); glVertex2f( 1.0f,  1.0f);
-    glTexCoord2f(0.0f, 1.0f); glVertex2f(-1.0f,  1.0f);
-    glEnd();
+    // --- Render fullscreen quad with shader ---
+    renderShaderQuad(width, height);
 
     // Restore state
     restoreGLState(&saved);
@@ -695,6 +749,141 @@ void glXSwapBuffers(Display* dpy, GLXDrawable drawable) {
 
     // Call real swap
     real_glXSwapBuffers(dpy, drawable);
+}
+
+// ---------------------------------------------------------------------------
+// eglSwapBuffers hook
+// ---------------------------------------------------------------------------
+
+EGLBoolean eglSwapBuffers(EGLDisplay dpy, EGLSurface surface) {
+    if (!real_eglSwapBuffers) {
+        real_eglSwapBuffers = dlsym(RTLD_NEXT, "eglSwapBuffers");
+    }
+
+    static int egl_first = 1;
+    if (egl_first) {
+        egl_first = 0;
+        g_swapBuffersCalled = 1;
+        glLog("[Ember GL Hook] eglSwapBuffers called (first time) pid=%d\n", getpid());
+    }
+
+    if (g_presetId == 0) {
+        if (real_eglSwapBuffers) return real_eglSwapBuffers(dpy, surface);
+        return EGL_FALSE;
+    }
+
+    // Lazy shader init — needs an active GL context
+    if (g_program == 0 && !g_initialized) {
+        g_initialized = 1;
+        initShaderProgram();
+        if (g_program == 0) {
+            glLog("[Ember GL Hook] Shader init failed (EGL), disabling hook\n");
+            g_presetId = 0;
+            if (real_eglSwapBuffers) return real_eglSwapBuffers(dpy, surface);
+            return EGL_FALSE;
+        }
+    }
+
+    if (g_program == 0) {
+        if (real_eglSwapBuffers) return real_eglSwapBuffers(dpy, surface);
+        return EGL_FALSE;
+    }
+
+    // Get surface dimensions
+    EGLint width = 0, height = 0;
+    eglQuerySurface(dpy, surface, EGL_WIDTH, &width);
+    eglQuerySurface(dpy, surface, EGL_HEIGHT, &height);
+
+    if (width == 0 || height == 0) {
+        if (real_eglSwapBuffers) return real_eglSwapBuffers(dpy, surface);
+        return EGL_FALSE;
+    }
+
+    // Save GL state
+    struct GLState saved;
+    saveGLState(&saved);
+
+    ensureTexture(width, height);
+
+    // Unbind any FBO to read from the default framebuffer
+    if (gl.BindFramebuffer) gl.BindFramebuffer(GL_FRAMEBUFFER, 0);
+    glReadBuffer(GL_BACK);
+    glDrawBuffer(GL_BACK);
+
+    gl.ActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, g_texture);
+    glPixelStorei(GL_PACK_ALIGNMENT, 1);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, width, height);
+
+    renderShaderQuad(width, height);
+
+    restoreGLState(&saved);
+
+    g_frameCount++;
+
+    return real_eglSwapBuffers(dpy, surface);
+}
+
+// ---------------------------------------------------------------------------
+// Auto-disable timer — if the game never calls glXSwapBuffers/eglSwapBuffers
+// within 15 seconds, it's using a different graphics API (Vulkan, DirectX,
+// software rendering, etc.). Disable the hook to avoid any overhead.
+// ---------------------------------------------------------------------------
+
+static void* autoDisableThread(void* arg) {
+    (void)arg;
+    struct timespec ts = {15, 0};
+    nanosleep(&ts, NULL);
+    if (!g_swapBuffersCalled && g_presetId != 0) {
+        g_autoDisabled = 1;
+        g_presetId = 0;
+        glLog("[Ember GL Hook] Auto-disable: no glXSwapBuffers/eglSwapBuffers within 15s, disabling hook\n");
+    }
+    return NULL;
+}
+
+static void startAutoDisableTimer(void) {
+    pthread_t tid;
+    pthread_create(&tid, NULL, autoDisableThread, NULL);
+    pthread_detach(tid);
+}
+
+// ---------------------------------------------------------------------------
+// dlsym interception — redirect glXSwapBuffers/eglSwapBuffers lookups
+// GLFW loads glXSwapBuffers via dlsym(libgl_handle, "glXSwapBuffers"), which
+// bypasses LD_PRELOAD interposition. We intercept dlsym to redirect these
+// lookups to our hook. For RTLD_NEXT/RTLD_DEFAULT, we pass through unchanged
+// to avoid breaking RTLD_NEXT semantics for the caller.
+// ---------------------------------------------------------------------------
+
+void* dlsym(void* handle, const char* symbol) {
+    // Recursion guard
+    if (g_inDlsymHook) {
+        if (real_dlsym) return real_dlsym(handle, symbol);
+        return NULL;
+    }
+
+    // Resolve real_dlsym lazily
+    if (!real_dlsym) {
+        g_inDlsymHook = 1;
+        real_dlsym = (void* (*)(void*, const char*))dlvsym(RTLD_NEXT, "dlsym", "GLIBC_2.2.5");
+        g_inDlsymHook = 0;
+        if (!real_dlsym) return NULL;
+    }
+
+    // Only intercept specific-handle lookups (not RTLD_NEXT or RTLD_DEFAULT)
+    // and only when a preset is active
+    if (symbol && g_presetId != 0 && handle != RTLD_NEXT && handle != RTLD_DEFAULT) {
+        if (strcmp(symbol, "glXSwapBuffers") == 0) {
+            return (void*)glXSwapBuffers;
+        }
+        if (strcmp(symbol, "eglSwapBuffers") == 0) {
+            return (void*)eglSwapBuffers;
+        }
+    }
+
+    return real_dlsym(handle, symbol);
 }
 
 // ---------------------------------------------------------------------------
@@ -841,10 +1030,24 @@ static void emberGlHookInit() {
     }
 
     g_logEnabled = getenv("EMBER_GL_HOOK_DEBUG") != NULL;
+    if (getenv("EMBER_GL_HOOK_DEBUG") == NULL) g_logEnabled = 1; // temp: always log
+
+    // Resolve real_dlsym early — safe to use dlvsym here before any game code runs.
+    // The recursion guard protects against dlvsym calling dlsym internally.
+    if (!real_dlsym) {
+        g_inDlsymHook = 1;
+        real_dlsym = (void* (*)(void*, const char*))dlvsym(RTLD_NEXT, "dlsym", "GLIBC_2.2.5");
+        g_inDlsymHook = 0;
+    }
+
+    glLog("[Ember GL Hook] Constructor: preset=%s(id=%d) pid=%d real_dlsym=%p\n",
+          preset ? preset : "(null)", g_presetId, getpid(), (void*)real_dlsym);
 
     if (g_presetId == 0) {
         return;
     }
 
     g_presetsInitialized = 1;
+    g_hookLoadTime = time(NULL);
+    startAutoDisableTimer();
 }
