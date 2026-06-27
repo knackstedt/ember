@@ -1,12 +1,20 @@
 import { create } from "zustand";
 import { useToastStore } from "./toast.store";
 
+export interface LaunchProgressStep {
+  step: string;
+  detail?: string;
+  timestamp: number;
+}
+
 interface GameLaunchState {
   launchingMap: Record<string, string>;
   launchingIds: string[];
+  progressMap: Record<string, LaunchProgressStep[]>;
   failedId: string | null;
   failedMessage: string | null;
   setLaunching: (id: string, title?: string) => void;
+  setProgress: (id: string, step: string, detail?: string) => void;
   setStarted: (id: string) => void;
   setStopped: (id: string) => void;
   setFailed: (id: string, message?: string | null) => void;
@@ -17,6 +25,7 @@ interface GameLaunchState {
 export const useGameLaunchStore = create<GameLaunchState>((set, get) => ({
   launchingMap: {},
   launchingIds: [],
+  progressMap: {},
   failedId: null,
   failedMessage: null,
 
@@ -26,18 +35,32 @@ export const useGameLaunchStore = create<GameLaunchState>((set, get) => ({
       return {
         launchingMap: map,
         launchingIds: Object.keys(map),
+        progressMap: { ...s.progressMap, [id]: [] },
         failedId: null,
         failedMessage: null,
       };
     });
   },
 
+  setProgress: (id, step, detail) => {
+    set((s) => {
+      const existing = s.progressMap[id] ?? [];
+      // Replace the last step if it has the same step name (updates detail, e.g. elapsed time)
+      const updated = existing.length > 0 && existing[existing.length - 1].step === step
+        ? [...existing.slice(0, -1), { step, detail, timestamp: Date.now() }]
+        : [...existing, { step, detail, timestamp: Date.now() }];
+      return { progressMap: { ...s.progressMap, [id]: updated } };
+    });
+  },
+
   setStarted: (id) => {
     set((s) => {
       const { [id]: _, ...rest } = s.launchingMap;
+      const { [id]: __, ...progressRest } = s.progressMap;
       return {
         launchingMap: rest,
         launchingIds: Object.keys(rest),
+        progressMap: progressRest,
       };
     });
   },
@@ -45,9 +68,11 @@ export const useGameLaunchStore = create<GameLaunchState>((set, get) => ({
   setStopped: (id) => {
     set((s) => {
       const { [id]: _, ...rest } = s.launchingMap;
+      const { [id]: __, ...progressRest } = s.progressMap;
       return {
         launchingMap: rest,
         launchingIds: Object.keys(rest),
+        progressMap: progressRest,
       };
     });
   },
@@ -55,9 +80,11 @@ export const useGameLaunchStore = create<GameLaunchState>((set, get) => ({
   setFailed: (id, message) => {
     set((s) => {
       const { [id]: _, ...rest } = s.launchingMap;
+      const { [id]: __, ...progressRest } = s.progressMap;
       const next: Partial<GameLaunchState> = {
         launchingMap: rest,
         launchingIds: Object.keys(rest),
+        progressMap: progressRest,
       };
       if (message) {
         next.failedId = id;
@@ -75,6 +102,6 @@ export const useGameLaunchStore = create<GameLaunchState>((set, get) => ({
   },
 
   clear: () => {
-    set({ launchingMap: {}, launchingIds: [], failedId: null, failedMessage: null });
+    set({ launchingMap: {}, launchingIds: [], progressMap: {}, failedId: null, failedMessage: null });
   },
 }));

@@ -148,6 +148,13 @@ function sendGameLaunching(gameId: string, title: string): void {
   }
 }
 
+function sendGameLaunchProgress(gameId: string, step: string, detail?: string): void {
+  const win = getMainWindow();
+  if (win && !win.isDestroyed() && !win.webContents.isDestroyed()) {
+    win.webContents.send("game:launch-progress", { gameId, step, detail });
+  }
+}
+
 function sendGameLaunchFailed(gameId: string, reason: string): void {
   clearOverlayGame(gameId);
   const win = getMainWindow();
@@ -216,7 +223,11 @@ function findSteamGamePid(steamAppId: number): number | null {
   return null;
 }
 
-async function waitForSteamGamePid(steamAppId: number): Promise<number | null> {
+async function waitForSteamGamePid(
+  steamAppId: number,
+  gameId?: string,
+  isProton?: boolean,
+): Promise<number | null> {
   const start = Date.now();
 
   // Phase 1: rapid polling for 2 minutes (covers most native launches)
@@ -228,10 +239,33 @@ async function waitForSteamGamePid(steamAppId: number): Promise<number | null> {
   }
 
   // Phase 2: slow polling every 15s for the next 10 minutes (covers Proton shader compilation)
+  if (gameId) {
+    const elapsed = Math.round((Date.now() - start) / 1000);
+    sendGameLaunchProgress(
+      gameId,
+      "Compiling shaders",
+      isProton
+        ? `Proton is compiling shaders — this can take several minutes… (${elapsed}s)`
+        : `Still waiting for game process… (${elapsed}s)`,
+    );
+  }
   const slowDeadline = start + 720_000; // 12 minutes total
+  let lastProgressAt = Date.now();
   while (Date.now() < slowDeadline) {
     const pid = findSteamGamePid(steamAppId);
     if (pid !== null) return pid;
+    // Send a progress update every 30 seconds during slow polling
+    if (gameId && Date.now() - lastProgressAt > 30_000) {
+      const elapsed = Math.round((Date.now() - start) / 1000);
+      sendGameLaunchProgress(
+        gameId,
+        "Compiling shaders",
+        isProton
+          ? `Proton is compiling shaders — this can take several minutes… (${elapsed}s)`
+          : `Still waiting for game process… (${elapsed}s)`,
+      );
+      lastProgressAt = Date.now();
+    }
     await new Promise((r) => setTimeout(r, 15_000));
   }
 
@@ -436,6 +470,9 @@ export async function launchGame(game: Game): Promise<void> {
   let prefixPath: string | null = null;
   let launchOptionsState: { original: string | null; configPath: string } | null = null;
   try {
+    if (game.platform === "steam") {
+      sendGameLaunchProgress(game.id, "Preparing shader injection", "Resolving injection config…");
+    }
     const gameInjectionConfig = await GameRepo.getInjectionConfig(game.id);
     const injectionConfig = await resolveInjectionConfig(game, gameInjectionConfig);
     if (hasActiveInjection(injectionConfig)) {
@@ -482,6 +519,7 @@ export async function launchGame(game: Game): Promise<void> {
   }
 
   if (needsUserSettingsPy && steamCompatAppId) {
+    sendGameLaunchProgress(game.id, "Writing Proton shader config", "Configuring user_settings.py…");
     const existing = checkUserSettingsPy(steamCompatAppId);
     if (existing === "external") {
       const win = getMainWindow();
@@ -507,6 +545,7 @@ export async function launchGame(game: Game): Promise<void> {
   }
 
   if (needsLaunchOptions && steamCompatAppId) {
+    sendGameLaunchProgress(game.id, "Configuring Steam launch options", "Setting up native game injection…");
     const launchOpts = buildLaunchOptionsString(injectionEnv);
     const result = setSteamLaunchOptions(steamCompatAppId, launchOpts);
     if (result) {
@@ -516,6 +555,7 @@ export async function launchGame(game: Game): Promise<void> {
       // Shut it down so it picks up the launch options on restart.
       if (isSteamRunning()) {
         log.info("launcher", "Restarting Steam to apply launch options…");
+        sendGameLaunchProgress(game.id, "Restarting Steam", "Applying launch options…");
         shutdownSteam(false);
         // Wait for Steam to fully exit
         await new Promise((r) => setTimeout(r, 3000));
@@ -560,6 +600,13 @@ export async function launchGame(game: Game): Promise<void> {
 
       sendGameLaunching(game.id, game.title);
 
+      const isProton = needsUserSettingsPy;
+      sendGameLaunchProgress(
+        game.id,
+        "Starting Steam",
+        isProton ? "Launching via Proton…" : "Launching native Steam game…",
+      );
+
       log.info(
         "launcher",
         `Spawning: ${steamCmd} ${steamArgs
@@ -581,7 +628,12 @@ export async function launchGame(game: Game): Promise<void> {
       // Wait for the actual game process to appear in /proc, then track its lifetime
       (async () => {
         log.info("launcher", `Waiting for Steam game ${game.steamAppId} to start…`);
-        const gamePid = await waitForSteamGamePid(game.steamAppId!);
+        sendGameLaunchProgress(
+          game.id,
+          "Waiting for game process",
+          isProton ? "Proton is preparing the game…" : "Waiting for game to start…",
+        );
+        const gamePid = await waitForSteamGamePid(game.steamAppId!, game.id, isProton);
         if (gamePid === null) {
           const reason = `Timed out waiting for Steam game ${game.steamAppId} process; it may not have started.`;
           log.warn("launcher", reason);
@@ -601,6 +653,7 @@ export async function launchGame(game: Game): Promise<void> {
         }
 
         log.info("launcher", `Detected Steam game PID ${gamePid} for AppID ${game.steamAppId}`);
+        sendGameLaunchProgress(game.id, "Game process detected", "Waiting for game window…");
         setOverlayGameProcess(game.id, gamePid);
         startPlayTimeTracking(game.id);
         void runSessionHooks(game, "after-start");

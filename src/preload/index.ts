@@ -1102,6 +1102,12 @@ const htpc = {
     return () => ipcRenderer.removeListener("game:launching", handler);
   },
 
+  onGameLaunchProgress: (cb: (detail: { gameId: string; step: string; detail?: string }) => void) => {
+    const handler = (_: Electron.IpcRendererEvent, detail: { gameId: string; step: string; detail?: string }) => cb(detail);
+    ipcRenderer.on("game:launch-progress", handler);
+    return () => ipcRenderer.removeListener("game:launch-progress", handler);
+  },
+
   onGameLaunchFailed: (cb: (detail: { gameId: string; reason: string }) => void) => {
     const handler = (_: Electron.IpcRendererEvent, detail: { gameId: string; reason: string }) => cb(detail);
     ipcRenderer.on("game:launch-failed", handler);

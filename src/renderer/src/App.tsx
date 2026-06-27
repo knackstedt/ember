@@ -400,6 +400,10 @@ export default function App(): React.ReactElement {
       console.log(`[renderer] External game launching: ${detail.gameId}`);
     });
 
+    const unsubGameLaunchProgress = window.htpc.onGameLaunchProgress((detail) => {
+      useGameLaunchStore.getState().setProgress(detail.gameId, detail.step, detail.detail);
+    });
+
     const unsubGameLaunchFailed = window.htpc.onGameLaunchFailed((detail) => {
       useGameLaunchStore.getState().setFailed(detail.gameId, detail.reason);
       console.log(`[renderer] External game launch failed: ${detail.gameId}`);
@@ -432,7 +436,7 @@ export default function App(): React.ReactElement {
       }
     })();
 
-    return () => { unsubScan(); unsubCores(); unsubHook(); unsubMusicMoved(); unsubToast(); unsubLibretro(); unsubGameLaunching(); unsubGameLaunchFailed(); unsubGameStarted(); unsubGameStopped(); };
+    return () => { unsubScan(); unsubCores(); unsubHook(); unsubMusicMoved(); unsubToast(); unsubLibretro(); unsubGameLaunching(); unsubGameLaunchProgress(); unsubGameLaunchFailed(); unsubGameStarted(); unsubGameStopped(); };
   }, []);
 
   useEffect(() => {
