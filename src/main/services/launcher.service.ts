@@ -791,6 +791,7 @@ export async function launchGame(game: Game): Promise<void> {
       if (hasStarted) {
         log.info("launcher", `"${game.title}" exited (code=${code}, signal=${signal})`);
         sendGameStopped(game.id);
+        restoreAndFocusWindow();
         return;
       }
       if (!settled && spawnOk) {
