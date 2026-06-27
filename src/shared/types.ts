@@ -160,10 +160,40 @@ export interface Game {
   missing?: boolean;
   /** The scanner source that discovered this game (e.g. steam, lutris, rom) */
   source?: ScanSourceId;
+  /** Filesystem path to the game install directory (for Steam games, the common/ folder) */
+  installPath?: string;
+  /** Main executable path within the install directory (for Steam/Windows games) */
+  mainExe?: string;
 }
 
 export interface GameEmulatorConfig {
   shader?: string;
+}
+
+/** Vulkan layer shader injection settings */
+export interface VulkanShaderConfig {
+  /** Enable the Ember Vulkan layer for this game */
+  enabled: boolean;
+  /** Shader preset name (e.g. "crt", "bloom", "color-grade") */
+  preset: string;
+  /** Intensity 0-1 */
+  intensity?: number;
+}
+
+/** Wine DLL override / custom DLL injection settings */
+export interface DllInjectionConfig {
+  /** Enable DLL override for this game */
+  enabled: boolean;
+  /** List of DLL names to override (e.g. ["dxgi.dll", "d3d11.dll"]) */
+  overrideDlls: string[];
+  /** Paths to custom DLL files to copy into the Wine prefix */
+  customDlls: string[];
+}
+
+/** Per-game injection configuration */
+export interface GameInjectionConfig {
+  vulkanShader?: VulkanShaderConfig;
+  dllInjection?: DllInjectionConfig;
 }
 
 export interface Movie {
@@ -646,6 +676,12 @@ export interface AppSettings {
   gameNotes?: Record<string, string>;
   /** Automatically open the overlay when a game starts */
   overlayAutoShow?: boolean;
+  /** Global default Vulkan shader injection config */
+  defaultVulkanShader?: VulkanShaderConfig;
+  /** Global default DLL injection config */
+  defaultDllInjection?: DllInjectionConfig;
+  /** Path to the Ember Vulkan layer shared library */
+  vulkanLayerPath?: string;
 }
 
 export type DashboardWidgetType =

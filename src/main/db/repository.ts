@@ -6,6 +6,7 @@ import {
   TVShow,
   AppSettings,
   GameEmulatorConfig,
+  GameInjectionConfig,
   ButtonMapping,
   Collection,
   CollectionItem,
@@ -131,6 +132,17 @@ export const GameRepo = {
     const rows = await db.query(`SELECT shader FROM game_config:⟨${escapeId(id)}⟩`);
     const row = ((rows as any[])[0] ?? [])[0];
     return (row ?? {}) as GameEmulatorConfig;
+  },
+
+  async getInjectionConfig(id: string): Promise<GameInjectionConfig | null> {
+    const db = getDb();
+    try {
+      const rows = await db.query(`SELECT injectionConfig FROM game_config:⟨${escapeId(id)}⟩`);
+      const row = ((rows as any[])[0] ?? [])[0];
+      return (row?.injectionConfig as GameInjectionConfig) ?? null;
+    } catch {
+      return null;
+    }
   },
 
   async setEmulatorConfig(id: string, config: GameEmulatorConfig): Promise<void> {

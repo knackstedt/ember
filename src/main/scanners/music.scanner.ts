@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, statSync } from "fs";
+import { existsSync, readdirSync, statSync, lstatSync } from "fs";
 import { join, extname } from "path";
 import { createHash } from "crypto";
 // @ts-expect-error music-metadata is ESM-only; Node 20.19+ supports require(esm) at runtime
@@ -38,6 +38,8 @@ function walkDir(dir: string, results: string[]): void {
   for (const entry of entries) {
     const full = join(dir, entry);
     try {
+      const lstat = lstatSync(full);
+      if (lstat.isSymbolicLink()) continue;
       const stat = statSync(full);
       if (stat.isDirectory()) {
         walkDir(full, results);
@@ -74,6 +76,8 @@ export async function scanMusicFiles(
       const { title, artist, album, genre, year, track } = meta.common;
       const id = createHash("md5").update(filePath).digest("hex").slice(0, 16);
 
+      const safeYear = typeof year === "number" && Number.isFinite(year) ? year : undefined;
+
       tracks.push({
         id,
         title:
@@ -87,7 +91,7 @@ export async function scanMusicFiles(
         album,
         albumArtUrl: undefined,
         genre: Array.isArray(genre) ? genre[0] : genre,
-        year,
+        year: safeYear,
         trackNumber: track?.no ?? undefined,
         duration: meta.format.duration,
         tags: [],

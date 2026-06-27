@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync, statSync, openSync, readSync, closeSync } from "fs";
+import { existsSync, readdirSync, readFileSync, statSync, lstatSync, openSync, readSync, closeSync } from "fs";
 import { join, extname, basename, dirname } from "path";
 import { homedir } from "os";
 import { createHash } from "crypto";
@@ -36,6 +36,8 @@ async function walkDir(dir: string, callback: (filePath: string) => Promise<void
   for (const entry of entries) {
     const fullPath = join(dir, entry);
     try {
+      const lstat = lstatSync(fullPath);
+      if (lstat.isSymbolicLink()) continue;
       const stat = statSync(fullPath);
       if (stat.isDirectory()) {
         await walkDir(fullPath, callback);

@@ -15,6 +15,18 @@ import {
   overlayGameStarted,
   clearOverlayGame,
 } from "./overlay.service";
+import {
+  resolveInjectionConfig,
+  buildVulkanLayerEnv,
+  buildDllOverrideEnv,
+  copyDllsToPrefix,
+  writeUserSettingsPy,
+  cleanupUserSettingsPy,
+  checkUserSettingsPy,
+  findSteamPrefixPath,
+  findUmuPrefixPath,
+  hasActiveInjection,
+} from "./shader-injection.service";
 
 const log = createLogger("info");
 
@@ -143,6 +155,8 @@ function sendGameLaunchFailed(gameId: string, reason: string): void {
 function minimizeWindow(): void {
   const win = getMainWindow();
   if (win && !win.isDestroyed()) {
+    // Save whether we were maximized so restoreAndFocusWindow can restore it
+    (win as any)._wasMaximized = win.isMaximized();
     win.minimize();
   }
 }
@@ -151,6 +165,11 @@ function restoreAndFocusWindow(): void {
   const win = getMainWindow();
   if (win && !win.isDestroyed()) {
     if (win.isMinimized()) win.restore();
+    // Restore maximized state if it was maximized before minimize
+    if ((win as any)._wasMaximized && !win.isMaximized()) {
+      win.maximize();
+    }
+    delete (win as any)._wasMaximized;
     win.focus();
   }
 }
@@ -404,6 +423,68 @@ export async function launchGame(game: Game): Promise<void> {
   // Fire non-blocking pre-start hooks (fire-and-forget)
   void runSessionHooks(game, "before-start");
 
+  // Resolve injection config (Vulkan layer + DLL override)
+  let injectionEnv: Record<string, string> = {};
+  let needsUserSettingsPy = false;
+  let steamCompatAppId: number | undefined;
+  let prefixPath: string | null = null;
+  try {
+    const gameInjectionConfig = await GameRepo.getInjectionConfig(game.id);
+    const injectionConfig = await resolveInjectionConfig(game, gameInjectionConfig);
+    if (hasActiveInjection(injectionConfig)) {
+      log.info("launcher", `Injection active for "${game.title}": ${JSON.stringify(injectionConfig)}`);
+      if (injectionConfig.vulkanShader) {
+        injectionEnv = { ...injectionEnv, ...buildVulkanLayerEnv(injectionConfig.vulkanShader) };
+      }
+      if (injectionConfig.dllInjection) {
+        const dllOverride = buildDllOverrideEnv(injectionConfig.dllInjection);
+        if (dllOverride) injectionEnv["WINEDLLOVERRIDES"] = dllOverride;
+        if (game.platform === "steam" && game.steamAppId) {
+          prefixPath = findSteamPrefixPath(game.steamAppId);
+        } else if (game.platform === "windows") {
+          prefixPath = findUmuPrefixPath(game);
+        }
+        if (prefixPath && injectionConfig.dllInjection.customDlls.length > 0) {
+          const result = copyDllsToPrefix(prefixPath, injectionConfig.dllInjection.customDlls);
+          if (result.errors.length > 0) {
+            log.warn("launcher", `DLL copy errors: ${result.errors.join("; ")}`);
+          }
+        }
+      }
+      if (game.platform === "steam" && game.steamAppId) {
+        needsUserSettingsPy = Object.keys(injectionEnv).length > 0;
+        steamCompatAppId = game.steamAppId;
+      }
+    }
+  } catch (err) {
+    log.warn("launcher", `Failed to resolve injection config: ${err}`);
+  }
+
+  if (needsUserSettingsPy && steamCompatAppId) {
+    const existing = checkUserSettingsPy(steamCompatAppId);
+    if (existing === "external") {
+      const win = getMainWindow();
+      if (win && !win.isDestroyed() && !win.webContents.isDestroyed()) {
+        const choice = await win.webContents.executeJavaScript(
+          `confirm('A non-Ember user_settings.py exists for this Steam game. Override it? (The original will be backed up.)')`,
+          true,
+        );
+        if (!choice) {
+          log.info("launcher", "User declined to override user_settings.py; skipping injection");
+          injectionEnv = {};
+          needsUserSettingsPy = false;
+        }
+      }
+    }
+    if (needsUserSettingsPy) {
+      const result = writeUserSettingsPy(steamCompatAppId, injectionEnv, true);
+      if (!result.success) {
+        log.warn("launcher", `Failed to write user_settings.py: ${result.error}`);
+        injectionEnv = {};
+      }
+    }
+  }
+
   if (typeof (global as any).gc === "function") {
     (global as any).gc();
   }
@@ -449,7 +530,7 @@ export async function launchGame(game: Game): Promise<void> {
       const steamProc = spawn(steamCmd, steamArgs, {
         detached: true,
         stdio: "ignore",
-        env: { ...process.env },
+        env: { ...process.env, ...game.launchEnv, ...injectionEnv },
       });
       steamProc.on("error", (err) => {
         log.error("launcher", `Spawn error for "${game.title}": ${err}`);
@@ -466,6 +547,9 @@ export async function launchGame(game: Game): Promise<void> {
           log.warn("launcher", reason);
           clearOverlayGame(game.id);
           sendGameLaunchFailed(game.id, reason);
+          if (needsUserSettingsPy && steamCompatAppId) {
+            cleanupUserSettingsPy(steamCompatAppId);
+          }
           void runSessionHooks(game, "after-start");
           GameRepo.setLastPlayed(game.id, Date.now()).catch((err) => {
             log.warn("launcher", `Failed to set lastPlayed for ${game.id}: ${err}`);
@@ -499,6 +583,11 @@ export async function launchGame(game: Game): Promise<void> {
           sendGameStopped(game.id);
           clearOverlayGame(game.id);
           restoreAndFocusWindow();
+
+          // Clean up Ember-generated user_settings.py
+          if (needsUserSettingsPy && steamCompatAppId) {
+            cleanupUserSettingsPy(steamCompatAppId);
+          }
 
           const launchState = steamLaunchState.get(game.id);
           steamLaunchState.delete(game.id);
@@ -537,7 +626,8 @@ export async function launchGame(game: Game): Promise<void> {
     }
     case "windows": {
       const exePath = game.romPath!;
-      const runner = game.wineRunner ?? "wine";
+      // Default to umu-run for non-store Windows games (it handles Proton prefix management)
+      const runner = game.wineRunner ?? "umu-run";
       const customCommand = runner === "umu-run"
         ? game.umuCustomCommand
         : game.wineCustomCommand;
@@ -611,19 +701,23 @@ export async function launchGame(game: Game): Promise<void> {
   }
 
   log.info("launcher", `Spawning: ${cmd} ${args.map((a) => (a.includes(" ") ? `"${a}"` : a)).join(" ")}`);
+  if (Object.keys(injectionEnv).length > 0) {
+    log.info("launcher", `Injection env vars: ${JSON.stringify(injectionEnv)}`);
+  }
 
   const isDolphin =
     game.platform === "dolphin-gc" || game.platform === "dolphin-wii";
 
-  const launchEnv = { ...process.env, ...game.launchEnv };
+  const launchEnv = { ...process.env, ...game.launchEnv, ...injectionEnv };
   const launchCwd = game.launchWorkingDir || undefined;
 
   sendGameLaunching(game.id, game.title);
 
   return new Promise<void>((resolve, reject) => {
+    const hasInjection = Object.keys(injectionEnv).length > 0;
     const proc = spawn(cmd, args, {
       detached: true,
-      stdio: isDolphin ? ["ignore", "pipe", "pipe"] : "ignore",
+      stdio: isDolphin || hasInjection ? ["ignore", "pipe", "pipe"] : "ignore",
       env: launchEnv,
       cwd: launchCwd,
     });
@@ -633,10 +727,16 @@ export async function launchGame(game: Game): Promise<void> {
     let hasStarted = false;
     let stderrBuf = "";
 
-    if (isDolphin && proc.stderr) {
+    if ((isDolphin || hasInjection) && proc.stderr) {
       proc.stderr.setEncoding("utf8");
       proc.stderr.on("data", (chunk: string) => {
         stderrBuf += chunk;
+        // Log Vulkan layer messages in real time
+        for (const line of chunk.split("\n")) {
+          if (line.includes("[Ember Vulkan Layer]")) {
+            log.info("vulkan-layer", line.trim());
+          }
+        }
       });
     }
 

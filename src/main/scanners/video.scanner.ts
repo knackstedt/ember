@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, statSync, mkdirSync, unlinkSync } from "fs";
+import { existsSync, readdirSync, statSync, lstatSync, mkdirSync, unlinkSync } from "fs";
 import { join, extname, basename, resolve } from "path";
 import { createHash } from "crypto";
 import { exec, execSync, spawn } from "child_process";
@@ -431,6 +431,8 @@ function walkDir(dir: string, results: string[]): void {
   for (const entry of entries) {
     const full = join(dir, entry);
     try {
+      const lstat = lstatSync(full);
+      if (lstat.isSymbolicLink()) continue;
       const stat = statSync(full);
       if (stat.isDirectory()) {
         walkDir(full, results);

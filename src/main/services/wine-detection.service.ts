@@ -127,7 +127,15 @@ export async function buildWineCommand(exePath: string, preferredRunner?: WineRu
   if (!runner) return null;
 
   if (runner === "umu-run") {
-    return { cmd: "umu-run", args: [exePath] };
+    // Check if umu-run is actually available
+    if (existsSync("/usr/bin/umu-run") || existsSync(join(homedir(), ".local", "bin", "umu-run"))) {
+      return { cmd: "umu-run", args: [exePath] };
+    }
+    // Fall back to wine if umu-run is not installed
+    if (await isWineInstalled()) {
+      return { cmd: "wine", args: [exePath] };
+    }
+    return null;
   }
 
   if (runner === "proton-ge" || runner === "system-proton") {

@@ -21,7 +21,7 @@ import { scaledImageUrl } from "../../lib/image-url";
 import { DetailPanel } from "../../components/DetailPanel/DetailPanel";
 import { ImageLightbox } from "../../components/ImageLightbox/ImageLightbox";
 import { CoreSelector } from "../../components/CoreSelector/CoreSelector";
-import { Game, GamePlatform, GameEmulatorConfig, WineRunner } from "@shared/types";
+import { Game, GamePlatform, GameEmulatorConfig, GameInjectionConfig, VulkanShaderConfig, DllInjectionConfig, WineRunner } from "@shared/types";
 import { useGridFocus, NavAction } from "../../hooks/useGridFocus";
 import { useDetailController } from "../../hooks/useDetailController";
 import { useContextMenu } from "../../hooks/useContextMenu";
@@ -282,6 +282,8 @@ export const GamingTab: React.FC = () => {
   const [columnCount, setColumnCount] = useState(6);
   const [viewColumnCount, setViewColumnCount] = useState(6);
   const [selectedEmulatorConfig, setSelectedEmulatorConfig] = useState<GameEmulatorConfig>({});
+  const [selectedInjectionConfig, setSelectedInjectionConfig] = useState<GameInjectionConfig | null>(null);
+  const [vulkanPresets, setVulkanPresets] = useState<{ id: string; name: string }[]>([]);
   const [activeCollectionId, setActiveCollectionId] = useState<string | null>(null);
   const [showCollectionManager, setShowCollectionManager] = useState(false);
   const [showLaunchSettings, setShowLaunchSettings] = useState(false);
@@ -352,6 +354,25 @@ export const GamingTab: React.FC = () => {
       });
     return () => { cancelled = true; };
   }, [selected, getEmulatorConfig]);
+
+  // Load injection config for Windows/Steam games
+  useEffect(() => {
+    if (!selected) {
+      setSelectedInjectionConfig(null);
+      return;
+    }
+    const isInjectable = selected.platform === "windows" || selected.platform === "steam";
+    if (isInjectable) {
+      window.htpc.games.injectionConfig.get(selected.id).then(setSelectedInjectionConfig).catch(() => setSelectedInjectionConfig(null));
+    } else {
+      setSelectedInjectionConfig(null);
+    }
+  }, [selected]);
+
+  // Load Vulkan shader presets once
+  useEffect(() => {
+    window.htpc.games.injectionConfig.vulkanPresets().then(setVulkanPresets).catch(() => {});
+  }, []);
 
   useEffect(() => {
     load();
@@ -1609,6 +1630,179 @@ export const GamingTab: React.FC = () => {
                       <p className="text-[12px] mt-1" style={{ color: "var(--text-secondary)" }}>
                         Use {"{exe}"} as placeholder for the executable path. Leave empty for default.
                       </p>
+                    </div>
+                  </div>
+                )}
+                {/* Shader Injection section — shown for Windows and Steam games */}
+                {(selected.platform === "windows" || selected.platform === "steam") && (
+                  <div className="flex flex-col gap-4">
+                    <div
+                      className="text-xs font-semibold uppercase tracking-wide mb-2"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
+                      Shader &amp; DLL Injection
+                    </div>
+                    {/* Vulkan Layer Shader Injection */}
+                    <div className="flex flex-col gap-2">
+                      <label className="flex items-center gap-2 text-sm" style={{ color: "var(--text-primary)" }}>
+                        <input
+                          type="checkbox"
+                          checked={selectedInjectionConfig?.vulkanShader?.enabled ?? false}
+                          onChange={(e) => {
+                            const next: GameInjectionConfig = {
+                              ...selectedInjectionConfig,
+                              vulkanShader: {
+                                enabled: e.target.checked,
+                                preset: selectedInjectionConfig?.vulkanShader?.preset ?? "crt",
+                                intensity: selectedInjectionConfig?.vulkanShader?.intensity ?? 1.0,
+                              },
+                            };
+                            setSelectedInjectionConfig(next);
+                            void window.htpc.games.injectionConfig.set(selected.id, next);
+                          }}
+                        />
+                        Vulkan Layer Shader
+                      </label>
+                      {selectedInjectionConfig?.vulkanShader?.enabled && (
+                        <div className="flex flex-col gap-2 pl-6">
+                          <div>
+                            <label className="text-[12px] block mb-1" style={{ color: "var(--text-secondary)" }}>
+                              Preset
+                            </label>
+                            <select
+                              value={selectedInjectionConfig.vulkanShader.preset}
+                              onChange={(e) => {
+                                const next: GameInjectionConfig = {
+                                  ...selectedInjectionConfig,
+                                  vulkanShader: { ...selectedInjectionConfig.vulkanShader!, preset: e.target.value },
+                                };
+                                setSelectedInjectionConfig(next);
+                                void window.htpc.games.injectionConfig.set(selected.id, next);
+                              }}
+                              className="w-full text-sm px-2 py-1.5 rounded"
+                              style={{
+                                background: "var(--surface-1)",
+                                border: "1px solid var(--border-default)",
+                                color: "var(--text-primary)",
+                                outline: "none",
+                              }}
+                            >
+                              {vulkanPresets.map((p) => (
+                                <option key={p.id} value={p.id}>{p.name}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="text-[12px] block mb-1" style={{ color: "var(--text-secondary)" }}>
+                              Intensity: {(selectedInjectionConfig.vulkanShader.intensity ?? 1.0).toFixed(2)}
+                            </label>
+                            <input
+                              type="range"
+                              min="0"
+                              max="1"
+                              step="0.05"
+                              value={selectedInjectionConfig.vulkanShader.intensity ?? 1.0}
+                              onChange={(e) => {
+                                const val = parseFloat(e.target.value);
+                                const next: GameInjectionConfig = {
+                                  ...selectedInjectionConfig,
+                                  vulkanShader: { ...selectedInjectionConfig.vulkanShader!, intensity: val },
+                                };
+                                setSelectedInjectionConfig(next);
+                                void window.htpc.games.injectionConfig.set(selected.id, next);
+                              }}
+                              className="w-full"
+                            />
+                          </div>
+                          {selected.platform === "steam" && (
+                            <p className="text-[12px]" style={{ color: "var(--text-secondary)" }}>
+                              Uses Proton's <code>user_settings.py</code> to inject env vars. The file is cleaned up when the game closes.
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    {/* DLL Override / Custom DLL Injection */}
+                    <div className="flex flex-col gap-2">
+                      <label className="flex items-center gap-2 text-sm" style={{ color: "var(--text-primary)" }}>
+                        <input
+                          type="checkbox"
+                          checked={selectedInjectionConfig?.dllInjection?.enabled ?? false}
+                          onChange={(e) => {
+                            const next: GameInjectionConfig = {
+                              ...selectedInjectionConfig,
+                              dllInjection: {
+                                enabled: e.target.checked,
+                                overrideDlls: selectedInjectionConfig?.dllInjection?.overrideDlls ?? ["dxgi.dll", "d3d11.dll"],
+                                customDlls: selectedInjectionConfig?.dllInjection?.customDlls ?? [],
+                              },
+                            };
+                            setSelectedInjectionConfig(next);
+                            void window.htpc.games.injectionConfig.set(selected.id, next);
+                          }}
+                        />
+                        DLL Override (ReShade / Mods)
+                      </label>
+                      {selectedInjectionConfig?.dllInjection?.enabled && (
+                        <div className="flex flex-col gap-2 pl-6">
+                          <div>
+                            <label className="text-[12px] block mb-1" style={{ color: "var(--text-secondary)" }}>
+                              DLL Override List (comma-separated)
+                            </label>
+                            <input
+                              type="text"
+                              value={selectedInjectionConfig.dllInjection.overrideDlls.join(", ")}
+                              onChange={(e) => {
+                                const dlls = e.target.value.split(",").map((d) => d.trim()).filter(Boolean);
+                                const next: GameInjectionConfig = {
+                                  ...selectedInjectionConfig,
+                                  dllInjection: { ...selectedInjectionConfig.dllInjection!, overrideDlls: dlls },
+                                };
+                                setSelectedInjectionConfig(next);
+                                void window.htpc.games.injectionConfig.set(selected.id, next);
+                              }}
+                              placeholder="dxgi.dll, d3d11.dll"
+                              className="w-full text-sm px-2 py-1.5 rounded"
+                              style={{
+                                background: "var(--surface-1)",
+                                border: "1px solid var(--border-default)",
+                                color: "var(--text-primary)",
+                                outline: "none",
+                              }}
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[12px] block mb-1" style={{ color: "var(--text-secondary)" }}>
+                              Custom DLL Paths (one per line)
+                            </label>
+                            <textarea
+                              value={selectedInjectionConfig.dllInjection.customDlls.join("\n")}
+                              onChange={(e) => {
+                                const dlls = e.target.value.split("\n").map((d) => d.trim()).filter(Boolean);
+                                const next: GameInjectionConfig = {
+                                  ...selectedInjectionConfig,
+                                  dllInjection: { ...selectedInjectionConfig.dllInjection!, customDlls: dlls },
+                                };
+                                setSelectedInjectionConfig(next);
+                                void window.htpc.games.injectionConfig.set(selected.id, next);
+                              }}
+                              placeholder="/path/to/ReShade.dll"
+                              rows={3}
+                              className="w-full text-sm px-2 py-1.5 rounded"
+                              style={{
+                                background: "var(--surface-1)",
+                                border: "1px solid var(--border-default)",
+                                color: "var(--text-primary)",
+                                outline: "none",
+                                resize: "vertical",
+                              }}
+                            />
+                            <p className="text-[12px] mt-1" style={{ color: "var(--text-secondary)" }}>
+                              DLLs are copied to the Wine prefix's <code>system32</code> directory before launch.
+                            </p>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}

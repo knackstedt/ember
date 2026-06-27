@@ -390,6 +390,11 @@ async function createWindow(): Promise<void> {
     },
   });
 
+  // Restore maximized state if it was saved
+  if (winState.maximized) {
+    mainWindow.maximize();
+  }
+
   // Remove the default application menu so its accelerators don't intercept
   // renderer-level shortcuts (especially on Linux where Ctrl+Fn combos are
   // commonly grabbed by the default menu or WM before reaching the page).

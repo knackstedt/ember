@@ -1,5 +1,6 @@
 import { app } from "electron";
-import { join } from "path";
+import { join, dirname, resolve } from "path";
+import { existsSync } from "fs";
 import { Worker } from "worker_threads";
 import { createLogger } from "../util/logger";
 
@@ -153,7 +154,10 @@ export async function initDb(): Promise<Surreal> {
     dataDir = join(process.cwd(), "db");
   }
 
-  const workerPath = join(__dirname, "workers/db.worker.js");
+  // __dirname may be out/main/ or out/main/chunks/ depending on bundling
+  const baseDir = join(__dirname, "workers", "db.worker.js");
+  const chunkDir = join(__dirname, "..", "workers", "db.worker.js");
+  const workerPath = existsSync(baseDir) ? baseDir : chunkDir;
   worker = new Worker(workerPath);
   db = new WorkerSurreal(worker);
 
@@ -253,6 +257,8 @@ async function runMigrations(db: Surreal): Promise<void> {
     DEFINE FIELD IF NOT EXISTS sourceLocation ON game TYPE option<string>;
     DEFINE FIELD IF NOT EXISTS missing ON game TYPE option<bool>;
     DEFINE FIELD IF NOT EXISTS source ON game TYPE option<string>;
+    DEFINE FIELD IF NOT EXISTS installPath ON game TYPE option<string>;
+    DEFINE FIELD IF NOT EXISTS mainExe ON game TYPE option<string>;
 
     DEFINE TABLE IF NOT EXISTS movie SCHEMAFULL;
     DEFINE FIELD IF NOT EXISTS id ON movie TYPE string;
@@ -353,7 +359,7 @@ async function runMigrations(db: Surreal): Promise<void> {
     DEFINE FIELD IF NOT EXISTS detectedAt ON broken_flash_game TYPE int;
     DEFINE INDEX IF NOT EXISTS broken_game_id ON broken_flash_game FIELDS gameId UNIQUE;
 
-    DEFINE TABLE IF NOT EXISTS game_config SCHEMAFULL;
+    DEFINE TABLE IF NOT EXISTS game_config SCHEMALESS;
     DEFINE FIELD IF NOT EXISTS id ON game_config TYPE string;
     DEFINE FIELD IF NOT EXISTS shader ON game_config TYPE option<string>;
 

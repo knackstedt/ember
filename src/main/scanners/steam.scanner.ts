@@ -128,6 +128,7 @@ export function scanSteamGames(): Game[] {
           steamAppId: parseInt(appId),
           coverUrl: cover,
           execPath: `steam://rungameid/${appId}`,
+          installPath,
           tags: [],
           sourceLocation: "local",
           source: "steam",

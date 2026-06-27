@@ -345,7 +345,10 @@ export async function performGameScan(
   window: BrowserWindow | null,
   extraPaths?: string[],
 ): Promise<Game[]> {
-  const workerPath = join(__dirname, "workers/game-scan.worker.js");
+  // __dirname may be out/main/ or out/main/chunks/ depending on bundling
+  const baseDir = join(__dirname, "workers", "game-scan.worker.js");
+  const chunkDir = join(__dirname, "..", "workers", "game-scan.worker.js");
+  const workerPath = existsSync(baseDir) ? baseDir : chunkDir;
 
   if (!existsSync(workerPath)) {
     log.warn(

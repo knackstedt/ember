@@ -193,6 +193,7 @@ import {
   TVShow,
   AppSettings,
   GameEmulatorConfig,
+  GameInjectionConfig,
   StreamingService,
   StreamingExtension,
   WineRunner,
@@ -1126,6 +1127,51 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     }
   });
 
+  // Injection config (Vulkan shader + DLL override)
+  ipcMain.handle("games:injectionConfig:get", async (_e, id: string) => {
+    const db = getDb();
+    try {
+      const rows = await db.query(`SELECT * FROM game_config:⟨${id}⟩`);
+      const row = ((rows as any[])[0] ?? [])[0];
+      if (row?.injectionConfig) return row.injectionConfig as GameInjectionConfig;
+      return null;
+    } catch {
+      return null;
+    }
+  });
+
+  ipcMain.handle("games:injectionConfig:set", async (_e, id: string, config: GameInjectionConfig) => {
+    const db = getDb();
+    try {
+      await db.query(`UPSERT game_config:⟨${id}⟩ SET injectionConfig = $config`, { config });
+    } catch (err) {
+      log.error("ipc", `Failed to set injection config: ${err}`);
+    }
+  });
+
+  ipcMain.handle("games:injectionConfig:checkUserSettingsPy", async (_e, steamAppId: number) => {
+    const { checkUserSettingsPy } = await import("../services/shader-injection.service");
+    return checkUserSettingsPy(steamAppId);
+  });
+
+  ipcMain.handle("games:injectionConfig:vulkanPresets", async () => {
+    const { VULKAN_SHADER_PRESETS } = await import("../services/shader-injection.service");
+    return VULKAN_SHADER_PRESETS;
+  });
+
+  ipcMain.handle("games:findMainExe", async (_e, id: string) => {
+    const { findMainExe } = await import("../services/shader-injection.service");
+    const db = getDb();
+    try {
+      const rows = await db.query(`SELECT * FROM game:⟨${id}⟩`);
+      const game = ((rows as any[])[0] ?? [])[0];
+      if (!game?.installPath) return null;
+      return findMainExe(game.installPath, game.title);
+    } catch {
+      return null;
+    }
+  });
+
   ipcMain.handle("games:playTime:start", async (_e, id: string) => {
     startPlayTimeTracking(id);
   });
@@ -1808,7 +1854,11 @@ export function registerIpcHandlers(window: BrowserWindow): void {
       const track = tracks[i];
       if (i % 100 === 0)
         log.debug("music:scan", `db insert ${i + 1}/${tracks.length}`);
-      await MusicRepo.upsert({ ...track, missing: false });
+      try {
+        await MusicRepo.upsert({ ...track, missing: false });
+      } catch (err) {
+        log.warn("music:scan", `Failed to upsert track ${track.id}: ${err}`);
+      }
     }
     log.debug("music:scan", "DB insert done");
 

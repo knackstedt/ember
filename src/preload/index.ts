@@ -6,6 +6,7 @@ import {
   AppSettings,
   Game,
   GameEmulatorConfig,
+  GameInjectionConfig,
   WineRunner,
   GamePlatform,
   Movie,
@@ -507,6 +508,18 @@ const htpc = {
     wineConfig: {
       set: (id: string, config: { wineRunner?: WineRunner; wineCustomCommand?: string | null; umuCustomCommand?: string | null }): Promise<void> =>
         ipcRenderer.invoke("games:wineConfig:set", id, config),
+    },
+    injectionConfig: {
+      get: (id: string): Promise<GameInjectionConfig | null> =>
+        ipcRenderer.invoke("games:injectionConfig:get", id),
+      set: (id: string, config: GameInjectionConfig): Promise<void> =>
+        ipcRenderer.invoke("games:injectionConfig:set", id, config),
+      checkUserSettingsPy: (steamAppId: number): Promise<"none" | "ember" | "external"> =>
+        ipcRenderer.invoke("games:injectionConfig:checkUserSettingsPy", steamAppId),
+      vulkanPresets: (): Promise<{ id: string; name: string }[]> =>
+        ipcRenderer.invoke("games:injectionConfig:vulkanPresets"),
+      findMainExe: (id: string): Promise<string | null> =>
+        ipcRenderer.invoke("games:findMainExe", id),
     },
     playTime: {
       start: (id: string): Promise<void> =>
