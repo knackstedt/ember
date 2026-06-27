@@ -100,7 +100,16 @@ const SKIP_NAMES = new Set([
   "win32s",
   "_mssetup",
   "_mstest",
+  "sx"
 ]);
+
+const JUNK_CONTAINS = [
+  "unins",
+  "settings",
+  "dgvoodoo",
+  "voodoo",
+  "cpl",
+];
 
 const SYSTEM_DIR_NAMES = new Set([
   "windows",
@@ -111,7 +120,6 @@ const SYSTEM_DIR_NAMES = new Set([
   "winxp",
   "win32s",
   "win32app",
-  "system",
   "system32",
   "syswow64",
   "drivers",
@@ -152,6 +160,9 @@ function isJunkName(base: string): boolean {
     if (base.endsWith(` ${name}`) || base.endsWith(`_${name}`) || base.endsWith(`-${name}`)) {
       return true;
     }
+  }
+  for (const pattern of JUNK_CONTAINS) {
+    if (base.includes(pattern)) return true;
   }
   return false;
 }

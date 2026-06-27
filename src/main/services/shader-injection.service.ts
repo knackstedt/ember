@@ -393,10 +393,17 @@ export function findMainExe(installPath: string, gameTitle?: string): string | n
     }
   }
 
-  // Skip common helper exes
-  const skipNames = ["unins", "setup", "crash", "reporter", "helper", "launcher", "config", "update"];
+  // Skip common helper/utility exes
+  const skipNames = ["unins", "setup", "crash", "reporter", "helper", "config", "update", "settings", "dgvoodoo", "voodoo", "cpl", "sx"];
   const filtered = exes.filter((e) => !skipNames.some((s) => e.name.toLowerCase().includes(s)));
   const candidates = filtered.length > 0 ? filtered : exes;
+
+  // Prefer common game executable names
+  const preferredNames = ["game", "play", "start", "run", "main"];
+  for (const preferred of preferredNames) {
+    const match = candidates.find((e) => e.name.toLowerCase().replace(/\.exe$/, "") === preferred);
+    if (match) return match.path;
+  }
 
   // Return the largest exe
   candidates.sort((a, b) => b.size - a.size);
