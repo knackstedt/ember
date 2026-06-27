@@ -170,116 +170,452 @@ export function findProtonPfxPath(steamAppId: number): string | null {
 }
 
 /**
- * Get the user_settings.py path for a Steam game's Proton prefix.
+ * Find all Proton installation directories.
+ * Proton looks for user_settings.py in its own installation directory
+ * (where the `proton` script lives), NOT in the Wine prefix.
+ * Proton installations are in:
  */
-export function getUserSettingsPyPath(steamAppId: number): string | null {
-  const pfx = findProtonPfxPath(steamAppId);
-  if (!pfx) return null;
-  return join(pfx, "user_settings.py");
+// * - <steam>/steamapps/common/Proton*/ (official Proton)
+// * - <steam>/compatibilitytools.d/*/ (custom Proton like GE-Proton)
+export function findProtonInstallations(): string[] {
+  const steamRoots = [
+    join(homedir(), ".steam", "steam"),
+    join(homedir(), ".local", "share", "Steam"),
+  ];
+
+  const protonDirs: string[] = [];
+
+  function scanForProton(commonDir: string) {
+    if (!existsSync(commonDir)) return;
+    try {
+      for (const entry of readdirSync(commonDir)) {
+        const lower = entry.toLowerCase();
+        if (!lower.startsWith("proton")) continue;
+        const dir = join(commonDir, entry);
+        if (existsSync(join(dir, "proton"))) {
+          protonDirs.push(dir);
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  for (const steamRoot of steamRoots) {
+    if (!existsSync(steamRoot)) continue;
+
+    // steamapps/common/Proton*
+    scanForProton(join(steamRoot, "steamapps", "common"));
+
+    // compatibilitytools.d/* (custom Proton versions like GE-Proton)
+    const compatToolsDir = join(steamRoot, "compatibilitytools.d");
+    if (existsSync(compatToolsDir)) {
+      try {
+        for (const entry of readdirSync(compatToolsDir)) {
+          const dir = join(compatToolsDir, entry);
+          if (existsSync(join(dir, "proton"))) {
+            protonDirs.push(dir);
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    // Check libraryfolders.vdf for additional Steam libraries
+    const libraryFoldersPath = join(steamRoot, "steamapps", "libraryfolders.vdf");
+    if (existsSync(libraryFoldersPath)) {
+      try {
+        const content = readFileSync(libraryFoldersPath, "utf-8");
+        const pathMatches = content.matchAll(/"path"\s+"([^"]+)"/g);
+        for (const [, p] of pathMatches) {
+          scanForProton(join(p, "steamapps", "common"));
+        }
+      } catch {
+        // ignore parse errors
+      }
+    }
+  }
+
+  return [...new Set(protonDirs)];
+}
+
+/**
+ * Get user_settings.py paths in all Proton installation directories.
+ * Proton loads user_settings.py from its own installation directory,
+ * not from the Wine prefix.
+ */
+export function getUserSettingsPyPaths(): string[] {
+  return findProtonInstallations().map((dir) => join(dir, "user_settings.py"));
 }
 
 /**
  * Check if a user_settings.py file exists and whether it was created by Ember.
+ * Checks all Proton installations.
  * Returns: "none" | "ember" | "external"
  */
-export function checkUserSettingsPy(steamAppId: number): "none" | "ember" | "external" {
-  const pyPath = getUserSettingsPyPath(steamAppId);
-  if (!pyPath || !existsSync(pyPath)) return "none";
-  try {
-    const content = readFileSync(pyPath, "utf-8");
-    if (content.includes(EMBER_MARKER)) return "ember";
-    return "external";
-  } catch {
-    return "none";
+export function checkUserSettingsPy(_steamAppId: number): "none" | "ember" | "external" {
+  const paths = getUserSettingsPyPaths();
+  if (paths.length === 0) return "none";
+
+  let hasEmber = false;
+  let hasExternal = false;
+
+  for (const pyPath of paths) {
+    if (!existsSync(pyPath)) continue;
+    try {
+      const content = readFileSync(pyPath, "utf-8");
+      if (content.includes(EMBER_MARKER)) {
+        hasEmber = true;
+      } else {
+        hasExternal = true;
+      }
+    } catch {
+      // ignore
+    }
   }
+
+  if (hasExternal) return "external";
+  if (hasEmber) return "ember";
+  return "none";
 }
 
 /**
- * Write a user_settings.py file with Ember marker that injects Vulkan layer env vars.
- * If a non-Ember user_settings.py exists, backs it up before overwriting.
+ * Write user_settings.py files to all Proton installation directories.
+ * Uses the user_settings dict format that Proton expects:
+ *   user_settings = { "KEY": "value", ... }
+ * Proton does `import user_settings` then reads `user_settings.user_settings.items()`
+ * and merges via `self.env.setdefault(key, value)`.
+ *
+ * The file checks STEAM_COMPAT_APP_ID so settings only apply to the target game.
  */
 export function writeUserSettingsPy(
   steamAppId: number,
   envVars: Record<string, string>,
   overrideExisting: boolean,
 ): { success: boolean; backedUp?: boolean; error?: string } {
-  const pyPath = getUserSettingsPyPath(steamAppId);
-  if (!pyPath) {
-    return { success: false, error: "Could not find Proton prefix for Steam app" };
+  const paths = getUserSettingsPyPaths();
+  if (paths.length === 0) {
+    return { success: false, error: "Could not find any Proton installations" };
   }
 
-  const existing = checkUserSettingsPy(steamAppId);
   let backedUp = false;
+  let anySuccess = false;
+  const errors: string[] = [];
 
-  if (existing === "external") {
-    if (!overrideExisting) {
-      return { success: false, error: "External user_settings.py exists and override not confirmed" };
+  for (const pyPath of paths) {
+    let isExternal = false;
+    if (existsSync(pyPath)) {
+      try {
+        const content = readFileSync(pyPath, "utf-8");
+        if (!content.includes(EMBER_MARKER)) {
+          isExternal = true;
+        }
+      } catch {
+        // ignore read errors
+      }
     }
-    // Backup the existing file
-    const backupPath = pyPath + EMBER_BACKUP_SUFFIX;
+
+    if (isExternal) {
+      if (!overrideExisting) {
+        errors.push(`External user_settings.py exists at ${pyPath}`);
+        continue;
+      }
+      const backupPath = pyPath + EMBER_BACKUP_SUFFIX;
+      try {
+        copyFileSync(pyPath, backupPath);
+        backedUp = true;
+        log.info("shader-injection", `Backed up existing user_settings.py to ${backupPath}`);
+      } catch (err) {
+        log.warn("shader-injection", `Failed to backup user_settings.py: ${err}`);
+      }
+    }
+
+    // Build the Python file content using user_settings dict format.
+    // Proton does: import user_settings; for k,v in user_settings.user_settings.items(): self.env.setdefault(k, v)
+    const entries = Object.entries(envVars).map(
+      ([key, value]) => `    "${key}": "${value.replace(/"/g, '\\"')}",`,
+    );
+
+    const lines: string[] = [
+      EMBER_MARKER,
+      "# This file was auto-generated by Ember HTPC for shader injection.",
+      "# It will be automatically removed when the game closes.",
+      "# Do not edit manually — Ember will overwrite it on next launch.",
+      "",
+      "import os",
+      '_ember_app_id = os.environ.get("STEAM_COMPAT_APP_ID", "") or os.environ.get("SteamAppId", "")',
+      `if _ember_app_id == "${String(steamAppId)}":`,
+      "    user_settings = {",
+      ...entries,
+      "    }",
+      "else:",
+      "    user_settings = {}",
+      "",
+    ];
+
     try {
-      copyFileSync(pyPath, backupPath);
-      backedUp = true;
-      log.info("shader-injection", `Backed up existing user_settings.py to ${backupPath}`);
+      writeFileSync(pyPath, lines.join("\n"), "utf-8");
+      anySuccess = true;
+      log.info("shader-injection", `Wrote user_settings.py to ${pyPath} for Steam app ${steamAppId}`);
     } catch (err) {
-      log.warn("shader-injection", `Failed to backup user_settings.py: ${err}`);
+      errors.push(`Failed to write ${pyPath}: ${err}`);
     }
   }
 
-  // Build the Python file content
-  const lines: string[] = [
-    EMBER_MARKER,
-    "# This file was auto-generated by Ember HTPC for shader injection.",
-    "# It will be automatically removed when the game closes.",
-    "# Do not edit manually — Ember will overwrite it on next launch.",
-    "",
-    "import os",
-  ];
-
-  for (const [key, value] of Object.entries(envVars)) {
-    lines.push(`os.environ["${key}"] = "${value.replace(/"/g, '\\"')}"`);
+  if (anySuccess) {
+    return { success: true, backedUp };
   }
+  return { success: false, error: errors.join("; ") };
+}
 
-  lines.push("");
+/**
+ * Remove Ember-generated user_settings.py files from all Proton installations
+ * and restore backups if they exist.
+ */
+export function cleanupUserSettingsPy(_steamAppId: number): void {
+  const paths = getUserSettingsPyPaths();
+
+  for (const pyPath of paths) {
+    if (!existsSync(pyPath)) continue;
+
+    try {
+      const content = readFileSync(pyPath, "utf-8");
+      if (!content.includes(EMBER_MARKER)) continue;
+    } catch {
+      continue;
+    }
+
+    try {
+      unlinkSync(pyPath);
+      log.info("shader-injection", `Removed Ember user_settings.py at ${pyPath}`);
+    } catch (err) {
+      log.warn("shader-injection", `Failed to remove user_settings.py: ${err}`);
+    }
+
+    // Restore backup if it exists
+    const backupPath = pyPath + EMBER_BACKUP_SUFFIX;
+    if (existsSync(backupPath)) {
+      try {
+        copyFileSync(backupPath, pyPath);
+        unlinkSync(backupPath);
+        log.info("shader-injection", `Restored original user_settings.py from backup at ${pyPath}`);
+      } catch (err) {
+        log.warn("shader-injection", `Failed to restore user_settings.py backup: ${err}`);
+      }
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Steam Launch Options — for native Linux Steam games (not using Proton)
+// ---------------------------------------------------------------------------
+
+const EMBER_LAUNCH_OPTIONS_MARKER = "#ember-inject";
+
+/**
+ * Find the Steam user's localconfig.vdf file.
+ */
+function findSteamLocalConfigPath(): string | null {
+  const steamRoots = [
+    join(homedir(), ".steam", "steam"),
+    join(homedir(), ".local", "share", "Steam"),
+  ];
+  for (const root of steamRoots) {
+    const userdataDir = join(root, "userdata");
+    if (!existsSync(userdataDir)) continue;
+    try {
+      for (const entry of readdirSync(userdataDir)) {
+        const configPath = join(userdataDir, entry, "config", "localconfig.vdf");
+        if (existsSync(configPath)) return configPath;
+      }
+    } catch {
+      // ignore
+    }
+  }
+  return null;
+}
+
+/**
+ * Read the current LaunchOptions for a Steam game from localconfig.vdf.
+ * Returns null if no launch options are set.
+ */
+export function getSteamLaunchOptions(steamAppId: number): string | null {
+  const configPath = findSteamLocalConfigPath();
+  if (!configPath) return null;
+  try {
+    const content = readFileSync(configPath, "utf-8");
+    // Find the app block: "appid" followed by { ... }
+    const appIdStr = String(steamAppId);
+    const appBlockPattern = new RegExp(
+      `"(\\d+)"\\s*\\{([^{}]*(?:\\{[^{}]*\\}[^{}]*)*)\\}`,
+      "g",
+    );
+    let match: RegExpExecArray | null;
+    while ((match = appBlockPattern.exec(content)) !== null) {
+      if (match[1] !== appIdStr) continue;
+      const block = match[2];
+      const loMatch = block.match(/"LaunchOptions"\s*"((?:[^"\\]|\\.)*)"/);
+      if (loMatch) {
+        return loMatch[1].replace(/\\(.)/g, "$1");
+      }
+      return null;
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+/**
+ * Set LaunchOptions for a Steam game in localconfig.vdf.
+ * Returns the original launch options (for restoration), or null if none existed.
+ */
+export function setSteamLaunchOptions(
+  steamAppId: number,
+  options: string,
+): { original: string | null; configPath: string } | null {
+  const configPath = findSteamLocalConfigPath();
+  if (!configPath) return null;
 
   try {
-    writeFileSync(pyPath, lines.join("\n"), "utf-8");
-    log.info("shader-injection", `Wrote user_settings.py for Steam app ${steamAppId}`);
-    return { success: true, backedUp };
+    const content = readFileSync(configPath, "utf-8");
+    const appIdStr = String(steamAppId);
+
+    // Find the app block
+    const appBlockPattern = new RegExp(
+      `("(\\d+)"\\s*\\{)([^{}]*(?:\\{[^{}]*\\}[^{}]*)*)(\\})`,
+      "g",
+    );
+    let match: RegExpExecArray | null;
+    let modified = false;
+    let original: string | null = null;
+    let newContent = content;
+
+    while ((match = appBlockPattern.exec(content)) !== null) {
+      if (match[2] !== appIdStr) continue;
+      const blockOpen = match[1];
+      const blockBody = match[3];
+      const blockClose = match[4];
+
+      // Check if LaunchOptions already exists
+      const loPattern = /"LaunchOptions"\s*"((?:[^"\\]|\\.)*)"/;
+      const loMatch = blockBody.match(loPattern);
+
+      if (loMatch) {
+        original = loMatch[1].replace(/\\(.)/g, "$1");
+        // Replace existing LaunchOptions value
+        const newBody = blockBody.replace(
+          loPattern,
+          `"LaunchOptions"                "${options.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`,
+        );
+        newContent =
+          newContent.slice(0, match.index) +
+          blockOpen +
+          newBody +
+          blockClose +
+          newContent.slice(match.index + match[0].length);
+      } else {
+        // Insert LaunchOptions at the beginning of the block
+        original = null;
+        const newBody = `\n                                                "LaunchOptions"                "${options.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"${blockBody}`;
+        newContent =
+          newContent.slice(0, match.index) +
+          blockOpen +
+          newBody +
+          blockClose +
+          newContent.slice(match.index + match[0].length);
+      }
+      modified = true;
+      break;
+    }
+
+    if (!modified) {
+      log.warn("shader-injection", `Could not find app block for ${steamAppId} in localconfig.vdf`);
+      return null;
+    }
+
+    writeFileSync(configPath, newContent, "utf-8");
+    log.info("shader-injection", `Set Steam launch options for app ${steamAppId}: ${options}`);
+    return { original, configPath };
   } catch (err) {
-    return { success: false, error: `Failed to write user_settings.py: ${err}` };
+    log.warn("shader-injection", `Failed to set Steam launch options: ${err}`);
+    return null;
   }
 }
 
 /**
- * Remove the Ember-generated user_settings.py file and restore backup if it exists.
+ * Restore original LaunchOptions (or remove if none existed).
  */
-export function cleanupUserSettingsPy(steamAppId: number): void {
-  const pyPath = getUserSettingsPyPath(steamAppId);
-  if (!pyPath) return;
+export function restoreSteamLaunchOptions(
+  steamAppId: number,
+  original: string | null,
+  configPath: string,
+): void {
+  try {
+    const content = readFileSync(configPath, "utf-8");
+    const appIdStr = String(steamAppId);
 
-  const existing = checkUserSettingsPy(steamAppId);
+    const appBlockPattern = new RegExp(
+      `("(\\d+)"\\s*\\{)([^{}]*(?:\\{[^{}]*\\}[^{}]*)*)(\\})`,
+      "g",
+    );
+    let match: RegExpExecArray | null;
+    let newContent = content;
 
-  if (existing === "ember") {
-    try {
-      unlinkSync(pyPath);
-      log.info("shader-injection", `Removed Ember user_settings.py for Steam app ${steamAppId}`);
-    } catch (err) {
-      log.warn("shader-injection", `Failed to remove user_settings.py: ${err}`);
+    while ((match = appBlockPattern.exec(content)) !== null) {
+      if (match[2] !== appIdStr) continue;
+      const blockOpen = match[1];
+      const blockBody = match[3];
+      const blockClose = match[4];
+
+      const loPattern = /\n?\s*"LaunchOptions"\s*"(?:[^"\\]|\\.)*"/;
+      if (original) {
+        // Restore original value
+        newContent =
+          newContent.slice(0, match.index) +
+          blockOpen +
+          blockBody.replace(
+            loPattern,
+            `\n                                                "LaunchOptions"                "${original.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`,
+          ) +
+          blockClose +
+          newContent.slice(match.index + match[0].length);
+      } else {
+        // Remove LaunchOptions entirely
+        newContent =
+          newContent.slice(0, match.index) +
+          blockOpen +
+          blockBody.replace(loPattern, "") +
+          blockClose +
+          newContent.slice(match.index + match[0].length);
+      }
+      break;
     }
-  }
 
-  // Restore backup if it exists
-  const backupPath = pyPath + EMBER_BACKUP_SUFFIX;
-  if (existsSync(backupPath)) {
-    try {
-      copyFileSync(backupPath, pyPath);
-      unlinkSync(backupPath);
-      log.info("shader-injection", `Restored original user_settings.py from backup`);
-    } catch (err) {
-      log.warn("shader-injection", `Failed to restore user_settings.py backup: ${err}`);
-    }
+    writeFileSync(configPath, newContent, "utf-8");
+    log.info("shader-injection", `Restored Steam launch options for app ${steamAppId}`);
+  } catch (err) {
+    log.warn("shader-injection", `Failed to restore Steam launch options: ${err}`);
   }
+}
+
+/**
+ * Build a launch options string from injection env vars.
+ * Format: "ENV1=val1 ENV2=val2 %command%"
+ */
+export function buildLaunchOptionsString(envVars: Record<string, string>): string {
+  const parts = Object.entries(envVars).map(([k, v]) => `${k}=${v}`);
+  return [...parts, "%command%"].join(" ");
+}
+
+/**
+ * Check if a Steam game uses Proton (has a compatdata/pfx directory).
+ */
+export function isSteamGameProton(steamAppId: number): boolean {
+  const compatData = findCompatDataPath(steamAppId);
+  if (!compatData) return false;
+  return existsSync(join(compatData, "pfx"));
 }
 
 /**
@@ -338,6 +674,46 @@ export function buildVulkanLayerEnv(config: VulkanShaderConfig): Record<string, 
     log.info("shader-injection", `Vulkan layer env: layerPath=${layerPath}, dir=${layerDir}, preset=${config.preset}`);
   } else {
     log.warn("shader-injection", "Vulkan layer .so not found — shader injection will not work");
+  }
+
+  return env;
+}
+
+/**
+ * Get the path to the installed GL hook shared library.
+ */
+export function getGLHookPath(): string | null {
+  const home = homedir();
+  const path = join(home, ".local", "share", "ember", "libember_gl_hook.so");
+  return existsSync(path) ? path : null;
+}
+
+/**
+ * Build environment variables for OpenGL LD_PRELOAD hook injection.
+ * Used for native Linux OpenGL games where the Vulkan layer can't hook
+ * (e.g. NVIDIA proprietary + GLX games).
+ */
+export function buildGLHookEnv(config: VulkanShaderConfig): Record<string, string> {
+  const env: Record<string, string> = {};
+  const hookPath = getGLHookPath();
+
+  if (hookPath) {
+    env["LD_PRELOAD"] = hookPath;
+    env["EMBER_GL_HOOK_LIB"] = hookPath;
+    env["EMBER_SHADER_PRESET"] = config.preset;
+    if (config.intensity !== undefined) {
+      env["EMBER_SHADER_INTENSITY"] = String(config.intensity);
+    }
+    if (config.params) {
+      for (let i = 0; i < Math.min(config.params.length, 8); i++) {
+        if (config.params[i] !== undefined && config.params[i] !== null) {
+          env[`EMBER_SHADER_PARAM${i}`] = String(config.params[i]);
+        }
+      }
+    }
+    log.info("shader-injection", `GL hook env: hookPath=${hookPath}, preset=${config.preset}`);
+  } else {
+    log.warn("shader-injection", "GL hook .so not found — OpenGL injection will not work");
   }
 
   return env;

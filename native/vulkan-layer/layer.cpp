@@ -12,6 +12,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <cstdio>
+#include <cstdarg>
 #include <string>
 #include <unordered_map>
 #include <mutex>
@@ -28,6 +29,13 @@
 
 static const char* kLayerName = "VK_LAYER_ember_shader";
 static const uint32_t kLayerImplementationVersion = 1;
+
+static void emberLog(const char* fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    vfprintf(stderr, fmt, ap);
+    va_end(ap);
+}
 
 static std::string getShaderPreset() {
     const char* preset = std::getenv("EMBER_SHADER_PRESET");
@@ -175,14 +183,8 @@ static void logShaderPreset() {
     if (g_shaderLogged.exchange(true)) return;
     std::string preset = getShaderPreset();
     float intensity = getShaderIntensity();
-    fprintf(stderr, "[Ember Vulkan Layer] Active shader preset: %s (intensity: %.2f)\n",
-            preset.c_str(), intensity);
-    fflush(stderr);
-    FILE* marker = fopen("/tmp/ember_vulkan_layer_loaded.txt", "w");
-    if (marker) {
-        fprintf(marker, "preset=%s\nintensity=%.2f\npid=%d\n", preset.c_str(), intensity, getpid());
-        fclose(marker);
-    }
+    emberLog("[Ember Vulkan Layer] Active shader preset: %s (intensity: %.2f) pid=%d\n",
+            preset.c_str(), intensity, getpid());
 }
 
 // ============================================================================
@@ -220,9 +222,8 @@ static bool createSwapchainPipeline(LayerDispatchTable* table, SwapchainData* sc
     VkFormat format = sc->format;
     VkExtent2D extent = sc->extent;
 
-    fprintf(stderr, "[Ember Vulkan Layer] Creating pipeline: %ux%u format=%d\n",
+    emberLog("[Ember Vulkan Layer] Creating pipeline: %ux%u format=%d\n",
             extent.width, extent.height, (int)format);
-    fflush(stderr);
 
     // --- Render pass ---
     VkAttachmentDescription colorAttachment = {};
@@ -252,7 +253,7 @@ static bool createSwapchainPipeline(LayerDispatchTable* table, SwapchainData* sc
     rpInfo.pSubpasses = &subpass;
 
     if (table->createRenderPass(dev, &rpInfo, nullptr, &sc->renderPass) != VK_SUCCESS) {
-        fprintf(stderr, "[Ember Vulkan Layer] Failed to create render pass\n");
+        emberLog("[Ember Vulkan Layer] Failed to create render pass\n");
         return false;
     }
 
@@ -269,7 +270,7 @@ static bool createSwapchainPipeline(LayerDispatchTable* table, SwapchainData* sc
     dslInfo.pBindings = &samplerBinding;
 
     if (table->createDescriptorSetLayout(dev, &dslInfo, nullptr, &sc->descriptorSetLayout) != VK_SUCCESS) {
-        fprintf(stderr, "[Ember Vulkan Layer] Failed to create descriptor set layout\n");
+        emberLog("[Ember Vulkan Layer] Failed to create descriptor set layout\n");
         return false;
     }
 
@@ -287,7 +288,7 @@ static bool createSwapchainPipeline(LayerDispatchTable* table, SwapchainData* sc
     plInfo.pPushConstantRanges = &pcRange;
 
     if (table->createPipelineLayout(dev, &plInfo, nullptr, &sc->pipelineLayout) != VK_SUCCESS) {
-        fprintf(stderr, "[Ember Vulkan Layer] Failed to create pipeline layout\n");
+        emberLog("[Ember Vulkan Layer] Failed to create pipeline layout\n");
         return false;
     }
 
@@ -306,7 +307,7 @@ static bool createSwapchainPipeline(LayerDispatchTable* table, SwapchainData* sc
         if (!createShaderModule) return false;
 
         if (createShaderModule(dev, &vertInfo, nullptr, &vertModule) != VK_SUCCESS) {
-            fprintf(stderr, "[Ember Vulkan Layer] Failed to create vert shader module\n");
+            emberLog("[Ember Vulkan Layer] Failed to create vert shader module\n");
             return false;
         }
 
@@ -317,7 +318,7 @@ static bool createSwapchainPipeline(LayerDispatchTable* table, SwapchainData* sc
 
         VkShaderModule fragModule;
         if (createShaderModule(dev, &fragInfo, nullptr, &fragModule) != VK_SUCCESS) {
-            fprintf(stderr, "[Ember Vulkan Layer] Failed to create frag shader module\n");
+            emberLog("[Ember Vulkan Layer] Failed to create frag shader module\n");
             destroyShaderModule(dev, vertModule, nullptr);
             return false;
         }
@@ -389,7 +390,7 @@ static bool createSwapchainPipeline(LayerDispatchTable* table, SwapchainData* sc
         pipelineInfo.subpass = 0;
 
         if (table->createGraphicsPipelines(dev, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &sc->pipeline) != VK_SUCCESS) {
-            fprintf(stderr, "[Ember Vulkan Layer] Failed to create graphics pipeline\n");
+            emberLog("[Ember Vulkan Layer] Failed to create graphics pipeline\n");
             destroyShaderModule(dev, vertModule, nullptr);
             destroyShaderModule(dev, fragModule, nullptr);
             return false;
@@ -413,7 +414,7 @@ static bool createSwapchainPipeline(LayerDispatchTable* table, SwapchainData* sc
     samplerInfo.unnormalizedCoordinates = VK_FALSE;
 
     if (table->createSampler(dev, &samplerInfo, nullptr, &sc->sampler) != VK_SUCCESS) {
-        fprintf(stderr, "[Ember Vulkan Layer] Failed to create sampler\n");
+        emberLog("[Ember Vulkan Layer] Failed to create sampler\n");
         return false;
     }
 
@@ -429,7 +430,7 @@ static bool createSwapchainPipeline(LayerDispatchTable* table, SwapchainData* sc
     poolInfo.pPoolSizes = &poolSize;
 
     if (table->createDescriptorPool(dev, &poolInfo, nullptr, &sc->descriptorPool) != VK_SUCCESS) {
-        fprintf(stderr, "[Ember Vulkan Layer] Failed to create descriptor pool\n");
+        emberLog("[Ember Vulkan Layer] Failed to create descriptor pool\n");
         return false;
     }
 
@@ -453,7 +454,7 @@ static bool createSwapchainPipeline(LayerDispatchTable* table, SwapchainData* sc
         imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
         if (table->createImage(dev, &imageInfo, nullptr, &img.tempImage) != VK_SUCCESS) {
-            fprintf(stderr, "[Ember Vulkan Layer] Failed to create temp image %zu\n", i);
+            emberLog("[Ember Vulkan Layer] Failed to create temp image %zu\n", i);
             return false;
         }
 
@@ -467,7 +468,7 @@ static bool createSwapchainPipeline(LayerDispatchTable* table, SwapchainData* sc
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
         if (table->allocateMemory(dev, &allocInfo, nullptr, &img.tempMemory) != VK_SUCCESS) {
-            fprintf(stderr, "[Ember Vulkan Layer] Failed to allocate temp memory %zu\n", i);
+            emberLog("[Ember Vulkan Layer] Failed to allocate temp memory %zu\n", i);
             return false;
         }
 
@@ -482,14 +483,14 @@ static bool createSwapchainPipeline(LayerDispatchTable* table, SwapchainData* sc
         viewInfo.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
 
         if (table->createImageView(dev, &viewInfo, nullptr, &img.tempView) != VK_SUCCESS) {
-            fprintf(stderr, "[Ember Vulkan Layer] Failed to create temp view %zu\n", i);
+            emberLog("[Ember Vulkan Layer] Failed to create temp view %zu\n", i);
             return false;
         }
 
         // Swapchain image view
         viewInfo.image = sc->images[i];
         if (table->createImageView(dev, &viewInfo, nullptr, &img.swapchainView) != VK_SUCCESS) {
-            fprintf(stderr, "[Ember Vulkan Layer] Failed to create swapchain view %zu\n", i);
+            emberLog("[Ember Vulkan Layer] Failed to create swapchain view %zu\n", i);
             return false;
         }
 
@@ -504,7 +505,7 @@ static bool createSwapchainPipeline(LayerDispatchTable* table, SwapchainData* sc
         fbInfo.layers = 1;
 
         if (table->createFramebuffer(dev, &fbInfo, nullptr, &img.framebuffer) != VK_SUCCESS) {
-            fprintf(stderr, "[Ember Vulkan Layer] Failed to create framebuffer %zu\n", i);
+            emberLog("[Ember Vulkan Layer] Failed to create framebuffer %zu\n", i);
             return false;
         }
 
@@ -516,7 +517,7 @@ static bool createSwapchainPipeline(LayerDispatchTable* table, SwapchainData* sc
         dsAllocInfo.pSetLayouts = &sc->descriptorSetLayout;
 
         if (table->allocateDescriptorSets(dev, &dsAllocInfo, &img.descriptorSet) != VK_SUCCESS) {
-            fprintf(stderr, "[Ember Vulkan Layer] Failed to allocate descriptor set %zu\n", i);
+            emberLog("[Ember Vulkan Layer] Failed to allocate descriptor set %zu\n", i);
             return false;
         }
 
@@ -598,9 +599,8 @@ static VKAPI_ATTR VkResult VKAPI_CALL emberQueuePresentKHR(
     static std::atomic<int> g_presentCount{0};
     int count = g_presentCount.fetch_add(1);
     if (count < 3) {
-        fprintf(stderr, "[Ember Vulkan Layer] present #%d (swapchains=%u)\n",
+        emberLog("[Ember Vulkan Layer] present #%d (swapchains=%u)\n",
                 count, pPresentInfo->swapchainCount);
-        fflush(stderr);
     }
 
     // Create command pool + buffer (all functions loaded in emberCreateDevice)
@@ -612,8 +612,7 @@ static VKAPI_ATTR VkResult VKAPI_CALL emberQueuePresentKHR(
 
         VkResult poolResult = table->createCommandPool(table->device, &poolInfo, nullptr, &table->commandPool);
         if (poolResult != VK_SUCCESS) {
-            fprintf(stderr, "[Ember Vulkan Layer] createCommandPool failed: %d\n", poolResult);
-            fflush(stderr);
+            emberLog("[Ember Vulkan Layer] createCommandPool failed: %d\n", poolResult);
         } else if (table->allocateCommandBuffers) {
             VkCommandBufferAllocateInfo allocInfo = {};
             allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -622,19 +621,16 @@ static VKAPI_ATTR VkResult VKAPI_CALL emberQueuePresentKHR(
             allocInfo.commandBufferCount = 1;
             VkResult allocResult = table->allocateCommandBuffers(table->device, &allocInfo, &table->commandBuffer);
             if (allocResult != VK_SUCCESS) {
-                fprintf(stderr, "[Ember Vulkan Layer] allocateCommandBuffers failed: %d\n", allocResult);
-                fflush(stderr);
+                emberLog("[Ember Vulkan Layer] allocateCommandBuffers failed: %d\n", allocResult);
             } else {
-                fprintf(stderr, "[Ember Vulkan Layer] Command pool + buffer created\n");
-                fflush(stderr);
+                emberLog("[Ember Vulkan Layer] Command pool + buffer created\n");
             }
         }
     }
 
     if (table->commandBuffer == VK_NULL_HANDLE) {
         if (count < 3) {
-            fprintf(stderr, "[Ember Vulkan Layer] No command buffer, passthrough\n");
-            fflush(stderr);
+            emberLog("[Ember Vulkan Layer] No command buffer, passthrough\n");
         }
         return table->queuePresentKHR(queue, pPresentInfo);
     }
@@ -654,33 +650,28 @@ static VKAPI_ATTR VkResult VKAPI_CALL emberQueuePresentKHR(
 
         if (!scData) {
             if (count < 3) {
-                fprintf(stderr, "[Ember Vulkan Layer] No swapchain data, passthrough\n");
-                fflush(stderr);
+                emberLog("[Ember Vulkan Layer] No swapchain data, passthrough\n");
             }
             continue;
         }
 
         // Lazily create pipeline on first present (safe — device is fully initialized)
         if (!scData->pipelineCreated) {
-            fprintf(stderr, "[Ember Vulkan Layer] Creating pipeline on first present: %ux%u format=%d\n",
+            emberLog("[Ember Vulkan Layer] Creating pipeline on first present: %ux%u format=%d\n",
                     scData->extent.width, scData->extent.height, (int)scData->format);
-            fflush(stderr);
             if (createSwapchainPipeline(table, scData)) {
                 scData->pipelineCreated = true;
-                fprintf(stderr, "[Ember Vulkan Layer] Pipeline created successfully (%zu images)\n",
+                emberLog("[Ember Vulkan Layer] Pipeline created successfully (%zu images)\n",
                         scData->images.size());
-                fflush(stderr);
             } else {
-                fprintf(stderr, "[Ember Vulkan Layer] Pipeline creation failed, passthrough\n");
-                fflush(stderr);
+                emberLog("[Ember Vulkan Layer] Pipeline creation failed, passthrough\n");
                 continue;
             }
         }
 
         if (imgIdx >= scData->perImage.size()) {
             if (count < 3) {
-                fprintf(stderr, "[Ember Vulkan Layer] Image index %u out of range, passthrough\n", imgIdx);
-                fflush(stderr);
+                emberLog("[Ember Vulkan Layer] Image index %u out of range, passthrough\n", imgIdx);
             }
             continue;
         }
@@ -852,8 +843,7 @@ static VKAPI_ATTR VkResult VKAPI_CALL emberQueuePresentKHR(
             if (submitResult == VK_SUCCESS) {
                 table->waitForFences(table->device, 1, &fence, VK_TRUE, UINT64_MAX);
             } else if (count < 5) {
-                fprintf(stderr, "[Ember Vulkan Layer] queueSubmit failed: %d\n", submitResult);
-                fflush(stderr);
+                emberLog("[Ember Vulkan Layer] queueSubmit failed: %d\n", submitResult);
             }
             table->destroyFence(table->device, fence, nullptr);
         } else {
@@ -861,8 +851,7 @@ static VKAPI_ATTR VkResult VKAPI_CALL emberQueuePresentKHR(
         }
 
         if (count < 3) {
-            fprintf(stderr, "[Ember Vulkan Layer] Rendered shader on present #%d\n", count);
-            fflush(stderr);
+            emberLog("[Ember Vulkan Layer] Rendered shader on present #%d\n", count);
         }
     }
 
@@ -877,6 +866,7 @@ static VKAPI_ATTR VkResult VKAPI_CALL emberCreateSwapchainKHR(
     VkDevice device, const VkSwapchainCreateInfoKHR* pCreateInfo,
     const VkAllocationCallbacks* pAllocator, VkSwapchainKHR* pSwapchain) {
 
+    emberLog("[Ember Vulkan Layer] emberCreateSwapchainKHR called\n");
     LayerDispatchTable* table = getDeviceTable(device);
     if (!table || !table->createSwapchainKHR) {
         return VK_ERROR_INITIALIZATION_FAILED;
@@ -902,9 +892,8 @@ static VKAPI_ATTR VkResult VKAPI_CALL emberCreateSwapchainKHR(
     scData->images.resize(imageCount);
     table->getSwapchainImagesKHR(device, *pSwapchain, &imageCount, scData->images.data());
 
-    fprintf(stderr, "[Ember Vulkan Layer] Swapchain created: %ux%u format=%d images=%u\n",
+    emberLog("[Ember Vulkan Layer] Swapchain created: %ux%u format=%d images=%u\n",
             scData->extent.width, scData->extent.height, (int)scData->format, imageCount);
-    fflush(stderr);
 
     {
         std::lock_guard<std::mutex> lock(g_swapchainMutex);
@@ -956,6 +945,8 @@ static VKAPI_ATTR VkResult VKAPI_CALL emberCreateInstance(
     const VkInstanceCreateInfo* pCreateInfo,
     const VkAllocationCallbacks* pAllocator,
     VkInstance* pInstance) {
+
+    emberLog("[Ember Vulkan Layer] emberCreateInstance called pid=%d\n", getpid());
 
     VkLayerInstanceCreateInfo* chain = (VkLayerInstanceCreateInfo*)pCreateInfo->pNext;
     while (chain && (chain->sType != VK_STRUCTURE_TYPE_LOADER_INSTANCE_CREATE_INFO ||
@@ -1088,9 +1079,8 @@ static VKAPI_ATTR VkResult VKAPI_CALL emberCreateDevice(
         getMemProps(physicalDevice, &table->memProps);
     }
 
-    fprintf(stderr, "[Ember Vulkan Layer] Device created, all %d function pointers loaded\n",
+    emberLog("[Ember Vulkan Layer] Device created, all %d function pointers loaded\n",
             (int)(g_deviceTables.size() + 1));
-    fflush(stderr);
 
     {
         std::lock_guard<std::mutex> lock(g_tableMutex);

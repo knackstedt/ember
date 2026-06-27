@@ -26,6 +26,11 @@ import {
   findSteamPrefixPath,
   findUmuPrefixPath,
   hasActiveInjection,
+  isSteamGameProton,
+  setSteamLaunchOptions,
+  restoreSteamLaunchOptions,
+  buildLaunchOptionsString,
+  buildGLHookEnv,
 } from "./shader-injection.service";
 
 const log = createLogger("info");
@@ -426,8 +431,10 @@ export async function launchGame(game: Game): Promise<void> {
   // Resolve injection config (Vulkan layer + DLL override)
   let injectionEnv: Record<string, string> = {};
   let needsUserSettingsPy = false;
+  let needsLaunchOptions = false;
   let steamCompatAppId: number | undefined;
   let prefixPath: string | null = null;
+  let launchOptionsState: { original: string | null; configPath: string } | null = null;
   try {
     const gameInjectionConfig = await GameRepo.getInjectionConfig(game.id);
     const injectionConfig = await resolveInjectionConfig(game, gameInjectionConfig);
@@ -452,8 +459,22 @@ export async function launchGame(game: Game): Promise<void> {
         }
       }
       if (game.platform === "steam" && game.steamAppId) {
-        needsUserSettingsPy = Object.keys(injectionEnv).length > 0;
         steamCompatAppId = game.steamAppId;
+        if (Object.keys(injectionEnv).length > 0) {
+          // Check if the game uses Proton or is native Linux
+          if (isSteamGameProton(game.steamAppId)) {
+            needsUserSettingsPy = true;
+          } else {
+            // Native Linux Steam game — use Steam launch options.
+            // Add GL hook env vars for OpenGL games (LD_PRELOAD based).
+            // Also keep Vulkan layer env vars for games that might use Vulkan.
+            // The GL hook only activates on glXSwapBuffers, the Vulkan layer
+            // only activates on vkCreateInstance, so both can coexist safely.
+            const glHookEnv = buildGLHookEnv(injectionConfig.vulkanShader!);
+            injectionEnv = { ...injectionEnv, ...glHookEnv };
+            needsLaunchOptions = true;
+          }
+        }
       }
     }
   } catch (err) {
@@ -482,6 +503,25 @@ export async function launchGame(game: Game): Promise<void> {
         log.warn("launcher", `Failed to write user_settings.py: ${result.error}`);
         injectionEnv = {};
       }
+    }
+  }
+
+  if (needsLaunchOptions && steamCompatAppId) {
+    const launchOpts = buildLaunchOptionsString(injectionEnv);
+    const result = setSteamLaunchOptions(steamCompatAppId, launchOpts);
+    if (result) {
+      launchOptionsState = result;
+      log.info("launcher", `Set Steam launch options for native Linux game: ${launchOpts}`);
+      // If Steam is already running, it needs to re-read localconfig.vdf.
+      // Shut it down so it picks up the launch options on restart.
+      if (isSteamRunning()) {
+        log.info("launcher", "Restarting Steam to apply launch options…");
+        shutdownSteam(false);
+        // Wait for Steam to fully exit
+        await new Promise((r) => setTimeout(r, 3000));
+      }
+    } else {
+      log.warn("launcher", `Failed to set Steam launch options; injection may not work`);
     }
   }
 
@@ -550,6 +590,9 @@ export async function launchGame(game: Game): Promise<void> {
           if (needsUserSettingsPy && steamCompatAppId) {
             cleanupUserSettingsPy(steamCompatAppId);
           }
+          if (needsLaunchOptions && steamCompatAppId && launchOptionsState) {
+            restoreSteamLaunchOptions(steamCompatAppId, launchOptionsState.original, launchOptionsState.configPath);
+          }
           void runSessionHooks(game, "after-start");
           GameRepo.setLastPlayed(game.id, Date.now()).catch((err) => {
             log.warn("launcher", `Failed to set lastPlayed for ${game.id}: ${err}`);
@@ -587,6 +630,10 @@ export async function launchGame(game: Game): Promise<void> {
           // Clean up Ember-generated user_settings.py
           if (needsUserSettingsPy && steamCompatAppId) {
             cleanupUserSettingsPy(steamCompatAppId);
+          }
+          // Restore original Steam launch options
+          if (needsLaunchOptions && steamCompatAppId && launchOptionsState) {
+            restoreSteamLaunchOptions(steamCompatAppId, launchOptionsState.original, launchOptionsState.configPath);
           }
 
           const launchState = steamLaunchState.get(game.id);
