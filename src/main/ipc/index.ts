@@ -8,6 +8,7 @@ import {
   getSettings,
   setSettings,
   setSetting,
+  applyCorruptPolicy,
 } from "../services/settings.service";
 import {
   getUpdaterState,
@@ -1856,6 +1857,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
         log.debug("music:scan", `db insert ${i + 1}/${tracks.length}`);
       try {
         await MusicRepo.upsert({ ...track, missing: false });
+        if (track.corrupt) await applyCorruptPolicy(track.id, "music");
       } catch (err) {
         log.warn("music:scan", `Failed to upsert track ${track.id}: ${err}`);
       }

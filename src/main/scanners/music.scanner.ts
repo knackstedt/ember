@@ -103,7 +103,16 @@ export async function scanMusicFiles(
         "music:scan",
         `failed to parse ${filePath}: ${err?.message ?? String(err)}`,
       );
-      continue;
+      const id = createHash("md5").update(filePath).digest("hex").slice(0, 16);
+      tracks.push({
+        id,
+        title: filePath.split("/").pop()!.replace(/\.[^.]+$/, ""),
+        filePath,
+        tags: [],
+        hidden: false,
+        corrupt: true,
+        sourceLocation: resolveSourceLocation(filePath),
+      });
     }
   }
 

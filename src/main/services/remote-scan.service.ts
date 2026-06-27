@@ -9,6 +9,7 @@ import { Movie, MusicTrack, Game, GamePlatform } from "../../shared/types";
 import { createLogger } from "../util/logger";
 import { getRemoteFileList, startServe, getServePort, restartServe, listRemotes } from "./rclone-manager";
 import { MovieRepo, MusicRepo, GameRepo } from "../db/repository";
+import { applyCorruptPolicy } from "./settings.service";
 import { generateMovieThumbnail } from "../scanners/video.scanner";
 
 const log = createLogger("info");
@@ -324,7 +325,16 @@ export async function scanRemoteMusic(
       });
     } catch (err: any) {
       log.error("remote:scan:music", `failed to parse ${remotePath}: ${err?.message ?? String(err)}`);
-      continue;
+      const id = createHash("md5").update(emberPath).digest("hex").slice(0, 16);
+      tracks.push({
+        id,
+        title: basename(remotePath).replace(/\.[^.]+$/, ""),
+        filePath: emberPath,
+        tags: [],
+        hidden: false,
+        corrupt: true,
+        sourceLocation: `rclone:${source.protocol}`,
+      });
     }
   }
 
@@ -542,6 +552,7 @@ export function queueRemoteSourceScan(
           for (const track of tracks) {
             try {
               await MusicRepo.upsert(track);
+              if (track.corrupt) await applyCorruptPolicy(track.id, "music");
             } catch (err) {
               log.warn("remote:scan", `failed to upsert track ${track.id}: ${err}`);
             }
