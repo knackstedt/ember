@@ -1160,6 +1160,11 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     return VULKAN_SHADER_PRESETS;
   });
 
+  ipcMain.handle("games:injectionConfig:shaderParamDefs", async () => {
+    const { SHADER_PARAM_DEFS } = await import("../services/shader-injection.service");
+    return SHADER_PARAM_DEFS;
+  });
+
   ipcMain.handle("games:findMainExe", async (_e, id: string) => {
     const { findMainExe } = await import("../services/shader-injection.service");
     const db = getDb();

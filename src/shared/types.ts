@@ -178,6 +178,8 @@ export interface VulkanShaderConfig {
   preset: string;
   /** Intensity 0-1 */
   intensity?: number;
+  /** Per-shader parameters (up to 8, meaning depends on preset) */
+  params?: number[];
 }
 
 /** Wine DLL override / custom DLL injection settings */

@@ -19,7 +19,109 @@ export const VULKAN_SHADER_PRESETS = [
   { id: "color-grade", name: "Color Grade" },
   { id: "fxaa", name: "FXAA" },
   { id: "cas", name: "Contrast Adaptive Sharpening" },
+  { id: "grayscale", name: "Grayscale" },
+  { id: "sepia", name: "Sepia" },
+  { id: "vignette", name: "Vignette" },
+  { id: "film-grain", name: "Film Grain" },
+  { id: "chromatic-aberration", name: "Chromatic Aberration" },
+  { id: "sharpen", name: "Sharpen" },
+  { id: "blur", name: "Gaussian Blur" },
+  { id: "pixelate", name: "Pixelate" },
+  { id: "posterize", name: "Posterize" },
+  { id: "invert", name: "Invert" },
+  { id: "scanline", name: "Scanline" },
+  { id: "vhs", name: "VHS" },
+  { id: "night-vision", name: "Night Vision" },
+  { id: "thermal", name: "Thermal" },
+  { id: "edge-detect", name: "Edge Detect" },
+  { id: "emboss", name: "Emboss" },
+  { id: "retro-pixel", name: "Retro Pixel" },
 ] as const;
+
+/** Parameter definition for a shader preset */
+export interface ShaderParamDef {
+  /** Display label for the parameter */
+  label: string;
+  /** Minimum value for the slider */
+  min: number;
+  /** Maximum value for the slider */
+  max: number;
+  /** Slider step */
+  step: number;
+  /** Default value */
+  default: number;
+}
+
+/** Per-preset parameter definitions. Each key is a preset id, value is an array of up to 8 params. */
+export const SHADER_PARAM_DEFS: Record<string, ShaderParamDef[]> = {
+  crt: [
+    { label: "Scanline Strength", min: 0, max: 1, step: 0.05, default: 0.3 },
+    { label: "RGB Aberration", min: 0, max: 0.01, step: 0.0005, default: 0.002 },
+    { label: "Vignette Strength", min: 0, max: 2, step: 0.1, default: 0.8 },
+  ],
+  bloom: [
+    { label: "Radius", min: 0.001, max: 0.05, step: 0.001, default: 0.01 },
+    { label: "Mix Amount", min: 0, max: 1, step: 0.05, default: 0.5 },
+  ],
+  "color-grade": [
+    { label: "Warmth", min: 0, max: 0.5, step: 0.01, default: 0.1 },
+    { label: "Contrast", min: 0, max: 1, step: 0.05, default: 0.2 },
+    { label: "Saturation", min: 0, max: 1, step: 0.05, default: 0.3 },
+  ],
+  fxaa: [
+    { label: "Edge Threshold", min: 0.01, max: 0.2, step: 0.01, default: 0.05 },
+  ],
+  cas: [
+    { label: "Sharpness", min: 0, max: 2, step: 0.1, default: 1.0 },
+  ],
+  grayscale: [],
+  sepia: [],
+  vignette: [
+    { label: "Inner Radius", min: 0.1, max: 0.6, step: 0.05, default: 0.3 },
+    { label: "Outer Radius", min: 0.4, max: 1.0, step: 0.05, default: 0.8 },
+  ],
+  "film-grain": [
+    { label: "Noise Amount", min: 0, max: 0.5, step: 0.01, default: 0.15 },
+  ],
+  "chromatic-aberration": [
+    { label: "Shift Amount", min: 0, max: 0.05, step: 0.001, default: 0.01 },
+  ],
+  sharpen: [
+    { label: "Amount", min: 0, max: 5, step: 0.1, default: 2.0 },
+  ],
+  blur: [
+    { label: "Sigma", min: 0.5, max: 10, step: 0.5, default: 2.0 },
+  ],
+  pixelate: [
+    { label: "Max Pixel Count", min: 64, max: 1024, step: 32, default: 512 },
+  ],
+  posterize: [
+    { label: "Max Levels", min: 2, max: 64, step: 1, default: 32 },
+  ],
+  invert: [],
+  scanline: [
+    { label: "Strength", min: 0, max: 1, step: 0.05, default: 0.4 },
+  ],
+  vhs: [
+    { label: "Warp Amount", min: 0, max: 0.02, step: 0.001, default: 0.003 },
+    { label: "Noise Amount", min: 0, max: 0.5, step: 0.01, default: 0.1 },
+  ],
+  "night-vision": [
+    { label: "Gain", min: 0, max: 5, step: 0.5, default: 2.0 },
+    { label: "Noise Amount", min: 0, max: 0.2, step: 0.01, default: 0.05 },
+  ],
+  thermal: [
+    { label: "Gain", min: 0, max: 3, step: 0.1, default: 1.0 },
+  ],
+  "edge-detect": [
+    { label: "Sensitivity", min: 0.5, max: 10, step: 0.5, default: 3.0 },
+  ],
+  emboss: [],
+  "retro-pixel": [
+    { label: "Max Pixel Count", min: 32, max: 512, step: 16, default: 256 },
+    { label: "Max Levels", min: 2, max: 32, step: 1, default: 16 },
+  ],
+};
 
 /**
  * Find the Steam compatdata (Proton prefix) directory for a given Steam app ID.
@@ -225,6 +327,13 @@ export function buildVulkanLayerEnv(config: VulkanShaderConfig): Record<string, 
     env["EMBER_SHADER_PRESET"] = config.preset;
     if (config.intensity !== undefined) {
       env["EMBER_SHADER_INTENSITY"] = String(config.intensity);
+    }
+    if (config.params) {
+      for (let i = 0; i < Math.min(config.params.length, 8); i++) {
+        if (config.params[i] !== undefined && config.params[i] !== null) {
+          env[`EMBER_SHADER_PARAM${i}`] = String(config.params[i]);
+        }
+      }
     }
     log.info("shader-injection", `Vulkan layer env: layerPath=${layerPath}, dir=${layerDir}, preset=${config.preset}`);
   } else {

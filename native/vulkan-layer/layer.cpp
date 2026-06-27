@@ -40,6 +40,15 @@ static float getShaderIntensity() {
     return std::atof(intensity);
 }
 
+static void getShaderParams(float* params, int maxParams) {
+    for (int i = 0; i < maxParams; i++) {
+        char envName[32];
+        snprintf(envName, sizeof(envName), "EMBER_SHADER_PARAM%d", i);
+        const char* val = std::getenv(envName);
+        params[i] = val ? std::atof(val) : 0.0f;
+    }
+}
+
 // ============================================================================
 // Dispatch table
 // ============================================================================
@@ -268,7 +277,7 @@ static bool createSwapchainPipeline(LayerDispatchTable* table, SwapchainData* sc
     VkPushConstantRange pcRange = {};
     pcRange.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
     pcRange.offset = 0;
-    pcRange.size = sizeof(float) * 5; // intensity, time, resolution.x, resolution.y, preset
+    pcRange.size = sizeof(float) * 13; // intensity, time, resolution.x, resolution.y, preset, params[8]
 
     VkPipelineLayoutCreateInfo plInfo = {};
     plInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -788,8 +797,32 @@ static VKAPI_ATTR VkResult VKAPI_CALL emberQueuePresentKHR(
         if (presetName == "crt") presetId = 1.0f;
         else if (presetName == "bloom") presetId = 2.0f;
         else if (presetName == "color-grade") presetId = 3.0f;
+        else if (presetName == "fxaa") presetId = 4.0f;
+        else if (presetName == "cas") presetId = 5.0f;
+        else if (presetName == "grayscale") presetId = 6.0f;
+        else if (presetName == "sepia") presetId = 7.0f;
+        else if (presetName == "vignette") presetId = 8.0f;
+        else if (presetName == "film-grain") presetId = 9.0f;
+        else if (presetName == "chromatic-aberration") presetId = 10.0f;
+        else if (presetName == "sharpen") presetId = 11.0f;
+        else if (presetName == "blur") presetId = 12.0f;
+        else if (presetName == "pixelate") presetId = 13.0f;
+        else if (presetName == "posterize") presetId = 14.0f;
+        else if (presetName == "invert") presetId = 15.0f;
+        else if (presetName == "scanline") presetId = 16.0f;
+        else if (presetName == "vhs") presetId = 18.0f;
+        else if (presetName == "night-vision") presetId = 19.0f;
+        else if (presetName == "thermal") presetId = 20.0f;
+        else if (presetName == "edge-detect") presetId = 21.0f;
+        else if (presetName == "emboss") presetId = 22.0f;
+        else if (presetName == "retro-pixel") presetId = 23.0f;
 
-        float pc[5] = {intensity, (float)count, (float)scData->extent.width, (float)scData->extent.height, presetId};
+        float shaderParams[8] = {};
+        getShaderParams(shaderParams, 8);
+
+        float pc[13] = {intensity, (float)count, (float)scData->extent.width, (float)scData->extent.height, presetId,
+                        shaderParams[0], shaderParams[1], shaderParams[2], shaderParams[3],
+                        shaderParams[4], shaderParams[5], shaderParams[6], shaderParams[7]};
         PFN_vkCmdPushConstants cmdPushConstants =
             (PFN_vkCmdPushConstants)table->getDeviceProcAddr(table->device, "vkCmdPushConstants");
         if (cmdPushConstants) {

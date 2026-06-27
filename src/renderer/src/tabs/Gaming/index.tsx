@@ -284,6 +284,7 @@ export const GamingTab: React.FC = () => {
   const [selectedEmulatorConfig, setSelectedEmulatorConfig] = useState<GameEmulatorConfig>({});
   const [selectedInjectionConfig, setSelectedInjectionConfig] = useState<GameInjectionConfig | null>(null);
   const [vulkanPresets, setVulkanPresets] = useState<{ id: string; name: string }[]>([]);
+  const [shaderParamDefs, setShaderParamDefs] = useState<Record<string, { label: string; min: number; max: number; step: number; default: number }[]>>({});
   const [activeCollectionId, setActiveCollectionId] = useState<string | null>(null);
   const [showCollectionManager, setShowCollectionManager] = useState(false);
   const [showLaunchSettings, setShowLaunchSettings] = useState(false);
@@ -369,9 +370,10 @@ export const GamingTab: React.FC = () => {
     }
   }, [selected]);
 
-  // Load Vulkan shader presets once
+  // Load Vulkan shader presets and param defs once
   useEffect(() => {
     window.htpc.games.injectionConfig.vulkanPresets().then(setVulkanPresets).catch(() => {});
+    window.htpc.games.injectionConfig.shaderParamDefs().then(setShaderParamDefs).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -1672,9 +1674,12 @@ export const GamingTab: React.FC = () => {
                             <select
                               value={selectedInjectionConfig.vulkanShader.preset}
                               onChange={(e) => {
+                                const newPreset = e.target.value;
+                                const defs = shaderParamDefs[newPreset] ?? [];
+                                const defaultParams = defs.map((d) => d.default);
                                 const next: GameInjectionConfig = {
                                   ...selectedInjectionConfig,
-                                  vulkanShader: { ...selectedInjectionConfig.vulkanShader!, preset: e.target.value },
+                                  vulkanShader: { ...selectedInjectionConfig.vulkanShader!, preset: newPreset, params: defaultParams.length > 0 ? defaultParams : undefined },
                                 };
                                 setSelectedInjectionConfig(next);
                                 void window.htpc.games.injectionConfig.set(selected.id, next);
@@ -1714,6 +1719,33 @@ export const GamingTab: React.FC = () => {
                               className="w-full"
                             />
                           </div>
+                          {(shaderParamDefs[selectedInjectionConfig.vulkanShader.preset] ?? []).map((def, idx) => (
+                            <div key={idx}>
+                              <label className="text-[12px] block mb-1" style={{ color: "var(--text-secondary)" }}>
+                                {def.label}: {(selectedInjectionConfig.vulkanShader.params?.[idx] ?? def.default).toFixed(def.step < 0.01 ? 4 : def.step < 1 ? 3 : 0)}
+                              </label>
+                              <input
+                                type="range"
+                                min={def.min}
+                                max={def.max}
+                                step={def.step}
+                                value={selectedInjectionConfig.vulkanShader.params?.[idx] ?? def.default}
+                                onChange={(e) => {
+                                  const val = parseFloat(e.target.value);
+                                  const currentParams = selectedInjectionConfig.vulkanShader.params ?? shaderParamDefs[selectedInjectionConfig.vulkanShader.preset]?.map((d) => d.default) ?? [];
+                                  const newParams = [...currentParams];
+                                  newParams[idx] = val;
+                                  const next: GameInjectionConfig = {
+                                    ...selectedInjectionConfig,
+                                    vulkanShader: { ...selectedInjectionConfig.vulkanShader!, params: newParams },
+                                  };
+                                  setSelectedInjectionConfig(next);
+                                  void window.htpc.games.injectionConfig.set(selected.id, next);
+                                }}
+                                className="w-full"
+                              />
+                            </div>
+                          ))}
                           {selected.platform === "steam" && (
                             <p className="text-[12px]" style={{ color: "var(--text-secondary)" }}>
                               Uses Proton's <code>user_settings.py</code> to inject env vars. The file is cleaned up when the game closes.

@@ -518,6 +518,8 @@ const htpc = {
         ipcRenderer.invoke("games:injectionConfig:checkUserSettingsPy", steamAppId),
       vulkanPresets: (): Promise<{ id: string; name: string }[]> =>
         ipcRenderer.invoke("games:injectionConfig:vulkanPresets"),
+      shaderParamDefs: (): Promise<Record<string, { label: string; min: number; max: number; step: number; default: number }[]>> =>
+        ipcRenderer.invoke("games:injectionConfig:shaderParamDefs"),
       findMainExe: (id: string): Promise<string | null> =>
         ipcRenderer.invoke("games:findMainExe", id),
     },
