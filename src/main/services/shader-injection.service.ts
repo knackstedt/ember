@@ -1,7 +1,18 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync, copyFileSync, readdirSync, statSync } from "fs";
 import { join, dirname, basename } from "path";
 import { homedir } from "os";
-import { Game, GameInjectionConfig, VulkanShaderConfig, DllInjectionConfig } from "../../shared/types";
+import { app } from "electron";
+import {
+  Game,
+  GameInjectionConfig,
+  VulkanShaderConfig,
+  DllInjectionConfig,
+  TaintManifest,
+  TaintEntry,
+  TaintType,
+  TAINT_MANIFEST_VERSION,
+  TAINT_ENTRY_VERSION,
+} from "../../shared/types";
 import { createLogger } from "../util/logger";
 import { getSettings } from "./settings.service";
 
@@ -11,6 +22,10 @@ const log = createLogger("info");
 const EMBER_MARKER = "# EMBER_SHADER_INJECTION_V1";
 /** Backup suffix for pre-existing user_settings.py files */
 const EMBER_BACKUP_SUFFIX = ".ember-backup";
+/** Filename for the taint manifest file written into the prefix/compatdata dir */
+const TAINT_MANIFEST_FILENAME = "ember-taints.json";
+/** Taints older than this (ms) are considered stale on startup.  24 hours. */
+const TAINT_STALE_MS = 24 * 60 * 60 * 1000;
 
 /** Available shader presets for the Vulkan layer */
 export const VULKAN_SHADER_PRESETS = [
@@ -293,7 +308,7 @@ export function writeUserSettingsPy(
   steamAppId: number,
   envVars: Record<string, string>,
   overrideExisting: boolean,
-): { success: boolean; backedUp?: boolean; error?: string } {
+): { success: boolean; backedUp?: boolean; error?: string; taints?: TaintEntry[] } {
   const paths = getUserSettingsPyPaths();
   if (paths.length === 0) {
     return { success: false, error: "Could not find any Proton installations" };
@@ -302,6 +317,8 @@ export function writeUserSettingsPy(
   let backedUp = false;
   let anySuccess = false;
   const errors: string[] = [];
+  const taints: TaintEntry[] = [];
+  const now = Date.now();
 
   for (const pyPath of paths) {
     let isExternal = false;
@@ -326,6 +343,13 @@ export function writeUserSettingsPy(
         copyFileSync(pyPath, backupPath);
         backedUp = true;
         log.info("shader-injection", `Backed up existing user_settings.py to ${backupPath}`);
+        taints.push({
+          type: "user_settings_backup",
+          path: backupPath,
+          originalPath: pyPath,
+          version: TAINT_ENTRY_VERSION,
+          createdAt: now,
+        });
       } catch (err) {
         log.warn("shader-injection", `Failed to backup user_settings.py: ${err}`);
       }
@@ -358,13 +382,19 @@ export function writeUserSettingsPy(
       writeFileSync(pyPath, lines.join("\n"), "utf-8");
       anySuccess = true;
       log.info("shader-injection", `Wrote user_settings.py to ${pyPath} for Steam app ${steamAppId}`);
+      taints.push({
+        type: "user_settings_py",
+        path: pyPath,
+        version: TAINT_ENTRY_VERSION,
+        createdAt: now,
+      });
     } catch (err) {
       errors.push(`Failed to write ${pyPath}: ${err}`);
     }
   }
 
   if (anySuccess) {
-    return { success: true, backedUp };
+    return { success: true, backedUp, taints };
   }
   return { success: false, error: errors.join("; ") };
 }
@@ -405,6 +435,307 @@ export function cleanupUserSettingsPy(_steamAppId: number): void {
       }
     }
   }
+}
+
+// ---------------------------------------------------------------------------
+// Taint manifest — tracks every side-effect Ember applies so we can clean up
+// reliably on game exit or on startup if the previous session crashed.
+// ---------------------------------------------------------------------------
+
+/**
+ * Determine the directory where the taint manifest should be written.
+ * For Steam games: the compatdata directory.
+ * For Windows games: the Wine prefix root.
+ * Falls back to a per-game directory in Ember's userData.
+ */
+export function getTaintManifestDir(
+  gameId: string,
+  steamAppId?: number,
+  prefixPath?: string | null,
+): string {
+  if (steamAppId) {
+    const compat = findCompatDataPath(steamAppId);
+    if (compat) return compat;
+  }
+  if (prefixPath && existsSync(prefixPath)) {
+    return prefixPath;
+  }
+  // Fallback: Ember's own userData
+  const fallback = join(app.getPath("userData"), "taints", gameId.replace(/[^a-zA-Z0-9_-]/g, "_"));
+  if (!existsSync(fallback)) mkdirSync(fallback, { recursive: true });
+  return fallback;
+}
+
+/**
+ * Get the full path to the taint manifest file for a game.
+ */
+export function getTaintManifestPath(
+  gameId: string,
+  steamAppId?: number,
+  prefixPath?: string | null,
+): string {
+  return join(getTaintManifestDir(gameId, steamAppId, prefixPath), TAINT_MANIFEST_FILENAME);
+}
+
+/**
+ * Write a taint manifest file recording all side-effects applied for a launch.
+ */
+export function writeTaintManifest(
+  gameId: string,
+  steamAppId: number | undefined,
+  prefixPath: string | null,
+  taints: TaintEntry[],
+): string | null {
+  if (taints.length === 0) return null;
+
+  const manifestDir = getTaintManifestDir(gameId, steamAppId, prefixPath);
+  const manifestPath = join(manifestDir, TAINT_MANIFEST_FILENAME);
+
+  const manifest: TaintManifest = {
+    version: TAINT_MANIFEST_VERSION,
+    emberVersion: app.getVersion(),
+    createdAt: Date.now(),
+    gameId,
+    steamAppId,
+    manifestDir,
+    taints,
+  };
+
+  try {
+    writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), "utf-8");
+    log.info("shader-injection", `Wrote taint manifest with ${taints.length} entries to ${manifestPath}`);
+    return manifestPath;
+  } catch (err) {
+    log.warn("shader-injection", `Failed to write taint manifest: ${err}`);
+    return null;
+  }
+}
+
+/**
+ * Read a taint manifest from disk.  Returns null if the file doesn't exist
+ * or is unreadable / corrupt.
+ */
+export function readTaintManifest(manifestPath: string): TaintManifest | null {
+  if (!existsSync(manifestPath)) return null;
+  try {
+    const content = readFileSync(manifestPath, "utf-8");
+    const parsed = JSON.parse(content) as TaintManifest;
+    if (parsed.version !== TAINT_MANIFEST_VERSION) {
+      log.warn("shader-injection", `Taint manifest version mismatch: ${parsed.version} vs ${TAINT_MANIFEST_VERSION} at ${manifestPath}`);
+    }
+    return parsed;
+  } catch (err) {
+    log.warn("shader-injection", `Failed to read taint manifest at ${manifestPath}: ${err}`);
+    return null;
+  }
+}
+
+/**
+ * Remove a single tainted file from disk.
+ */
+function removeTaintFile(entry: TaintEntry): boolean {
+  if (!existsSync(entry.path)) return true;
+  try {
+    unlinkSync(entry.path);
+    log.info("shader-injection", `Removed tainted file: ${entry.path}`);
+    return true;
+  } catch (err) {
+    log.warn("shader-injection", `Failed to remove tainted file ${entry.path}: ${err}`);
+    return false;
+  }
+}
+
+/**
+ * Restore a backed-up file (for user_settings_backup taints).
+ */
+function restoreBackup(entry: TaintEntry): boolean {
+  if (!entry.originalPath || !existsSync(entry.path)) return false;
+  try {
+    copyFileSync(entry.path, entry.originalPath);
+    unlinkSync(entry.path);
+    log.info("shader-injection", `Restored backup from ${entry.path} to ${entry.originalPath}`);
+    return true;
+  } catch (err) {
+    log.warn("shader-injection", `Failed to restore backup ${entry.path}: ${err}`);
+    return false;
+  }
+}
+
+/**
+ * Clean up all taints listed in a manifest file.
+ * Removes DLLs, user_settings.py files, and restores backups.
+ * Also removes the manifest file itself when done.
+ */
+export function cleanupTaintManifest(manifestPath: string): { removed: number; failed: number } {
+  const manifest = readTaintManifest(manifestPath);
+  if (!manifest) return { removed: 0, failed: 0 };
+
+  let removed = 0;
+  let failed = 0;
+
+  // Process taints in reverse order so backups are restored after the
+  // generated file is removed.
+  const ordered = [...manifest.taints].reverse();
+
+  for (const entry of ordered) {
+    switch (entry.type) {
+      case "user_settings_py":
+        if (removeTaintFile(entry)) removed++;
+        else failed++;
+        break;
+      case "user_settings_backup":
+        if (restoreBackup(entry)) removed++;
+        else failed++;
+        break;
+      case "dll":
+        if (removeTaintFile(entry)) removed++;
+        else failed++;
+        break;
+      case "launch_options":
+        // Launch options are restored separately via restoreSteamLaunchOptions.
+        // The taint entry exists for documentation; no file to delete here.
+        removed++;
+        break;
+    }
+  }
+
+  // Remove the manifest file itself
+  try {
+    unlinkSync(manifestPath);
+    removed++;
+  } catch {
+    // non-fatal
+  }
+
+  log.info("shader-injection", `Taint cleanup complete: ${removed} removed, ${failed} failed for ${manifestPath}`);
+  return { removed, failed };
+}
+
+/**
+ * Clean up all taints for a specific game.
+ * Searches for the manifest in the expected location(s).
+ */
+export function cleanupGameTaints(
+  gameId: string,
+  steamAppId?: number,
+  prefixPath?: string | null,
+): { removed: number; failed: number } {
+  const manifestPath = getTaintManifestPath(gameId, steamAppId, prefixPath);
+  return cleanupTaintManifest(manifestPath);
+}
+
+/**
+ * Find all taint manifest files across all known locations:
+ * - All Steam compatdata dirs
+ * - All umu prefix dirs
+ * - Ember's fallback userData/taints/ dir
+ */
+export function findAllTaintManifests(): string[] {
+  const manifests: string[] = [];
+
+  // Steam compatdata dirs
+  const steamRoots = [
+    join(homedir(), ".steam", "steam"),
+    join(homedir(), ".local", "share", "Steam"),
+  ];
+
+  for (const steamRoot of steamRoots) {
+    if (!existsSync(steamRoot)) continue;
+
+    // Primary library compatdata
+    const compatDir = join(steamRoot, "steamapps", "compatdata");
+    if (existsSync(compatDir)) {
+      try {
+        for (const entry of readdirSync(compatDir)) {
+          const m = join(compatDir, entry, TAINT_MANIFEST_FILENAME);
+          if (existsSync(m)) manifests.push(m);
+        }
+      } catch { /* ignore */ }
+    }
+
+    // Additional Steam libraries
+    const libraryFoldersPath = join(steamRoot, "steamapps", "libraryfolders.vdf");
+    if (existsSync(libraryFoldersPath)) {
+      try {
+        const content = readFileSync(libraryFoldersPath, "utf-8");
+        const pathMatches = content.matchAll(/"path"\s+"([^"]+)"/g);
+        for (const [, p] of pathMatches) {
+          const libCompat = join(p, "steamapps", "compatdata");
+          if (existsSync(libCompat)) {
+            for (const entry of readdirSync(libCompat)) {
+              const m = join(libCompat, entry, TAINT_MANIFEST_FILENAME);
+              if (existsSync(m)) manifests.push(m);
+            }
+          }
+        }
+      } catch { /* ignore */ }
+    }
+  }
+
+  // umu prefix dirs
+  const umuPrefixes = join(homedir(), ".local", "share", "umu", "prefixes");
+  if (existsSync(umuPrefixes)) {
+    try {
+      for (const entry of readdirSync(umuPrefixes)) {
+        const m = join(umuPrefixes, entry, TAINT_MANIFEST_FILENAME);
+        if (existsSync(m)) manifests.push(m);
+      }
+    } catch { /* ignore */ }
+  }
+
+  // Ember fallback
+  const fallbackDir = join(app.getPath("userData"), "taints");
+  if (existsSync(fallbackDir)) {
+    try {
+      for (const entry of readdirSync(fallbackDir)) {
+        const m = join(fallbackDir, entry, TAINT_MANIFEST_FILENAME);
+        if (existsSync(m)) manifests.push(m);
+      }
+    } catch { /* ignore */ }
+  }
+
+  return [...new Set(manifests)];
+}
+
+/**
+ * Clean up stale taints on startup.
+ * A taint is considered stale if its manifest is older than TAINT_STALE_MS.
+ * This handles the case where Ember crashed or was killed during a game
+ * session and never ran the normal cleanup path.
+ */
+export function cleanupStaleTaints(): { cleaned: number; skipped: number } {
+  const manifests = findAllTaintManifests();
+  let cleaned = 0;
+  let skipped = 0;
+  const now = Date.now();
+
+  for (const manifestPath of manifests) {
+    const manifest = readTaintManifest(manifestPath);
+    if (!manifest) {
+      // Corrupt or unreadable — try to remove the file
+      try { unlinkSync(manifestPath); } catch { /* ignore */ }
+      continue;
+    }
+
+    const age = now - manifest.createdAt;
+    if (age > TAINT_STALE_MS) {
+      log.info("shader-injection", `Cleaning stale taint manifest (age=${Math.round(age / 1000 / 60)}min) for game ${manifest.gameId} at ${manifestPath}`);
+      const result = cleanupTaintManifest(manifestPath);
+      if (result.failed === 0) {
+        cleaned++;
+      } else {
+        log.warn("shader-injection", `Stale taint cleanup had ${result.failed} failures for ${manifestPath}`);
+        cleaned++;
+      }
+    } else {
+      skipped++;
+    }
+  }
+
+  if (cleaned > 0 || skipped > 0) {
+    log.info("shader-injection", `Stale taint cleanup: ${cleaned} cleaned, ${skipped} still active`);
+  }
+  return { cleaned, skipped };
 }
 
 // ---------------------------------------------------------------------------
@@ -733,9 +1064,11 @@ export function buildDllOverrideEnv(config: DllInjectionConfig): string {
 export function copyDllsToPrefix(
   prefixPath: string,
   customDlls: string[],
-): { copied: string[]; errors: string[] } {
+): { copied: string[]; errors: string[]; taints?: TaintEntry[] } {
   const copied: string[] = [];
   const errors: string[] = [];
+  const taints: TaintEntry[] = [];
+  const now = Date.now();
 
   const system32 = join(prefixPath, "drive_c", "windows", "system32");
   if (!existsSync(system32)) {
@@ -752,12 +1085,18 @@ export function copyDllsToPrefix(
       copyFileSync(dllPath, dest);
       copied.push(basename(dllPath));
       log.info("shader-injection", `Copied ${basename(dllPath)} to prefix system32`);
+      taints.push({
+        type: "dll",
+        path: dest,
+        version: TAINT_ENTRY_VERSION,
+        createdAt: now,
+      });
     } catch (err) {
       errors.push(`Failed to copy ${basename(dllPath)}: ${err}`);
     }
   }
 
-  return { copied, errors };
+  return { copied, errors, taints };
 }
 
 /**

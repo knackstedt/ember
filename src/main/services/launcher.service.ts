@@ -2,7 +2,7 @@ import { spawn, spawnSync, ChildProcess, execFile } from "child_process";
 import { existsSync, readdirSync, readFileSync } from "fs";
 import { promisify } from "util";
 import { BrowserWindow } from "electron";
-import { Game, Movie, MusicTrack } from "../../shared/types";
+import { Game, Movie, MusicTrack, type TaintEntry } from "../../shared/types";
 import { createLogger } from "../util/logger";
 import { GameRepo } from "../db/repository";
 import { buildWineCommand } from "./wine-detection.service";
@@ -31,6 +31,8 @@ import {
   restoreSteamLaunchOptions,
   buildLaunchOptionsString,
   buildGLHookEnv,
+  writeTaintManifest,
+  cleanupGameTaints,
 } from "./shader-injection.service";
 
 const log = createLogger("info");
@@ -469,6 +471,7 @@ export async function launchGame(game: Game): Promise<void> {
   let steamCompatAppId: number | undefined;
   let prefixPath: string | null = null;
   let launchOptionsState: { original: string | null; configPath: string } | null = null;
+  const collectedTaints: TaintEntry[] = [];
   try {
     if (game.platform === "steam") {
       sendGameLaunchProgress(game.id, "Preparing shader injection", "Resolving injection config…");
@@ -493,6 +496,7 @@ export async function launchGame(game: Game): Promise<void> {
           if (result.errors.length > 0) {
             log.warn("launcher", `DLL copy errors: ${result.errors.join("; ")}`);
           }
+          if (result.taints) collectedTaints.push(...result.taints);
         }
       }
       if (game.platform === "steam" && game.steamAppId) {
@@ -541,6 +545,7 @@ export async function launchGame(game: Game): Promise<void> {
         log.warn("launcher", `Failed to write user_settings.py: ${result.error}`);
         injectionEnv = {};
       }
+      if (result.taints) collectedTaints.push(...result.taints);
     }
   }
 
@@ -551,6 +556,12 @@ export async function launchGame(game: Game): Promise<void> {
     if (result) {
       launchOptionsState = result;
       log.info("launcher", `Set Steam launch options for native Linux game: ${launchOpts}`);
+      collectedTaints.push({
+        type: "launch_options",
+        path: result.configPath,
+        version: 1,
+        createdAt: Date.now(),
+      });
       // If Steam is already running, it needs to re-read localconfig.vdf.
       // Shut it down so it picks up the launch options on restart.
       if (isSteamRunning()) {
@@ -563,6 +574,11 @@ export async function launchGame(game: Game): Promise<void> {
     } else {
       log.warn("launcher", `Failed to set Steam launch options; injection may not work`);
     }
+  }
+
+  // Write taint manifest so we can clean up even if Ember crashes
+  if (collectedTaints.length > 0) {
+    writeTaintManifest(game.id, steamCompatAppId, prefixPath, collectedTaints);
   }
 
   if (typeof (global as any).gc === "function") {
@@ -645,6 +661,8 @@ export async function launchGame(game: Game): Promise<void> {
           if (needsLaunchOptions && steamCompatAppId && launchOptionsState) {
             restoreSteamLaunchOptions(steamCompatAppId, launchOptionsState.original, launchOptionsState.configPath);
           }
+          // Clean up all remaining taints (DLLs, manifest file, etc.)
+          cleanupGameTaints(game.id, steamCompatAppId, prefixPath);
           void runSessionHooks(game, "after-start");
           GameRepo.setLastPlayed(game.id, Date.now()).catch((err) => {
             log.warn("launcher", `Failed to set lastPlayed for ${game.id}: ${err}`);
@@ -688,6 +706,8 @@ export async function launchGame(game: Game): Promise<void> {
           if (needsLaunchOptions && steamCompatAppId && launchOptionsState) {
             restoreSteamLaunchOptions(steamCompatAppId, launchOptionsState.original, launchOptionsState.configPath);
           }
+          // Clean up all remaining taints (DLLs, manifest file, etc.)
+          cleanupGameTaints(game.id, steamCompatAppId, prefixPath);
 
           const launchState = steamLaunchState.get(game.id);
           steamLaunchState.delete(game.id);
@@ -892,6 +912,10 @@ export async function launchGame(game: Game): Promise<void> {
         log.info("launcher", `"${game.title}" exited (code=${code}, signal=${signal})`);
         sendGameStopped(game.id);
         restoreAndFocusWindow();
+        // Clean up injection taints (DLLs, user_settings.py, manifest)
+        if (collectedTaints.length > 0) {
+          cleanupGameTaints(game.id, steamCompatAppId, prefixPath);
+        }
         return;
       }
       if (!settled && spawnOk) {
@@ -902,6 +926,10 @@ export async function launchGame(game: Game): Promise<void> {
           : `Process exited immediately with code ${code}. ${stderrTail}`;
         log.error("launcher", `"${game.title}" failed: ${reason}`);
         restoreAndFocusWindow();
+        // Clean up injection taints on early exit too
+        if (collectedTaints.length > 0) {
+          cleanupGameTaints(game.id, steamCompatAppId, prefixPath);
+        }
         reject(new Error(reason));
       }
     });

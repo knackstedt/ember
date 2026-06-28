@@ -16,6 +16,7 @@ import { getXdgVideosDir } from "./scanners/xdg";
 import { GameRepo, MovieRepo, RemoteSourceRepo } from "./db/repository";
 import { launchGame } from "./services/launcher.service";
 import { initOverlayService } from "./services/overlay.service";
+import { cleanupStaleTaints } from "./services/shader-injection.service";
 import { getServePort, shutdownRcloneManager } from "./services/rclone-manager";
 import { startRemoteAvailabilityWorker, stopRemoteAvailabilityWorker } from "./services/remote-availability.service";
 import { bootPlugins, shutdownPlugins } from "./plugins/loader";
@@ -622,6 +623,9 @@ protocol.registerSchemesAsPrivileged([
 
 app.whenReady().then(async () => {
   app.setAppUserModelId("com.ember.app");
+
+  // Clean up stale shader injection taints from crashed/killed sessions
+  cleanupStaleTaints();
 
   if (!isDev) {
     initUpdater();

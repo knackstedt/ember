@@ -198,6 +198,58 @@ export interface GameInjectionConfig {
   dllInjection?: DllInjectionConfig;
 }
 
+// ---------------------------------------------------------------------------
+// Taint tracking — Ember records every side-effect it applies to the system
+// (user_settings.py, copied DLLs, Steam launch options, backups) in a taint
+// manifest file.  Each manifest carries a version and timestamp so Ember can
+// detect stale taints on startup and clean them up.
+// ---------------------------------------------------------------------------
+
+/** Current taint manifest format version.  Bump when the schema changes. */
+export const TAINT_MANIFEST_VERSION = 1;
+
+/** Current version for individual taint entries.  Bump when the entry format changes. */
+export const TAINT_ENTRY_VERSION = 1;
+
+/** Types of side-effects Ember can apply to the system */
+export type TaintType =
+  | "user_settings_py"
+  | "user_settings_backup"
+  | "dll"
+  | "launch_options";
+
+/** A single taint entry — one file or config modification Ember made. */
+export interface TaintEntry {
+  /** What kind of taint this is */
+  type: TaintType;
+  /** Full path to the tainted file (or config file for launch_options) */
+  path: string;
+  /** For backups: the original file path that was backed up */
+  originalPath?: string;
+  /** Taint entry format version */
+  version: number;
+  /** Unix timestamp (ms) when this taint was applied */
+  createdAt: number;
+}
+
+/** Manifest tracking all taints Ember has applied for a game launch. */
+export interface TaintManifest {
+  /** Manifest format version (TAINT_MANIFEST_VERSION) */
+  version: number;
+  /** Ember app version that created the taints */
+  emberVersion: string;
+  /** Unix timestamp (ms) when the manifest was written */
+  createdAt: number;
+  /** Game ID from the Ember database */
+  gameId: string;
+  /** Steam app ID if applicable */
+  steamAppId?: number;
+  /** Directory where the manifest file lives (compatdata or prefix root) */
+  manifestDir: string;
+  /** All taint entries applied for this launch */
+  taints: TaintEntry[];
+}
+
 export interface Movie {
   id: string;
   title: string;
