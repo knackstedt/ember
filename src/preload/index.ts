@@ -358,6 +358,7 @@ const htpc = {
   app: {
     setFullscreen: (value: boolean): Promise<void> =>
       ipcRenderer.invoke("app:fullscreen", value),
+    focusEmber: (): Promise<void> => ipcRenderer.invoke("app:focus-ember"),
     quit: (): Promise<void> => ipcRenderer.invoke("app:quit"),
     restart: (): Promise<void> => ipcRenderer.invoke("app:restart"),
     shutdown: (): Promise<void> => ipcRenderer.invoke("app:shutdown"),

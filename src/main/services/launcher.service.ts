@@ -177,7 +177,7 @@ function minimizeWindow(): void {
   }
 }
 
-function restoreAndFocusWindow(): void {
+export function restoreAndFocusWindow(): void {
   const win = getMainWindow();
   if (win && !win.isDestroyed()) {
     if (win.isMinimized()) win.restore();

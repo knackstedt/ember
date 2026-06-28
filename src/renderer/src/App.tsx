@@ -588,8 +588,19 @@ export default function App(): React.ReactElement {
         setEvdevGamepadActive(true);
       }
 
-      // When an external game is running, suppress all controller navigation in Ember
+      // When an external game is running, only allow mapped controller keybinds
+      // (e.g. focus-ember, kill game, toggle overlay, pause). All navigation
+      // and unmapped inputs are suppressed so the game gets clean controller input.
       if (gameRunningRef.current) {
+        if (ev.type === "axis") return;
+        if (ev.type === "button_press") {
+          const ctrlMap = customControllerMapRef.current;
+          const mappedCmdId = Object.entries(ctrlMap).find(([, btn]) => btn === ev.action)?.[0];
+          if (mappedCmdId) {
+            const cmd = COMMAND_DEFINITIONS.find((c) => c.id === mappedCmdId);
+            if (cmd) executeCommandRef.current(cmd);
+          }
+        }
         return;
       }
 

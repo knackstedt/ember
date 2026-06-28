@@ -534,6 +534,14 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     setSetting("fullscreen", value);
   });
 
+  ipcMain.handle("app:focus-ember", () => {
+    const win = getMainWindow();
+    if (win && !win.isDestroyed()) {
+      if (win.isMinimized()) win.restore();
+      win.focus();
+    }
+  });
+
   ipcMain.handle("app:quit", () => {
     app.quit();
   });

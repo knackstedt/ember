@@ -251,6 +251,12 @@ export function useCommands(
         case "gaming.pause":
           window.htpc.overlay.pause();
           break;
+        case "gaming.focus-ember":
+          window.htpc.app.focusEmber();
+          break;
+        case "gaming.kill":
+          window.htpc.overlay.stopGame();
+          break;
         case "gaming.shader.clear": {
           if (context.selectedGameId) {
             const setEmulatorConfig = useGamesStore.getState().setEmulatorConfig;
