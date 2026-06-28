@@ -15,6 +15,7 @@ import { useMusicPlayerStore } from "../../store/musicPlayer.store";
 import { useFocusZoneStore } from "../../store/focusZone.store";
 import { getTrackDisplayName } from "../lib/track-title";
 import { scaledImageUrl } from "../../lib/image-url";
+import { ConfirmDialog } from "../../components/ConfirmDialog/ConfirmDialog";
 
 const MINI_HEIGHT = 56;
 
@@ -54,6 +55,8 @@ export const MusicPlayerBar: React.FC<MusicPlayerBarProps> = React.memo(({ onExp
   const [focusedButton, setFocusedButton] = useState<MiniButton>("play");
   const focusedButtonRef = useRef(focusedButton);
   focusedButtonRef.current = focusedButton;
+
+  const [confirmClear, setConfirmClear] = useState(false);
 
   const volumeRef = useRef(volume);
   volumeRef.current = volume;
@@ -117,7 +120,7 @@ export const MusicPlayerBar: React.FC<MusicPlayerBarProps> = React.memo(({ onExp
             case "volDown": setVolume(Math.max(0, volume - 0.05)); break;
             case "volUp": setVolume(Math.min(1, volume + 0.05)); break;
             case "expand": onExpand(); break;
-            case "clear": clearQueue(); break;
+            case "clear": setConfirmClear(true); break;
           }
           break;
         }
@@ -130,7 +133,7 @@ export const MusicPlayerBar: React.FC<MusicPlayerBarProps> = React.memo(({ onExp
 
     window.addEventListener("htpc:nav", handler);
     return () => window.removeEventListener("htpc:nav", handler);
-  }, [activeZone, playing, volume, setZone, prev, pause, resume, next, setVolume, onExpand, clearQueue]);
+  }, [activeZone, playing, volume, setZone, prev, pause, resume, next, setVolume, onExpand]);
 
   const isFocused = (btn: MiniButton) => activeZone === "player" && focusedButton === btn;
   const focusStyle = (btn: MiniButton): React.CSSProperties =>
@@ -295,7 +298,7 @@ export const MusicPlayerBar: React.FC<MusicPlayerBarProps> = React.memo(({ onExp
           <ChevronUp size={16} />
         </button>
         <button
-          onClick={clearQueue}
+          onClick={() => setConfirmClear(true)}
           className="w-7 h-7 flex items-center justify-center rounded hover:bg-white/10 transition-colors"
           style={{ color: "var(--text-secondary)", ...focusStyle("clear") }}
           aria-label="Clear player"
@@ -303,6 +306,19 @@ export const MusicPlayerBar: React.FC<MusicPlayerBarProps> = React.memo(({ onExp
           <X size={14} />
         </button>
       </div>
+
+      <ConfirmDialog
+        isOpen={confirmClear}
+        title="Clear Queue"
+        message="Are you sure you want to clear the queue? This will stop playback and cannot be undone."
+        confirmLabel="Clear"
+        destructive
+        onConfirm={() => {
+          clearQueue();
+          setConfirmClear(false);
+        }}
+        onCancel={() => setConfirmClear(false)}
+      />
     </motion.div>
   );
 });

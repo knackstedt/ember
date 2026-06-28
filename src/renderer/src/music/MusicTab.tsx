@@ -554,6 +554,7 @@ export const MusicTab: React.FC = () => {
         track.filePath &&
         (track.filePath.startsWith("/") || track.filePath.startsWith("file://"));
       const opts: ContextMenuOption[] = [
+        { id: "play", label: "Play", icon: <ListStart size={16} /> },
         { id: "play-next", label: "Play Next", icon: <ListStart size={16} /> },
         { id: "queue", label: "Queue", icon: <ListPlus size={16} /> },
         { id: "random-insert", label: "Random Insert", icon: <Shuffle size={16} /> },
@@ -575,6 +576,9 @@ export const MusicTab: React.FC = () => {
     },
     onAction: (track, optionId) => {
       switch (optionId) {
+        case "play":
+          play([track], 0);
+          break;
         case "play-next":
           queueNext([track]);
           break;
