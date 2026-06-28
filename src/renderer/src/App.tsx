@@ -11,6 +11,11 @@ import {
   Power,
   Loader,
   LayoutDashboard,
+  LogOut,
+  RotateCw,
+  Moon,
+  Snowflake,
+  Monitor,
 } from "lucide-react";
 import { useSettingsStore } from "./store/settings.store";
 import { useInputStore } from "./store/input.store";
@@ -190,6 +195,22 @@ export default function App(): React.ReactElement {
   /* Power dialog state */
   const [powerDialogOpen, setPowerDialogOpen] = useState(false);
   const [powerActionLoading, setPowerActionLoading] = useState(false);
+  const [canHibernate, setCanHibernate] = useState(false);
+
+  const POWER_GRID_COLS = 3;
+  const powerActions = [
+    { id: "exit", label: "Exit Ember", icon: LogOut, action: () => window.htpc.app.quit() },
+    { id: "restart", label: "Restart Ember", icon: RotateCw, action: () => window.htpc.app.restart() },
+    { id: "shutdown", label: "Shut Down", icon: Power, action: () => window.htpc.app.shutdown(), danger: true },
+    { id: "reboot", label: "Reboot", icon: Monitor, action: () => window.htpc.app.reboot(), danger: true },
+    { id: "suspend", label: "Sleep", icon: Moon, action: () => window.htpc.app.suspend() },
+    ...(canHibernate
+      ? [{ id: "hibernate", label: "Hibernate", icon: Snowflake, action: () => window.htpc.app.hibernate() }]
+      : []),
+    { id: "cancel", label: "Cancel", icon: Loader, action: () => Promise.resolve() },
+  ] as const;
+  const powerActionsRef = useRef(powerActions);
+  powerActionsRef.current = powerActions;
 
   /* Command palette context refs */
   const selectedGameRef = useRef<string | null>(null);
@@ -406,6 +427,8 @@ export default function App(): React.ReactElement {
     });
 
     const unsubGameLaunchFailed = window.htpc.onGameLaunchFailed((detail) => {
+      gameRunningRef.current = false;
+      setGameRunning(false);
       useGameLaunchStore.getState().setFailed(detail.gameId, detail.reason);
       console.log(`[renderer] External game launch failed: ${detail.gameId}`);
     });
@@ -1077,6 +1100,7 @@ export default function App(): React.ReactElement {
   useEffect(() => {
     if (powerDialogOpen) {
       setPowerDialogFocusIndex(0);
+      void window.htpc.app.canHibernate().then(setCanHibernate);
     }
   }, [powerDialogOpen]);
 
@@ -1087,19 +1111,24 @@ export default function App(): React.ReactElement {
       const action = detail?.action;
       if (!action) return;
       e.stopImmediatePropagation();
+      const maxIndex = powerActionsRef.current.length - 1;
       if (action === "left") {
         setPowerDialogFocusIndex((prev) => Math.max(0, prev - 1));
       } else if (action === "right") {
-        setPowerDialogFocusIndex((prev) => Math.min(2, prev + 1));
+        setPowerDialogFocusIndex((prev) => Math.min(maxIndex, prev + 1));
+      } else if (action === "up") {
+        setPowerDialogFocusIndex((prev) => Math.max(0, prev - POWER_GRID_COLS));
+      } else if (action === "down") {
+        setPowerDialogFocusIndex((prev) => Math.min(maxIndex, prev + POWER_GRID_COLS));
       } else if (action === "confirm") {
-        if (powerDialogFocusIndex === 0) {
-          setPowerDialogOpen(false);
-        } else if (powerDialogFocusIndex === 1) {
-          setPowerActionLoading(true);
-          void window.htpc.app.quit();
-        } else if (powerDialogFocusIndex === 2) {
-          setPowerActionLoading(true);
-          void window.htpc.app.shutdown();
+        const item = powerActionsRef.current[powerDialogFocusIndex];
+        if (item) {
+          if (item.id === "cancel") {
+            setPowerDialogOpen(false);
+          } else {
+            setPowerActionLoading(true);
+            void item.action();
+          }
         }
       } else if (action === "cancel") {
         setPowerDialogOpen(false);
@@ -1360,7 +1389,7 @@ export default function App(): React.ReactElement {
               style={{
                 background: "var(--surface-1)",
                 border: "1px solid var(--border-default)",
-                minWidth: 320,
+                maxWidth: 520,
               }}
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
@@ -1368,68 +1397,66 @@ export default function App(): React.ReactElement {
               transition={{ type: "spring", damping: 30, stiffness: 400 }}
               onClick={(e) => e.stopPropagation()}
             >
-              <h2
-                className="text-lg font-semibold"
-                style={{ color: "var(--text-primary)" }}
-              >
-                Power Options
-              </h2>
-              <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-                What would you like to do?
-              </p>
-              <div className="flex gap-3 justify-end">
-                <button
-                  className={`px-4 py-2 rounded-[var(--radius-card)] text-sm transition-colors ${powerDialogFocusIndex === 0 ? "tab-bar-focus" : ""}`}
-                  style={{
-                    background: powerDialogFocusIndex === 0 ? "var(--accent)" : "transparent",
-                    color: powerDialogFocusIndex === 0 ? "var(--surface-base)" : "var(--text-primary)",
-                    border: `1px solid ${powerDialogFocusIndex === 0 ? "var(--accent)" : "var(--border-default)"}`,
-                    opacity: powerActionLoading ? 0.6 : 1,
-                  }}
-                  onClick={() => setPowerDialogOpen(false)}
-                  disabled={powerActionLoading}
+              <div className="flex flex-col gap-1">
+                <h2
+                  className="text-lg font-semibold"
+                  style={{ color: "var(--text-primary)" }}
                 >
-                  Cancel
-                </button>
-                <button
-                  className={`px-4 py-2 rounded-[var(--radius-card)] text-sm transition-colors ${powerDialogFocusIndex === 1 ? "tab-bar-focus" : ""}`}
-                  style={{
-                    background: powerDialogFocusIndex === 1 ? "var(--accent)" : "transparent",
-                    color: powerDialogFocusIndex === 1 ? "var(--surface-base)" : "var(--text-primary)",
-                    border: `1px solid ${powerDialogFocusIndex === 1 ? "var(--accent)" : "var(--border-default)"}`,
-                    opacity: powerActionLoading ? 0.6 : 1,
-                  }}
-                  onClick={async () => {
-                    setPowerActionLoading(true);
-                    await window.htpc.app.quit();
-                  }}
-                  disabled={powerActionLoading}
-                >
-                  {powerActionLoading && (
-                    <Loader size={14} className="animate-spin inline mr-1.5" />
-                  )}
-                  Exit Ember
-                </button>
-                <button
-                  className={`px-4 py-2 rounded-[var(--radius-card)] text-sm transition-colors ${powerDialogFocusIndex === 2 ? "tab-bar-focus" : ""}`}
-                  style={{
-                    background: powerDialogFocusIndex === 2 ? "#ff4444" : "transparent",
-                    color: powerDialogFocusIndex === 2 ? "#fff" : "var(--text-primary)",
-                    border: `1px solid ${powerDialogFocusIndex === 2 ? "#ff4444" : "var(--border-default)"}`,
-                    opacity: powerActionLoading ? 0.6 : 1,
-                  }}
-                  onClick={async () => {
-                    setPowerActionLoading(true);
-                    await window.htpc.app.shutdown();
-                  }}
-                  disabled={powerActionLoading}
-                >
-                  {powerActionLoading && (
-                    <Loader size={14} className="animate-spin inline mr-1.5" />
-                  )}
-                  Shut Down Computer
-                </button>
+                  Power Options
+                </h2>
+                <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+                  Choose an action below.
+                </p>
               </div>
+              <div
+                className="grid gap-3"
+                style={{ gridTemplateColumns: `repeat(${POWER_GRID_COLS}, 1fr)` }}
+              >
+                {powerActions.map((item, idx) => {
+                  const Icon = item.icon;
+                  const isFocused = powerDialogFocusIndex === idx;
+                  const isCancel = item.id === "cancel";
+                  const isDanger = "danger" in item && item.danger;
+                  const focusBg = isDanger ? "#ff4444" : "var(--accent)";
+                  const focusColor = isDanger ? "#fff" : "var(--surface-base)";
+                  const focusBorder = isDanger ? "#ff4444" : "var(--accent)";
+                  return (
+                    <button
+                      key={item.id}
+                      className={`flex flex-col items-center justify-center gap-2 px-4 py-5 rounded-[var(--radius-card)] text-sm font-medium transition-all ${isFocused ? "tab-bar-focus" : ""}`}
+                      style={{
+                        background: isFocused ? focusBg : "var(--surface-0)",
+                        color: isFocused ? focusColor : "var(--text-primary)",
+                        border: `1px solid ${isFocused ? focusBorder : "var(--border-default)"}`,
+                        opacity: powerActionLoading ? 0.5 : 1,
+                        cursor: powerActionLoading ? "not-allowed" : "pointer",
+                      }}
+                      onClick={() => {
+                        if (powerActionLoading) return;
+                        if (isCancel) {
+                          setPowerDialogOpen(false);
+                        } else {
+                          setPowerActionLoading(true);
+                          void item.action();
+                        }
+                      }}
+                      disabled={powerActionLoading}
+                    >
+                      <Icon size={28} strokeWidth={1.5} />
+                      <span>{item.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              {powerActionLoading && (
+                <div
+                  className="flex items-center justify-center gap-2 text-sm"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  <Loader size={14} className="animate-spin" />
+                  <span>Executing…</span>
+                </div>
+              )}
             </motion.div>
           </motion.div>
         )}

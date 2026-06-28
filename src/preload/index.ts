@@ -362,6 +362,10 @@ const htpc = {
     quit: (): Promise<void> => ipcRenderer.invoke("app:quit"),
     restart: (): Promise<void> => ipcRenderer.invoke("app:restart"),
     shutdown: (): Promise<void> => ipcRenderer.invoke("app:shutdown"),
+    reboot: (): Promise<void> => ipcRenderer.invoke("app:reboot"),
+    suspend: (): Promise<void> => ipcRenderer.invoke("app:suspend"),
+    hibernate: (): Promise<void> => ipcRenderer.invoke("app:hibernate"),
+    canHibernate: (): Promise<boolean> => ipcRenderer.invoke("app:canHibernate"),
     getXdgDefaults: (): Promise<{
       videosDir: string;
       musicDir: string;

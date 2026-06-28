@@ -75,7 +75,7 @@ export function listInstalledItchGames(): Game[] {
 }
 
 /** Launch an itch game via direct exec */
-export async function launchItchGame(game: Game): Promise<{ success: boolean; error?: string }> {
+export async function launchItchGame(game: Game): Promise<{ success: boolean; error?: string; pid?: number }> {
   if (!game.execPath) {
     return { success: false, error: "No executable path for itch game" };
   }
@@ -90,7 +90,7 @@ export async function launchItchGame(game: Game): Promise<{ success: boolean; er
       log.error("itch", `Failed to launch ${game.title}: ${err.message}`);
     });
     proc.unref();
-    return { success: true };
+    return { success: true, pid: proc.pid };
   } catch (err: any) {
     return { success: false, error: err.message };
   }

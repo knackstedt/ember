@@ -817,17 +817,41 @@ export async function launchGame(game: Game): Promise<void> {
     case "itch": {
       sendGameLaunching(game.id, game.title);
       const result = await launchItchGame(game);
-      if (result.success) {
+      if (result.success && result.pid) {
+        const itchPid = result.pid;
+        setOverlayGameProcess(game.id, itchPid);
         startPlayTimeTracking(game.id);
         sendGameStarted(game.id);
         void overlayGameStarted(game.id);
         GameRepo.setLastPlayed(game.id, Date.now()).catch((err) => {
           log.warn("launcher", `Failed to set lastPlayed for ${game.id}: ${err}`);
         });
+
+        // Track the itch process so sendGameStopped fires when it exits,
+        // re-enabling controller navigation in the renderer.
+        void (async () => {
+          try {
+            await pollProcUntilGone(itchPid, 2000);
+            log.info("launcher", `itch game ${game.title} (PID ${itchPid}) has exited.`);
+          } catch (err) {
+            log.error("launcher", `Error polling itch game ${game.id}: ${err}`);
+          } finally {
+            stopPlayTimeTracking(game.id);
+            sendGameStopped(game.id);
+            clearOverlayGame(game.id);
+            restoreAndFocusWindow();
+            void runSessionHooks(game, "after-close");
+            GameRepo.setLastPlayed(game.id, Date.now()).catch((err) => {
+              log.warn("launcher", `Failed to set lastPlayed for ${game.id}: ${err}`);
+            });
+          }
+        })();
+
         return Promise.resolve();
       }
       clearOverlayGame(game.id);
       const reason = result.error ?? "Failed to launch itch game";
+      sendGameLaunchFailed(game.id, reason);
       return Promise.reject(new Error(reason));
     }
     default:

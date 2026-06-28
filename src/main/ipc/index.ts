@@ -574,6 +574,47 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     }
   });
 
+  ipcMain.handle("app:reboot", () => {
+    try {
+      spawn("systemctl", ["reboot"], { detached: true, stdio: "ignore" });
+    } catch {
+      try {
+        spawn("shutdown", ["-r", "now"], { detached: true, stdio: "ignore" });
+      } catch {
+        // Fallback not available
+      }
+    }
+  });
+
+  ipcMain.handle("app:suspend", () => {
+    try {
+      spawn("systemctl", ["suspend"], { detached: true, stdio: "ignore" });
+    } catch {
+      try {
+        spawn("pm-suspend", [], { detached: true, stdio: "ignore" });
+      } catch {
+        // Fallback not available
+      }
+    }
+  });
+
+  ipcMain.handle("app:hibernate", () => {
+    try {
+      spawn("systemctl", ["hibernate"], { detached: true, stdio: "ignore" });
+    } catch {
+      // Fallback not available
+    }
+  });
+
+  ipcMain.handle("app:canHibernate", () => {
+    try {
+      const states = readFileSync("/sys/power/state", "utf-8");
+      return states.includes("disk");
+    } catch {
+      return false;
+    }
+  });
+
   ipcMain.handle("games:scan", async (_e, extraPaths?: string[]) => {
     await performGameScan(window, extraPaths);
     // Also scan remote sources configured for ROMs
