@@ -215,6 +215,19 @@ function findSteamGamePid(steamAppId: number): number | null {
           environ.includes(`SteamAppId=${steamAppId}`) ||
           environ.includes(`SteamGameId=${steamAppId}`)
         ) {
+          // Skip Steam's own helper processes — they carry SteamAppId but
+          // are not the game process.  steamwebhelper is prone to crashing
+          // when Vulkan layer env vars leak into its environment, which
+          // can cause false-positive PID detection or missed game PIDs.
+          try {
+            const comm = readFileSync(`/proc/${pid}/comm`, "utf8").trim();
+            if (comm.includes("steamwebhelper") || comm === "steam") {
+              continue;
+            }
+          } catch {
+            // can't read comm — skip this process to be safe
+            continue;
+          }
           return pid;
         }
       } catch {
@@ -636,10 +649,15 @@ export async function launchGame(game: Game): Promise<void> {
           .join(" ")}`,
       );
 
+      // Do NOT pass injectionEnv to the Steam process itself.
+      // Injection env vars (VK_INSTANCE_LAYERS, VK_LAYER_PATH, etc.) are
+      // delivered via user_settings.py (Proton) or Steam launch options
+      // (native).  Leaking them into Steam's env causes steamwebhelper and
+      // other Steam components to load the Vulkan layer, which crashes them.
       const steamProc = spawn(steamCmd, steamArgs, {
         detached: true,
         stdio: "ignore",
-        env: { ...process.env, ...game.launchEnv, ...injectionEnv },
+        env: { ...process.env, ...game.launchEnv },
       });
       steamProc.on("error", (err) => {
         log.error("launcher", `Spawn error for "${game.title}": ${err}`);
