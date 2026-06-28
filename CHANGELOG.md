@@ -2,6 +2,33 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.5.0](https://github.com/knackstedt/ember/compare/v0.4.7...v0.5.0) (2026-06-28)
+
+
+### Features
+
+* add OpenGL shader injection to native linux games ([a3565d6](https://github.com/knackstedt/ember/commit/a3565d61c77f5ed035a5179c5a324beafeff3c44))
+* add visual shutdown indicator and fix intermittent shutdown errors ([ebffcc3](https://github.com/knackstedt/ember/commit/ebffcc31ed68a1a9512b6ab8e81ea7d61b0ef60c))
+* Expand shader support to support EGL OpenGL games ([ae4f76c](https://github.com/knackstedt/ember/commit/ae4f76c0cf5b724073e6fbfda0431e43dd0cfa4a))
+* **gaming:** add controller keybind support for focus-ember and kill-game commands while game is running ([99a62e1](https://github.com/knackstedt/ember/commit/99a62e1e392c615a6f3bff68fef4bd8c0d21b791))
+* **launcher:** add detailed launch progress tracking with step-by-step status updates for Steam games ([4574f28](https://github.com/knackstedt/ember/commit/4574f28d954344907bbdb1903c15da27af8ae869))
+* **music:** add "Play" context menu option and confirm dialog for queue clearing ([cbfd163](https://github.com/knackstedt/ember/commit/cbfd163e695a12e39b733831c9179213f4ab7eee))
+* **music:** add corrupt file handling with policy-based cleanup for unparseable tracks ([d2a9c4a](https://github.com/knackstedt/ember/commit/d2a9c4a0ecff778863c3b6dde6a8c780742d1760))
+* **power:** add reboot, suspend, and hibernate options to power dialog with grid layout ([1dcaaf2](https://github.com/knackstedt/ember/commit/1dcaaf2ee3a60dd4f2879e7e3a21c72f1915f9cc))
+* **scanners:** improve executable detection by filtering common utility patterns and preferring game-specific names ([12ba924](https://github.com/knackstedt/ember/commit/12ba924f85e8c07412337d5beaa12ba04792b3f2))
+* **shaders:** add 20 new post-processing effects with configurable parameters to Vulkan layer ([4cbf42e](https://github.com/knackstedt/ember/commit/4cbf42eb684ecf684076e3c3cc03ecb6004a4b68))
+* **shaders:** add realtime shader updates in overlay ([a1dc9e0](https://github.com/knackstedt/ember/commit/a1dc9e0fa3440b665482b8afdf924ad584052b39))
+* **shaders:** add taint manifest system for reliable cleanup of shader injection side-effects across crashes ([2037a86](https://github.com/knackstedt/ember/commit/2037a861487ab041352e654c61ae66a4b0a51034))
+* **shaders:** add Vulkan layer shader injection and DLL override support for Windows games ([17ebc7b](https://github.com/knackstedt/ember/commit/17ebc7baf3a8b13d62180c266cdaec272a3023f8))
+
+
+### Bug Fixes
+
+* correct a bug that causes controller virtual cursors to not activate ([f561988](https://github.com/knackstedt/ember/commit/f561988cfb9bea21963bc308f3149dfdfc7badee))
+* **launcher:** restore and focus main window when game exits ([1b33b6e](https://github.com/knackstedt/ember/commit/1b33b6ee0c4733794c38d3b819fad22e5b3520e1))
+* prevent launching games from killing and restarting Steam ([c59bcf3](https://github.com/knackstedt/ember/commit/c59bcf3770327c71197302d36a722f54df74772a))
+* prevent Vulkan layer env vars from leaking into Steam process and crashing steamwebhelper ([b608a4b](https://github.com/knackstedt/ember/commit/b608a4b85784e2fadb4e9cc7f5795e5d68f1b12c))
+
 ### [0.4.7](https://github.com/knackstedt/ember/compare/v0.4.6...v0.4.7) (2026-06-26)
 
 
