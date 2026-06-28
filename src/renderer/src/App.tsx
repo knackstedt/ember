@@ -175,7 +175,8 @@ export default function App(): React.ReactElement {
     if (restored) restoredTabRef.current = restored;
     return restored ?? "gaming";
   });
-  useBrowserControllerNav({ enabled: !loading && !anyEmulatorOpen && !gameRunning, evdevActive: inputDevices.length > 0 });
+  const hasEvdevDevices = inputDevices.some((d) => !d.id.startsWith("gamepad-"));
+  useBrowserControllerNav({ enabled: !loading && !anyEmulatorOpen && !gameRunning, evdevActive: hasEvdevDevices });
   const activeTabRef = useRef<TabId>(activeTab);
   activeTabRef.current = activeTab;
   const [evdevGamepadActive, setEvdevGamepadActive] = useState(false);
@@ -289,7 +290,7 @@ export default function App(): React.ReactElement {
   }, [executeCommand]);
 
   // Fallback gamepad input via browser Gamepad API (works without evdev permissions)
-  useGamepadApi(!anyEmulatorOpen && !gameRunning && inputDevices.length === 0 && !evdevGamepadActive, activeTab);
+  useGamepadApi(!anyEmulatorOpen && !gameRunning && !hasEvdevDevices && !evdevGamepadActive, activeTab);
 
   useEffect(() => {
     load().then(() => {
@@ -583,7 +584,7 @@ export default function App(): React.ReactElement {
       if (activeTabRef.current === "controllers") {
         useInputStore.getState().recordRawInput(ev.deviceId, ev);
       }
-      if (ev.source === "gamepad" && !evdevGamepadActiveRef.current) {
+      if (ev.source === "gamepad" && !ev.deviceId.startsWith("gamepad-") && !evdevGamepadActiveRef.current) {
         evdevGamepadActiveRef.current = true;
         setEvdevGamepadActive(true);
       }
