@@ -7,6 +7,7 @@ import {
   Game,
   GameEmulatorConfig,
   GameInjectionConfig,
+  VulkanShaderConfig,
   WineRunner,
   GamePlatform,
   Movie,
@@ -522,6 +523,8 @@ const htpc = {
         ipcRenderer.invoke("games:injectionConfig:shaderParamDefs"),
       findMainExe: (id: string): Promise<string | null> =>
         ipcRenderer.invoke("games:findMainExe", id),
+      updateRuntimeShader: (id: string, config: VulkanShaderConfig): Promise<boolean> =>
+        ipcRenderer.invoke("games:injectionConfig:updateRuntimeShader", id, config),
     },
     playTime: {
       start: (id: string): Promise<void> =>

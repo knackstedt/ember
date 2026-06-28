@@ -19,6 +19,7 @@
 #include <atomic>
 #include <unistd.h>
 #include <vector>
+#include <sys/stat.h>
 
 #include "spirv/post_vert.h"
 #include "spirv/post_frag.h"
@@ -30,6 +31,12 @@
 static const char* kLayerName = "VK_LAYER_ember_shader";
 static const uint32_t kLayerImplementationVersion = 1;
 
+// How many present calls between stat() checks of the runtime config file.
+// At 60fps this checks ~2x/sec; at 360fps ~12x/sec. stat() on tmpfs is
+// ~200ns so this is negligible. Tune lower for faster response, higher
+// to reduce syscalls further.
+static const int kConfigPollInterval = 30;
+
 static void emberLog(const char* fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
@@ -37,24 +44,165 @@ static void emberLog(const char* fmt, ...) {
     va_end(ap);
 }
 
+// ---------------------------------------------------------------------------
+// Runtime config — stat()-based polling of a config file written by Ember.
+// The env var EMBER_SHADER_CONFIG_FILE points to a small JSON-like file on
+// tmpfs. We stat() it every kConfigPollInterval present calls and re-read
+// only when the mtime changes. This lets the user change shader preset /
+// intensity / params during gameplay without restarting the game.
+// ---------------------------------------------------------------------------
+
+struct CachedShaderConfig {
+    std::string preset;
+    float intensity = 1.0f;
+    float params[8] = {};
+    time_t mtime = 0;
+    int presentCounter = 0;
+    bool valid = false;
+};
+
+static CachedShaderConfig g_cachedConfig;
+
+static std::string getEnvString(const char* name, const char* fallback = "") {
+    const char* val = std::getenv(name);
+    return val ? std::string(val) : std::string(fallback);
+}
+
+static float getEnvFloat(const char* name, float fallback) {
+    const char* val = std::getenv(name);
+    return val ? std::atof(val) : fallback;
+}
+
+// Minimal JSON value extractor — finds "key": value (string or number)
+// in a flat JSON object. Not a full parser, but sufficient for our tiny
+// config file format.
+static bool extractJsonString(const std::string& json, const char* key, std::string& out) {
+    std::string needle = std::string("\"") + key + "\"";
+    size_t k = json.find(needle);
+    if (k == std::string::npos) return false;
+    k = json.find(':', k);
+    if (k == std::string::npos) return false;
+    k++;
+    while (k < json.size() && (json[k] == ' ' || json[k] == '\t')) k++;
+    if (k >= json.size() || json[k] != '"') return false;
+    k++;
+    size_t end = json.find('"', k);
+    if (end == std::string::npos) return false;
+    out = json.substr(k, end - k);
+    return true;
+}
+
+static bool extractJsonFloat(const std::string& json, const char* key, float& out) {
+    std::string needle = std::string("\"") + key + "\"";
+    size_t k = json.find(needle);
+    if (k == std::string::npos) return false;
+    k = json.find(':', k);
+    if (k == std::string::npos) return false;
+    k++;
+    while (k < json.size() && (json[k] == ' ' || json[k] == '\t')) k++;
+    if (k >= json.size()) return false;
+    out = std::atof(json.c_str() + k);
+    return true;
+}
+
+static bool extractJsonFloatArray(const std::string& json, const char* key, float* arr, int maxCount) {
+    std::string needle = std::string("\"") + key + "\"";
+    size_t k = json.find(needle);
+    if (k == std::string::npos) return false;
+    k = json.find('[', k);
+    if (k == std::string::npos) return false;
+    k++;
+    for (int i = 0; i < maxCount; i++) {
+        while (k < json.size() && (json[k] == ' ' || json[k] == '\t' || json[k] == ',')) k++;
+        if (k >= json.size() || json[k] == ']') return true;
+        arr[i] = std::atof(json.c_str() + k);
+        k = json.find_first_of(",]", k);
+        if (k == std::string::npos) return true;
+        if (json[k] == ']') return true;
+        k++;
+    }
+    return true;
+}
+
+static void refreshConfigFromFile() {
+    const char* configPath = std::getenv("EMBER_SHADER_CONFIG_FILE");
+    if (!configPath || configPath[0] == '\0') return;
+
+    struct stat st;
+    if (stat(configPath, &st) != 0) return;
+
+    // Only re-read if the file was modified since last read
+    if (st.st_mtime == g_cachedConfig.mtime && g_cachedConfig.valid) return;
+
+    g_cachedConfig.mtime = st.st_mtime;
+
+    FILE* f = fopen(configPath, "r");
+    if (!f) return;
+
+    std::string content;
+    char buf[1024];
+    size_t n;
+    while ((n = fread(buf, 1, sizeof(buf), f)) > 0) {
+        content.append(buf, n);
+    }
+    fclose(f);
+
+    std::string preset;
+    if (extractJsonString(content, "preset", preset)) {
+        g_cachedConfig.preset = preset;
+    } else {
+        g_cachedConfig.preset = getEnvString("EMBER_SHADER_PRESET", "none");
+    }
+
+    float intensity;
+    if (extractJsonFloat(content, "intensity", intensity)) {
+        g_cachedConfig.intensity = intensity;
+    } else {
+        g_cachedConfig.intensity = getEnvFloat("EMBER_SHADER_INTENSITY", 1.0f);
+    }
+
+    float params[8] = {};
+    if (extractJsonFloatArray(content, "params", params, 8)) {
+        memcpy(g_cachedConfig.params, params, sizeof(params));
+    } else {
+        for (int i = 0; i < 8; i++) {
+            char envName[32];
+            snprintf(envName, sizeof(envName), "EMBER_SHADER_PARAM%d", i);
+            g_cachedConfig.params[i] = getEnvFloat(envName, 0.0f);
+        }
+    }
+
+    g_cachedConfig.valid = true;
+    emberLog("[Ember Vulkan Layer] Config reloaded from %s: preset=%s intensity=%.2f\n",
+            configPath, g_cachedConfig.preset.c_str(), g_cachedConfig.intensity);
+}
+
+static void initCachedConfig() {
+    if (g_cachedConfig.valid) return;
+    // Seed from env vars (initial launch values)
+    g_cachedConfig.preset = getEnvString("EMBER_SHADER_PRESET", "none");
+    g_cachedConfig.intensity = getEnvFloat("EMBER_SHADER_INTENSITY", 1.0f);
+    for (int i = 0; i < 8; i++) {
+        char envName[32];
+        snprintf(envName, sizeof(envName), "EMBER_SHADER_PARAM%d", i);
+        g_cachedConfig.params[i] = getEnvFloat(envName, 0.0f);
+    }
+    g_cachedConfig.valid = true;
+    // Try an immediate file read in case the config file already exists
+    refreshConfigFromFile();
+}
+
 static std::string getShaderPreset() {
-    const char* preset = std::getenv("EMBER_SHADER_PRESET");
-    return preset ? std::string(preset) : std::string("none");
+    return g_cachedConfig.preset;
 }
 
 static float getShaderIntensity() {
-    const char* intensity = std::getenv("EMBER_SHADER_INTENSITY");
-    if (!intensity) return 1.0f;
-    return std::atof(intensity);
+    return g_cachedConfig.intensity;
 }
 
 static void getShaderParams(float* params, int maxParams) {
-    for (int i = 0; i < maxParams; i++) {
-        char envName[32];
-        snprintf(envName, sizeof(envName), "EMBER_SHADER_PARAM%d", i);
-        const char* val = std::getenv(envName);
-        params[i] = val ? std::atof(val) : 0.0f;
-    }
+    int count = maxParams < 8 ? maxParams : 8;
+    memcpy(params, g_cachedConfig.params, count * sizeof(float));
 }
 
 // ============================================================================
@@ -572,6 +720,15 @@ static void destroySwapchainPipeline(LayerDispatchTable* table, SwapchainData* s
 
 static VKAPI_ATTR VkResult VKAPI_CALL emberQueuePresentKHR(
     VkQueue queue, const VkPresentInfoKHR* pPresentInfo) {
+
+    initCachedConfig();
+
+    // Poll the runtime config file every kConfigPollInterval present calls.
+    // stat() is ~200ns on tmpfs; negligible even at 360fps.
+    if (++g_cachedConfig.presentCounter >= kConfigPollInterval) {
+        g_cachedConfig.presentCounter = 0;
+        refreshConfigFromFile();
+    }
 
     logShaderPreset();
 

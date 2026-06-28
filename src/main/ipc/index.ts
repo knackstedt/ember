@@ -1165,6 +1165,11 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     return SHADER_PARAM_DEFS;
   });
 
+  ipcMain.handle("games:injectionConfig:updateRuntimeShader", async (_e, id: string, config: import("../../shared/types").VulkanShaderConfig) => {
+    const { updateRuntimeShaderConfig } = await import("../services/shader-injection.service");
+    return updateRuntimeShaderConfig(id, config);
+  });
+
   ipcMain.handle("games:findMainExe", async (_e, id: string) => {
     const { findMainExe } = await import("../services/shader-injection.service");
     const db = getDb();

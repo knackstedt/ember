@@ -27,7 +27,7 @@ import {
 } from "lucide-react";
 import { useInputNav } from "../hooks/useInputNav";
 import { useControllerWorker } from "../hooks/useControllerWorker";
-import { Game, AppSettings, OverlayStyle, BluetoothDevice } from "../../../shared/types";
+import { Game, AppSettings, OverlayStyle, BluetoothDevice, VulkanShaderConfig, GameInjectionConfig } from "../../../shared/types";
 
 /* ─── Sidebar items ─────────────────────────────────────────── */
 
@@ -37,6 +37,7 @@ type SidebarId =
   | "achievements"
   | "gameinfo"
   | "controllers"
+  | "shaders"
   | "settings"
   | "exit";
 
@@ -52,6 +53,7 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
   { id: "achievements", label: "Achievements", Icon: Trophy },
   { id: "gameinfo", label: "Game Info", Icon: Info },
   { id: "controllers", label: "Controllers", Icon: Gamepad2 },
+  { id: "shaders", label: "Shaders", Icon: Zap },
   { id: "settings", label: "Quick Settings", Icon: Settings },
   { id: "exit", label: "Exit to Ember", Icon: Power },
 ];
@@ -618,6 +620,192 @@ function QuickSettingsPanel({
   );
 }
 
+/* ─── Shader panel ─────────────────────────────────────────── */
+
+const EMULATOR_PLATFORMS = new Set([
+  "dolphin-gc", "dolphin-wii", "nes", "snes", "gb", "gba", "n64",
+  "genesis", "sms", "gamegear", "pce", "psx", "ps2", "ps3", "psp",
+  "xbox360", "nds", "dreamcast", "flash", "dos",
+]);
+
+function ShaderPanel({ game }: { game: Game }) {
+  const [injectionConfig, setInjectionConfig] = useState<GameInjectionConfig | null>(null);
+  const [presets, setPresets] = useState<{ id: string; name: string }[]>([]);
+  const [paramDefs, setParamDefs] = useState<Record<string, { label: string; min: number; max: number; step: number; default: number }[]>>({});
+  const [loading, setLoading] = useState(true);
+
+  const isEmulator = EMULATOR_PLATFORMS.has(game.platform);
+  const shaderConfig = injectionConfig?.vulkanShader;
+  const shaderActive = shaderConfig?.enabled === true;
+
+  useEffect(() => {
+    void Promise.all([
+      window.htpc.games.injectionConfig.get(game.id),
+      window.htpc.games.injectionConfig.vulkanPresets(),
+      window.htpc.games.injectionConfig.shaderParamDefs(),
+    ]).then(([cfg, p, defs]) => {
+      setInjectionConfig(cfg);
+      setPresets(p ?? []);
+      setParamDefs(defs ?? {});
+      setLoading(false);
+    });
+  }, [game.id]);
+
+  const updateShader = useCallback((next: VulkanShaderConfig) => {
+    const newCfg: GameInjectionConfig = {
+      ...injectionConfig,
+      vulkanShader: next,
+    };
+    setInjectionConfig(newCfg);
+    void window.htpc.games.injectionConfig.set(game.id, newCfg);
+    void window.htpc.games.injectionConfig.updateRuntimeShader(game.id, next);
+  }, [injectionConfig, game.id]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-40 opacity-60">
+        <div className="w-8 h-8 border-2 border-[var(--border-default)] border-t-[var(--accent)] rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (isEmulator) {
+    return (
+      <div className="flex flex-col items-center justify-center h-40 gap-3 opacity-70">
+        <Zap size={40} />
+        <div className="text-sm">Shader injection is not available for emulator games.</div>
+        <div className="text-xs opacity-60 max-w-md text-center">
+          The Vulkan layer only works with native and Proton/Wine games that use Vulkan or OpenGL.
+        </div>
+      </div>
+    );
+  }
+
+  if (!shaderActive) {
+    return (
+      <div className="flex flex-col items-center justify-center h-40 gap-3 opacity-70">
+        <Zap size={40} />
+        <div className="text-sm">Shader injection is not enabled for this game.</div>
+        <div className="text-xs opacity-60 max-w-md text-center">
+          Enable Vulkan Layer Shader in the game's settings before launching to use runtime shader controls.
+        </div>
+        <button
+          onClick={() => updateShader({ enabled: true, preset: "crt", intensity: 1.0 })}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium mt-2"
+          style={{ background: "var(--accent)", color: "var(--surface-base)" }}
+        >
+          <Zap size={16} /> Enable Shaders
+        </button>
+      </div>
+    );
+  }
+
+  const currentPreset = shaderConfig!.preset;
+  const currentIntensity = shaderConfig!.intensity ?? 1.0;
+  const currentParams = shaderConfig!.params ?? [];
+  const defs = paramDefs[currentPreset] ?? [];
+
+  return (
+    <div className="flex flex-col gap-4 overflow-y-auto p-1 max-w-md">
+      <div className="flex items-center gap-2">
+        <Zap size={18} style={{ color: "var(--accent)" }} />
+        <span className="text-sm font-semibold">Runtime Shader Controls</span>
+        <span className="text-[12px] px-2 py-0.5 rounded ml-auto" style={{ background: "var(--surface-2)", color: "var(--accent)" }}>
+          Active
+        </span>
+      </div>
+
+      <div>
+        <label className="text-[12px] block mb-1" style={{ color: "var(--text-secondary)" }}>
+          Preset
+        </label>
+        <select
+          value={currentPreset}
+          onChange={(e) => {
+            const newPreset = e.target.value;
+            const newDefs = paramDefs[newPreset] ?? [];
+            const defaultParams = newDefs.map((d) => d.default);
+            updateShader({
+              enabled: true,
+              preset: newPreset,
+              intensity: currentIntensity,
+              params: defaultParams.length > 0 ? defaultParams : undefined,
+            });
+          }}
+          className="w-full text-sm px-2 py-1.5 rounded"
+          style={{
+            background: "var(--surface-1)",
+            border: "1px solid var(--border-default)",
+            color: "var(--text-primary)",
+            outline: "none",
+          }}
+        >
+          {presets.map((p) => (
+            <option key={p.id} value={p.id}>{p.name}</option>
+          ))}
+        </select>
+      </div>
+
+      <div>
+        <label className="text-[12px] block mb-1" style={{ color: "var(--text-secondary)" }}>
+          Intensity: {currentIntensity.toFixed(2)}
+        </label>
+        <input
+          type="range"
+          min="0"
+          max="1"
+          step="0.05"
+          value={currentIntensity}
+          onChange={(e) => {
+            updateShader({
+              enabled: true,
+              preset: currentPreset,
+              intensity: parseFloat(e.target.value),
+              params: currentParams.length > 0 ? currentParams : undefined,
+            });
+          }}
+          className="w-full"
+        />
+      </div>
+
+      {defs.map((def, idx) => (
+        <div key={idx}>
+          <label className="text-[12px] block mb-1" style={{ color: "var(--text-secondary)" }}>
+            {def.label}: {(currentParams[idx] ?? def.default).toFixed(def.step < 0.01 ? 4 : def.step < 1 ? 3 : 0)}
+          </label>
+          <input
+            type="range"
+            min={def.min}
+            max={def.max}
+            step={def.step}
+            value={currentParams[idx] ?? def.default}
+            onChange={(e) => {
+              const newParams = [...currentParams];
+              while (newParams.length <= idx) newParams.push(def.default);
+              newParams[idx] = parseFloat(e.target.value);
+              updateShader({
+                enabled: true,
+                preset: currentPreset,
+                intensity: currentIntensity,
+                params: newParams,
+              });
+            }}
+            className="w-full"
+          />
+        </div>
+      ))}
+
+      <button
+        onClick={() => updateShader({ enabled: false, preset: currentPreset, intensity: currentIntensity })}
+        className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium mt-2"
+        style={{ background: "var(--surface-2)", color: "var(--text-secondary)" }}
+      >
+        <Zap size={16} /> Disable Shaders
+      </button>
+    </div>
+  );
+}
+
 /* ─── Controller hints ──────────────────────────────────────── */
 
 function ControllerHints() {
@@ -765,6 +953,8 @@ export function OverlayApp(): React.ReactElement {
         return <GameInfoPanel game={game} />;
       case "controllers":
         return <ControllersPanel />;
+      case "shaders":
+        return <ShaderPanel game={game} />;
       case "settings":
         return <QuickSettingsPanel style={style} onAdjustOpacity={adjustOpacity} />;
       default:
@@ -772,7 +962,7 @@ export function OverlayApp(): React.ReactElement {
     }
   }, [activeId, game, style, adjustOpacity]);
 
-  const showContent = activeId === "achievements" || activeId === "gameinfo" || activeId === "controllers" || activeId === "settings";
+  const showContent = activeId === "achievements" || activeId === "gameinfo" || activeId === "controllers" || activeId === "shaders" || activeId === "settings";
 
   return (
     <div

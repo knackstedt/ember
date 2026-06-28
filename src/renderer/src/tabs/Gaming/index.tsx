@@ -1661,6 +1661,9 @@ export const GamingTab: React.FC = () => {
                             };
                             setSelectedInjectionConfig(next);
                             void window.htpc.games.injectionConfig.set(selected.id, next);
+                            if (next.vulkanShader) {
+                              void window.htpc.games.injectionConfig.updateRuntimeShader(selected.id, next.vulkanShader);
+                            }
                           }}
                         />
                         Vulkan Layer Shader (Experimental)
@@ -1683,6 +1686,7 @@ export const GamingTab: React.FC = () => {
                                 };
                                 setSelectedInjectionConfig(next);
                                 void window.htpc.games.injectionConfig.set(selected.id, next);
+                                void window.htpc.games.injectionConfig.updateRuntimeShader(selected.id, next.vulkanShader!);
                               }}
                               className="w-full text-sm px-2 py-1.5 rounded"
                               style={{
@@ -1715,6 +1719,7 @@ export const GamingTab: React.FC = () => {
                                 };
                                 setSelectedInjectionConfig(next);
                                 void window.htpc.games.injectionConfig.set(selected.id, next);
+                                void window.htpc.games.injectionConfig.updateRuntimeShader(selected.id, next.vulkanShader!);
                               }}
                               className="w-full"
                             />
@@ -1741,6 +1746,7 @@ export const GamingTab: React.FC = () => {
                                   };
                                   setSelectedInjectionConfig(next);
                                   void window.htpc.games.injectionConfig.set(selected.id, next);
+                                  void window.htpc.games.injectionConfig.updateRuntimeShader(selected.id, next.vulkanShader!);
                                 }}
                                 className="w-full"
                               />

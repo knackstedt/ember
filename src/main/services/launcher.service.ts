@@ -33,6 +33,8 @@ import {
   buildGLHookEnv,
   writeTaintManifest,
   cleanupGameTaints,
+  writeRuntimeShaderConfig,
+  cleanupRuntimeShaderConfig,
 } from "./shader-injection.service";
 
 const log = createLogger("info");
@@ -482,6 +484,10 @@ export async function launchGame(game: Game): Promise<void> {
       log.info("launcher", `Injection active for "${game.title}": ${JSON.stringify(injectionConfig)}`);
       if (injectionConfig.vulkanShader) {
         injectionEnv = { ...injectionEnv, ...buildVulkanLayerEnv(injectionConfig.vulkanShader) };
+        // Write the runtime config file so the Vulkan layer can pick up
+        // shader changes during gameplay via stat() polling.
+        const runtimeEnv = writeRuntimeShaderConfig(game.id, injectionConfig.vulkanShader);
+        injectionEnv = { ...injectionEnv, ...runtimeEnv };
       }
       if (injectionConfig.dllInjection) {
         const dllOverride = buildDllOverrideEnv(injectionConfig.dllInjection);
@@ -663,6 +669,7 @@ export async function launchGame(game: Game): Promise<void> {
           }
           // Clean up all remaining taints (DLLs, manifest file, etc.)
           cleanupGameTaints(game.id, steamCompatAppId, prefixPath);
+          cleanupRuntimeShaderConfig(game.id);
           void runSessionHooks(game, "after-start");
           GameRepo.setLastPlayed(game.id, Date.now()).catch((err) => {
             log.warn("launcher", `Failed to set lastPlayed for ${game.id}: ${err}`);
@@ -708,6 +715,7 @@ export async function launchGame(game: Game): Promise<void> {
           }
           // Clean up all remaining taints (DLLs, manifest file, etc.)
           cleanupGameTaints(game.id, steamCompatAppId, prefixPath);
+          cleanupRuntimeShaderConfig(game.id);
 
           const launchState = steamLaunchState.get(game.id);
           steamLaunchState.delete(game.id);
@@ -916,6 +924,7 @@ export async function launchGame(game: Game): Promise<void> {
         if (collectedTaints.length > 0) {
           cleanupGameTaints(game.id, steamCompatAppId, prefixPath);
         }
+        cleanupRuntimeShaderConfig(game.id);
         return;
       }
       if (!settled && spawnOk) {
@@ -930,6 +939,7 @@ export async function launchGame(game: Game): Promise<void> {
         if (collectedTaints.length > 0) {
           cleanupGameTaints(game.id, steamCompatAppId, prefixPath);
         }
+        cleanupRuntimeShaderConfig(game.id);
         reject(new Error(reason));
       }
     });

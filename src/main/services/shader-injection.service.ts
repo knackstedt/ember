@@ -1050,6 +1050,91 @@ export function buildGLHookEnv(config: VulkanShaderConfig): Record<string, strin
   return env;
 }
 
+// ---------------------------------------------------------------------------
+// Runtime shader config file — written to /tmp so the Vulkan layer can
+// stat() it and pick up preset/intensity/param changes during gameplay.
+// ---------------------------------------------------------------------------
+
+/** Active runtime config files keyed by gameId, for cleanup on exit */
+const activeRuntimeConfigs = new Map<string, string>();
+
+/**
+ * Get the runtime shader config file path for a game.
+ * Uses /tmp (tmpfs) so stat() and read() are essentially zero-cost.
+ */
+export function getRuntimeConfigPath(gameId: string): string {
+  const safeId = gameId.replace(/[^a-zA-Z0-9_-]/g, "_");
+  return `/tmp/ember_shader_${safeId}.json`;
+}
+
+/**
+ * Write the initial runtime shader config file and set the env var.
+ * Returns the env var to merge into the launch environment.
+ */
+export function writeRuntimeShaderConfig(
+  gameId: string,
+  config: VulkanShaderConfig,
+): Record<string, string> {
+  const configPath = getRuntimeConfigPath(gameId);
+  const data = {
+    preset: config.enabled ? config.preset : "none",
+    intensity: config.intensity ?? 1.0,
+    params: config.params ?? [],
+  };
+  try {
+    writeFileSync(configPath, JSON.stringify(data), "utf-8");
+    activeRuntimeConfigs.set(gameId, configPath);
+    log.info("shader-injection", `Wrote runtime shader config to ${configPath}: preset=${data.preset}`);
+  } catch (err) {
+    log.warn("shader-injection", `Failed to write runtime shader config: ${err}`);
+  }
+  return { EMBER_SHADER_CONFIG_FILE: configPath };
+}
+
+/**
+ * Update the runtime shader config file for a running game.
+ * Called when the user changes preset/intensity/params in the UI.
+ */
+export function updateRuntimeShaderConfig(
+  gameId: string,
+  config: VulkanShaderConfig,
+): boolean {
+  const configPath = activeRuntimeConfigs.get(gameId) ?? getRuntimeConfigPath(gameId);
+  const data = {
+    preset: config.enabled ? config.preset : "none",
+    intensity: config.intensity ?? 1.0,
+    params: config.params ?? [],
+  };
+  try {
+    writeFileSync(configPath, JSON.stringify(data), "utf-8");
+    if (!activeRuntimeConfigs.has(gameId)) {
+      activeRuntimeConfigs.set(gameId, configPath);
+    }
+    log.info("shader-injection", `Updated runtime shader config for ${gameId}: preset=${config.preset}`);
+    return true;
+  } catch (err) {
+    log.warn("shader-injection", `Failed to update runtime shader config: ${err}`);
+    return false;
+  }
+}
+
+/**
+ * Remove the runtime shader config file for a game.
+ * Called on game exit.
+ */
+export function cleanupRuntimeShaderConfig(gameId: string): void {
+  const configPath = activeRuntimeConfigs.get(gameId);
+  if (configPath) {
+    try {
+      unlinkSync(configPath);
+      log.info("shader-injection", `Removed runtime shader config at ${configPath}`);
+    } catch {
+      // non-fatal — file may already be gone
+    }
+    activeRuntimeConfigs.delete(gameId);
+  }
+}
+
 /**
  * Build WINEDLLOVERRIDES string for DLL injection.
  */

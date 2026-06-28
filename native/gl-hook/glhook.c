@@ -20,6 +20,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <stdarg.h>
+#include <sys/stat.h>
 #include <GL/glx.h>
 #include <GL/gl.h>
 #define GL_GLEXT_PROTOTYPES
@@ -171,6 +172,114 @@ static int g_frameCount = 0;
 static int g_presetId = 0;
 static float g_intensity = 1.0f;
 static float g_params[8] = {0};
+
+// Forward declaration — defined below
+static int presetNameToId(const char* name);
+
+// Runtime config file polling — stat() the config file every N swap calls
+// and re-read if mtime changed. Lets the user change shaders during gameplay.
+static const int kConfigPollInterval = 30;
+static time_t g_configMtime = 0;
+static int g_configPollCounter = 0;
+static int g_configInited = 0;
+
+// Minimal JSON value extractors for the tiny config file
+static int extractJsonString(const char* json, const char* key, char* out, int outLen) {
+    char needle[64];
+    snprintf(needle, sizeof(needle), "\"%s\"", key);
+    const char* k = strstr(json, needle);
+    if (!k) return 0;
+    k = strchr(k, ':');
+    if (!k) return 0;
+    k++;
+    while (*k == ' ' || *k == '\t') k++;
+    if (*k != '"') return 0;
+    k++;
+    const char* end = strchr(k, '"');
+    if (!end) return 0;
+    int len = (int)(end - k);
+    if (len >= outLen) len = outLen - 1;
+    memcpy(out, k, len);
+    out[len] = '\0';
+    return 1;
+}
+
+static int extractJsonFloat(const char* json, const char* key, float* out) {
+    char needle[64];
+    snprintf(needle, sizeof(needle), "\"%s\"", key);
+    const char* k = strstr(json, needle);
+    if (!k) return 0;
+    k = strchr(k, ':');
+    if (!k) return 0;
+    k++;
+    while (*k == ' ' || *k == '\t') k++;
+    *out = (float)atof(k);
+    return 1;
+}
+
+static int extractJsonFloatArray(const char* json, const char* key, float* arr, int maxCount) {
+    char needle[64];
+    snprintf(needle, sizeof(needle), "\"%s\"", key);
+    const char* k = strstr(json, needle);
+    if (!k) return 0;
+    k = strchr(k, '[');
+    if (!k) return 0;
+    k++;
+    for (int i = 0; i < maxCount; i++) {
+        while (*k == ' ' || *k == '\t' || *k == ',') k++;
+        if (*k == ']' || *k == '\0') return 1;
+        arr[i] = (float)atof(k);
+        k = strpbrk(k, ",]");
+        if (!k || *k == ']') return 1;
+        k++;
+    }
+    return 1;
+}
+
+static void refreshConfigFromFile(void) {
+    const char* configPath = getenv("EMBER_SHADER_CONFIG_FILE");
+    if (!configPath || !configPath[0]) return;
+
+    struct stat st;
+    if (stat(configPath, &st) != 0) return;
+
+    if (st.st_mtime == g_configMtime && g_configInited) return;
+    g_configMtime = st.st_mtime;
+    g_configInited = 1;
+
+    FILE* f = fopen(configPath, "r");
+    if (!f) return;
+
+    char buf[1024];
+    size_t n = fread(buf, 1, sizeof(buf) - 1, f);
+    fclose(f);
+    buf[n] = '\0';
+
+    char preset[64] = {0};
+    if (extractJsonString(buf, "preset", preset, sizeof(preset))) {
+        g_presetId = presetNameToId(preset);
+    }
+
+    float intensity;
+    if (extractJsonFloat(buf, "intensity", &intensity)) {
+        g_intensity = intensity;
+    }
+
+    float params[8] = {0};
+    if (extractJsonFloatArray(buf, "params", params, 8)) {
+        memcpy(g_params, params, sizeof(params));
+    }
+
+    glLog("[Ember GL Hook] Config reloaded: preset=%s(id=%d) intensity=%.2f\n",
+          preset, g_presetId, g_intensity);
+}
+
+static void pollConfigFile(void) {
+    if (++g_configPollCounter >= kConfigPollInterval) {
+        g_configPollCounter = 0;
+        refreshConfigFromFile();
+    }
+}
 
 // Preset name -> ID mapping (matches Vulkan layer)
 static int presetNameToId(const char* name) {
@@ -681,6 +790,8 @@ void glXSwapBuffers(Display* dpy, GLXDrawable drawable) {
         glLog("[Ember GL Hook] glXSwapBuffers called (first time) pid=%d\n", getpid());
     }
 
+    pollConfigFile();
+
     if (g_presetId == 0) {
         if (real_glXSwapBuffers) real_glXSwapBuffers(dpy, drawable);
         return;
@@ -766,6 +877,8 @@ EGLBoolean eglSwapBuffers(EGLDisplay dpy, EGLSurface surface) {
         g_swapBuffersCalled = 1;
         glLog("[Ember GL Hook] eglSwapBuffers called (first time) pid=%d\n", getpid());
     }
+
+    pollConfigFile();
 
     if (g_presetId == 0) {
         if (real_eglSwapBuffers) return real_eglSwapBuffers(dpy, surface);
