@@ -838,6 +838,7 @@ export function OverlayApp(): React.ReactElement {
   const { settings, update } = useOverlaySettings();
   const [selectedItem, setSelectedItem] = useState(0);
   const selectedItemRef = useRef(0);
+  const [isExiting, setIsExiting] = useState(false);
 
   const style = settings?.overlayStyle ?? { mode: "glass", color: "#000000", opacity: 0.7 };
 
@@ -878,8 +879,10 @@ export function OverlayApp(): React.ReactElement {
           togglePaused();
           break;
         case "exit":
-          window.htpc.overlay.stopGame();
-          window.htpc.overlay.close();
+          setIsExiting(true);
+          void window.htpc.overlay.stopGame().then(() => {
+            window.htpc.overlay.close();
+          });
           break;
         default:
           break;
@@ -1157,6 +1160,17 @@ export function OverlayApp(): React.ReactElement {
           <ControllerHints />
         </div>
       </div>
+
+      {/* Exit progress overlay */}
+      {isExiting && (
+        <div
+          className="fixed inset-0 flex flex-col items-center justify-center gap-4 z-50"
+          style={{ background: "rgba(0,0,0,0.85)" }}
+        >
+          <div className="w-10 h-10 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+          <div className="text-sm text-white/80">Stopping game…</div>
+        </div>
+      )}
     </div>
   );
 }

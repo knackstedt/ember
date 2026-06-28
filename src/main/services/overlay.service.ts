@@ -908,13 +908,52 @@ export function initOverlayService(parent: BrowserWindow): void {
     return activeGame;
   });
 
-  ipcMain.handle(IPC_CHANNELS.overlay.stopGame, () => {
-    if (activeGamePid && activeGamePid > 0) {
+  ipcMain.handle(IPC_CHANNELS.overlay.stopGame, async () => {
+    if (!activeGamePid || activeGamePid <= 0) return;
+
+    const pid = activeGamePid;
+
+    // Gather the full process tree: descendants first (bottom-up so they
+    // can't be respawned by the parent), then the parent PID itself.
+    const descendants = getDescendantPids(pid);
+    const allPids = [...descendants, pid];
+
+    // Phase 1: SIGTERM everything gracefully
+    for (const p of allPids) {
       try {
-        process.kill(activeGamePid, "SIGTERM");
-      } catch (err) {
-        log.warn("overlay", `failed to stop game process: ${err}`);
+        process.kill(p, "SIGTERM");
+      } catch {
+        // already dead or inaccessible
       }
+    }
+    log.info("overlay", `stopGame: SIGTERM sent to ${allPids.length} processes (tree of ${pid})`);
+
+    // Phase 2: escalate to SIGKILL after 2s for any survivors
+    setTimeout(() => {
+      for (const p of allPids) {
+        try {
+          process.kill(p, 0); // check if still alive
+        } catch {
+          continue; // process is gone
+        }
+        try {
+          process.kill(p, "SIGKILL");
+          log.info("overlay", `SIGKILL escalated for pid ${p}`);
+        } catch {
+          // race: exited between check and kill
+        }
+      }
+    }, 2000);
+
+    // Wait for the root PID to actually exit (poll every 200ms, max 5s)
+    const deadline = Date.now() + 5000;
+    while (Date.now() < deadline) {
+      try {
+        process.kill(pid, 0); // still alive
+      } catch {
+        break; // process is gone
+      }
+      await new Promise((r) => setTimeout(r, 200));
     }
   });
 
