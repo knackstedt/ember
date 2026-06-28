@@ -581,14 +581,12 @@ export async function launchGame(game: Game): Promise<void> {
         version: 1,
         createdAt: Date.now(),
       });
-      // If Steam is already running, it needs to re-read localconfig.vdf.
-      // Shut it down so it picks up the launch options on restart.
+      // Steam watches localconfig.vdf via inotify and will pick up the
+      // modified launch options without needing a restart.  Give it a brief
+      // moment to detect the file change before we send -applaunch.
       if (isSteamRunning()) {
-        log.info("launcher", "Restarting Steam to apply launch options…");
-        sendGameLaunchProgress(game.id, "Restarting Steam", "Applying launch options…");
-        shutdownSteam(false);
-        // Wait for Steam to fully exit
-        await new Promise((r) => setTimeout(r, 3000));
+        log.info("launcher", "Steam is running; waiting for it to pick up launch options…");
+        await new Promise((r) => setTimeout(r, 500));
       }
     } else {
       log.warn("launcher", `Failed to set Steam launch options; injection may not work`);
