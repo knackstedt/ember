@@ -1336,12 +1336,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
       return url ?? null;
     }
     if (isLibretroPlatform(game.platform)) {
-      const url = await loadLibretroThumbnail(game, () => {
-        sendToWindow(window, "toast:push", {
-          type: "info",
-          message: `No emulator core installed for ${game.platform.toUpperCase()}. Install one in Settings.`,
-        });
-      });
+      const url = await loadLibretroThumbnail(game);
       return url ?? null;
     }
     return null;
