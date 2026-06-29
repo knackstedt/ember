@@ -13,6 +13,7 @@ import {
   Music,
   Info,
   Layers,
+  Volume2,
 } from "lucide-react";
 import { AppearanceTab } from "./AppearanceTab";
 import { GeneralTab } from "./GeneralTab";
@@ -26,6 +27,7 @@ import { SystemInfoTab } from "./SystemInfoTab";
 import { MusicLibraryTab } from "./MusicLibraryTab";
 import { AboutTab } from "./AboutTab";
 import { OverlayTab } from "./OverlayTab";
+import { AudioTab } from "./AudioTab";
 
 const SUB_TABS = [
   { id: "general", label: "General", Icon: Settings },
@@ -37,6 +39,7 @@ const SUB_TABS = [
   { id: "plugins", label: "Plugins", Icon: Plug },
   { id: "dependencies", label: "Dependencies", Icon: Package },
   { id: "overlay", label: "Overlay", Icon: Layers },
+  { id: "audio", label: "Audio", Icon: Volume2 },
   { id: "system-info", label: "System Info", Icon: Monitor },
   { id: "about", label: "About", Icon: Info },
   { id: "danger-zone", label: "Danger Zone", Icon: AlertTriangle },
@@ -54,6 +57,7 @@ const TAB_COMPONENTS: Record<SubTabId, React.FC> = {
   plugins: PluginsTab,
   dependencies: DependenciesTab,
   overlay: OverlayTab,
+  audio: AudioTab,
   "system-info": SystemInfoTab,
   about: AboutTab,
   "danger-zone": DangerZoneTab,

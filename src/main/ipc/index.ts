@@ -233,6 +233,26 @@ import {
   previewReorganize,
   executeReorganize,
 } from "../services/music-reorganize.service";
+import { IPC_CHANNELS } from "../../shared/ipc";
+import {
+  startSession,
+  stopSession,
+  getSessionState,
+  pauseInstanceBySlot,
+  resumeInstanceBySlot,
+  stopInstanceBySlot,
+  getDisplays,
+  getLayouts,
+  getAudioSinks,
+  setSinkLabel,
+  setHost,
+  assignDeviceToSlot,
+  locateDeviceByDeviceId,
+  showOverlay,
+  hideOverlay,
+  focusSlot,
+} from "../services/splitscreen.service";
+import { routeAudioStream } from "../services/splitscreen-audio.service";
 const log = createLogger("info");
 
 /** Recursively search a directory for a file by exact name. */
@@ -489,6 +509,75 @@ export function registerIpcHandlers(window: BrowserWindow): void {
   });
   window.webContents.on("devtools-closed", () => {
     sendToWindow(window, "devtools:changed", false);
+  });
+
+  // ── Splitscreen IPC handlers ──────────────────────────────────────────
+  ipcMain.handle(IPC_CHANNELS.splitscreen.detectDisplays, async () => {
+    return getDisplays();
+  });
+
+  ipcMain.handle(IPC_CHANNELS.splitscreen.getLayouts, () => {
+    return getLayouts();
+  });
+
+  ipcMain.handle(IPC_CHANNELS.splitscreen.startSession, async (_e, config: any) => {
+    return startSession(config);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.splitscreen.stopSession, async () => {
+    return stopSession();
+  });
+
+  ipcMain.handle(IPC_CHANNELS.splitscreen.getSessionState, async () => {
+    return getSessionState();
+  });
+
+  ipcMain.handle(IPC_CHANNELS.splitscreen.pauseInstance, async (_e, slotIndex: number) => {
+    return pauseInstanceBySlot(slotIndex);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.splitscreen.resumeInstance, async (_e, slotIndex: number) => {
+    return resumeInstanceBySlot(slotIndex);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.splitscreen.stopInstance, async (_e, slotIndex: number) => {
+    return stopInstanceBySlot(slotIndex);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.splitscreen.getAudioSinks, async () => {
+    return getAudioSinks();
+  });
+
+  ipcMain.handle(IPC_CHANNELS.splitscreen.setAudioSinkLabel, async (_e, sinkId: string, label: string) => {
+    return setSinkLabel(sinkId, label);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.splitscreen.routeAudio, async (_e, pid: number, sinkId: string) => {
+    return routeAudioStream(pid, sinkId);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.splitscreen.assignDevice, async (_e, deviceId: string, slotIndex: number) => {
+    return assignDeviceToSlot(deviceId, slotIndex);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.splitscreen.setHostDevice, async (_e, deviceId: string) => {
+    return setHost(deviceId);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.splitscreen.locateDevice, async (_e, deviceId: string) => {
+    return locateDeviceByDeviceId(deviceId);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.splitscreen.showOverlay, async () => {
+    return showOverlay();
+  });
+
+  ipcMain.handle(IPC_CHANNELS.splitscreen.hideOverlay, async () => {
+    return hideOverlay();
+  });
+
+  ipcMain.handle(IPC_CHANNELS.splitscreen.focusSlot, async (_e, slotIndex: number) => {
+    return focusSlot(slotIndex);
   });
 
   // Register MPV worker IPC handlers (if native addon is available).

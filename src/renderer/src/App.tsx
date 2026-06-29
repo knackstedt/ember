@@ -47,6 +47,8 @@ import { LibretroPlayer } from "./components/LibretroPlayer/LibretroPlayer";
 import { useLibretroPlayerStore } from "./store/libretroPlayer.store";
 import { useGameLaunchStore } from "./store/gameLaunch.store";
 import { GameLaunchOverlay } from "./components/GameLaunchOverlay/GameLaunchOverlay";
+import { useSplitscreenStore } from "./store/splitscreen.store";
+import { SplitscreenLaunchSpinner } from "./components/Splitscreen/SplitscreenLaunchSpinner";
 import { useContextMenuStore } from "./store/contextMenu.store";
 
 import { ErrorBoundary } from "./components/ErrorBoundary/ErrorBoundary";
@@ -447,6 +449,14 @@ export default function App(): React.ReactElement {
       console.log(`[renderer] External game stopped: ${gameId}`);
     });
 
+    const unsubSplitscreenState = window.htpc.splitscreen.onState((session) => {
+      useSplitscreenStore.getState().setSession(session);
+    });
+
+    const unsubSplitscreenProgress = window.htpc.splitscreen.onInstanceProgress((detail) => {
+      useSplitscreenStore.getState().setInstanceProgress(detail);
+    });
+
     // Check for a pending desktop-entry launch on startup
     void (async () => {
       try {
@@ -460,7 +470,7 @@ export default function App(): React.ReactElement {
       }
     })();
 
-    return () => { unsubScan(); unsubCores(); unsubHook(); unsubMusicMoved(); unsubToast(); unsubLibretro(); unsubGameLaunching(); unsubGameLaunchProgress(); unsubGameLaunchFailed(); unsubGameStarted(); unsubGameStopped(); };
+    return () => { unsubScan(); unsubCores(); unsubHook(); unsubMusicMoved(); unsubToast(); unsubLibretro(); unsubGameLaunching(); unsubGameLaunchProgress(); unsubGameLaunchFailed(); unsubGameStarted(); unsubGameStopped(); unsubSplitscreenState(); unsubSplitscreenProgress(); };
   }, []);
 
   useEffect(() => {
@@ -1370,6 +1380,9 @@ export default function App(): React.ReactElement {
 
       {/* Game launch overlay */}
       <GameLaunchOverlay />
+
+      {/* Splitscreen launch spinner */}
+      <SplitscreenLaunchSpinner />
 
       {/* Power dialog */}
       <AnimatePresence>

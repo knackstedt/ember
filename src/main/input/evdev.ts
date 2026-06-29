@@ -382,6 +382,8 @@ function detectControllerType(
   // Most generic USB gamepads present as Xbox-style (standard mapping).
   // Show the Xbox diagram since it is the most complete and widely applicable.
   if (n.includes("gamepad") || n.includes("controller") || n.includes("joystick") || n.includes("pad")) return "xbox";
+  if (nameLooksLikeKeyboard(name)) return "keyboard";
+  if (nameLooksLikeMouse(name)) return "mouse";
   return "generic";
 }
 
@@ -475,9 +477,32 @@ const CONTROLLER_NAME_HINTS = [
   "wii remote", "gamecube", "n64", "nintendo", "8bitdo", "steam controller",
 ];
 
+const KEYBOARD_NAME_HINTS = ["keyboard", "kbd"];
+const MOUSE_NAME_HINTS = ["mouse", "trackpad", "touchpad"];
+
+// Devices that expose EV_KEY but are not real input devices
+const NON_INPUT_NAME_HINTS = [
+  "power button", "power switch", "sleep button",
+  "video bus", "camera", "webcam", "microphone",
+  "hdmi", "speaker", "headset", "consumer control",
+  "wakeup", "lid switch", "tablet mode", "pen",
+];
+
 function nameLooksLikeController(name: string): boolean {
   const lower = name.toLowerCase();
   return CONTROLLER_NAME_HINTS.some((hint) => lower.includes(hint));
+}
+
+function nameLooksLikeKeyboard(name: string): boolean {
+  const lower = name.toLowerCase();
+  if (NON_INPUT_NAME_HINTS.some((hint) => lower.includes(hint))) return false;
+  return KEYBOARD_NAME_HINTS.some((hint) => lower.includes(hint));
+}
+
+function nameLooksLikeMouse(name: string): boolean {
+  const lower = name.toLowerCase();
+  if (NON_INPUT_NAME_HINTS.some((hint) => lower.includes(hint))) return false;
+  return MOUSE_NAME_HINTS.some((hint) => lower.includes(hint));
 }
 
 /** Reject motion-sensor / IMU sub-devices that share the same USB/BT
@@ -499,14 +524,22 @@ async function hasControllerCapabilities(eventPath: string, name?: string): Prom
   try {
     if (name && isMotionSensorDevice(name)) return false;
     if (name && nameLooksLikeController(name)) return true;
+    if (name && nameLooksLikeKeyboard(name)) return true;
+    if (name && nameLooksLikeMouse(name)) return true;
 
     const deviceNum = eventPath.replace("/dev/input/event", "");
     const capPath = `/sys/class/input/event${deviceNum}/device/capabilities/ev`;
     if (!existsSync(capPath)) return false;
     const evCap = parseInt((await fsPromises.readFile(capPath, "utf-8")).trim(), 16);
-    // Controllers/joysticks expose absolute axes (EV_ABS). Keyboards, mice,
-    // power buttons, and HDMI audio devices do not.
-    return (evCap & (1 << EV_ABS)) !== 0;
+    // Accept controllers (EV_ABS), keyboards (EV_KEY), and mice (EV_REL)
+    // but reject non-input devices like power buttons, HDMI audio, etc.
+    if (name && NON_INPUT_NAME_HINTS.some((h) => name.toLowerCase().includes(h))) return false;
+    const hasAbs = (evCap & (1 << EV_ABS)) !== 0;
+    const hasRel = (evCap & (1 << 0x02)) !== 0; // EV_REL = 0x02
+    // Device must have EV_ABS (controller) or EV_REL (mouse) to qualify.
+    // Keyboards only have EV_KEY, which is too broad (power buttons also have it),
+    // so keyboards must be matched by name above.
+    return hasAbs || hasRel;
   } catch {
     return false;
   }
@@ -649,6 +682,7 @@ async function openDevice(
   const EVENT_SIZE = 24; // sec(8) + usec(8) + type(2) + code(2) + value(4)
   const EV_SYN = 0,
     EV_KEY = 1,
+    EV_REL = 0x02,
     EV_ABS = 3;
 
   try {
@@ -752,6 +786,27 @@ async function openDevice(
           compactBuf.writeFloatLE(normalized, 4);
           compactBuf.writeUInt32LE(Date.now() >>> 0, 8);
           sendToTargets("input:event", compactBuf.buffer.slice(compactBuf.byteOffset, compactBuf.byteOffset + COMPACT_EVENT_SIZE));
+        } else if (type === EV_REL) {
+          // Mouse relative movement and scroll events
+          const REL_X = 0, REL_Y = 1, REL_WHEEL = 8, REL_HWHEEL = 6;
+          let axis: string | null = null;
+          if (code === REL_X) axis = "mouse_x";
+          else if (code === REL_Y) axis = "mouse_y";
+          else if (code === REL_WHEEL) axis = "mouse_scroll";
+          else if (code === REL_HWHEEL) axis = "mouse_hscroll";
+          if (axis) {
+            const inputEvent: NormalizedInputEvent = {
+              source: "mouse",
+              deviceId,
+              deviceName: info.name,
+              type: "axis",
+              axis,
+              value,
+              rawCode: code,
+              timestamp: Date.now(),
+            };
+            sendToTargets("input:event-mouse", inputEvent);
+          }
         }
       }
       remainder = buf;

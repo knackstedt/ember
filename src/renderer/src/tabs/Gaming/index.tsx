@@ -61,12 +61,16 @@ import {
   Plus,
   Globe,
   Monitor,
+  Columns,
+  FlaskConical,
 } from "lucide-react";
 import { DynamicFacetFilters, FacetField } from "../../components/DynamicFacetFilters/DynamicFacetFilters";
 import type { GameVideo } from "../../../../shared/metadata";
 import { GamingNavRail } from "./components/GamingNavRail";
 import { GamingToolbar } from "./components/GamingToolbar";
 import type { GamingNavItem } from "./types";
+import { useSplitscreenStore } from "../../store/splitscreen.store";
+import { SplitscreenConfigModal } from "../../components/Splitscreen/SplitscreenConfigModal";
 
 // Extended game type that includes lazy-loaded metadata properties
 type GameWithMetadata = Game & Partial<{
@@ -288,6 +292,7 @@ export const GamingTab: React.FC = () => {
   const [activeCollectionId, setActiveCollectionId] = useState<string | null>(null);
   const [showCollectionManager, setShowCollectionManager] = useState(false);
   const [showLaunchSettings, setShowLaunchSettings] = useState(false);
+  const [showSplitscreenModal, setShowSplitscreenModal] = useState(false);
   const [collectionItemIds, setCollectionItemIds] = useState<Set<string>>(new Set());
   const [localScreenshots, setLocalScreenshots] = useState<string[]>([]);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
@@ -1326,6 +1331,18 @@ export const GamingTab: React.FC = () => {
                   <Play size={14} /> Launch
                 </motion.button>
               </Tooltip>
+              <motion.button
+                className="px-4 py-2.5 rounded-[var(--radius-card)] font-semibold text-sm flex items-center gap-2 whitespace-nowrap"
+                style={{
+                  background: "var(--surface-1)",
+                  color: "var(--text-primary)",
+                  border: "1px solid var(--border-default)",
+                }}
+                onClick={() => setShowSplitscreenModal(true)}
+                whileTap={{ scale: 0.96 }}
+              >
+                <Columns size={14} /> Splitscreen <FlaskConical size={12} style={{ opacity: 0.6 }} />
+              </motion.button>
               {selected.romPath && !selected.compressedRomPath && (
                 <Tooltip content="Compress ROM to emulator-compatible format">
                   <motion.button
@@ -1888,6 +1905,12 @@ export const GamingTab: React.FC = () => {
         onClose={() => setShowCollectionManager(false)}
         itemType="game"
       />
+      {showSplitscreenModal && selected && (
+        <SplitscreenConfigModal
+          game={selected}
+          onClose={() => setShowSplitscreenModal(false)}
+        />
+      )}
       </div>
     </div>
   );

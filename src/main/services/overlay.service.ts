@@ -31,6 +31,7 @@ let cachedGameWindowId: number | null = null;
 let cachedGameBounds: Electron.Rectangle | null = null;
 let loggedWindowDiscovery = false;
 let cachedGameFocused = true;
+let splitscreenWindows: BrowserWindow[] = [];
 
 function isWayland(): boolean {
   return (
@@ -410,25 +411,37 @@ export async function showOverlay(): Promise<void> {
   let targetBounds: Electron.Rectangle;
   let useFullscreen = false;
 
-  const gameBounds = await findGameWindowBounds();
-  if (gameBounds) {
-    targetDisplay = screen.getDisplayNearestPoint({ x: gameBounds.x, y: gameBounds.y }) ?? screen.getPrimaryDisplay();
-    targetBounds = { ...gameBounds };
-    useFullscreen = isNearFullscreen(gameBounds, targetDisplay);
+  // Check for splitscreen BrowserWindow bounds first
+  const ssBounds = getFocusedSplitscreenBounds();
+  if (ssBounds) {
+    targetDisplay = screen.getDisplayNearestPoint({ x: ssBounds.x, y: ssBounds.y }) ?? screen.getPrimaryDisplay();
+    targetBounds = { ...ssBounds };
+    useFullscreen = isNearFullscreen(ssBounds, targetDisplay);
     log.info(
       "overlay",
-      `targeting game window ${gameBounds.width}x${gameBounds.height} at ${gameBounds.x},${gameBounds.y} (fullscreen=${useFullscreen})`,
+      `targeting splitscreen window ${ssBounds.width}x${ssBounds.height} at ${ssBounds.x},${ssBounds.y} (fullscreen=${useFullscreen})`,
     );
   } else {
-    targetDisplay = await getDisplayForOverlay();
-    targetBounds = {
-      x: targetDisplay.workArea.x,
-      y: targetDisplay.workArea.y,
-      width: targetDisplay.workAreaSize.width,
-      height: targetDisplay.workAreaSize.height,
-    };
-    useFullscreen = true;
-    log.info("overlay", `targeting display ${targetDisplay.id} ${targetBounds.width}x${targetBounds.height}`);
+    const gameBounds = await findGameWindowBounds();
+    if (gameBounds) {
+      targetDisplay = screen.getDisplayNearestPoint({ x: gameBounds.x, y: gameBounds.y }) ?? screen.getPrimaryDisplay();
+      targetBounds = { ...gameBounds };
+      useFullscreen = isNearFullscreen(gameBounds, targetDisplay);
+      log.info(
+        "overlay",
+        `targeting game window ${gameBounds.width}x${gameBounds.height} at ${gameBounds.x},${gameBounds.y} (fullscreen=${useFullscreen})`,
+      );
+    } else {
+      targetDisplay = await getDisplayForOverlay();
+      targetBounds = {
+        x: targetDisplay.workArea.x,
+        y: targetDisplay.workArea.y,
+        width: targetDisplay.workAreaSize.width,
+        height: targetDisplay.workAreaSize.height,
+      };
+      useFullscreen = true;
+      log.info("overlay", `targeting display ${targetDisplay.id} ${targetBounds.width}x${targetBounds.height}`);
+    }
   }
 
   const currentBounds = win.getBounds();
@@ -681,6 +694,7 @@ export function clearOverlayGame(gameId: string): void {
     cachedGameWindowId = null;
     cachedGameBounds = null;
     loggedWindowDiscovery = false;
+    splitscreenWindows = [];
     if (activeGameIds.size > 0) {
       // keep shortcut active while other games run
       return;
@@ -693,6 +707,26 @@ export function clearOverlayGame(gameId: string): void {
     }
   }
   log.info("overlay", `game cleared: ${gameId}`);
+}
+
+export function setSplitscreenWindows(wins: BrowserWindow[]): void {
+  splitscreenWindows = wins.filter((w) => !w.isDestroyed());
+}
+
+function getFocusedSplitscreenBounds(): Electron.Rectangle | null {
+  for (const win of splitscreenWindows) {
+    if (win.isDestroyed()) continue;
+    if (win.isFocused()) {
+      return win.getBounds();
+    }
+  }
+  // If none focused, use the first available
+  for (const win of splitscreenWindows) {
+    if (!win.isDestroyed()) {
+      return win.getBounds();
+    }
+  }
+  return null;
 }
 
 export async function overlayGameStarted(gameId: string): Promise<void> {

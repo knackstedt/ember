@@ -413,6 +413,8 @@ export type ControllerType =
   | "n64"
   | "switch"
   | "wiimote"
+  | "keyboard"
+  | "mouse"
   | "generic";
 
 export type ControllerConnectionType =
@@ -736,6 +738,12 @@ export interface AppSettings {
   defaultDllInjection?: DllInjectionConfig;
   /** Path to the Ember Vulkan layer shared library */
   vulkanLayerPath?: string;
+  /** User-defined labels for audio sinks (sinkId → label) */
+  audioSinkLabels?: Record<string, string>;
+  /** Last used splitscreen layout type */
+  splitscreenDefaultLayout?: import("./splitscreen-types").SplitscreenLayoutType;
+  /** Overlay toggle key for splitscreen mode (defaults to F1) */
+  splitscreenOverlayShortcut?: string;
 }
 
 export type DashboardWidgetType =

@@ -24,10 +24,13 @@ import {
   Unlink,
   Search,
   Trash2,
+  Columns,
 } from "lucide-react";
 import { useInputNav } from "../hooks/useInputNav";
 import { useControllerWorker } from "../hooks/useControllerWorker";
 import { Game, AppSettings, OverlayStyle, BluetoothDevice, VulkanShaderConfig, GameInjectionConfig } from "../../../shared/types";
+import { SplitscreenOverlay } from "../components/Splitscreen/SplitscreenOverlay";
+import { useSplitscreenStore } from "../store/splitscreen.store";
 
 /* ─── Sidebar items ─────────────────────────────────────────── */
 
@@ -39,6 +42,7 @@ type SidebarId =
   | "controllers"
   | "shaders"
   | "settings"
+  | "splitscreen"
   | "exit";
 
 interface SidebarItem {
@@ -55,6 +59,7 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
   { id: "controllers", label: "Controllers", Icon: Gamepad2 },
   { id: "shaders", label: "Shaders", Icon: Zap },
   { id: "settings", label: "Quick Settings", Icon: Settings },
+  { id: "splitscreen", label: "Splitscreen", Icon: Columns },
   { id: "exit", label: "Exit to Ember", Icon: Power },
 ];
 
@@ -960,12 +965,14 @@ export function OverlayApp(): React.ReactElement {
         return <ShaderPanel game={game} />;
       case "settings":
         return <QuickSettingsPanel style={style} onAdjustOpacity={adjustOpacity} />;
+      case "splitscreen":
+        return <SplitscreenOverlay />;
       default:
         return null;
     }
   }, [activeId, game, style, adjustOpacity]);
 
-  const showContent = activeId === "achievements" || activeId === "gameinfo" || activeId === "controllers" || activeId === "shaders" || activeId === "settings";
+  const showContent = activeId === "achievements" || activeId === "gameinfo" || activeId === "controllers" || activeId === "shaders" || activeId === "settings" || activeId === "splitscreen";
 
   return (
     <div

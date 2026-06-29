@@ -1236,6 +1236,53 @@ const htpc = {
     needsSessionReauth: (sources: import("../shared/types").RemoteSource[]): Promise<import("../shared/types").RemoteSource[]> =>
       ipcRenderer.invoke("credentials:needsSessionReauth", sources),
   },
+
+  splitscreen: {
+    detectDisplays: (): Promise<import("../shared/splitscreen-types").DisplayInfo[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.splitscreen.detectDisplays),
+    getLayouts: (): Promise<{ type: import("../shared/splitscreen-types").SplitscreenLayoutType; playerCount: number; label: string }[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.splitscreen.getLayouts),
+    startSession: (config: import("../shared/splitscreen-types").SplitscreenConfig): Promise<string> =>
+      ipcRenderer.invoke(IPC_CHANNELS.splitscreen.startSession, config),
+    stopSession: (): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.splitscreen.stopSession),
+    getSessionState: (): Promise<import("../shared/splitscreen-types").SplitscreenSession | null> =>
+      ipcRenderer.invoke(IPC_CHANNELS.splitscreen.getSessionState),
+    pauseInstance: (slotIndex: number): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.splitscreen.pauseInstance, slotIndex),
+    resumeInstance: (slotIndex: number): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.splitscreen.resumeInstance, slotIndex),
+    stopInstance: (slotIndex: number): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.splitscreen.stopInstance, slotIndex),
+    getAudioSinks: (): Promise<import("../shared/splitscreen-types").AudioSink[]> =>
+      ipcRenderer.invoke(IPC_CHANNELS.splitscreen.getAudioSinks),
+    setAudioSinkLabel: (sinkId: string, label: string): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.splitscreen.setAudioSinkLabel, sinkId, label),
+    routeAudio: (pid: number, sinkId: string): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.splitscreen.routeAudio, pid, sinkId),
+    assignDevice: (deviceId: string, slotIndex: number): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.splitscreen.assignDevice, deviceId, slotIndex),
+    setHostDevice: (deviceId: string): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.splitscreen.setHostDevice, deviceId),
+    locateDevice: (deviceId: string): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.splitscreen.locateDevice, deviceId),
+    showOverlay: (): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.splitscreen.showOverlay),
+    hideOverlay: (): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.splitscreen.hideOverlay),
+    focusSlot: (slotIndex: number): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.splitscreen.focusSlot, slotIndex),
+    onState: (cb: (session: import("../shared/splitscreen-types").SplitscreenSession) => void): (() => void) => {
+      const handler = (_e: unknown, session: import("../shared/splitscreen-types").SplitscreenSession) => cb(session);
+      ipcRenderer.on(IPC_CHANNELS.splitscreen.state, handler);
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.splitscreen.state, handler);
+    },
+    onInstanceProgress: (cb: (detail: import("../shared/splitscreen-types").SplitscreenInstanceProgress) => void): (() => void) => {
+      const handler = (_e: unknown, detail: import("../shared/splitscreen-types").SplitscreenInstanceProgress) => cb(detail);
+      ipcRenderer.on(IPC_CHANNELS.splitscreen.instanceProgress, handler);
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.splitscreen.instanceProgress, handler);
+    },
+  },
 };
 
 contextBridge.exposeInMainWorld("htpc", htpc);

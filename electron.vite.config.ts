@@ -237,6 +237,7 @@ export default defineConfig({
         input: {
           index: resolve("src/preload/index.ts"),
           "streaming-preload": resolve("src/preload/streaming-preload.ts"),
+          "splitscreen-preload": resolve("src/preload/splitscreen-preload.ts"),
         },
         output: {
           entryFileNames: "[name].js",

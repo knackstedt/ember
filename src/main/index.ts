@@ -21,6 +21,7 @@ import { getServePort, shutdownRcloneManager } from "./services/rclone-manager";
 import { startRemoteAvailabilityWorker, stopRemoteAvailabilityWorker } from "./services/remote-availability.service";
 import { bootPlugins, shutdownPlugins } from "./plugins/loader";
 import { installBundledPlugins } from "./services/plugin-manager.service";
+import { cleanupSplitscreen } from "./services/splitscreen.service";
 import {
   initUpdater,
   checkPostUpdateCrash,
@@ -737,6 +738,181 @@ app.whenReady().then(async () => {
       }
     }
 
+    // Splitscreen player pages: ember://splitscreen/<page>.html?<params>
+    if (url.hostname === "splitscreen") {
+      const page = url.pathname.split("/").filter(Boolean)[0] ?? "";
+
+      // Serve Ruffle assets: ember://splitscreen/ruffle/<path>
+      if (page === "ruffle") {
+        const assetRel = url.pathname.split("/").filter(Boolean).slice(1).join("/");
+        const rufflePath = join(__dirname, "..", "renderer", "ruffle", assetRel);
+        if (rufflePath.includes("..")) {
+          return new Response("Forbidden", { status: 403 });
+        }
+        try {
+          const data = readFileSync(rufflePath);
+          const ext = rufflePath.toLowerCase().slice(rufflePath.lastIndexOf("."));
+          let contentType = "application/octet-stream";
+          if (ext === ".js") contentType = "application/javascript";
+          else if (ext === ".wasm") contentType = "application/wasm";
+          else if (ext === ".map") contentType = "application/json";
+          return new Response(data, {
+            status: 200,
+            headers: { "Content-Type": contentType },
+          });
+        } catch {
+          return new Response("Not Found", { status: 404 });
+        }
+      }
+
+      // Serve SWF files: ember://splitscreen/swf/<encoded-path>
+      if (page === "swf") {
+        const encodedPath = url.pathname.split("/").filter(Boolean).slice(1).join("/");
+        const swfFilePath = decodeURIComponent(encodedPath);
+        if (!swfFilePath || swfFilePath.includes("..")) {
+          return new Response("Forbidden", { status: 403 });
+        }
+        try {
+          const data = readFileSync(swfFilePath);
+          return new Response(data, {
+            status: 200,
+            headers: {
+              "Content-Type": "application/x-shockwave-flash",
+              "Cache-Control": "no-store",
+            },
+          });
+        } catch {
+          return new Response("SWF Not Found", { status: 404 });
+        }
+      }
+
+      // Generate HTML pages for each player type
+      const params = url.searchParams;
+      const slot = params.get("slot") ?? "0";
+
+      if (page === "flash.html") {
+        const swfPath = params.get("swf") ?? "";
+        // Serve the SWF through ember://splitscreen/swf/ to avoid file: protocol issues
+        const swfUrl = `ember://splitscreen/swf/${encodeURIComponent(swfPath)}`;
+        const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;background:#000;overflow:hidden}
+#player{width:100%;height:100%}
+#exit-bar{position:fixed;top:0;right:0;z-index:9999;display:flex;gap:8px;padding:6px 10px;background:rgba(0,0,0,0.6);border-radius:0 0 0 8px;opacity:0;transition:opacity 0.2s}
+#exit-bar:hover{opacity:1}
+#exit-bar button{background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.25);color:#fff;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:12px}
+#exit-bar button:hover{background:rgba(255,255,255,0.25)}
+#hint{position:fixed;bottom:8px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,0.4);font-size:12px;font-family:monospace;pointer-events:none;opacity:0;transition:opacity 0.3s}
+body:hover #hint{opacity:1}
+</style></head><body>
+<div id="exit-bar">
+  <button onclick="window.htpc.splitscreen.toggleOverlay()">Overlay (F1)</button>
+  <button onclick="window.htpc.splitscreen.exit()">Exit</button>
+</div>
+<div id="player"></div>
+<div id="hint">F1 = Overlay &middot; Esc = Exit</div>
+<script src="ember://splitscreen/ruffle/ruffle.js"></script>
+<script>
+window.RufflePlayer = window.RufflePlayer || {};
+window.addEventListener("load", function() {
+  var ruffle = window.RufflePlayer && window.RufflePlayer.newest();
+  if (!ruffle) { console.error("Ruffle failed to load"); return; }
+  var player = ruffle.createPlayer();
+  player.style.width = "100%";
+  player.style.height = "100%";
+  document.getElementById("player").appendChild(player);
+  player.load({ url: "${swfUrl.replace(/"/g, '\\"')}" }).catch(function(e) {
+    console.error("Failed to load SWF:", e);
+  });
+});
+document.addEventListener("keydown", function(e) {
+  if (e.key === "F1") { e.preventDefault(); window.htpc.splitscreen.toggleOverlay(); }
+  if (e.key === "Escape") { e.preventDefault(); window.htpc.splitscreen.exit(); }
+});
+</script>
+</body></html>`;
+        return new Response(html, {
+          status: 200,
+          headers: { "Content-Type": "text/html" },
+        });
+      }
+
+      if (page === "video.html") {
+        const src = params.get("src") ?? "";
+        const title = params.get("title") ?? "";
+        const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;background:#000;overflow:hidden}
+video{width:100%;height:100%;object-fit:contain}
+#exit-bar{position:fixed;top:0;right:0;z-index:9999;display:flex;gap:8px;padding:6px 10px;background:rgba(0,0,0,0.6);border-radius:0 0 0 8px;opacity:0;transition:opacity 0.2s}
+#exit-bar:hover{opacity:1}
+#exit-bar button{background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.25);color:#fff;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:12px}
+#exit-bar button:hover{background:rgba(255,255,255,0.25)}
+#hint{position:fixed;bottom:8px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,0.4);font-size:12px;font-family:monospace;pointer-events:none;opacity:0;transition:opacity 0.3s}
+body:hover #hint{opacity:1}
+</style></head><body>
+<div id="exit-bar">
+  <button onclick="window.htpc.splitscreen.toggleOverlay()">Overlay (F1)</button>
+  <button onclick="window.htpc.splitscreen.exit()">Exit</button>
+</div>
+<video src="${src.replace(/"/g, '\\"')}" autoplay controls></video>
+<div id="hint">F1 = Overlay &middot; Esc = Exit</div>
+<script>
+document.addEventListener("keydown", function(e) {
+  if (e.key === "F1") { e.preventDefault(); window.htpc.splitscreen.toggleOverlay(); }
+  if (e.key === "Escape") { e.preventDefault(); window.htpc.splitscreen.exit(); }
+});
+</script>
+</body></html>`;
+        return new Response(html, {
+          status: 200,
+          headers: { "Content-Type": "text/html" },
+        });
+      }
+
+      if (page === "libretro.html") {
+        // Stub — libretro player requires the full app context
+        const rom = params.get("rom") ?? "";
+        const title = params.get("title") ?? "";
+        const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;background:#000;color:#fff;display:flex;align-items:center;justify-content:center;font-family:sans-serif}
+#exit-bar{position:fixed;top:0;right:0;z-index:9999;display:flex;gap:8px;padding:6px 10px;background:rgba(0,0,0,0.6);border-radius:0 0 0 8px;opacity:0;transition:opacity 0.2s}
+#exit-bar:hover{opacity:1}
+#exit-bar button{background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.25);color:#fff;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:12px}
+#exit-bar button:hover{background:rgba(255,255,255,0.25)}
+#hint{position:fixed;bottom:8px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,0.4);font-size:12px;font-family:monospace;pointer-events:none;opacity:0;transition:opacity 0.3s}
+body:hover #hint{opacity:1}
+</style></head><body>
+<div id="exit-bar">
+  <button onclick="window.htpc.splitscreen.toggleOverlay()">Overlay (F1)</button>
+  <button onclick="window.htpc.splitscreen.exit()">Exit</button>
+</div>
+<div>
+<h2>Libretro: ${title.replace(/</g, '&lt;')}</h2>
+<p>ROM: ${rom.replace(/</g, '&lt;')}</p>
+<p style="color:#888;margin-top:1em">Libretro splitscreen player requires the full renderer context.</p>
+</div>
+<div id="hint">F1 = Overlay &middot; Esc = Exit</div>
+<script>
+document.addEventListener("keydown", function(e) {
+  if (e.key === "F1") { e.preventDefault(); window.htpc.splitscreen.toggleOverlay(); }
+  if (e.key === "Escape") { e.preventDefault(); window.htpc.splitscreen.exit(); }
+});
+</script>
+</body></html>`;
+        return new Response(html, {
+          status: 200,
+          headers: { "Content-Type": "text/html" },
+        });
+      }
+
+      return new Response("Not Found", { status: 404 });
+    }
+
     // Plugin asset serving: ember://plugin/<id>/<path>
     if (url.hostname === "plugin") {
       const segments = url.pathname.split("/").filter(Boolean);
@@ -984,6 +1160,8 @@ app.on("before-quit", (e) => {
       await destroyLibretroWorker();
       log.info("shutdown", "shutting down plugins...");
       await shutdownPlugins();
+      log.info("shutdown", "stopping splitscreen session...");
+      await cleanupSplitscreen();
     } catch (err) {
       log.warn("shutdown", `Cleanup error: ${err}`);
     }
