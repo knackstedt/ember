@@ -376,6 +376,9 @@ export async function destroyWorker(): Promise<void> {
   if (!libretroWorker) return;
   const dyingWorker = libretroWorker;
   libretroWorker = null;
+  for (const pending of workerPending.values()) {
+    pending.reject(new Error("Libretro worker destroyed"));
+  }
   workerPending.clear();
   workerReqId = 0;
 
@@ -1288,28 +1291,28 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     }
   });
 
-  ipcMain.handle("games:injectionConfig:checkUserSettingsPy", async (_e, steamAppId: number) => {
-    const { checkUserSettingsPy } = await import("../services/shader-injection.service");
-    return checkUserSettingsPy(steamAppId);
+  ipcMain.handle("games:injectionConfig:checkUserSettingsPy", async () => {
+    const { checkUserSettingsPy } = await import("../services/shader-injection.service.js");
+    return checkUserSettingsPy();
   });
 
   ipcMain.handle("games:injectionConfig:vulkanPresets", async () => {
-    const { VULKAN_SHADER_PRESETS } = await import("../services/shader-injection.service");
+    const { VULKAN_SHADER_PRESETS } = await import("../services/shader-injection.service.js");
     return VULKAN_SHADER_PRESETS;
   });
 
   ipcMain.handle("games:injectionConfig:shaderParamDefs", async () => {
-    const { SHADER_PARAM_DEFS } = await import("../services/shader-injection.service");
+    const { SHADER_PARAM_DEFS } = await import("../services/shader-injection.service.js");
     return SHADER_PARAM_DEFS;
   });
 
   ipcMain.handle("games:injectionConfig:updateRuntimeShader", async (_e, id: string, config: import("../../shared/types").VulkanShaderConfig) => {
-    const { updateRuntimeShaderConfig } = await import("../services/shader-injection.service");
+    const { updateRuntimeShaderConfig } = await import("../services/shader-injection.service.js");
     return updateRuntimeShaderConfig(id, config);
   });
 
   ipcMain.handle("games:findMainExe", async (_e, id: string) => {
-    const { findMainExe } = await import("../services/shader-injection.service");
+    const { findMainExe } = await import("../services/shader-injection.service.js");
     const db = getDb();
     try {
       const rows = await db.query(`SELECT * FROM game:⟨${id}⟩`);
@@ -1336,7 +1339,12 @@ export function registerIpcHandlers(window: BrowserWindow): void {
       return url ?? null;
     }
     if (isLibretroPlatform(game.platform)) {
-      const url = await loadLibretroThumbnail(game);
+      const url = await loadLibretroThumbnail(game, () => {
+        sendToWindow(window, "toast", {
+          type: "warning",
+          message: `No libretro core found for ${game.title}`,
+        });
+      });
       return url ?? null;
     }
     return null;

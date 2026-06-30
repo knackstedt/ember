@@ -16,12 +16,16 @@ const log = createLogger("info");
 let PLUGINS_DIR: string;
 try { PLUGINS_DIR = join(app.getPath("home"), ".config", "htpc", "plugins"); } catch { PLUGINS_DIR = join(process.cwd(), ".config", "htpc", "plugins"); }
 
+function sanitizeId(id: string): string {
+  return id.replace(/[^a-zA-Z0-9_-]/g, "_");
+}
+
 function getPluginDir(id: string): string {
-  return join(PLUGINS_DIR, id);
+  return join(PLUGINS_DIR, sanitizeId(id));
 }
 
 function getPluginStatePath(id: string): string {
-  return join(PLUGINS_DIR, `.${id}.state.json`);
+  return join(PLUGINS_DIR, `.${sanitizeId(id)}.state.json`);
 }
 
 interface PluginState {

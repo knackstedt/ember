@@ -12,6 +12,8 @@ const PLATFORM_COLORS: Record<GamePlatform, string> = {
   ps2: "#3498db", ps3: "#9b59b6", psp: "#1abc9c", xbox360: "#27ae60",
   nds: "#c0392b", dreamcast: "#e74c3c", flash: "#f1c40f", dos: "#95a5a6",
   windows: "#3498db", desktop: "#7f8c8d", itch: "#fa5c5c", unknown: "#7f8c8d",
+  gbc: "#2ecc71", atari2600: "#34495e", atari5200: "#34495e", atari7800: "#34495e",
+  lynx: "#e74c3c", ngp: "#3498db", movie: "#9b59b6", tv: "#9b59b6", video: "#9b59b6",
 };
 
 export const QuickLaunchWidget: React.FC<{ title?: string; maxItems?: number }> = ({

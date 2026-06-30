@@ -1,7 +1,7 @@
 import { spawn, spawnSync, ChildProcess, execFile } from "child_process";
 import { existsSync, readdirSync, readFileSync } from "fs";
 import { promisify } from "util";
-import { BrowserWindow } from "electron";
+import { BrowserWindow, dialog } from "electron";
 import { Game, Movie, MusicTrack, type TaintEntry } from "../../shared/types";
 import { createLogger } from "../util/logger";
 import { GameRepo } from "../db/repository";
@@ -464,7 +464,13 @@ function fullscreenDolphinWindow(): void {
   }
 }
 
-export async function launchGame(game: Game): Promise<void> {
+export interface LaunchResult {
+  pid: number | null;
+  windowId: number | null;
+  browserWindowId: string | null;
+}
+
+export async function launchGame(game: Game): Promise<LaunchResult> {
   if (!game.execPath && !game.romPath && !game.launchCommand) {
     return Promise.reject(
       new Error(`No executable or ROM path for game: ${game.title}`),
@@ -543,19 +549,20 @@ export async function launchGame(game: Game): Promise<void> {
 
   if (needsUserSettingsPy && steamCompatAppId) {
     sendGameLaunchProgress(game.id, "Writing Proton shader config", "Configuring user_settings.py…");
-    const existing = checkUserSettingsPy(steamCompatAppId);
+    const existing = checkUserSettingsPy();
     if (existing === "external") {
-      const win = getMainWindow();
-      if (win && !win.isDestroyed() && !win.webContents.isDestroyed()) {
-        const choice = await win.webContents.executeJavaScript(
-          `confirm('A non-Ember user_settings.py exists for this Steam game. Override it? (The original will be backed up.)')`,
-          true,
-        );
-        if (!choice) {
-          log.info("launcher", "User declined to override user_settings.py; skipping injection");
-          injectionEnv = {};
-          needsUserSettingsPy = false;
-        }
+      const { response } = await dialog.showMessageBox({
+        type: "question",
+        buttons: ["Override", "Skip"],
+        defaultId: 0,
+        title: "Proton user_settings.py",
+        message: "A non-Ember user_settings.py exists for this Steam game.",
+        detail: "Override it? The original will be backed up.",
+      });
+      if (response === 1) {
+        log.info("launcher", "User declined to override user_settings.py; skipping injection");
+        injectionEnv = {};
+        needsUserSettingsPy = false;
       }
     }
     if (needsUserSettingsPy) {
@@ -678,7 +685,7 @@ export async function launchGame(game: Game): Promise<void> {
           clearOverlayGame(game.id);
           sendGameLaunchFailed(game.id, reason);
           if (needsUserSettingsPy && steamCompatAppId) {
-            cleanupUserSettingsPy(steamCompatAppId);
+            cleanupUserSettingsPy();
           }
           if (needsLaunchOptions && steamCompatAppId && launchOptionsState) {
             restoreSteamLaunchOptions(steamCompatAppId, launchOptionsState.original, launchOptionsState.configPath);
@@ -723,7 +730,7 @@ export async function launchGame(game: Game): Promise<void> {
 
           // Clean up Ember-generated user_settings.py
           if (needsUserSettingsPy && steamCompatAppId) {
-            cleanupUserSettingsPy(steamCompatAppId);
+            cleanupUserSettingsPy();
           }
           // Restore original Steam launch options
           if (needsLaunchOptions && steamCompatAppId && launchOptionsState) {
@@ -747,8 +754,8 @@ export async function launchGame(game: Game): Promise<void> {
         }
       })();
 
-      // Return immediately so the UI isn't blocked
-      return Promise.resolve();
+      // Return immediately so the UI isn't blocked; the actual game PID is tracked asynchronously.
+      return Promise.resolve({ pid: null, windowId: null, browserWindowId: null });
     }
     case "dolphin-gc":
     case "dolphin-wii": {
@@ -769,7 +776,12 @@ export async function launchGame(game: Game): Promise<void> {
       break;
     }
     case "windows": {
-      const exePath = game.romPath!;
+      const exePath = game.mainExe ?? game.romPath;
+      if (!exePath) {
+        return Promise.reject(
+          new Error(`No executable path for Windows game: ${game.title}`),
+        );
+      }
       // Default to umu-run for non-store Windows games (it handles Proton prefix management)
       const runner = game.wineRunner ?? "umu-run";
       const customCommand = runner === "umu-run"
@@ -813,7 +825,7 @@ export async function launchGame(game: Game): Promise<void> {
     case "dreamcast":
       // Handled via in-renderer emulator components
       clearOverlayGame(game.id);
-      return Promise.resolve();
+      return Promise.resolve({ pid: null, windowId: null, browserWindowId: null });
     case "itch": {
       sendGameLaunching(game.id, game.title);
       const result = await launchItchGame(game);
@@ -847,7 +859,7 @@ export async function launchGame(game: Game): Promise<void> {
           }
         })();
 
-        return Promise.resolve();
+        return Promise.resolve({ pid: itchPid, windowId: null, browserWindowId: null });
       }
       clearOverlayGame(game.id);
       const reason = result.error ?? "Failed to launch itch game";
@@ -881,7 +893,7 @@ export async function launchGame(game: Game): Promise<void> {
 
   sendGameLaunching(game.id, game.title);
 
-  return new Promise<void>((resolve, reject) => {
+  return new Promise<LaunchResult>((resolve, reject) => {
     const hasInjection = Object.keys(injectionEnv).length > 0;
     const proc = spawn(cmd, args, {
       detached: true,
@@ -932,7 +944,12 @@ export async function launchGame(game: Game): Promise<void> {
         log.info("launcher", `"${game.title}" started successfully`);
         if (isDolphin) fullscreenDolphinWindow();
         void runSessionHooks(game, "after-start", launchEnv);
-        resolve();
+        const result: LaunchResult = {
+          pid: proc.pid ?? null,
+          windowId: null,
+          browserWindowId: null,
+        };
+        resolve(result);
         sendGameStarted(game.id);
         minimizeWindow();
         void windowPromise.then((found) => {
@@ -949,8 +966,8 @@ export async function launchGame(game: Game): Promise<void> {
       activeProcesses.delete(game.id);
       stopPlayTimeTracking(game.id);
       clearOverlayGame(game.id);
-      const crashed = !signal && code !== 0;
-      const closed = !signal && code === 0;
+      const crashed = signal !== null || code !== 0;
+      const closed = signal === null && code === 0;
       if (crashed) {
         void runSessionHooks(game, "after-crash", launchEnv);
       } else if (closed) {

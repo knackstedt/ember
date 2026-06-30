@@ -43,10 +43,18 @@ const log = createLogger("info");
 
 let activeSession: SplitscreenSession | null = null;
 let overlayVisible = false;
+const pendingAudioTimeouts = new Set<NodeJS.Timeout>();
 
 function getMainWindow(): BrowserWindow | null {
   const wins = BrowserWindow.getAllWindows();
-  return wins.find((w) => !w.isDestroyed()) ?? null;
+  return (
+    wins.find((w) => {
+      if (w.isDestroyed() || w.webContents.isDestroyed()) return false;
+      // Splitscreen player windows use ember://splitscreen/ URLs.
+      const url = w.webContents.getURL();
+      return !url.startsWith("ember://splitscreen/");
+    }) ?? null
+  );
 }
 
 function sendStateToRenderer(): void {
@@ -74,6 +82,7 @@ export async function startSession(config: SplitscreenConfig): Promise<string> {
   const sessionId = `ss-${Date.now()}`;
   const instances: SplitscreenInstanceState[] = config.instances.map((inst) => ({
     slotIndex: inst.slotIndex,
+    gameId: inst.game.id,
     windowId: null,
     pid: null,
     browserWindowId: null,
@@ -152,11 +161,13 @@ export async function startSession(config: SplitscreenConfig): Promise<string> {
       // Route audio to assigned sink
       const audioMapping = config.audioMappings.find((m) => m.slotIndex === instConfig.slotIndex);
       if (audioMapping && result.pid) {
-        setTimeout(() => {
+        const timeout = setTimeout(() => {
+          pendingAudioTimeouts.delete(timeout);
           routeAudioStream(result.pid!, audioMapping.sinkId).catch((err) => {
             log.warn("splitscreen", `Failed to route audio for slot ${instConfig.slotIndex}: ${err}`);
           });
         }, 2000);
+        pendingAudioTimeouts.add(timeout);
       }
 
       sendStateToRenderer();
@@ -186,6 +197,11 @@ function updateInstanceStatus(slotIndex: number, status: SplitscreenInstanceStat
 
 export async function stopSession(): Promise<void> {
   if (!activeSession) return;
+
+  for (const timeout of pendingAudioTimeouts) {
+    clearTimeout(timeout);
+  }
+  pendingAudioTimeouts.clear();
 
   log.info("splitscreen", `Stopping session ${activeSession.id}`);
 

@@ -1741,25 +1741,26 @@ export const GamingTab: React.FC = () => {
                               className="w-full"
                             />
                           </div>
-                          {(shaderParamDefs[selectedInjectionConfig.vulkanShader.preset] ?? []).map((def, idx) => (
+                          {selectedInjectionConfig.vulkanShader && (shaderParamDefs[selectedInjectionConfig.vulkanShader.preset] ?? []).map((def, idx) => (
                             <div key={idx}>
                               <label className="text-[12px] block mb-1" style={{ color: "var(--text-secondary)" }}>
-                                {def.label}: {(selectedInjectionConfig.vulkanShader.params?.[idx] ?? def.default).toFixed(def.step < 0.01 ? 4 : def.step < 1 ? 3 : 0)}
+                                {def.label}: {(selectedInjectionConfig.vulkanShader!.params?.[idx] ?? def.default).toFixed(def.step < 0.01 ? 4 : def.step < 1 ? 3 : 0)}
                               </label>
                               <input
                                 type="range"
                                 min={def.min}
                                 max={def.max}
                                 step={def.step}
-                                value={selectedInjectionConfig.vulkanShader.params?.[idx] ?? def.default}
+                                value={selectedInjectionConfig.vulkanShader!.params?.[idx] ?? def.default}
                                 onChange={(e) => {
                                   const val = parseFloat(e.target.value);
-                                  const currentParams = selectedInjectionConfig.vulkanShader.params ?? shaderParamDefs[selectedInjectionConfig.vulkanShader.preset]?.map((d) => d.default) ?? [];
+                                  const vulkanShader = selectedInjectionConfig.vulkanShader!;
+                                  const currentParams = vulkanShader.params ?? shaderParamDefs[vulkanShader.preset]?.map((d) => d.default) ?? [];
                                   const newParams = [...currentParams];
                                   newParams[idx] = val;
                                   const next: GameInjectionConfig = {
                                     ...selectedInjectionConfig,
-                                    vulkanShader: { ...selectedInjectionConfig.vulkanShader!, params: newParams },
+                                    vulkanShader: { ...vulkanShader, params: newParams },
                                   };
                                   setSelectedInjectionConfig(next);
                                   void window.htpc.games.injectionConfig.set(selected.id, next);

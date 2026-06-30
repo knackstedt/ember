@@ -1,5 +1,5 @@
-import React, { useRef, useState, useEffect, useLayoutEffect, CSSProperties, RefObject } from "react";
-import { experimental_VGrid as VGrid, VGridHandle, Virtualizer, VirtualizerHandle } from "virtua";
+import React, { useRef, useState, useEffect, useLayoutEffect, useMemo, CSSProperties, RefObject } from "react";
+import { Virtualizer, VirtualizerHandle } from "virtua";
 
 export interface VirtualGridHandle {
   scrollToItem(index: number): void;
@@ -27,25 +27,6 @@ export interface VirtualGridProps<T> {
   scrollRef?: RefObject<HTMLElement>;
 }
 
-const GridCell = React.forwardRef<
-  HTMLDivElement,
-  { style: CSSProperties; children: React.ReactNode }
->(function GridCellInner({ style, children }, ref) {
-  return (
-    <div
-      ref={ref}
-      style={{
-        ...style,
-        width: style.minWidth,
-        height: style.minHeight,
-        display: "flex",
-      }}
-    >
-      {children}
-    </div>
-  );
-});
-
 function useGridLayout(
   containerRef: RefObject<HTMLDivElement | null>,
   columnCountProp: number,
@@ -53,19 +34,12 @@ function useGridLayout(
   onColumnCountChange: ((count: number) => void) | undefined,
 ) {
   const [containerWidth, setContainerWidth] = useState(0);
-  const [effectiveColCount, setEffectiveColCount] = useState(columnCountProp);
 
   useLayoutEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     const w = el.clientWidth;
-    if (w > 0) {
-      setContainerWidth(w);
-      const cols = minItemWidth
-        ? Math.max(2, Math.floor(w / minItemWidth))
-        : columnCountProp;
-      setEffectiveColCount((prev) => (prev !== cols ? cols : prev));
-    }
+    if (w > 0) setContainerWidth(w);
   }, []);
 
   useEffect(() => {
@@ -78,13 +52,7 @@ function useGridLayout(
         rafId = null;
         for (const entry of entries) {
           const w = entry.contentRect.width;
-          if (w > 0) {
-            setContainerWidth(w);
-            const cols = minItemWidth
-              ? Math.max(2, Math.floor(w / minItemWidth))
-              : columnCountProp;
-            setEffectiveColCount((prev) => (prev !== cols ? cols : prev));
-          }
+          if (w > 0) setContainerWidth(w);
         }
       });
     });
@@ -93,11 +61,23 @@ function useGridLayout(
       ro.disconnect();
       if (rafId) cancelAnimationFrame(rafId);
     };
-  }, [columnCountProp, minItemWidth]);
+  }, []);
 
+  const effectiveColCount = useMemo(() => {
+    if (containerWidth <= 0) return columnCountProp;
+    return minItemWidth
+      ? Math.max(2, Math.floor(containerWidth / minItemWidth))
+      : columnCountProp;
+  }, [containerWidth, minItemWidth, columnCountProp]);
+
+  const prevColCountRef = useRef<number | null>(null);
   useEffect(() => {
+    if (effectiveColCount === prevColCountRef.current) return;
+    // Skip the initial unmeasured default so the parent doesn't see a bogus column count.
+    if (prevColCountRef.current === null && containerWidth <= 0) return;
+    prevColCountRef.current = effectiveColCount;
     onColumnCountChange?.(effectiveColCount);
-  }, [effectiveColCount]);
+  }, [effectiveColCount, containerWidth, onColumnCountChange]);
 
   return { containerWidth, effectiveColCount };
 }
@@ -117,7 +97,6 @@ export const VirtualGrid = React.forwardRef(function VirtualGridInner<T>(
   }: VirtualGridProps<T>,
   forwardedRef: React.Ref<VirtualGridHandle>,
 ): React.ReactElement {
-  const vgridRef = useRef<VGridHandle>(null);
   const virtualizerRef = useRef<VirtualizerHandle>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const renderItemRef = useRef(renderItem);
@@ -135,23 +114,10 @@ export const VirtualGrid = React.forwardRef(function VirtualGridInner<T>(
     () => ({
       scrollToItem(index: number) {
         const row = Math.floor(index / effectiveColCount);
-        if (scrollRef) {
-          virtualizerRef.current?.scrollToIndex(row, { align: "nearest" });
-        } else {
-          const vgrid = vgridRef.current;
-          if (!vgrid) return;
-          const rowOffset = row * rowHeight;
-          const scrollTop = vgrid.scrollTop;
-          const viewportHeight = vgrid.viewportHeight;
-          if (rowOffset < scrollTop) {
-            vgrid.scrollTo(0, rowOffset);
-          } else if (rowOffset + rowHeight > scrollTop + viewportHeight) {
-            vgrid.scrollTo(0, rowOffset + rowHeight - viewportHeight);
-          }
-        }
+        virtualizerRef.current?.scrollToIndex(row, { align: "nearest" });
       },
     }),
-    [effectiveColCount, rowHeight, scrollRef],
+    [effectiveColCount],
   );
 
   const cellWidth = minItemWidth
@@ -166,11 +132,35 @@ export const VirtualGrid = React.forwardRef(function VirtualGridInner<T>(
       ? Math.max(0, Math.floor((containerWidth - gridWidth) / 2))
       : 0;
 
-  const rowCount = Math.ceil(items.length / effectiveColCount);
+  const rowCount = Math.max(1, Math.ceil(items.length / effectiveColCount));
+
+  const renderRow = (rowIndex: number) => (
+    <div
+      key={rowIndex}
+      style={{
+        display: "flex",
+        height: rowHeight,
+        paddingLeft: offset,
+        paddingRight: offset,
+      }}
+    >
+      {Array.from({ length: effectiveColCount }, (_, colIndex) => {
+        const index = rowIndex * effectiveColCount + colIndex;
+        if (index >= items.length) {
+          return <div key={colIndex} style={{ width: cellWidth, flexShrink: 0 }} />;
+        }
+        return (
+          <div key={colIndex} style={{ width: cellWidth, flexShrink: 0 }} className="min-w-0">
+            {renderItemRef.current(items[index], index)}
+          </div>
+        );
+      })}
+    </div>
+  );
 
   if (scrollRef) {
     return (
-      <div ref={containerRef} className="w-full relative">
+      <div ref={containerRef} className={`w-full relative ${className ?? ""}`} style={style}>
         <Virtualizer
           ref={virtualizerRef}
           scrollRef={scrollRef}
@@ -178,69 +168,26 @@ export const VirtualGrid = React.forwardRef(function VirtualGridInner<T>(
           itemSize={rowHeight}
           overscan={overscan}
         >
-          {(rowIndex) => (
-            <div
-              key={rowIndex}
-              style={{
-                display: "flex",
-                height: rowHeight,
-                paddingLeft: offset,
-                paddingRight: offset,
-              }}
-            >
-              {Array.from({ length: effectiveColCount }, (_, colIndex) => {
-                const index = rowIndex * effectiveColCount + colIndex;
-                if (index >= items.length) {
-                  return <div key={colIndex} style={{ width: cellWidth, flexShrink: 0 }} />;
-                }
-                return (
-                  <div key={colIndex} style={{ width: cellWidth, flexShrink: 0 }} className="min-w-0">
-                    {renderItemRef.current(items[index], index)}
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          {renderRow}
         </Virtualizer>
       </div>
     );
   }
 
   return (
-    <div ref={containerRef} className="w-full h-full relative overflow-hidden">
-      <VGrid
-        key={effectiveColCount}
-        ref={vgridRef}
-        className={`gpu-scroll vgrid-center ${className ?? ""}`}
-        style={{
-          height: "100%",
-          width: "100%",
-          overflowX: "hidden",
-          paddingTop: 8,
-          paddingBottom: 8,
-          // @ts-expect-error - CSS variable
-          "--scroll-x": `${offset}px`,
-          ...style,
-        }}
-        item={GridCell}
-        row={rowCount}
-        col={effectiveColCount}
-        cellHeight={rowHeight}
-        cellWidth={cellWidth}
+    <div
+      ref={containerRef}
+      className={`w-full h-full overflow-y-auto gpu-scroll ${className ?? ""}`}
+      style={style}
+    >
+      <Virtualizer
+        ref={virtualizerRef}
+        count={rowCount}
+        itemSize={rowHeight}
         overscan={overscan}
       >
-        {({ rowIndex, colIndex }) => {
-          const index = rowIndex * effectiveColCount + colIndex;
-          if (index >= items.length) {
-            return <div className="w-full h-full" />;
-          }
-          return (
-            <div className="w-full h-full min-w-0">
-              {renderItemRef.current(items[index], index)}
-            </div>
-          );
-        }}
-      </VGrid>
+        {renderRow}
+      </Virtualizer>
     </div>
   );
 }) as <T>(

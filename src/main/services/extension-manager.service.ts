@@ -22,8 +22,12 @@ function getExtensionsDir(): string {
   return dir;
 }
 
+function sanitizeId(id: string): string {
+  return id.replace(/[^a-zA-Z0-9_-]/g, "_");
+}
+
 function getExtensionPath(extId: string): string {
-  return join(getExtensionsDir(), extId);
+  return join(getExtensionsDir(), sanitizeId(extId));
 }
 
 function getVersionFilePath(extId: string): string {

@@ -80,7 +80,7 @@ async function renderNonBlackFrame(
   decoder: any,
   ab: ArrayBuffer,
 ): Promise<{ width: number; height: number; data: Uint8Array } | null> {
-  for (let attempt = 0; attempt < 15; attempt++) {
+  for (let attempt = 0; attempt < 5; attempt++) {
     const frameMeta = decoder.renderFrame();
     if (!frameMeta) {
       throw new Error("Failed to render frame");
@@ -112,7 +112,7 @@ async function renderNonBlackFrame(
       return { width, height, data };
     }
 
-    await new Promise((r) => setTimeout(r, 300));
+    await new Promise((r) => setTimeout(r, 100));
   }
   return null;
 }
@@ -147,21 +147,21 @@ async function capture(): Promise<void> {
     decoder.attachSharedBuffer(ab);
 
     decoder.seek(seek);
-    await new Promise((r) => setTimeout(r, 500));
+    await new Promise((r) => setTimeout(r, 100));
 
     let frame = await renderNonBlackFrame(decoder, ab);
     if (!frame) {
       throw new Error("Rendered frame is black after multiple attempts");
     }
 
-    // If visual complexity is very low, try progressively later frames.
-    for (let retry = 0; retry < 10; retry++) {
+    // If visual complexity is very low, try a couple progressively later frames.
+    for (let retry = 0; retry < 3; retry++) {
       const complexity = computeComplexity(frame.data);
       if (complexity >= 15) break;
       const nextSeek = seek + (retry + 1) * 60000;
       if (durationMs > 0 && nextSeek >= durationMs - 1000) break;
       decoder.seek(nextSeek);
-      await new Promise((r) => setTimeout(r, 500));
+      await new Promise((r) => setTimeout(r, 100));
       const laterFrame = await renderNonBlackFrame(decoder, ab);
       if (laterFrame) {
         frame = laterFrame;

@@ -6,11 +6,30 @@ import { getMainWindow } from "../index";
 const log = createLogger("info");
 
 const DEFAULT_TIMEOUT = 30000;
+const MAX_HOOK_TIMEOUT = 600000;
 const MAX_HOOK_OUTPUT = 4096;
+
+function hookTimeout(hook: SessionHook): number {
+  const raw = hook.timeout ?? DEFAULT_TIMEOUT;
+  return Math.max(0, Math.min(raw, MAX_HOOK_TIMEOUT));
+}
+
+function validateHook(hook: SessionHook): string | null {
+  if (!hook.command || hook.command.trim().length === 0) {
+    return "Hook command is empty";
+  }
+  return null;
+}
 
 function runHook(hook: SessionHook, env: NodeJS.ProcessEnv): Promise<{ ok: boolean; code?: number; signal?: string; error?: string }> {
   return new Promise((resolve) => {
-    const timeoutMs = hook.timeout ?? DEFAULT_TIMEOUT;
+    const validation = validateHook(hook);
+    if (validation) {
+      log.error("session-hooks", validation);
+      resolve({ ok: false, error: validation });
+      return;
+    }
+    const timeoutMs = hookTimeout(hook);
     const cmd = hook.command;
     const args = hook.args ?? [];
     const cwd = hook.workingDir || undefined;
@@ -69,7 +88,12 @@ function runHook(hook: SessionHook, env: NodeJS.ProcessEnv): Promise<{ ok: boole
 }
 
 function runHookSync(hook: SessionHook, env: NodeJS.ProcessEnv): { ok: boolean; code?: number; signal?: string; error?: string } {
-  const timeoutMs = hook.timeout ?? DEFAULT_TIMEOUT;
+  const validation = validateHook(hook);
+  if (validation) {
+    log.error("session-hooks", validation);
+    return { ok: false, error: validation };
+  }
+  const timeoutMs = hookTimeout(hook);
   const cmd = hook.command;
   const args = hook.args ?? [];
   const cwd = hook.workingDir || undefined;

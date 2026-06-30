@@ -1,4 +1,4 @@
-import { execSync } from "child_process";
+import { execFileSync, execSync } from "child_process";
 import { AudioSink, AudioServerType, AudioRouter } from "../../shared/splitscreen-types";
 import { createLogger } from "../util/logger";
 import { getSettings, setSettings } from "./settings.service";
@@ -68,10 +68,10 @@ class PulseAudioRouter implements AudioRouter {
         if (parts.length < 2) continue;
         const inputId = parts[0];
 
-        const details = execSync(`pactl list sink-inputs ${inputId}`, { encoding: "utf-8", stdio: "pipe" });
+        const details = execFileSync("pactl", ["list", "sink-inputs", inputId], { encoding: "utf-8", stdio: "pipe" });
         const pidMatch = details.match(/application\.process\.id\s*=\s*"(\d+)"/);
         if (pidMatch && parseInt(pidMatch[1], 10) === pid) {
-          execSync(`pactl move-sink-input ${inputId} ${sinkId}`, { stdio: "pipe" });
+          execFileSync("pactl", ["move-sink-input", inputId, sinkId], { stdio: "pipe" });
           log.info("splitscreen-audio", `Routed sink-input ${inputId} (pid ${pid}) to sink ${sinkId}`);
           return;
         }
@@ -179,9 +179,34 @@ class PipeWireRouter implements AudioRouter {
         return;
       }
 
-      // Create a link between the stream and the target sink
-      execSync(`pw-link ${streamNodeId} ${sinkNodeId}`, { stdio: "pipe" });
-      log.info("splitscreen-audio", `Routed pid ${pid} (node ${streamNodeId}) to sink ${sinkId} (node ${sinkNodeId})`);
+      // Find the output port of the stream node and an input port of the sink node.
+      const portsOutput = execSync("pw-cli list-objects PipeWire:Interface:Port", { encoding: "utf-8", stdio: "pipe" });
+      let sourcePort: string | null = null;
+      let targetPort: string | null = null;
+      for (const block of portsOutput.split(/(?=^\s*id\s+\d+)/m)) {
+        const nodeIdMatch = block.match(/node\.id\s*=\s*"(\d+)"/);
+        const directionMatch = block.match(/port\.direction\s*=\s*"([^"]+)"/);
+        const nameMatch = block.match(/port\.name\s*=\s*"([^"]+)"/);
+        if (!nodeIdMatch || !directionMatch || !nameMatch) continue;
+        const nodeId = nodeIdMatch[1];
+        const direction = directionMatch[1];
+        const portName = nameMatch[1];
+        if (nodeId === streamNodeId && direction === "out") {
+          sourcePort = portName;
+        } else if (nodeId === sinkNodeId && direction === "in") {
+          targetPort = portName;
+        }
+        if (sourcePort && targetPort) break;
+      }
+
+      if (!sourcePort || !targetPort) {
+        log.warn("splitscreen-audio", `Could not find ports to route pid ${pid} to sink ${sinkId}`);
+        return;
+      }
+
+      // Create a link between the ports using pw-link.
+      execFileSync("pw-link", [sourcePort, targetPort], { stdio: "pipe" });
+      log.info("splitscreen-audio", `Routed pid ${pid} (port ${sourcePort}) to sink ${sinkId} (port ${targetPort})`);
     } catch (err) {
       log.error("splitscreen-audio", `Failed to route PipeWire stream for pid ${pid}: ${err}`);
     }

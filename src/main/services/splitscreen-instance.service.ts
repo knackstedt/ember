@@ -1,4 +1,4 @@
-import { spawn, ChildProcess } from "child_process";
+import { spawn } from "child_process";
 import { BrowserWindow, ipcMain } from "electron";
 import { join } from "path";
 import { Game } from "../../shared/types";
@@ -23,7 +23,7 @@ export interface InstanceLaunchResult {
 }
 
 const activeBrowserWindows = new Map<number, BrowserWindow>();
-const activeProcesses = new Map<number, ChildProcess>();
+const activeProcesses = new Map<number, number>();
 let overlayGameRegistered = false;
 let overlayGameId: string | null = null;
 let overlayIpcInitialized = false;
@@ -38,8 +38,8 @@ function ensureOverlayIpc(): void {
 
   ipcMain.on("splitscreen:exit", () => {
     // Import dynamically to avoid circular dependency
-    import("./splitscreen.service").then(({ stopSession }) => {
-      stopSession().catch((err) => log.error("splitscreen-instance", `Failed to stop session: ${err}`));
+    import("./splitscreen.service.js").then(({ stopSession }) => {
+      stopSession().catch((err: unknown) => log.error("splitscreen-instance", `Failed to stop session: ${err}`));
     });
   });
 
@@ -91,25 +91,21 @@ async function launchNativeInstance(
   const game = config.game;
   progress("Launching game");
 
-  // For native games, we use the existing launcher but need to capture the PID
-  // The launcher handles Steam, Wine, Dolphin, etc.
-  // We add PULSE_SINK to the environment for audio routing
+  // For native games, use the existing launcher and capture the PID/window.
+  const result = await launchGame(game);
+  if (result.pid) {
+    activeProcesses.set(slot.index, result.pid);
+  }
 
-  // Launch the game (this is async but returns quickly for external games)
-  await launchGame(game);
-
-  // Try to find the game window via xdotool
-  // Since we don't have direct PID access from launchGame, we use a different approach:
-  // Wait for a new window to appear and position it
   progress("Waiting for game window");
-  // We need to find the window. Since launchGame doesn't return the PID directly,
-  // we use a fallback: search for recently created windows
-  // In a full implementation, we'd modify launchGame to return the PID
+  const windowId = result.pid ? await waitForGameWindow(result.pid, 10000) : null;
+  if (windowId) {
+    positionWindow(windowId, slot);
+  }
 
-  // For now, return a placeholder. The session orchestrator will handle window detection.
   return {
-    windowId: null,
-    pid: null,
+    windowId,
+    pid: result.pid,
     browserWindowId: null,
   };
 }
@@ -162,8 +158,8 @@ async function launchFlashInstance(
     // Escape exits splitscreen if overlay is not visible
     if (input.key === "Escape" && input.type === "keyDown") {
       event.preventDefault();
-      import("./splitscreen.service").then(({ stopSession }) => {
-        stopSession().catch((err) => log.error("splitscreen-instance", `Failed to stop session: ${err}`));
+      import("./splitscreen.service.js").then(({ stopSession }) => {
+        stopSession().catch((err: unknown) => log.error("splitscreen-instance", `Failed to stop session: ${err}`));
       });
     }
   });
@@ -234,8 +230,8 @@ async function launchLibretroInstance(
     }
     if (input.key === "Escape" && input.type === "keyDown") {
       event.preventDefault();
-      import("./splitscreen.service").then(({ stopSession }) => {
-        stopSession().catch((err) => log.error("splitscreen-instance", `Failed to stop session: ${err}`));
+      import("./splitscreen.service.js").then(({ stopSession }) => {
+        stopSession().catch((err: unknown) => log.error("splitscreen-instance", `Failed to stop session: ${err}`));
       });
     }
   });
@@ -306,8 +302,8 @@ async function launchVideoInstance(
     }
     if (input.key === "Escape" && input.type === "keyDown") {
       event.preventDefault();
-      import("./splitscreen.service").then(({ stopSession }) => {
-        stopSession().catch((err) => log.error("splitscreen-instance", `Failed to stop session: ${err}`));
+      import("./splitscreen.service.js").then(({ stopSession }) => {
+        stopSession().catch((err: unknown) => log.error("splitscreen-instance", `Failed to stop session: ${err}`));
       });
     }
   });
@@ -345,11 +341,19 @@ export async function stopInstance(instance: SplitscreenInstanceState): Promise<
     updateSplitscreenWindows();
   } else if (instance.pid) {
     // It's an external process
+    activeProcesses.delete(instance.slotIndex);
     try {
       process.kill(instance.pid, "SIGTERM");
     } catch (err) {
       log.warn("splitscreen-instance", `Failed to kill pid ${instance.pid}: ${err}`);
     }
+  }
+
+  // Clear overlay game registration if this instance owned it
+  if (overlayGameRegistered && overlayGameId === instance.gameId) {
+    clearOverlayGame(overlayGameId);
+    overlayGameRegistered = false;
+    overlayGameId = null;
   }
 }
 
@@ -414,9 +418,9 @@ export async function cleanupAllInstances(): Promise<void> {
     overlayGameId = null;
   }
 
-  for (const [slotIndex, proc] of activeProcesses) {
+  for (const [slotIndex, pid] of activeProcesses) {
     try {
-      process.kill(proc.pid!, "SIGTERM");
+      process.kill(pid, "SIGTERM");
     } catch {
       // ignore
     }

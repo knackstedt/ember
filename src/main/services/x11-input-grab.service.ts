@@ -128,7 +128,7 @@ async function loadKeyboardMapping(client: X11Client, display: X11Display): Prom
   }
   const nameByKeysym: Map<number, string> = new Map();
   for (const [name, value] of Object.entries(x11.keySyms)) {
-    if (value && typeof value === "object" && typeof value.code === "number") {
+    if (value && typeof value === "object" && "code" in value && typeof value.code === "number") {
       nameByKeysym.set(value.code, name);
     }
   }
@@ -213,7 +213,7 @@ function shortcutMatches(shortcut: string, keyCode: string, modifiers: string[])
 
 function forwardKeyEvent(webContents: WebContents, type: "keyDown" | "keyUp", keyCode: string, modifiers: string[]): void {
   try {
-    webContents.sendInputEvent({ type, keyCode, modifiers });
+    webContents.sendInputEvent({ type, keyCode, modifiers: modifiers as ("shift" | "control" | "alt" | "meta" | "cmd" | "isAutoRepeat" | "leftButtonDown" | "middleButtonDown" | "rightButtonDown" | "capsLock" | "numLock")[] });
   } catch (err) {
     log.warn("x11-grab", `failed to forward key event: ${err}`);
   }

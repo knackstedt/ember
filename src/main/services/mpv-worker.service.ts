@@ -353,8 +353,13 @@ export function destroyMpvWorker(): void {
     try {
       worker.kill("SIGTERM");
     } catch { /* ignore */ }
-    worker = null;
   }
+  worker = null;
+  for (const pending of workerPending.values()) {
+    pending.reject(new Error("MPV worker destroyed"));
+  }
+  workerPending.clear();
+  frameQueues.clear();
 }
 
 export function registerMpvIpcHandlers(): void {

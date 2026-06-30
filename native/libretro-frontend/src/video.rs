@@ -208,8 +208,10 @@ impl VideoState {
 
     pub fn set_frame(&self, frame: VideoFrame) {
         self.double_buffer.publish_frame(&frame);
-        if let Some(ref sab) = *self.shared_buffer.lock().unwrap() {
-            sab.publish_frame(frame.width, frame.height, frame.pitch, frame.format, &frame.data);
+        if let Ok(mut guard) = self.shared_buffer.lock() {
+            if let Some(ref mut sab) = guard.as_mut() {
+                sab.publish_frame(frame.width, frame.height, frame.pitch, frame.format, &frame.data);
+            }
         }
         *self.current_frame.lock().unwrap() = Some(frame);
     }

@@ -8,11 +8,13 @@ export const SplitscreenLaunchSpinner: React.FC = () => {
 
   if (!session) return null;
 
-  const launchingInstances = session.instances.filter(
-    (i) => i.status === "launching",
+  const relevantInstances = session.instances.filter(
+    (i) => i.status === "launching" || i.status === "error",
   );
 
-  if (launchingInstances.length === 0) return null;
+  if (relevantInstances.length === 0) return null;
+
+  const hasLaunching = relevantInstances.some((i) => i.status === "launching");
 
   return (
     <AnimatePresence>
@@ -31,15 +33,15 @@ export const SplitscreenLaunchSpinner: React.FC = () => {
           }}
         >
           <h2 className="text-lg font-semibold text-center" style={{ color: "var(--text-primary)" }}>
-            Launching Splitscreen Session
+            {hasLaunching ? "Launching Splitscreen Session" : "Splitscreen Launch Failed"}
           </h2>
           <div
             className="grid gap-3"
             style={{
-              gridTemplateColumns: `repeat(${Math.min(launchingInstances.length, 2)}, 1fr)`,
+              gridTemplateColumns: `repeat(${Math.min(relevantInstances.length, 2)}, 1fr)`,
             }}
           >
-            {launchingInstances.map((inst) => {
+            {relevantInstances.map((inst) => {
               const progress = instanceProgress[inst.slotIndex];
               const game = session.config.instances.find(
                 (c) => c.slotIndex === inst.slotIndex,
@@ -55,8 +57,10 @@ export const SplitscreenLaunchSpinner: React.FC = () => {
                   }}
                 >
                   <div className="flex items-center gap-2">
-                    <Loader2 size={16} className="animate-spin" style={{ color: "var(--accent)" }} />
-                    <span className="text-sm font-semibold" style={{ color: "var(--accent)" }}>
+                    {inst.status === "launching" && (
+                      <Loader2 size={16} className="animate-spin" style={{ color: "var(--accent)" }} />
+                    )}
+                    <span className="text-sm font-semibold" style={{ color: inst.status === "error" ? "var(--danger)" : "var(--accent)" }}>
                       Player {inst.slotIndex + 1}
                     </span>
                   </div>
@@ -65,7 +69,7 @@ export const SplitscreenLaunchSpinner: React.FC = () => {
                       {game.title}
                     </span>
                   )}
-                  {progress && (
+                  {progress && inst.status === "launching" && (
                     <span className="text-xs text-center" style={{ color: "var(--text-secondary)" }}>
                       {progress.step}
                       {progress.detail ? ` — ${progress.detail}` : ""}

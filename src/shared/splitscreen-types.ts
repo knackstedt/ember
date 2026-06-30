@@ -69,6 +69,7 @@ export type SplitscreenInstanceStatus =
 
 export interface SplitscreenInstanceState {
   slotIndex: number;
+  gameId: string;
   windowId: number | null;
   pid: number | null;
   browserWindowId: string | null;
@@ -181,32 +182,36 @@ export function computeLayoutSlots(
     };
   }
 
-  // When per-monitor mapping is provided, compute slots within each display's bounds
+  // When per-monitor mapping is provided, compute slots within each display's bounds.
   if (slotDisplayMapping) {
     const result: SplitscreenSlot[] = [];
-    const layoutSlots = computeSpanningSlots(layoutType, totalWidth, totalHeight);
-    for (const s of layoutSlots) {
-      const displayId = slotDisplayMapping[s.index];
+    const slotsPerDisplay = new Map<string, number[]>();
+    for (const [slotIndex, displayId] of Object.entries(slotDisplayMapping)) {
+      if (!slotsPerDisplay.has(displayId)) {
+        slotsPerDisplay.set(displayId, []);
+      }
+      slotsPerDisplay.get(displayId)!.push(parseInt(slotIndex, 10));
+    }
+    for (const [displayId, slotIndices] of slotsPerDisplay) {
       const display = displays.find((d) => d.id === displayId);
-      if (display) {
-        // Position the slot within this display's area
-        const relW = s.width / totalWidth;
-        const relH = s.height / totalHeight;
-        const relX = s.x / totalWidth;
-        const relY = s.y / totalHeight;
+      if (!display) continue;
+      const layoutSlots = computeSpanningSlotsForCount(slotIndices.length, display.width, display.height);
+      for (let i = 0; i < slotIndices.length; i++) {
+        const s = layoutSlots[i];
+        if (!s) continue;
         result.push({
-          index: s.index,
+          index: slotIndices[i],
           displayId: display.id,
           displayLabel: display.name,
-          x: Math.round(display.x + relX * display.width),
-          y: Math.round(display.y + relY * display.height),
-          width: Math.round(relW * display.width),
-          height: Math.round(relH * display.height),
+          x: Math.round(display.x + s.x),
+          y: Math.round(display.y + s.y),
+          width: Math.round(s.width),
+          height: Math.round(s.height),
         });
-      } else {
-        result.push(slot(s.index, s.x, s.y, s.width, s.height));
       }
     }
+    // Sort by original slot index so callers can rely on ordering.
+    result.sort((a, b) => a.index - b.index);
     return result;
   }
 
@@ -276,7 +281,43 @@ export function detectInstanceType(game: Game): SplitscreenInstanceType {
     "genesis", "sms", "gamegear", "psx", "dreamcast", "pce",
     "atari2600", "atari5200", "atari7800", "lynx", "ngp",
   ];
+  const VIDEO_PLATFORMS: GamePlatform[] = ["movie", "tv", "video"];
   if (game.platform === "flash") return "flash";
   if (LIBRETRO_PLATFORMS.includes(game.platform)) return "libretro";
+  if (VIDEO_PLATFORMS.includes(game.platform)) return "video";
   return "native";
+}
+
+function computeSpanningSlotsForCount(
+  count: number,
+  width: number,
+  height: number,
+): { index: number; x: number; y: number; width: number; height: number }[] {
+  function s(index: number, x: number, y: number, w: number, h: number) {
+    return { index, x, y, width: w, height: h };
+  }
+  switch (count) {
+  case 1:
+    return [s(0, 0, 0, width, height)];
+  case 2:
+    return [
+      s(0, 0, 0, width / 2, height),
+      s(1, width / 2, 0, width / 2, height),
+    ];
+  case 3:
+    return [
+      s(0, 0, 0, width, height / 2),
+      s(1, 0, height / 2, width / 2, height / 2),
+      s(2, width / 2, height / 2, width / 2, height / 2),
+    ];
+  case 4:
+    return [
+      s(0, 0, 0, width / 2, height / 2),
+      s(1, width / 2, 0, width / 2, height / 2),
+      s(2, 0, height / 2, width / 2, height / 2),
+      s(3, width / 2, height / 2, width / 2, height / 2),
+    ];
+  default:
+    return [];
+  }
 }

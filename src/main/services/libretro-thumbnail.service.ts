@@ -294,117 +294,131 @@ async function runLibretroCapture(
   const config = loadCaptureConfig(romPath);
   let coreId: number | null = null;
   const capturedFrames: { width: number; height: number; png: Buffer; score: number }[] = [];
+  let timeout: NodeJS.Timeout | null = null;
 
-  return new Promise<{ url?: string; source?: string }>(async (resolve) => {
-    let resolved = false;
-    const resolveOnce = (val?: { url?: string; source?: string }) => {
-      if (resolved) return;
-      resolved = true;
-      resolve(val ?? {});
-    };
+  let resolved = false;
+  const resolveOnce = (val?: { url?: string; source?: string }) => {
+    if (resolved) return;
+    resolved = true;
+    if (timeout) clearTimeout(timeout);
+    if (coreId !== null) {
+      const cid = coreId;
+      coreId = null;
+      workerCall("stop", cid).catch(() => {});
+      workerCall("unload", cid).catch(() => {});
+    }
+  };
 
-    const timeout = setTimeout(() => {
-      if (!resolved) {
-        log.warn("libretro:screenshot", `timeout for "${game.title}" (${id}) after ${config.timeoutMs}ms`);
-        resolveOnce();
-      }
-    }, config.timeoutMs);
+  try {
+    const coreInfo = await workerCall("loadCore", corePath);
+    coreId = coreInfo.id;
+    log.info("libretro:screenshot", `loaded core ${coreInfo.name} (id=${coreId}) for ${game.title}`);
 
     try {
-      const coreInfo = await workerCall("loadCore", corePath);
-      coreId = coreInfo.id;
-      log.info("libretro:screenshot", `loaded core ${coreInfo.name} (id=${coreId}) for ${game.title}`);
-
-      try {
-        await workerCall("setAudioEnabled", coreId, false);
-      } catch {
-        // Addon may be from an older build; audio will still run, which is fine.
-      }
-      await workerCall("loadGame", coreId, romPath);
-      log.info("libretro:screenshot", `loaded game ${romPath}`);
-
-      const avInfo = await workerCall("getAvInfo", coreId);
-      if (!avInfo) {
-        log.warn("libretro:screenshot", `no avInfo for ${romPath}`);
-        clearTimeout(timeout);
-        resolveOnce();
-        return;
-      }
-      log.info("libretro:screenshot", `avInfo: ${avInfo.base_width}x${avInfo.base_height} @ ${avInfo.fps}fps`);
-
-      await workerCall("start", coreId);
-      await workerCall("setMute", coreId, true);
-      log.info("libretro:screenshot", `started core (muted) for ${game.title}`);
-
-      const startTime = Date.now();
-      for (const delayMs of config.delaysMs) {
-        const elapsed = Date.now() - startTime;
-        const waitRemaining = delayMs - elapsed;
-        if (waitRemaining > 0) {
-          await new Promise((r) => setTimeout(r, waitRemaining));
-        }
-
-        const frame = await workerCall("getFrame", coreId);
-        if (!frame || !frame.data || frame.width === 0 || frame.height === 0) {
-          log.warn("libretro:screenshot", `blank frame at ${delayMs}ms for ${game.title}`);
-          continue;
-        }
-
-        const rgba = Buffer.from(frame.data, "base64");
-        const cropped = cropSolidDsScreens(frame.width, frame.height, rgba, game.platform);
-        const cw = cropped.width;
-        const ch = cropped.height;
-        const cbuf = cropped.rgba;
-        if (isImageUniform(cw, ch, cbuf)) {
-          log.info("libretro:screenshot", `uniform frame at ${delayMs}ms for ${game.title}, skipping`);
-          continue;
-        }
-
-        const score = scoreFrameVariance(cw, ch, cbuf);
-        const png = rgbaToPng(cw, ch, cbuf);
-        log.info("libretro:screenshot", `captured ${cw}x${ch} at ${delayMs}ms score=${score.toFixed(1)} for ${game.title}`);
-
-        capturedFrames.push({ width: cw, height: ch, png, score });
-      }
-
-      await workerCall("stop", coreId);
-      try {
-        await workerCall("unload", coreId);
-      } catch {}
-      coreId = null;
-
-      clearTimeout(timeout);
-
-      const lastFrame = capturedFrames.at(-1);
-      if (lastFrame) {
-        writeFileSync(destPath, lastFrame.png);
-        log.info("libretro:screenshot", `saved last screenshot for ${game.title} score=${lastFrame.score.toFixed(1)}`);
-        // Save all captured frames as numbered screenshots for the gallery
-        for (let i = 0; i < capturedFrames.length; i++) {
-          const framePath = join(screenshotDir, `${id}_${i}.png`);
-          writeFileSync(framePath, capturedFrames[i].png);
-        }
-        log.info("libretro:screenshot", `saved ${capturedFrames.length} screenshots for ${game.title}`);
-        resolveOnce({
-          url: `ember://covers/libretro/screenshots/${id}.png`,
-          source: "libretro-screenshot",
-        });
-      } else {
-        log.warn("libretro:screenshot", `no usable frames for ${game.title}`);
-        resolveOnce();
-      }
-    } catch (err: any) {
-      log.error("libretro:screenshot", `capture error for ${game.title}: ${err?.message ?? String(err)}`);
-      clearTimeout(timeout);
-      resolveOnce();
-    } finally {
-      if (coreId !== null) {
-        try {
-          await workerCall("unload", coreId);
-        } catch {}
-      }
+      await workerCall("setAudioEnabled", coreId, false);
+    } catch {
+      // Addon may be from an older build; audio will still run, which is fine.
     }
-  });
+    await workerCall("loadGame", coreId, romPath);
+    log.info("libretro:screenshot", `loaded game ${romPath}`);
+
+    const avInfo = await workerCall("getAvInfo", coreId);
+    if (!avInfo) {
+      log.warn("libretro:screenshot", `no avInfo for ${romPath}`);
+      resolveOnce();
+      return {};
+    }
+    log.info("libretro:screenshot", `avInfo: ${avInfo.base_width}x${avInfo.base_height} @ ${avInfo.fps}fps`);
+
+    await workerCall("start", coreId);
+    try {
+      await workerCall("setMute", coreId, true);
+    } catch {
+      // Addon may be from an older build without setMute; continue silently.
+    }
+    log.info("libretro:screenshot", `started core (muted) for ${game.title}`);
+
+    const deadline = Date.now() + config.timeoutMs;
+    timeout = setTimeout(() => {
+      log.warn("libretro:screenshot", `timeout for "${game.title}" (${id}) after ${config.timeoutMs}ms`);
+      resolveOnce();
+    }, config.timeoutMs);
+
+    const startTime = Date.now();
+    for (const delayMs of config.delaysMs) {
+      if (resolved) break;
+      const elapsed = Date.now() - startTime;
+      const waitRemaining = delayMs - elapsed;
+      if (waitRemaining > 0) {
+        await new Promise((r) => setTimeout(r, waitRemaining));
+      }
+      if (resolved) break;
+
+      const frame = await workerCall("getFrame", coreId);
+      if (resolved) break;
+      if (!frame || !frame.data || frame.width === 0 || frame.height === 0) {
+        log.warn("libretro:screenshot", `blank frame at ${delayMs}ms for ${game.title}`);
+        continue;
+      }
+
+      const rgba = Buffer.from(frame.data, "base64");
+      const cropped = cropSolidDsScreens(frame.width, frame.height, rgba, game.platform);
+      const cw = cropped.width;
+      const ch = cropped.height;
+      const cbuf = cropped.rgba;
+      if (isImageUniform(cw, ch, cbuf)) {
+        log.info("libretro:screenshot", `uniform frame at ${delayMs}ms for ${game.title}, skipping`);
+        continue;
+      }
+
+      const score = scoreFrameVariance(cw, ch, cbuf);
+      const png = rgbaToPng(cw, ch, cbuf);
+      log.info("libretro:screenshot", `captured ${cw}x${ch} at ${delayMs}ms score=${score.toFixed(1)} for ${game.title}`);
+
+      capturedFrames.push({ width: cw, height: ch, png, score });
+    }
+
+    if (timeout) clearTimeout(timeout);
+    timeout = null;
+    if (resolved) return {};
+
+    await workerCall("stop", coreId);
+    try {
+      await workerCall("unload", coreId);
+    } catch {}
+    coreId = null;
+
+    const lastFrame = capturedFrames.at(-1);
+    if (lastFrame) {
+      writeFileSync(destPath, lastFrame.png);
+      log.info("libretro:screenshot", `saved last screenshot for ${game.title} score=${lastFrame.score.toFixed(1)}`);
+      // Save all captured frames as numbered screenshots for the gallery
+      for (let i = 0; i < capturedFrames.length; i++) {
+        const framePath = join(screenshotDir, `${id}_${i}.png`);
+        writeFileSync(framePath, capturedFrames[i].png);
+      }
+      log.info("libretro:screenshot", `saved ${capturedFrames.length} screenshots for ${game.title}`);
+      return {
+        url: `ember://covers/libretro/screenshots/${id}.png`,
+        source: "libretro-screenshot",
+      };
+    } else {
+      log.warn("libretro:screenshot", `no usable frames for ${game.title}`);
+      return {};
+    }
+  } catch (err: any) {
+    log.error("libretro:screenshot", `capture error for ${game.title}: ${err?.message ?? String(err)}`);
+    resolveOnce();
+    return {};
+  } finally {
+    if (timeout) clearTimeout(timeout);
+    if (coreId !== null) {
+      const cid = coreId;
+      coreId = null;
+      workerCall("stop", cid).catch(() => {});
+      workerCall("unload", cid).catch(() => {});
+    }
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -522,11 +536,18 @@ export function listLocalScreenshots(id: string): string[] {
     const p = join(screenshotDir, `${id}_${i}.png`);
     if (existsSync(p)) {
       urls.push(`ember://covers/libretro/screenshots/${id}_${i}.png`);
-    } else {
-      break;
     }
   }
   return urls;
+}
+
+function escapeXml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
 }
 
 /* ------------------------------------------------------------------ */
@@ -624,8 +645,8 @@ function generateProceduralThumbnail(filePath: string, id: string): string | und
 }
 
 function buildBrokenSVG(slug: string, subtext: string): string {
-  const safeSlug = slug.slice(0, 14).toUpperCase();
-  const safeSub = subtext.slice(0, 20).toUpperCase();
+  const safeSlug = escapeXml(slug.slice(0, 14).toUpperCase());
+  const safeSub = escapeXml(subtext.slice(0, 20).toUpperCase());
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">

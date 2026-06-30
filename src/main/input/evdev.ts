@@ -524,22 +524,19 @@ async function hasControllerCapabilities(eventPath: string, name?: string): Prom
   try {
     if (name && isMotionSensorDevice(name)) return false;
     if (name && nameLooksLikeController(name)) return true;
-    if (name && nameLooksLikeKeyboard(name)) return true;
-    if (name && nameLooksLikeMouse(name)) return true;
+    if (name && nameLooksLikeKeyboard(name)) return false;
+    if (name && nameLooksLikeMouse(name)) return false;
 
     const deviceNum = eventPath.replace("/dev/input/event", "");
     const capPath = `/sys/class/input/event${deviceNum}/device/capabilities/ev`;
     if (!existsSync(capPath)) return false;
     const evCap = parseInt((await fsPromises.readFile(capPath, "utf-8")).trim(), 16);
-    // Accept controllers (EV_ABS), keyboards (EV_KEY), and mice (EV_REL)
-    // but reject non-input devices like power buttons, HDMI audio, etc.
+    // Reject non-input devices like power buttons, HDMI audio, etc.
     if (name && NON_INPUT_NAME_HINTS.some((h) => name.toLowerCase().includes(h))) return false;
-    const hasAbs = (evCap & (1 << EV_ABS)) !== 0;
-    const hasRel = (evCap & (1 << 0x02)) !== 0; // EV_REL = 0x02
-    // Device must have EV_ABS (controller) or EV_REL (mouse) to qualify.
-    // Keyboards only have EV_KEY, which is too broad (power buttons also have it),
-    // so keyboards must be matched by name above.
-    return hasAbs || hasRel;
+    // Only accept devices with EV_ABS (gamepads/joysticks). Mice and keyboards
+    // are handled by their own dedicated input paths and should not appear as
+    // controllers or consume compact controller slots.
+    return (evCap & (1 << EV_ABS)) !== 0;
   } catch {
     return false;
   }
@@ -1006,6 +1003,26 @@ export function triggerRescan(): void {
 /** Clear all recent-failure cooldowns (call on system resume). */
 export function clearFailureCooldowns(): void {
   recentFailures.clear();
+}
+
+/** Force-close every active device and re-scan from scratch.
+ *  Used after system resume: USB devices re-enumerate during suspend and may
+ *  present different evdev axis/button codes, but the old stream entry in
+ *  activeDevices prevents scanDevices() from re-opening them with fresh
+ *  capability detection. Closing all devices first ensures correct axis and
+ *  button maps are re-derived for the post-wake device state. */
+export function forceRescanAll(): void {
+  for (const [path, handle] of activeDevices) {
+    handle.close();
+  }
+  activeDevices.clear();
+  recentFailures.clear();
+  // Give USB devices a moment to settle after re-enumeration before reopening.
+  setTimeout(() => {
+    scanDevices().catch((err) =>
+      log.warn("evdev", `forceRescanAll error: ${err}`),
+    );
+  }, 1500);
 }
 
 export async function destroyInputSystem(): Promise<void> {

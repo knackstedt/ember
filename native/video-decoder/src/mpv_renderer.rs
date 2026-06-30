@@ -213,7 +213,7 @@ impl MpvRenderer {
 
     pub fn render_frame(
         &mut self,
-        sab: Option<(&SharedFrameBuffer, u32, u32)>,
+        sab: Option<(&mut SharedFrameBuffer, u32, u32)>,
     ) -> Result<Option<(u32, u32)>, String> {
         let mpv_api = api::get_api()?;
 
@@ -233,6 +233,7 @@ impl MpvRenderer {
             Some((s, w, h)) => (Some(s), w, h),
             None => (None, width, height),
         };
+        let sab_ref = sab_ref.map(|s| &mut *s);
         // setRenderSize is for downsampling (smaller canvas = less CPU).
         // Never render larger than the source video — the SAB slot is sized
         // for the source resolution and upscaling wastes CPU anyway.

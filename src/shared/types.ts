@@ -57,6 +57,15 @@ export type GamePlatform =
   | "windows"
   | "desktop"
   | "itch"
+  | "gbc"
+  | "atari2600"
+  | "atari5200"
+  | "atari7800"
+  | "lynx"
+  | "ngp"
+  | "movie"
+  | "tv"
+  | "video"
   | "unknown";
 
 export type WineRunner = "wine" | "proton-ge" | "system-proton" | "umu-run";
@@ -117,6 +126,7 @@ export interface Game {
   isFavorite?: boolean;
   tags?: string[];
   lastPlayed?: number;
+  /** Total time the user has played this game, in seconds. */
   playTime?: number;
   rating?: number;
   hidden?: boolean;
@@ -128,6 +138,7 @@ export interface Game {
   steamReviewScore?: number;
   steamOwnersEstimate?: number;
   platforms?: string[];
+  /** Estimated time to beat (hours), from metadata providers like RAWG. Not user play time. */
   playtime?: number;
   igdbId?: number;
   mobyGamesId?: number;
@@ -163,7 +174,7 @@ export interface Game {
   /** Filesystem path to the game install directory (for Steam games, the common/ folder) */
   installPath?: string;
   /** Main executable path within the install directory (for Steam/Windows games) */
-  mainExe?: string;
+  mainExe?: string | null;
 }
 
 export interface GameEmulatorConfig {

@@ -98,7 +98,7 @@ impl VideoDecoder {
             return Ok(None);
         }
 
-        let sab = self.sab.as_ref().ok_or(Error::new(
+        let sab = self.sab.as_mut().ok_or(Error::new(
             Status::GenericFailure,
             "No shared buffer attached",
         ))?;

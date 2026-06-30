@@ -6,7 +6,7 @@ import { createHash } from "crypto";
 import { initDb, terminateDbWorker } from "./db";
 import { registerIpcHandlers, destroyWorker as destroyLibretroWorker } from "./ipc";
 import { destroyMpvWorker } from "./services/mpv-worker.service";
-import { initInputSystem, destroyInputSystem, clearFailureCooldowns, triggerRescan } from "./input/evdev";
+import { initInputSystem, destroyInputSystem, forceRescanAll } from "./input/evdev";
 import { getSettings, setSetting } from "./services/settings.service";
 import type { TabId } from "../shared/types";
 import { setFlashThumbnailConcurrency } from "./services/flash-thumbnail.service";
@@ -36,6 +36,14 @@ EventEmitter.defaultMaxListeners = 30;
 const log = createLogger("info");
 
 const isDev = !app.isPackaged || process.env.NODE_ENV === "development";
+
+function escapeHtmlAttr(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
 
 let errorDialogOpen = false;
 let pendingLaunchGame: import("../shared/types").Game | null = null;
@@ -788,7 +796,6 @@ app.whenReady().then(async () => {
 
       // Generate HTML pages for each player type
       const params = url.searchParams;
-      const slot = params.get("slot") ?? "0";
 
       if (page === "flash.html") {
         const swfPath = params.get("swf") ?? "";
@@ -822,7 +829,7 @@ window.addEventListener("load", function() {
   player.style.width = "100%";
   player.style.height = "100%";
   document.getElementById("player").appendChild(player);
-  player.load({ url: "${swfUrl.replace(/"/g, '\\"')}" }).catch(function(e) {
+  player.load({ url: "${escapeHtmlAttr(swfUrl)}" }).catch(function(e) {
     console.error("Failed to load SWF:", e);
   });
 });
@@ -857,7 +864,7 @@ body:hover #hint{opacity:1}
   <button onclick="window.htpc.splitscreen.toggleOverlay()">Overlay (F1)</button>
   <button onclick="window.htpc.splitscreen.exit()">Exit</button>
 </div>
-<video src="${src.replace(/"/g, '\\"')}" autoplay controls></video>
+<video src="${escapeHtmlAttr(src)}" autoplay controls></video>
 <div id="hint">F1 = Overlay &middot; Esc = Exit</div>
 <script>
 document.addEventListener("keydown", function(e) {
@@ -1127,8 +1134,7 @@ document.addEventListener("keydown", function(e) {
   startRemoteAvailabilityWorker();
 
   powerMonitor.on("resume", () => {
-    clearFailureCooldowns();
-    triggerRescan();
+    forceRescanAll();
   });
 
   app.on("activate", () => {

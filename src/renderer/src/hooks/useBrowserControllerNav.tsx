@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useInputStore } from "../store/input.store";
 import { useSettingsStore } from "../store/settings.store";
-import { ControllerBrowserSettings } from "../../shared/types";
+import { ControllerBrowserSettings } from "@shared/types";
 import { getCursorManager, DeviceCursor } from "./browserControllerManager";
 import { CursorStyle } from "../components/VirtualCursor/VirtualCursor";
 import { findInputElement, useControllerOskStore } from "../store/controllerOsk.store";

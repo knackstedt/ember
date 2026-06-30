@@ -81,7 +81,7 @@ impl SharedFrameBuffer {
 
     /// Returns a mutable slice for the entire slot buffer (max_width * max_height * 4 bytes).
     /// This is useful when the caller needs the full buffer for external rendering.
-    pub fn slot_mut_slice(&self, slot_idx: usize) -> &mut [u8] {
+    pub fn slot_mut_slice(&mut self, slot_idx: usize) -> &mut [u8] {
         let offset = self.slot_offset(slot_idx);
         let slot_size = self.u32_at(OFF_SLOT_SIZE).load(Ordering::Relaxed) as usize;
         // SAFETY: caller ensures slot_idx < slot_count and buffer is large enough.
@@ -89,13 +89,14 @@ impl SharedFrameBuffer {
     }
 
     /// Write an RGBA frame into the next available slot, then atomically publish.
-    pub fn publish_rgba_frame(&self, width: u32, height: u32, data: &[u8]) {
+    pub fn publish_rgba_frame(&mut self, width: u32, height: u32, data: &[u8]) {
         if width == 0 || height == 0 {
             return;
         }
 
         let current_ready = self.u32_at(OFF_READY_SLOT).load(Ordering::Acquire);
-        let write_idx = if current_ready == 1 { 0 } else { 1 };
+        // ready_slot: 0=none, 1=slot0, 2=slot1. Write to the slot NOT being read.
+        let write_idx = if current_ready == 1 { 1 } else { 0 };
 
         let slot = self.slot_mut_slice(write_idx);
         let needed = (width * height * BYTES_PER_PIXEL) as usize;
@@ -118,7 +119,7 @@ impl SharedFrameBuffer {
     }
 
     /// Get a mutable slice for a given slot for direct writing.
-    pub fn slot_mut_rgba(&self, slot_idx: usize, width: u32, height: u32) -> Option<&mut [u8]> {
+    pub fn slot_mut_rgba(&mut self, slot_idx: usize, width: u32, height: u32) -> Option<&mut [u8]> {
         let needed = (width * height * BYTES_PER_PIXEL) as usize;
         let slot = self.slot_mut_slice(slot_idx);
         if needed > slot.len() {

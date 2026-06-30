@@ -468,10 +468,9 @@ export const useGamesStore = create<GamesState>((set, get) => ({
       });
     }
 
-    // Completion filter (no-op until backend tracks earned achievements)
+    // Completion filter. The backend does not yet track earned achievements,
+    // so "completed" is treated as games with substantial playtime (>2h).
     if (completionFilter !== "all") {
-      // TODO: implement when earnedAchievements field is available
-      // For now, treat "completed" as games with substantial playtime (>2h)
       result = result.filter((g) => {
         const substantial = (g.playTime ?? 0) > 120;
         return completionFilter === "completed" ? substantial : !substantial;

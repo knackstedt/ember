@@ -151,7 +151,7 @@ async function resolveThumbnailPath(filePath: string): Promise<string> {
   const sourceId = segments[0];
   let proxyPath = segments.slice(1).join("/");
   try {
-    const { getServePort } = await import("../services/rclone-manager");
+    const { getServePort } = await import("../services/rclone-manager.js");
     const { RemoteSourceRepo } = await import("../db/repository.js");
     const port = await getServePort(sourceId);
     if (port) {
@@ -265,11 +265,11 @@ async function tryNativeThumbnail(
         }
       });
 
-      // Hard timeout — must exceed Rust mpv_renderer open() timeout (120s).
+      // Hard timeout — must exceed the native worker's worst-case runtime.
       setTimeout(() => {
         try { child.kill("SIGTERM"); } catch { /* ignore */ }
         reject(new Error("thumbnail-worker timed out"));
-      }, 130000);
+      }, 30000);
     });
 
     if (exitCode === 0 && existsSync(dest) && statSync(dest).size > 0) {

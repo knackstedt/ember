@@ -171,9 +171,9 @@ export const SplitscreenOverlay: React.FC = () => {
 
             {/* Instance info */}
             <div className="flex flex-col gap-1 text-xs" style={{ color: "var(--text-secondary)" }}>
-              {activeInstance.pid && <div>PID: {activeInstance.pid}</div>}
-              {activeInstance.windowId && <div>Window ID: {activeInstance.windowId}</div>}
-              {activeInstance.browserWindowId && <div>Window: {activeInstance.browserWindowId}</div>}
+              {activeInstance.pid !== null && <div>PID: {activeInstance.pid}</div>}
+              {activeInstance.windowId !== null && <div>Window ID: {activeInstance.windowId}</div>}
+              {activeInstance.browserWindowId !== null && <div>Window: {activeInstance.browserWindowId}</div>}
             </div>
           </>
         )}

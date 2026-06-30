@@ -30,16 +30,23 @@ pub struct SharedFrameBuffer {
     len: usize,
 }
 
-// SAFETY: The caller must ensure the pointer remains valid and that
-// only one writer (core thread) and one reader (JS main thread) access
-// this buffer, with proper atomic synchronization on ready_slot.
+/// # Safety
+/// The caller must ensure the backing memory remains valid for the lifetime of this struct.
+/// The `SharedFrameBuffer` ABI is designed for a single producer (core thread) and a single
+/// consumer (JS main thread). Because the producer uses `&mut self` on the writer path,
+/// Rust's type system prevents mutable aliasing; however, the JS consumer still reads through
+/// `SharedArrayBuffer` atomics, so the caller must ensure the JS side does not mutate the
+/// buffer and that the `SharedArrayBuffer` is not garbage collected while this struct exists.
 unsafe impl Send for SharedFrameBuffer {}
 unsafe impl Sync for SharedFrameBuffer {}
 
 impl SharedFrameBuffer {
     /// # Safety
-    /// `ptr` must be valid for `len` bytes for the lifetime of this struct.
+    /// `ptr` must be non-null and valid for `len` bytes for the lifetime of this struct.
+    /// The pointer must point to a `SharedArrayBuffer` that is not garbage collected while
+    /// this struct is in use; otherwise the pointer may dangle.
     pub unsafe fn from_raw(ptr: *mut u8, len: usize) -> Self {
+        assert!(!ptr.is_null(), "SharedFrameBuffer::from_raw called with null pointer");
         Self { ptr, len }
     }
 
@@ -73,23 +80,31 @@ impl SharedFrameBuffer {
         HEADER_SIZE + slot_idx * slot_size
     }
 
-    fn slot_mut_slice(&self, slot_idx: usize) -> &mut [u8] {
+    fn slot_mut_slice(&mut self, slot_idx: usize) -> &mut [u8] {
         let offset = self.slot_offset(slot_idx);
         let slot_size = self.u32_at(OFF_SLOT_SIZE).load(Ordering::Relaxed) as usize;
         // SAFETY: caller ensures slot_idx < slot_count and buffer is large enough.
         unsafe { slice::from_raw_parts_mut(self.ptr.add(offset), slot_size) }
     }
 
+    fn slot_slice(&self, slot_idx: usize) -> &[u8] {
+        let offset = self.slot_offset(slot_idx);
+        let slot_size = self.u32_at(OFF_SLOT_SIZE).load(Ordering::Relaxed) as usize;
+        // SAFETY: caller ensures slot_idx < slot_count and buffer is large enough.
+        unsafe { slice::from_raw_parts(self.ptr.add(offset), slot_size) }
+    }
+
     /// Convert frame data to RGBA8888 and write into the next available slot,
     /// then atomically publish.
-    pub fn publish_frame(&self, width: u32, height: u32, pitch: usize, format: u32, data: &[u8]) {
+    pub fn publish_frame(&mut self, width: u32, height: u32, pitch: usize, format: u32, data: &[u8]) {
         if width == 0 || height == 0 {
             return;
         }
 
         let current_ready = self.u32_at(OFF_READY_SLOT).load(Ordering::Acquire);
-        // Slots are 0-indexed internally; pick the one that isn't currently ready.
-        let write_idx = if current_ready == 1 { 0 } else { 1 };
+        // ready_slot encoding: 0 = none, 1 = slot 0, 2 = slot 1.
+        // Pick the slot that is NOT currently being read.
+        let write_idx = if current_ready == 1 { 1 } else { 0 };
 
         let slot = self.slot_mut_slice(write_idx);
         let needed = (width * height * BYTES_PER_PIXEL) as usize;
@@ -140,7 +155,7 @@ impl SharedFrameBuffer {
         let slot_idx = (ready - 1) as usize;
         let meta = self.read_metadata();
         let needed = (meta.width * meta.height * BYTES_PER_PIXEL) as usize;
-        let slot = self.slot_mut_slice(slot_idx);
+        let slot = self.slot_slice(slot_idx);
         Some(&slot[..needed.min(slot.len())])
     }
 }

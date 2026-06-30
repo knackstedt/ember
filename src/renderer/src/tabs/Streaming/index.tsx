@@ -63,7 +63,7 @@ export const StreamingTab: React.FC = () => {
   const handleLaunchService = (svc: StreamingService) => {
     setActiveService(svc);
     setViewMode("webview");
-    setGlobalZone("player");
+    setGlobalZone("streaming");
 
     const dismissed = settings?.streamingExtensionPromptDismissed ?? [];
     const extensions = settings?.streamingExtensions ?? [];

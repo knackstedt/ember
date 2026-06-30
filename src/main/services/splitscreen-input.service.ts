@@ -25,6 +25,7 @@ interface VirtualDevice {
   deviceType: SplitscreenDeviceType;
   fd: number;
   name: string;
+  process: ChildProcess;
 }
 
 class X11InputRouter implements InputRouter {
@@ -32,7 +33,6 @@ class X11InputRouter implements InputRouter {
   private deviceAssignments = new Map<string, number>(); // deviceId → slotIndex
   private hostDeviceId: string | null = null;
   private hostMode = false;
-  private eventReaders = new Map<string, ChildProcess>();
 
   async createVirtualDevice(slotIndex: number, deviceType: SplitscreenDeviceType): Promise<string> {
     const deviceName = `ember-splitscreen-p${slotIndex + 1}-${deviceType}`;
@@ -140,7 +140,7 @@ time.sleep(999999)
       }
 
       const devices = this.virtualDevices.get(slotIndex) ?? [];
-      devices.push({ slotIndex, deviceType, fd: -1, name: deviceName });
+      devices.push({ slotIndex, deviceType, fd: -1, name: deviceName, process: child });
       this.virtualDevices.set(slotIndex, devices);
 
       log.info("splitscreen-input", `Created virtual device ${deviceName} for slot ${slotIndex}`);
@@ -169,8 +169,13 @@ time.sleep(999999)
   async destroyVirtualDevice(slotIndex: number): Promise<void> {
     const devices = this.virtualDevices.get(slotIndex);
     if (!devices) return;
-    // The python process keeping the device alive will be killed
-    // which automatically destroys the uinput device
+    for (const device of devices) {
+      try {
+        device.process.kill("SIGTERM");
+      } catch (err) {
+        log.warn("splitscreen-input", `Failed to kill python process for slot ${slotIndex}: ${err}`);
+      }
+    }
     this.virtualDevices.delete(slotIndex);
     log.info("splitscreen-input", `Destroyed virtual devices for slot ${slotIndex}`);
   }

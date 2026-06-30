@@ -127,8 +127,8 @@ export async function buildWineCommand(exePath: string, preferredRunner?: WineRu
   if (!runner) return null;
 
   if (runner === "umu-run") {
-    // Check if umu-run is actually available
-    if (existsSync("/usr/bin/umu-run") || existsSync(join(homedir(), ".local", "bin", "umu-run"))) {
+    // Check if umu-run is actually available on PATH
+    if (await isUmuRunInstalled()) {
       return { cmd: "umu-run", args: [exePath] };
     }
     // Fall back to wine if umu-run is not installed

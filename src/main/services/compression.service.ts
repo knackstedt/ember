@@ -72,6 +72,15 @@ const PLATFORM_FORMATS: Record<
   windows: undefined,
   desktop: undefined,
   itch: undefined,
+  gbc: { format: "7z", tool: "sevenZip" },
+  atari2600: { format: "7z", tool: "sevenZip" },
+  atari5200: { format: "7z", tool: "sevenZip" },
+  atari7800: { format: "7z", tool: "sevenZip" },
+  lynx: { format: "7z", tool: "sevenZip" },
+  ngp: { format: "7z", tool: "sevenZip" },
+  movie: undefined,
+  tv: undefined,
+  video: undefined,
   unknown: undefined,
 };
 

@@ -70,9 +70,11 @@ impl LibretroFrontend {
             core: core.clone(),
             runner: runner.clone(),
         };
-        self.cores.lock().push(handle);
+        let mut cores = self.cores.lock();
+        cores.push(handle);
+        let id = cores.len() - 1;
+        drop(cores);
 
-        let id = self.cores.lock().len() - 1;
         let sys_info = core.lock().system_info.clone();
         if let Some(sys_info) = sys_info {
             Ok(CoreInfo {
@@ -109,8 +111,12 @@ impl LibretroFrontend {
         let handle = cores
             .get_mut(core_id as usize)
             .ok_or_else(|| Error::new(Status::InvalidArg, "Invalid core ID"))?;
+        let mut runner_slot = handle.runner.lock();
+        if runner_slot.is_some() {
+            return Err(Error::new(Status::GenericFailure, "Core is already running"));
+        }
         let runner = CoreRunner::new(handle.core.clone());
-        *handle.runner.lock() = Some(runner);
+        *runner_slot = Some(runner);
         Ok(true)
     }
 
@@ -203,7 +209,8 @@ impl LibretroFrontend {
             .get(core_id as usize)
             .ok_or_else(|| Error::new(Status::InvalidArg, "Invalid core ID"))?;
 
-        let raw = handle.core.lock().video.get_raw();
+        let core = handle.core.lock();
+        let raw = core.video.get_raw();
         let mut obj = env.create_object()?;
         if let Some((width, height, pitch, format, ptr, len)) = raw {
             unsafe {
@@ -214,7 +221,7 @@ impl LibretroFrontend {
                 obj.set("format", format as i32)?;
                 obj.set("data", buf)?;
             }
-            handle.core.lock().video.consume();
+            core.video.consume();
         } else {
             obj.set("width", 0)?;
             obj.set("height", 0)?;
@@ -326,7 +333,7 @@ impl LibretroFrontend {
             )
         };
         if status != napi::Status::Ok as i32 {
-            return Err(Error::new(Status::GenericFailure, "Failed to get ArrayBuffer info"));
+            return Err(Error::new(Status::GenericFailure, "Failed to get SharedArrayBuffer info"));
         }
 
         let sab = unsafe { shared_buffer::SharedFrameBuffer::from_raw(data_ptr as *mut u8, data_len) };

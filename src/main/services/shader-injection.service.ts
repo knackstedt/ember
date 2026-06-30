@@ -269,7 +269,7 @@ export function getUserSettingsPyPaths(): string[] {
  * Checks all Proton installations.
  * Returns: "none" | "ember" | "external"
  */
-export function checkUserSettingsPy(_steamAppId: number): "none" | "ember" | "external" {
+export function checkUserSettingsPy(): "none" | "ember" | "external" {
   const paths = getUserSettingsPyPaths();
   if (paths.length === 0) return "none";
 
@@ -403,7 +403,7 @@ export function writeUserSettingsPy(
  * Remove Ember-generated user_settings.py files from all Proton installations
  * and restore backups if they exist.
  */
-export function cleanupUserSettingsPy(_steamAppId: number): void {
+export function cleanupUserSettingsPy(): void {
   const paths = getUserSettingsPyPaths();
 
   for (const pyPath of paths) {
@@ -768,29 +768,39 @@ function findSteamLocalConfigPath(): string | null {
 }
 
 /**
- * Read the current LaunchOptions for a Steam game from localconfig.vdf.
- * Returns null if no launch options are set.
+ * Find the top-level VDF block for a given key and return the inner content.
+ * Returns null if the block is not found or if parsing fails.
  */
+function findVdfBlock(content: string, key: string): { start: number; end: number; inner: string } | null {
+  const keyPattern = new RegExp(`"${key.replace(/\\/g, "\\\\")}"\\s*\\{`, "g");
+  let match: RegExpExecArray | null;
+  while ((match = keyPattern.exec(content)) !== null) {
+    const start = match.index + match[0].length - 1; // position of the opening brace
+    let depth = 1;
+    let i = start + 1;
+    while (i < content.length && depth > 0) {
+      if (content[i] === "{") depth++;
+      else if (content[i] === "}") depth--;
+      i++;
+    }
+    if (depth === 0) {
+      return { start, end: i - 1, inner: content.slice(start + 1, i - 1) };
+    }
+  }
+  return null;
+}
+
 export function getSteamLaunchOptions(steamAppId: number): string | null {
   const configPath = findSteamLocalConfigPath();
   if (!configPath) return null;
   try {
     const content = readFileSync(configPath, "utf-8");
-    // Find the app block: "appid" followed by { ... }
     const appIdStr = String(steamAppId);
-    const appBlockPattern = new RegExp(
-      `"(\\d+)"\\s*\\{([^{}]*(?:\\{[^{}]*\\}[^{}]*)*)\\}`,
-      "g",
-    );
-    let match: RegExpExecArray | null;
-    while ((match = appBlockPattern.exec(content)) !== null) {
-      if (match[1] !== appIdStr) continue;
-      const block = match[2];
-      const loMatch = block.match(/"LaunchOptions"\s*"((?:[^"\\]|\\.)*)"/);
-      if (loMatch) {
-        return loMatch[1].replace(/\\(.)/g, "$1");
-      }
-      return null;
+    const block = findVdfBlock(content, appIdStr);
+    if (!block) return null;
+    const loMatch = block.inner.match(/"LaunchOptions"\s*"((?:[^"\\]|\\.)*)"/);
+    if (loMatch) {
+      return loMatch[1].replace(/\\(.)/g, "$1");
     }
   } catch {
     // ignore
@@ -812,60 +822,32 @@ export function setSteamLaunchOptions(
   try {
     const content = readFileSync(configPath, "utf-8");
     const appIdStr = String(steamAppId);
-
-    // Find the app block
-    const appBlockPattern = new RegExp(
-      `("(\\d+)"\\s*\\{)([^{}]*(?:\\{[^{}]*\\}[^{}]*)*)(\\})`,
-      "g",
-    );
-    let match: RegExpExecArray | null;
-    let modified = false;
-    let original: string | null = null;
-    let newContent = content;
-
-    while ((match = appBlockPattern.exec(content)) !== null) {
-      if (match[2] !== appIdStr) continue;
-      const blockOpen = match[1];
-      const blockBody = match[3];
-      const blockClose = match[4];
-
-      // Check if LaunchOptions already exists
-      const loPattern = /"LaunchOptions"\s*"((?:[^"\\]|\\.)*)"/;
-      const loMatch = blockBody.match(loPattern);
-
-      if (loMatch) {
-        original = loMatch[1].replace(/\\(.)/g, "$1");
-        // Replace existing LaunchOptions value
-        const newBody = blockBody.replace(
-          loPattern,
-          `"LaunchOptions"                "${options.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`,
-        );
-        newContent =
-          newContent.slice(0, match.index) +
-          blockOpen +
-          newBody +
-          blockClose +
-          newContent.slice(match.index + match[0].length);
-      } else {
-        // Insert LaunchOptions at the beginning of the block
-        original = null;
-        const newBody = `\n                                                "LaunchOptions"                "${options.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"${blockBody}`;
-        newContent =
-          newContent.slice(0, match.index) +
-          blockOpen +
-          newBody +
-          blockClose +
-          newContent.slice(match.index + match[0].length);
-      }
-      modified = true;
-      break;
-    }
-
-    if (!modified) {
+    const block = findVdfBlock(content, appIdStr);
+    if (!block) {
       log.warn("shader-injection", `Could not find app block for ${steamAppId} in localconfig.vdf`);
       return null;
     }
 
+    let original: string | null = null;
+    const loPattern = /"LaunchOptions"\s*"((?:[^"\\]|\\.)*)"/;
+    const loMatch = block.inner.match(loPattern);
+    const inner = block.inner;
+    let newInner: string;
+    const escapedOptions = options.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+
+    if (loMatch) {
+      const current = loMatch[1].replace(/\\(.)/g, "$1");
+      const alreadyInjected = current.includes("EMBER_SHADER_INJECTED=1");
+      if (!alreadyInjected) {
+        original = current;
+      }
+      newInner = inner.replace(loPattern, `"LaunchOptions"                "${escapedOptions}"`);
+    } else {
+      original = null;
+      newInner = `\n                                                "LaunchOptions"                "${escapedOptions}"${inner}`;
+    }
+
+    const newContent = content.slice(0, block.start) + "{" + newInner + "}" + content.slice(block.end + 1);
     writeFileSync(configPath, newContent, "utf-8");
     log.info("shader-injection", `Set Steam launch options for app ${steamAppId}: ${options}`);
     return { original, configPath };
@@ -886,44 +868,22 @@ export function restoreSteamLaunchOptions(
   try {
     const content = readFileSync(configPath, "utf-8");
     const appIdStr = String(steamAppId);
-
-    const appBlockPattern = new RegExp(
-      `("(\\d+)"\\s*\\{)([^{}]*(?:\\{[^{}]*\\}[^{}]*)*)(\\})`,
-      "g",
-    );
-    let match: RegExpExecArray | null;
-    let newContent = content;
-
-    while ((match = appBlockPattern.exec(content)) !== null) {
-      if (match[2] !== appIdStr) continue;
-      const blockOpen = match[1];
-      const blockBody = match[3];
-      const blockClose = match[4];
-
-      const loPattern = /\n?\s*"LaunchOptions"\s*"(?:[^"\\]|\\.)*"/;
-      if (original) {
-        // Restore original value
-        newContent =
-          newContent.slice(0, match.index) +
-          blockOpen +
-          blockBody.replace(
-            loPattern,
-            `\n                                                "LaunchOptions"                "${original.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`,
-          ) +
-          blockClose +
-          newContent.slice(match.index + match[0].length);
-      } else {
-        // Remove LaunchOptions entirely
-        newContent =
-          newContent.slice(0, match.index) +
-          blockOpen +
-          blockBody.replace(loPattern, "") +
-          blockClose +
-          newContent.slice(match.index + match[0].length);
-      }
-      break;
+    const block = findVdfBlock(content, appIdStr);
+    if (!block) {
+      log.warn("shader-injection", `Could not find app block for ${steamAppId} in localconfig.vdf`);
+      return;
     }
 
+    const loPattern = /\n?\s*"LaunchOptions"\s*"(?:[^"\\]|\\.)*"/;
+    let newInner: string;
+    if (original) {
+      const escapedOriginal = original.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+      newInner = block.inner.replace(loPattern, `\n                                                "LaunchOptions"                "${escapedOriginal}"`);
+    } else {
+      newInner = block.inner.replace(loPattern, "");
+    }
+
+    const newContent = content.slice(0, block.start) + "{" + newInner + "}" + content.slice(block.end + 1);
     writeFileSync(configPath, newContent, "utf-8");
     log.info("shader-injection", `Restored Steam launch options for app ${steamAppId}`);
   } catch (err) {
@@ -935,8 +895,15 @@ export function restoreSteamLaunchOptions(
  * Build a launch options string from injection env vars.
  * Format: "ENV1=val1 ENV2=val2 %command%"
  */
+function shellQuote(value: string): string {
+  if (/^[A-Za-z0-9_./=@:-]+$/.test(value)) return value;
+  return `"${value.replace(/\\/g, "\\\\").replace(/"/g, "\\\"").replace(/\$/g, "\\$")}"`;
+}
+
 export function buildLaunchOptionsString(envVars: Record<string, string>): string {
-  const parts = Object.entries(envVars).map(([k, v]) => `${k}=${v}`);
+  const parts = Object.entries(envVars).map(([k, v]) => `${k}=${shellQuote(v)}`);
+  // Add a marker env var so we can detect our own injections and avoid overwriting the original value.
+  parts.push("EMBER_SHADER_INJECTED=1");
   return [...parts, "%command%"].join(" ");
 }
 
@@ -1123,7 +1090,7 @@ export function updateRuntimeShaderConfig(
  * Called on game exit.
  */
 export function cleanupRuntimeShaderConfig(gameId: string): void {
-  const configPath = activeRuntimeConfigs.get(gameId);
+  const configPath = activeRuntimeConfigs.get(gameId) ?? getRuntimeConfigPath(gameId);
   if (configPath) {
     try {
       unlinkSync(configPath);
@@ -1131,8 +1098,8 @@ export function cleanupRuntimeShaderConfig(gameId: string): void {
     } catch {
       // non-fatal — file may already be gone
     }
-    activeRuntimeConfigs.delete(gameId);
   }
+  activeRuntimeConfigs.delete(gameId);
 }
 
 /**
@@ -1203,7 +1170,8 @@ export function findUmuPrefixPath(game: Game): string | null {
       const entries = readdirSync(umuPrefixes);
       const gameId = game.id.replace(/[^a-zA-Z0-9_-]/g, "_");
       for (const entry of entries) {
-        if (entry.includes(gameId) || entry.includes(game.title.replace(/[^a-zA-Z0-9_-]/g, "_"))) {
+        const titleSlug = game.title ? game.title.replace(/[^a-zA-Z0-9_-]/g, "_") : "";
+        if (entry.includes(gameId) || (titleSlug && entry.includes(titleSlug))) {
           const prefix = join(umuPrefixes, entry);
           if (existsSync(join(prefix, "drive_c"))) return prefix;
         }
@@ -1272,7 +1240,7 @@ export function findMainExe(installPath: string, gameTitle?: string): string | n
           if (st.isDirectory()) {
             // Skip common non-game directories
             const lower = entry.toLowerCase();
-            if (lower === "redist" || lower === "directx" || lower === "bin" || lower === "data" || lower === "cache") continue;
+            if (lower === "redist" || lower === "directx" || lower === "data" || lower === "cache") continue;
             scanDir(full, depth + 1);
           } else if (entry.toLowerCase().endsWith(".exe")) {
             exes.push({ path: full, size: st.size, name: entry });

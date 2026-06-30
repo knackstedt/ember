@@ -18,7 +18,7 @@ interface LayoutPickerProps {
 function LayoutPreview({ type, size = 80 }: { type: SplitscreenLayoutType; size?: number }) {
   const padding = 2;
   const inner = size - padding * 2;
-  const slotStyle: React.CSSProperties = {
+  const slotStyle: React.SVGProps<SVGRectElement> = {
     stroke: "currentColor",
     strokeWidth: 1,
     fill: "currentColor",

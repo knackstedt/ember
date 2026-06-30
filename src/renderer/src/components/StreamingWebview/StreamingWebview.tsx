@@ -117,7 +117,7 @@ export const StreamingWebview = forwardRef<StreamingWebviewHandle, Props>(
               border: "none",
               display: "flex",
             }}
-            allowpopups="false"
+            {...{ allowpopups: "false" as any }}
             webpreferences="contextIsolation=yes,nodeIntegration=no,sandbox=yes"
           />
         )}

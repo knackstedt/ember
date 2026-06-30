@@ -19,6 +19,7 @@ import { getTrackDisplayName } from "./lib/track-title";
 import { useContextMenu } from "../hooks/useContextMenu";
 import { ContextMenuOption } from "../components/ContextMenu/ContextMenu";
 import { ConfirmDialog } from "../components/ConfirmDialog/ConfirmDialog";
+import { PromptDialog } from "../components/PromptDialog/PromptDialog";
 
 const NAV_ITEMS: MusicNavItem[] = [
   "all",
@@ -518,11 +519,11 @@ export const MusicTab: React.FC = () => {
     setContentIndex(0);
   }, []);
 
-  const handleCreatePlaylist = useCallback(async () => {
-    const name = window.prompt("Enter playlist name:");
-    if (!name || !name.trim()) return;
-    await createPlaylist(name.trim());
-  }, [createPlaylist]);
+  const [playlistDialogOpen, setPlaylistDialogOpen] = useState(false);
+
+  const handleCreatePlaylist = useCallback(() => {
+    setPlaylistDialogOpen(true);
+  }, []);
 
   const getGroupTracks = useCallback((group: MusicGroup): MusicTrack[] => {
     const source = tracks.filter((t) => !t.hidden);
@@ -828,6 +829,22 @@ export const MusicTab: React.FC = () => {
           setConfirmDelete({ open: false, track: null });
         }}
         onCancel={() => setConfirmDelete({ open: false, track: null })}
+      />
+
+      <PromptDialog
+        isOpen={playlistDialogOpen}
+        title="Create Playlist"
+        label="Enter playlist name:"
+        placeholder="Playlist name"
+        confirmLabel="Create"
+        onConfirm={(name) => {
+          const trimmed = name.trim();
+          if (trimmed) {
+            void createPlaylist(trimmed);
+          }
+          setPlaylistDialogOpen(false);
+        }}
+        onCancel={() => setPlaylistDialogOpen(false)}
       />
     </div>
   );

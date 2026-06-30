@@ -4,6 +4,7 @@ import { homedir } from "os";
 import { Game } from "../../shared/types";
 import { resolveSourceLocation } from "../../shared/path-utils";
 import { createLogger } from "../util/logger";
+import { findMainExe } from "../services/shader-injection.service";
 
 const log = createLogger("info");
 
@@ -120,6 +121,7 @@ export function scanSteamGames(): Game[] {
         }
 
         const cover = findCover(gridDir, appId);
+        const mainExe = findMainExe(installPath, data["name"]);
 
         games.push({
           id: `steam_${appId}`,
@@ -129,6 +131,7 @@ export function scanSteamGames(): Game[] {
           coverUrl: cover,
           execPath: `steam://rungameid/${appId}`,
           installPath,
+          mainExe,
           tags: [],
           sourceLocation: "local",
           source: "steam",

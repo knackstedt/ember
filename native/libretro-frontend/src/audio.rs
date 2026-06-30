@@ -12,8 +12,8 @@ pub struct AudioSystem {
     _stream: Option<cpal::Stream>,
 }
 
-// SAFETY: The cpal::Stream is only used internally by cpal's audio thread.
-// The only shared state is `buffer` which is already thread-safe.
+// SAFETY: AudioSystem is kept behind an Arc<Mutex> inside the core and is only
+// moved to cpal's audio thread. All shared state is already thread-safe.
 unsafe impl Send for AudioSystem {}
 
 /// Fill the output buffer with silence.

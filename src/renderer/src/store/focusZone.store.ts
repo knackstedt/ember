@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-export type FocusZone = "tab" | "queue" | "player";
+export type FocusZone = "tab" | "queue" | "player" | "streaming";
 
 interface FocusZoneState {
   activeZone: FocusZone;

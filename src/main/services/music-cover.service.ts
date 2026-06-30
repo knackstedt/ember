@@ -35,6 +35,30 @@ try { mkdirSync(artistCache, { recursive: true }); } catch { /* ignore */ }
 
 const inFlight = new Set<string>();
 
+let musicThumbnailQueue: Array<() => void> = [];
+let musicThumbnailRunning = 0;
+const MAX_MUSIC_THUMBNAIL_CONCURRENCY = 4;
+
+function runMusicThumbnail<T>(fn: () => Promise<T>): Promise<T> {
+  return new Promise((resolve, reject) => {
+    musicThumbnailQueue.push(() => {
+      musicThumbnailRunning++;
+      fn()
+        .then(resolve)
+        .catch(reject)
+        .finally(() => {
+          musicThumbnailRunning--;
+          const next = musicThumbnailQueue.shift();
+          if (next) next();
+        });
+    });
+    if (musicThumbnailRunning < MAX_MUSIC_THUMBNAIL_CONCURRENCY) {
+      const next = musicThumbnailQueue.shift();
+      if (next) next();
+    }
+  });
+}
+
 let musicMetadata: any = null;
 
 async function getMusicMetadata() {
@@ -335,19 +359,21 @@ export async function loadThumbnail(
   inFlight.add(id);
 
   try {
-    const { filePath } = track;
-    const url =
-      (await extractCover(filePath, id)) ??
-      findFolderArt(filePath, id) ??
-      (await generateProceduralCover(filePath, id));
-    if (url) {
-      try {
-        await updateTrackCover(id, url);
-      } catch (err) {
-        log.error("loadThumbnail", `DB update failed: ${err}`);
+    return await runMusicThumbnail(async () => {
+      const { filePath } = track;
+      const url =
+        (await extractCover(filePath, id)) ??
+        findFolderArt(filePath, id) ??
+        (await generateProceduralCover(filePath, id));
+      if (url) {
+        try {
+          await updateTrackCover(id, url);
+        } catch (err) {
+          log.error("loadThumbnail", `DB update failed: ${err}`);
+        }
       }
-    }
-    return url;
+      return url;
+    });
   } finally {
     inFlight.delete(id);
   }

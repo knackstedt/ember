@@ -122,7 +122,11 @@ export const DeviceMapper: React.FC<DeviceMapperProps> = ({
                   return (
                     <div key={mapping.deviceId} className="flex items-center gap-2">
                       <ControllerGhost
-                        type={detectDeviceType(device)}
+                        type={({
+                          keyboard: "keyboard",
+                          mouse: "mouse",
+                          controller: "gamepad",
+                        } as const)[detectDeviceType(device)]}
                         playerNumber={slotIndex + 1}
                         label={device.name}
                         locateActive={locateActiveId === mapping.deviceId}

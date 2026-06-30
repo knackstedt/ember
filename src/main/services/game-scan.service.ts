@@ -31,6 +31,7 @@ function normalizeGame(game: Game): Record<string, unknown> {
   if (n.lastPlayed === undefined) n.lastPlayed = 0;
   if (n.hidden === undefined) n.hidden = false;
   if (n.sourceLocation === undefined) n.sourceLocation = "local";
+  if (n.mainExe === null) n.mainExe = undefined;
   delete n.metadataFetched;
   return n;
 }
@@ -103,7 +104,8 @@ async function markStaleGamesMissing(
 
   log.info("cleanup", `Checking ${existingGames.length} existing games against ${scannedIds.size} scanned games`);
 
-  const updatePromises: Promise<unknown>[] = [];
+  const restoreIds: string[] = [];
+  const missingIds: string[] = [];
 
   for (const game of existingGames) {
     const id = extractRecordId(game.id);
@@ -119,14 +121,7 @@ async function markStaleGamesMissing(
     if (source && disabledSources.has(source)) continue;
 
     if (scannedIds.has(id)) {
-      // Game was found in scan: ensure it is not marked missing
-      if (game.missing) {
-        updatePromises.push(
-          db.query(`UPDATE game:⟨${id}⟩ SET missing = false`)
-            .then(() => log.info("cleanup", `Restored game ${id} (${game.title})`))
-            .catch((err) => log.warn("cleanup", `Failed to restore ${id}: ${err}`))
-        );
-      }
+      if (game.missing) restoreIds.push(id);
       continue;
     }
 
@@ -142,20 +137,26 @@ async function markStaleGamesMissing(
       }
     }
 
-    if (shouldMarkMissing && !game.missing) {
-      log.info("cleanup", `Marking missing game ${id} (${game.title}) platform=${game.platform}`);
-      updatePromises.push(
-        db.query(`UPDATE game:⟨${id}⟩ SET missing = true`)
-          .catch((err) => log.warn("cleanup", `Failed to mark missing ${id}: ${err}`))
-      );
+    if (shouldMarkMissing && !game.missing) missingIds.push(id);
+  }
+
+  // Batch update to reduce SurrealDB transaction conflicts.
+  async function batchUpdate(ids: string[], field: string, value: boolean) {
+    if (ids.length === 0) return;
+    const chunkSize = 100;
+    for (let i = 0; i < ids.length; i += chunkSize) {
+      const chunk = ids.slice(i, i + chunkSize);
+      try {
+        const idList = chunk.map((id) => `game:⟨${id}⟩`).join(", ");
+        await db.query(`UPDATE ${idList} SET ${field} = ${value}`);
+      } catch (err) {
+        log.warn("cleanup", `Failed to batch ${field}=${value} for ${chunk.length} games: ${err}`);
+      }
     }
   }
 
-  // Await in chunks
-  const chunkSize = 50;
-  for (let i = 0; i < updatePromises.length; i += chunkSize) {
-    await Promise.all(updatePromises.slice(i, i + chunkSize));
-  }
+  await batchUpdate(restoreIds, "missing", false);
+  await batchUpdate(missingIds, "missing", true);
 }
 
 /**

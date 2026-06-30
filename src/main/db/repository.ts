@@ -89,6 +89,7 @@ export const GameRepo = {
     if (normalized.lastPlayed === undefined) normalized.lastPlayed = 0;
     if (normalized.hidden === undefined) normalized.hidden = false;
     if (normalized.sourceLocation === undefined) normalized.sourceLocation = "local";
+    if (normalized.mainExe === null) normalized.mainExe = undefined;
     await db.query(`UPSERT game:⟨${escapeId(game.id)}⟩ CONTENT $game`, { game: normalized });
   },
 

@@ -54,6 +54,7 @@ import {
 import { subscribeLearning, setLearningDeviceIds } from "../../hooks/useControllerWorker";
 import { useContextMenu } from "../../hooks/useContextMenu";
 import { ContextMenuOption } from "../../components/ContextMenu/ContextMenu";
+import { PromptDialog } from "../../components/PromptDialog/PromptDialog";
 
 const CONTROLLER_ICON_SIZE = 28;
 
@@ -69,6 +70,8 @@ const CONTROLLER_ICONS: Record<ControllerType, React.ReactNode> = {
   switch: <Gamepad2 size={CONTROLLER_ICON_SIZE} />,
   wiimote: <Gamepad2 size={CONTROLLER_ICON_SIZE} />,
   generic: <Gamepad2 size={CONTROLLER_ICON_SIZE} />,
+  keyboard: <Gamepad2 size={CONTROLLER_ICON_SIZE} />,
+  mouse: <Gamepad2 size={CONTROLLER_ICON_SIZE} />,
 };
 
 const CONNECTION_ICONS: Record<string, React.ReactNode> = {
@@ -677,6 +680,11 @@ export const ControllersTab: React.FC = () => {
   const [confirmReset, setConfirmReset] = useState(false);
   const [rawExpanded, setRawExpanded] = useState(false);
   const [aliases, setAliases] = useState<Record<string, string>>({});
+  const [renameDialog, setRenameDialog] = useState<{
+    deviceId: string;
+    currentName: string;
+    originalName: string;
+  } | null>(null);
   const learningRef = useRef<string | null>(null);
   learningRef.current = learningCode;
 
@@ -923,23 +931,10 @@ export const ControllersTab: React.FC = () => {
       switch (optionId) {
         case "rename": {
           const current = aliases[aliasTargetId] ?? dev.name;
-          const name = window.prompt("Controller name:", current);
-          if (name === null) return;
-          const trimmed = name.trim();
-          if (trimmed === "" || trimmed === dev.name) {
-            if (aliases[aliasTargetId]) {
-              window.htpc.input.removeAlias(aliasTargetId).then(() => {
-                setAliases((prev) => {
-                  const next = { ...prev };
-                  delete next[aliasTargetId];
-                  return next;
-                });
-              });
-            }
-            return;
-          }
-          window.htpc.input.setAlias(aliasTargetId, trimmed).then(() => {
-            setAliases((prev) => ({ ...prev, [aliasTargetId]: trimmed }));
+          setRenameDialog({
+            deviceId: aliasTargetId,
+            currentName: current,
+            originalName: dev.name,
           });
           break;
         }
@@ -1730,6 +1725,32 @@ export const ControllersTab: React.FC = () => {
         )}
       </div>
       {deviceCtxMenu}
+      <PromptDialog
+        isOpen={renameDialog !== null}
+        title="Rename Controller"
+        defaultValue={renameDialog?.currentName ?? ""}
+        confirmLabel="Save"
+        onConfirm={(name) => {
+          if (!renameDialog) return;
+          const trimmed = name.trim();
+          const { deviceId, originalName } = renameDialog;
+          if (trimmed === "" || trimmed === originalName) {
+            window.htpc.input.removeAlias(deviceId).then(() => {
+              setAliases((prev) => {
+                const next = { ...prev };
+                delete next[deviceId];
+                return next;
+              });
+            });
+          } else {
+            window.htpc.input.setAlias(deviceId, trimmed).then(() => {
+              setAliases((prev) => ({ ...prev, [deviceId]: trimmed }));
+            });
+          }
+          setRenameDialog(null);
+        }}
+        onCancel={() => setRenameDialog(null)}
+      />
     </div>
   );
 };

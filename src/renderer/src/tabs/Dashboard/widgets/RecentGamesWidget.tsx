@@ -33,6 +33,15 @@ const PLATFORM_COLORS: Record<GamePlatform, string> = {
   desktop: "#7f8c8d",
   itch: "#fa5c5c",
   unknown: "#7f8c8d",
+  gbc: "#2ecc71",
+  atari2600: "#34495e",
+  atari5200: "#34495e",
+  atari7800: "#34495e",
+  lynx: "#e74c3c",
+  ngp: "#3498db",
+  movie: "#9b59b6",
+  tv: "#9b59b6",
+  video: "#9b59b6",
 };
 
 function formatPlayTime(minutes: number): string {

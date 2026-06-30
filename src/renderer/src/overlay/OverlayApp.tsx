@@ -48,7 +48,7 @@ type SidebarId =
 interface SidebarItem {
   id: SidebarId;
   label: string;
-  Icon: React.ComponentType<{ size?: number; className?: string }>;
+  Icon: React.ComponentType<{ size?: number | string; className?: string }>;
 }
 
 const SIDEBAR_ITEMS: SidebarItem[] = [
@@ -83,9 +83,12 @@ function useOverlayGame() {
   const [game, setGame] = useState<Game | null>(null);
   useEffect(() => {
     void window.htpc.overlay.getGame().then(setGame);
-    return window.htpc.overlay.onState((state) => {
+    const unsubscribe = window.htpc.overlay.onState((state) => {
       setGame(state.game);
     });
+    return () => {
+      unsubscribe();
+    };
   }, []);
   return game;
 }
@@ -191,7 +194,7 @@ function MiniChart({
   label: string;
   value: string;
   unit: string;
-  Icon: React.ComponentType<{ size?: number }>;
+  Icon: React.ComponentType<{ size?: number | string }>;
 }) {
   const width = 120;
   const height = 32;
