@@ -10,6 +10,7 @@ export type GamingNavItem =
   | "nintendo"
   | "playstation"
   | "retro"
+  | "web"
   | "windows"
   | "other";
 
@@ -37,7 +38,8 @@ export const NAV_PLATFORM_GROUPS: Record<GamingNavItem, GamePlatform[]> = {
   itch: ["itch"],
   nintendo: ["dolphin-gc", "dolphin-wii", "nes", "snes", "gb", "gba", "n64", "nds"],
   playstation: ["psx"],
-  retro: ["genesis", "sms", "gamegear", "dreamcast", "pce", "dos", "flash"],
+  retro: ["genesis", "sms", "gamegear", "dreamcast", "pce", "dos"],
+  web: ["flash", "html5", "unity"],
   windows: ["windows"],
   other: ["desktop"],
 };

@@ -122,6 +122,8 @@ const PLATFORM_FILTERS: ChipFilter<
   { id: "nds", label: "DS" },
   { id: "dreamcast", label: "Dreamcast" },
   { id: "flash", label: "Flash" },
+  { id: "html5", label: "HTML5" },
+  { id: "unity", label: "Unity" },
   { id: "dos", label: "DOS/PC" },
   { id: "windows", label: "Windows" },
   { id: "desktop", label: "Other" },
@@ -153,6 +155,8 @@ const LIBRETRO_THUMB_PLATFORMS = new Set<string>([
   "gamegear", "pce", "psx", "dreamcast", "nds", "dos",
 ]);
 
+const WEB_THUMB_PLATFORMS = new Set<string>(["flash", "html5", "unity"]);
+
 const LazyGameCard: React.FC<{
   game: Game;
   index: number;
@@ -169,7 +173,7 @@ const LazyGameCard: React.FC<{
 
   useEffect(() => {
     const isLibretro = LIBRETRO_THUMB_PLATFORMS.has(game.platform);
-    if ((game.platform === "flash" || isLibretro) && !game.coverUrl) {
+    if ((WEB_THUMB_PLATFORMS.has(game.platform) || isLibretro) && !game.coverUrl) {
       loadThumbnail(game.id);
     }
   }, [game.id, game.platform, game.coverUrl, loadThumbnail]);
@@ -215,7 +219,7 @@ const LazyGameThumbnail: React.FC<{ game: Game }> = React.memo(({ game }) => {
   const loadThumbnail = useGamesStore((s) => s.loadThumbnail);
   useEffect(() => {
     const isLibretro = LIBRETRO_THUMB_PLATFORMS.has(game.platform);
-    if ((game.platform === "flash" || isLibretro) && !game.coverUrl) {
+    if ((WEB_THUMB_PLATFORMS.has(game.platform) || isLibretro) && !game.coverUrl) {
       loadThumbnail(game.id);
     }
   }, [game.id, game.platform, game.coverUrl, loadThumbnail]);
@@ -870,7 +874,7 @@ export const GamingTab: React.FC = () => {
         onFavorite: () => toggleFavorite(game.id),
         onVisible: () => {
           const isLibretro = LIBRETRO_THUMB_PLATFORMS.has(game.platform);
-          if ((game.platform === "flash" || isLibretro) && !game.coverUrl) {
+          if ((WEB_THUMB_PLATFORMS.has(game.platform) || isLibretro) && !game.coverUrl) {
             loadThumbnail(game.id);
           }
         },

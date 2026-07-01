@@ -84,6 +84,8 @@ export type GamePlatform =
   | "nds"
   | "dreamcast"
   | "flash"
+  | "html5"
+  | "unity"
   | "dos"
   | "windows"
   | "desktop"

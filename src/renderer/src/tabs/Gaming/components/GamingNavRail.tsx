@@ -5,6 +5,7 @@ import {
   Star,
   Users,
   Folder,
+  Globe,
 } from "lucide-react";
 import type { GamingNavItem } from "../types";
 import {
@@ -31,6 +32,7 @@ const NAV_ITEMS: { id: GamingNavItem; label: string; Icon: React.ComponentType<{
   { id: "nintendo", label: "Nintendo", Icon: NintendoLogo },
   { id: "playstation", label: "PlayStation", Icon: PlayStationLogo },
   { id: "retro", label: "Retro", Icon: RetroLogo },
+  { id: "web", label: "Web", Icon: Globe },
   { id: "windows", label: "Windows", Icon: WindowsLogo },
   { id: "other", label: "Other", Icon: Folder },
 ];

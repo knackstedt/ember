@@ -97,7 +97,9 @@ const PLATFORM_TO_NAV: Partial<Record<GamePlatform, GamingNavItem>> = {
   dreamcast: "retro",
   pce: "retro",
   dos: "retro",
-  flash: "retro",
+  flash: "web",
+  html5: "web",
+  unity: "web",
   windows: "windows",
   desktop: "other",
 };
