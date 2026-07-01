@@ -542,7 +542,7 @@ const htpc = {
       onReinstallProgress: (cb: (progress: { step: string; message: string }) => void) => {
         const handler = (_: Electron.IpcRendererEvent, p: { step: string; message: string }) => cb(p);
         ipcRenderer.on("reshade:reinstall:progress", handler);
-        return () => ipcRenderer.removeListener("reshade:reinstall:progress", handler);
+        return () => { ipcRenderer.removeListener("reshade:reinstall:progress", handler); };
       },
       isCompatible: (game: Game): Promise<boolean> =>
         ipcRenderer.invoke("reshade:isCompatible", game),

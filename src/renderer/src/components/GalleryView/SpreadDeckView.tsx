@@ -170,17 +170,19 @@ export const SpreadDeckView = React.forwardRef(function SpreadDeckViewInner<T>(
     [items, itemsPerDeck, deckHeight, hoveredGlobalIndex, focusedIndex],
   );
 
+  const deckData = Array.from({ length: deckCount }, (_, i) => i);
+
   if (scrollRef) {
     return (
       <div ref={containerRef} className={`w-full ${className ?? ""}`} style={style}>
         <Virtualizer
           ref={virtualizerRef}
           scrollRef={scrollRef}
-          count={deckCount}
+          data={deckData}
           itemSize={deckHeight}
-          overscan={overscan}
+          bufferSize={overscan * deckHeight}
         >
-          {(deckIndex) => renderDeck(deckIndex)}
+          {(_, deckIndex) => renderDeck(deckIndex)}
         </Virtualizer>
       </div>
     );
@@ -194,11 +196,11 @@ export const SpreadDeckView = React.forwardRef(function SpreadDeckViewInner<T>(
     >
       <Virtualizer
         ref={virtualizerRef}
-        count={deckCount}
+        data={deckData}
         itemSize={deckHeight}
-        overscan={overscan}
+        bufferSize={overscan * deckHeight}
       >
-        {(deckIndex) => renderDeck(deckIndex)}
+        {(_, deckIndex) => renderDeck(deckIndex)}
       </Virtualizer>
     </div>
   );

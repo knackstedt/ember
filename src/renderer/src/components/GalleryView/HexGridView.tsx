@@ -622,18 +622,20 @@ export const HexGridView = React.forwardRef(function HexGridViewInner<T>(
     paddingRight: 12,
   };
 
+  const rowData = Array.from({ length: rowCount }, (_, i) => i);
+
   if (scrollRef) {
     return (
       <div ref={containerRef} className={`w-full ${className ?? ""}`} style={{ ...style, ...wrapperStyle }}>
         <Virtualizer
           ref={virtualizerRef}
           scrollRef={scrollRef}
-          count={rowCount}
+          data={rowData}
           itemSize={rowHeight}
-          overscan={overscan}
+          bufferSize={overscan * rowHeight}
           item={HexGridItem}
         >
-          {(rowIndex) => renderRow(rowIndex)}
+          {(_, rowIndex) => renderRow(rowIndex)}
         </Virtualizer>
       </div>
     );
@@ -647,12 +649,12 @@ export const HexGridView = React.forwardRef(function HexGridViewInner<T>(
     >
       <Virtualizer
         ref={virtualizerRef}
-        count={rowCount}
+        data={rowData}
         itemSize={rowHeight}
-        overscan={overscan}
+        bufferSize={overscan * rowHeight}
         item={HexGridItem}
       >
-        {(rowIndex) => renderRow(rowIndex)}
+        {(_, rowIndex) => renderRow(rowIndex)}
       </Virtualizer>
     </div>
   );

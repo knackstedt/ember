@@ -46,17 +46,19 @@ export const ListView = React.forwardRef(function ListViewInner<T>(
     borderBottom: "1px solid var(--border-default)",
   };
 
+  const itemData = Array.from({ length: items.length }, (_, i) => i);
+
   if (scrollRef) {
     return (
       <div className={`w-full ${className ?? ""}`} style={containerStyle}>
         <Virtualizer
           ref={virtualizerRef}
           scrollRef={scrollRef}
-          count={items.length}
+          data={itemData}
           itemSize={rowHeight}
-          overscan={overscan}
+          bufferSize={overscan * rowHeight}
         >
-          {(index) => (
+          {(_, index) => (
             <div key={index} style={rowStyle} className="flex items-center">
               {renderItemRef.current(items[index], index)}
             </div>
@@ -73,11 +75,11 @@ export const ListView = React.forwardRef(function ListViewInner<T>(
     >
       <Virtualizer
         ref={virtualizerRef}
-        count={items.length}
+        data={itemData}
         itemSize={rowHeight}
-        overscan={overscan}
+        bufferSize={overscan * rowHeight}
       >
-        {(index) => (
+        {(_, index) => (
           <div key={index} style={rowStyle} className="flex items-center">
             {renderItemRef.current(items[index], index)}
           </div>

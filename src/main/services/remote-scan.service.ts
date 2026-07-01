@@ -1,7 +1,5 @@
 import { createHash } from "crypto";
 import { extname, basename } from "path";
-// @ts-ignore music-metadata is ESM-only; Node 20.19+ supports require(esm) at runtime
-import { loadMusicMetadata } from "music-metadata";
 import { promisify } from "util";
 import { exec } from "child_process";
 import { RemoteSource } from "../../shared/types";
@@ -257,7 +255,7 @@ export async function scanRemoteMovies(
 let musicMetadata: any = null;
 
 async function getMusicMetadata() {
-  if (!musicMetadata) musicMetadata = await loadMusicMetadata();
+  if (!musicMetadata) musicMetadata = await import("music-metadata");
   return musicMetadata;
 }
 

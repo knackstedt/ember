@@ -174,17 +174,19 @@ export const BookshelfView = React.forwardRef(function BookshelfViewInner<T>(
     [items, itemsPerShelf, shelfHeight, hoveredGlobalIndex, focusedIndex],
   );
 
+  const shelfData = Array.from({ length: shelfCount }, (_, i) => i);
+
   if (scrollRef) {
     return (
       <div ref={containerRef} className={`w-full ${className ?? ""}`} style={style}>
         <Virtualizer
           ref={virtualizerRef}
           scrollRef={scrollRef}
-          count={shelfCount}
+          data={shelfData}
           itemSize={shelfHeight}
-          overscan={overscan}
+          bufferSize={overscan * shelfHeight}
         >
-          {(shelfIndex) => renderShelf(shelfIndex)}
+          {(_, shelfIndex) => renderShelf(shelfIndex)}
         </Virtualizer>
       </div>
     );
@@ -198,11 +200,11 @@ export const BookshelfView = React.forwardRef(function BookshelfViewInner<T>(
     >
       <Virtualizer
         ref={virtualizerRef}
-        count={shelfCount}
+        data={shelfData}
         itemSize={shelfHeight}
-        overscan={overscan}
+        bufferSize={overscan * shelfHeight}
       >
-        {(shelfIndex) => renderShelf(shelfIndex)}
+        {(_, shelfIndex) => renderShelf(shelfIndex)}
       </Virtualizer>
     </div>
   );

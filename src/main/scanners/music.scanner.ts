@@ -1,8 +1,6 @@
 import { existsSync, readdirSync, statSync, lstatSync } from "fs";
 import { join, extname } from "path";
 import { createHash } from "crypto";
-// @ts-expect-error music-metadata is ESM-only; Node 20.19+ supports require(esm) at runtime
-import { loadMusicMetadata } from "music-metadata";
 import { getXdgMusicDir } from "./xdg";
 import { MusicTrack } from "../../shared/types";
 import { resolveSourceLocation } from "../../shared/path-utils";
@@ -24,7 +22,7 @@ const AUDIO_EXTS = new Set([
 let musicMetadata: any = null;
 
 async function getMusicMetadata() {
-  if (!musicMetadata) musicMetadata = await loadMusicMetadata();
+  if (!musicMetadata) musicMetadata = await import("music-metadata");
   return musicMetadata;
 }
 

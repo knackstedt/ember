@@ -11,8 +11,6 @@ import {
 } from "fs";
 import { join, extname, dirname, basename } from "path";
 import { app, dialog } from "electron";
-// @ts-expect-error music-metadata is ESM-only; Node 20.19+ supports require(esm) at runtime
-import { loadMusicMetadata } from "music-metadata";
 import { MusicTrack } from "../../shared/types";
 import { getDb } from "../db";
 import { createLogger } from "../util/logger";
@@ -62,7 +60,7 @@ function runMusicThumbnail<T>(fn: () => Promise<T>): Promise<T> {
 let musicMetadata: any = null;
 
 async function getMusicMetadata() {
-  if (!musicMetadata) musicMetadata = await loadMusicMetadata();
+  if (!musicMetadata) musicMetadata = await import("music-metadata");
   return musicMetadata;
 }
 

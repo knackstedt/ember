@@ -133,6 +133,7 @@ export const VirtualGrid = React.forwardRef(function VirtualGridInner<T>(
       : 0;
 
   const rowCount = Math.max(1, Math.ceil(items.length / effectiveColCount));
+  const rowData = Array.from({ length: rowCount }, (_, i) => i);
 
   const renderRow = (rowIndex: number) => (
     <div
@@ -164,11 +165,11 @@ export const VirtualGrid = React.forwardRef(function VirtualGridInner<T>(
         <Virtualizer
           ref={virtualizerRef}
           scrollRef={scrollRef}
-          count={rowCount}
+          data={rowData}
           itemSize={rowHeight}
-          overscan={overscan}
+          bufferSize={overscan * rowHeight}
         >
-          {renderRow}
+          {(_, rowIndex) => renderRow(rowIndex)}
         </Virtualizer>
       </div>
     );
@@ -182,11 +183,11 @@ export const VirtualGrid = React.forwardRef(function VirtualGridInner<T>(
     >
       <Virtualizer
         ref={virtualizerRef}
-        count={rowCount}
+        data={rowData}
         itemSize={rowHeight}
-        overscan={overscan}
+        bufferSize={overscan * rowHeight}
       >
-        {renderRow}
+        {(_, rowIndex) => renderRow(rowIndex)}
       </Virtualizer>
     </div>
   );
