@@ -5,6 +5,7 @@ import { Game } from "../../shared/types";
 import { resolveSourceLocation } from "../../shared/path-utils";
 import { createLogger } from "../util/logger";
 import { findMainExe } from "../services/shader-injection.service";
+import { detectGameInfo } from "../services/game-detection.service";
 
 const log = createLogger("info");
 
@@ -122,6 +123,7 @@ export function scanSteamGames(): Game[] {
 
         const cover = findCover(gridDir, appId);
         const mainExe = findMainExe(installPath, data["name"]);
+        const detection = detectGameInfo(installPath, mainExe);
 
         games.push({
           id: `steam_${appId}`,
@@ -135,6 +137,11 @@ export function scanSteamGames(): Game[] {
           tags: [],
           sourceLocation: "local",
           source: "steam",
+          osPlatform: detection.osPlatform,
+          engine: detection.engine,
+          engineVersion: detection.engineVersion,
+          graphicsApi: detection.graphicsApi,
+          entrypoints: detection.entrypoints.length > 0 ? detection.entrypoints : undefined,
         });
       } catch {
         log.error("scanSteamGames", `Failed to parse Steam game: ${entry}`);

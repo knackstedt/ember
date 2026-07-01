@@ -5,6 +5,7 @@ import { homedir } from "os";
 import { Game } from "../../shared/types";
 import { resolveSourceLocation } from "../../shared/path-utils";
 import { createLogger } from "../util/logger";
+import { detectGameInfo } from "./game-detection.service";
 
 const log = createLogger("info");
 
@@ -55,6 +56,8 @@ export function listInstalledItchGames(): Game[] {
       const exe = findExecutableInInstall(path);
       if (!exe) continue;
 
+      const detection = detectGameInfo(path, exe);
+
       games.push({
         id: `itch_${game.id ?? caveId}`,
         title: game.title ?? "Unknown",
@@ -65,6 +68,11 @@ export function listInstalledItchGames(): Game[] {
         tags: [],
         sourceLocation: resolveSourceLocation(exe),
         source: "itch",
+        osPlatform: detection.osPlatform,
+        engine: detection.engine,
+        engineVersion: detection.engineVersion,
+        graphicsApi: detection.graphicsApi,
+        entrypoints: detection.entrypoints.length > 0 ? detection.entrypoints : undefined,
       });
     }
   } catch (err: any) {

@@ -259,6 +259,11 @@ async function runMigrations(db: Surreal): Promise<void> {
     DEFINE FIELD IF NOT EXISTS source ON game TYPE option<string>;
     DEFINE FIELD IF NOT EXISTS installPath ON game TYPE option<string>;
     DEFINE FIELD IF NOT EXISTS mainExe ON game TYPE option<string>;
+    DEFINE FIELD IF NOT EXISTS osPlatform ON game TYPE option<string>;
+    DEFINE FIELD IF NOT EXISTS engine ON game TYPE option<string>;
+    DEFINE FIELD IF NOT EXISTS engineVersion ON game TYPE option<string>;
+    DEFINE FIELD IF NOT EXISTS graphicsApi ON game TYPE option<string>;
+    DEFINE FIELD IF NOT EXISTS entrypoints ON game TYPE option<array<object>> FLEXIBLE;
 
     DEFINE TABLE IF NOT EXISTS movie SCHEMAFULL;
     DEFINE FIELD IF NOT EXISTS id ON movie TYPE string;

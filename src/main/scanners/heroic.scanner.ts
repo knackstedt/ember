@@ -1,9 +1,10 @@
 import { existsSync, readdirSync, readFileSync } from "fs";
-import { join } from "path";
+import { join, dirname } from "path";
 import { homedir } from "os";
 import { Game, GamePlatform } from "../../shared/types";
 import { resolveSourceLocation } from "../../shared/path-utils";
 import { createLogger } from "../util/logger";
+import { detectGameInfo } from "../services/game-detection.service";
 
 const log = createLogger("info");
 
@@ -89,18 +90,28 @@ function parseLibrary(
         if (!exe) return false;
         return existsSync(exe);
       })
-      .map((g) => ({
-        id: `heroic_${g.app_name}`,
-        title: g.title,
-        platform,
-        execPath: g.install?.executable,
-        coverUrl: coverFor(g, imagesDir),
-        developer: g.developer,
-        description: g.extra?.about?.longDescription,
-        tags: [],
-        sourceLocation: resolveSourceLocation(g.install?.executable),
-        source: "heroic" as const,
-      }));
+      .map((g) => {
+        const exe = g.install?.executable;
+        const installDir = exe ? dirname(exe) : "";
+        const detection = exe ? detectGameInfo(installDir, exe) : null;
+        return {
+          id: `heroic_${g.app_name}`,
+          title: g.title,
+          platform,
+          execPath: exe,
+          coverUrl: coverFor(g, imagesDir),
+          developer: g.developer,
+          description: g.extra?.about?.longDescription,
+          tags: [],
+          sourceLocation: resolveSourceLocation(exe),
+          source: "heroic" as const,
+          osPlatform: detection?.osPlatform,
+          engine: detection?.engine,
+          engineVersion: detection?.engineVersion,
+          graphicsApi: detection?.graphicsApi,
+          entrypoints: detection && detection.entrypoints.length > 0 ? detection.entrypoints : undefined,
+        };
+      });
   } catch {
     log.error("parseLibrary", `Failed to parse Heroic library: ${path}`);
     return [];
@@ -154,6 +165,7 @@ export function scanLutrisGames(): Game[] {
       );
       if (!data.name) continue;
       if (!data.exe || !existsSync(data.exe)) continue;
+      const detection = detectGameInfo(dirname(data.exe), data.exe);
       games.push({
         id: `lutris_${data.slug ?? entry}`,
         title: data.name,
@@ -164,6 +176,11 @@ export function scanLutrisGames(): Game[] {
           : undefined,
         tags: [],
         source: "lutris",
+        osPlatform: detection.osPlatform,
+        engine: detection.engine,
+        engineVersion: detection.engineVersion,
+        graphicsApi: detection.graphicsApi,
+        entrypoints: detection.entrypoints.length > 0 ? detection.entrypoints : undefined,
       });
     } catch {
       log.error("scanLutrisGames", `Failed to parse Lutris game: ${entry}`);

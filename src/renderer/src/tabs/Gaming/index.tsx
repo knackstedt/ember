@@ -63,6 +63,10 @@ import {
   Monitor,
   Columns,
   FlaskConical,
+  Cpu,
+  Box,
+  Terminal,
+  Wrench,
 } from "lucide-react";
 import { DynamicFacetFilters, FacetField } from "../../components/DynamicFacetFilters/DynamicFacetFilters";
 import type { GameVideo } from "../../../../shared/metadata";
@@ -1302,6 +1306,18 @@ export const GamingTab: React.FC = () => {
                   ? { label: "Est. Playtime", value: `${Math.round(detailGameData.playtime)}h` }
                   : null,
                 { label: "Platform", value: detailGameData?.platform ?? "" },
+                detailGameData?.osPlatform
+                  ? { label: "OS", value: detailGameData.osPlatform === "windows" ? "Windows" : "Linux" }
+                  : null,
+                detailGameData?.engine && detailGameData.engine !== "unknown"
+                  ? { label: "Engine", value: detailGameData.engine.charAt(0).toUpperCase() + detailGameData.engine.slice(1) }
+                  : null,
+                detailGameData?.engineVersion
+                  ? { label: "Engine Version", value: detailGameData.engineVersion }
+                  : null,
+                detailGameData?.graphicsApi && detailGameData.graphicsApi !== "unknown"
+                  ? { label: "Graphics", value: detailGameData.graphicsApi.replace(/directx/, "DirectX ").replace(/opengl/, "OpenGL").replace(/vulkan/, "Vulkan").replace(/metal/, "Metal").replace(/software/, "Software") }
+                  : null,
               ].filter(Boolean) as { label: string; value: string }[])
             : []
         }
@@ -1433,6 +1449,49 @@ export const GamingTab: React.FC = () => {
               <GameSessionSettings game={selected} />
             ) : (
               <>
+                {/* Associated entrypoints (level editor, mod tools, etc.) */}
+                {selected.entrypoints && selected.entrypoints.length > 0 && (
+                  <div>
+                    <div
+                      className="text-xs font-semibold uppercase tracking-wide mb-2"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
+                      Associated Tools
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      {selected.entrypoints.map((ep, i) => {
+                        const icon = ep.type === "editor"
+                          ? <Box size={14} />
+                          : ep.type === "mod-tool"
+                            ? <Wrench size={14} />
+                            : ep.type === "server"
+                              ? <Terminal size={14} />
+                              : <Cpu size={14} />;
+                        return (
+                          <button
+                            key={i}
+                            className="flex items-center gap-2 p-2 rounded hover:bg-white/5 transition-colors text-left"
+                            style={{ background: "var(--surface-1)" }}
+                            onClick={() => {
+                              void window.htpc.games.launch({
+                                ...selected,
+                                execPath: ep.path,
+                                romPath: undefined,
+                              });
+                            }}
+                          >
+                            <span style={{ color: "var(--accent)" }}>{icon}</span>
+                            <span className="text-sm truncate flex-1">{ep.label}</span>
+                            <span className="text-[12px]" style={{ color: "var(--text-secondary)" }}>
+                              {ep.type}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 {/* Screenshots from game data + locally captured */}
                 {screenshotUrls.length > 0 && (
                   <div>

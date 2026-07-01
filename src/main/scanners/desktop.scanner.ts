@@ -1,8 +1,9 @@
 import { existsSync, readdirSync, readFileSync } from "fs";
-import { join } from "path";
+import { join, dirname } from "path";
 import { getXdgDesktopDirs } from "./xdg";
 import { Game } from "../../shared/types";
 import { resolveSourceLocation } from "../../shared/path-utils";
+import { detectGameInfo } from "../services/game-detection.service";
 
 interface DesktopEntry {
   Name?: string;
@@ -91,6 +92,9 @@ export function scanDesktopGames(): Game[] {
         const execBin = resolveExec(data.Exec);
         if (!execBin || !existsSync(execBin)) continue;
 
+        const installDir = dirname(execBin);
+        const detection = detectGameInfo(installDir, execBin);
+
         let coverUrl: string | undefined;
         if (data.Icon) {
           const iconPaths = [
@@ -113,6 +117,11 @@ export function scanDesktopGames(): Game[] {
           tags: [],
           sourceLocation: resolveSourceLocation(data.Exec),
           source: "desktop",
+          osPlatform: detection.osPlatform,
+          engine: detection.engine,
+          engineVersion: detection.engineVersion,
+          graphicsApi: detection.graphicsApi,
+          entrypoints: detection.entrypoints.length > 0 ? detection.entrypoints : undefined,
         });
       } catch {
         continue;

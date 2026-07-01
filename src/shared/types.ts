@@ -29,6 +29,37 @@ export interface ScanProgress {
   message?: string;
 }
 
+export type GameOsPlatform = "windows" | "linux";
+
+export type GameEngineType =
+  | "unity"
+  | "unreal"
+  | "godot"
+  | "gamemaker"
+  | "java"
+  | "source"
+  | "idtech"
+  | "rpgmaker"
+  | "renpy"
+  | "adventure"
+  | "unknown";
+
+export type GraphicsApi =
+  | "directx9"
+  | "directx11"
+  | "directx12"
+  | "opengl"
+  | "vulkan"
+  | "metal"
+  | "software"
+  | "unknown";
+
+export interface GameEntrypoint {
+  label: string;
+  path: string;
+  type: "editor" | "mod-tool" | "config" | "launcher" | "server" | "other";
+}
+
 export type GamePlatform =
   | "steam"
   | "gog"
@@ -175,6 +206,16 @@ export interface Game {
   installPath?: string;
   /** Main executable path within the install directory (for Steam/Windows games) */
   mainExe?: string | null;
+  /** Detected OS platform (windows/linux) */
+  osPlatform?: GameOsPlatform;
+  /** Detected game engine */
+  engine?: GameEngineType;
+  /** Detected engine version (e.g. "5.3.2", "4.x") */
+  engineVersion?: string;
+  /** Detected graphics API */
+  graphicsApi?: GraphicsApi;
+  /** Associated entrypoints (level editor, mod tools, config, etc.) */
+  entrypoints?: GameEntrypoint[];
 }
 
 export interface GameEmulatorConfig {

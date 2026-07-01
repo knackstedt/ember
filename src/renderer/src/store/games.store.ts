@@ -157,7 +157,7 @@ export const useGamesStore = create<GamesState>((set, get) => ({
     set({ loading: true });
     try {
       const odata =
-        "$select=id,title,platform,execPath,romPath,wineRunner,coverUrl,bannerUrl,description,genres,releaseYear,developer,publisher,playerCount,protonRating,steamAppId,rawgSlug,isFavorite,tags,lastPlayed,playTime,rating,hidden,sourceLocation,missing,source,launchCommand,launchArgs,launchWorkingDir,launchEnv,sessionHooks,compressedRomPath,compressionFormat&$orderby=title asc";
+        "$select=id,title,platform,execPath,romPath,wineRunner,coverUrl,bannerUrl,description,genres,releaseYear,developer,publisher,playerCount,protonRating,steamAppId,rawgSlug,isFavorite,tags,lastPlayed,playTime,rating,hidden,sourceLocation,missing,source,launchCommand,launchArgs,launchWorkingDir,launchEnv,sessionHooks,compressedRomPath,compressionFormat,installPath,mainExe,osPlatform,engine,engineVersion,graphicsApi,entrypoints&$orderby=title asc";
       const result = await window.htpc.db.query<Game>("game", odata);
       set((state) => ({
         games: mergeGames(state.games, result.results),

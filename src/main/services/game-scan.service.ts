@@ -32,6 +32,7 @@ function normalizeGame(game: Game): Record<string, unknown> {
   if (n.hidden === undefined) n.hidden = false;
   if (n.sourceLocation === undefined) n.sourceLocation = "local";
   if (n.mainExe === null) n.mainExe = undefined;
+  if (n.entrypoints === null) n.entrypoints = undefined;
   delete n.metadataFetched;
   return n;
 }

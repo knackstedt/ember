@@ -6,6 +6,7 @@ import { Game, WineRunner } from "../../shared/types";
 import { resolveSourceLocation } from "../../shared/path-utils";
 import { createLogger } from "../util/logger";
 import { detectWineRunner } from "../services/wine-detection.service";
+import { detectGameInfo } from "../services/game-detection.service";
 
 const log = createLogger("info");
 
@@ -241,7 +242,9 @@ export function scanWindowsGames(gamePaths: string[] = [], romPaths: string[] = 
       const title = titleForWindowsGame(fullPath);
       const isUnity = ext === ".exe" && isUnityGame(fullPath);
       const id = hashId("win", fullPath);
-      log.debug("windows", `found ${title} → ${id} unity: ${isUnity} path: ${fullPath}`);
+      const installDir = dirname(fullPath);
+      const detection = detectGameInfo(installDir, fullPath);
+      log.debug("windows", `found ${title} → ${id} unity: ${isUnity} engine: ${detection.engine} path: ${fullPath}`);
 
       games.push({
         id,
@@ -252,6 +255,11 @@ export function scanWindowsGames(gamePaths: string[] = [], romPaths: string[] = 
         tags: isUnity ? ["unity"] : [],
         sourceLocation: resolveSourceLocation(fullPath),
         source: "windows",
+        osPlatform: detection.osPlatform,
+        engine: detection.engine,
+        engineVersion: detection.engineVersion,
+        graphicsApi: detection.graphicsApi,
+        entrypoints: detection.entrypoints.length > 0 ? detection.entrypoints : undefined,
       });
     });
   }
