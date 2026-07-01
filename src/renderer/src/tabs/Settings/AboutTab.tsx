@@ -89,6 +89,8 @@ const BUNDLED_DEPENDENCIES = [
   { name: "multicast-dns", license: "MIT", url: "https://github.com/mafintosh/multicast-dns" },
   { name: "castv2", license: "MIT", url: "https://github.com/thibauts/node-castv2" },
   { name: "Matrix Animation", license: "MIT", url: "https://github.com/knackstedt/matrix-animation" },
+  { name: "ReShade", license: "BSD-3-Clause", url: "https://github.com/crosire/ReShade" },
+  { name: "ReShade Shaders", license: "MIT", url: "https://github.com/crosire/reshade-shaders" },
 ];
 
 const SYSTEM_DEPENDENCIES = [
