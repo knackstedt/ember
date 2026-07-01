@@ -217,14 +217,14 @@ async function buildVulkanLayer(): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// ReShade Addon (EmberReShadeAddon.dll) — cross-compiled for Windows x64
+// ReShade Addon (EmberReShadeAddon.addon64) — cross-compiled for Windows x64
 // ---------------------------------------------------------------------------
 
 async function buildReShadeAddon(): Promise<void> {
   const srcDir = resolve(PROJECT_ROOT, "native/reshade-addon");
   const srcFile = resolve(srcDir, "src/ember_reshade_addon.cpp");
   const destDir = resolve(PROJECT_ROOT, "resources/reshade");
-  const destFile = resolve(destDir, "EmberReShadeAddon.dll");
+  const destFile = resolve(destDir, "EmberReShadeAddon.addon64");
 
   if (!existsSync(srcFile)) {
     console.log("Skipping ReShade addon: source not found.");
@@ -239,6 +239,7 @@ async function buildReShadeAddon(): Promise<void> {
     return;
   }
 
+  // ReShade 6+ looks for *.addon and *.addon64 files (not *.dll)
   const srcMtime = fileMtime(srcFile);
   const destMtime = fileMtime(destFile);
   if (destMtime > 0 && destMtime >= srcMtime) {
@@ -254,7 +255,7 @@ async function buildReShadeAddon(): Promise<void> {
      "-static-libgcc", "-static-libstdc++",
      "-o", destFile, srcFile],
     srcDir,
-    "ReShade addon (EmberReShadeAddon.dll)",
+    "ReShade addon (EmberReShadeAddon.addon64)",
   );
 
   if (exitCode !== 0) {
@@ -280,6 +281,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error(err);
+  console.error("Fatal error:", err);
   process.exit(1);
 });

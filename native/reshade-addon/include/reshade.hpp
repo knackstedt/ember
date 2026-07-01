@@ -10,7 +10,8 @@
 #include <charconv>
 
 // Current version of the ReShade API
-#define RESHADE_API_VERSION 20
+// Set to 18 for compatibility with ReShade 6.7.3 addon runtime
+#define RESHADE_API_VERSION 18
 
 // Optionally import ReShade API functions when 'RESHADE_API_LIBRARY' is defined instead of using header-only mode
 #if defined(RESHADE_API_LIBRARY) || defined(RESHADE_API_LIBRARY_EXPORT)

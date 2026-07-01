@@ -85,11 +85,12 @@ export function getReShade32DllPath(): string {
  */
 export function getReShadeAddonDllPath(): string {
   // resources/ is at the project root (or in the app's resources dir in production)
+  // ReShade 6+ loads addons from *.addon64 files (not *.dll)
   const { resolve } = require("path") as typeof import("path");
   const possiblePaths = [
-    resolve(app.getAppPath(), "resources", "reshade", "EmberReShadeAddon.dll"),
-    resolve(app.getAppPath(), "..", "resources", "reshade", "EmberReShadeAddon.dll"),
-    join(process.cwd(), "resources", "reshade", "EmberReShadeAddon.dll"),
+    resolve(app.getAppPath(), "resources", "reshade", "EmberReShadeAddon.addon64"),
+    resolve(app.getAppPath(), "..", "resources", "reshade", "EmberReShadeAddon.addon64"),
+    join(process.cwd(), "resources", "reshade", "EmberReShadeAddon.addon64"),
   ];
   for (const p of possiblePaths) {
     if (existsSync(p)) return p;
@@ -339,7 +340,11 @@ async function doEnsureReShadeDll(onProgress?: ReShadeProgressCallback): Promise
     if (pageResult.status !== 0 || !pageResult.stdout) {
       throw new Error("Failed to fetch reshade.me homepage");
     }
-    const match = pageResult.stdout.match(/href="(\/downloads\/ReShade_Setup_\d+\.\d+\.\d+\.exe)"/);
+    // Scrape the download link from reshade.me homepage.
+    // Prefer the _Addon build (full addon API support) over the lite build.
+    const addonMatch = pageResult.stdout.match(/href="(\/downloads\/ReShade_Setup_\d+\.\d+\.\d+_Addon\.exe)"/);
+    const liteMatch = pageResult.stdout.match(/href="(\/downloads\/ReShade_Setup_\d+\.\d+\.\d+\.exe)"/);
+    const match = addonMatch ?? liteMatch;
     if (!match) {
       throw new Error("Could not find ReShade download link on homepage");
     }
@@ -498,7 +503,7 @@ export async function installReShadeForGame(
   const addonDllPath = getReShadeAddonDllPath();
   if (existsSync(addonDllPath)) {
     try {
-      const targetAddonPath = join(gameDir, "EmberReShadeAddon.dll");
+      const targetAddonPath = join(gameDir, "EmberReShadeAddon.addon64");
       copyFileSync(addonDllPath, targetAddonPath);
       log.info("reshade", `Copied Ember ReShade addon to ${gameDir}`);
       taints.push({

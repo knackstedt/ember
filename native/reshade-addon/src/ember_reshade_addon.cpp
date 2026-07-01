@@ -281,11 +281,8 @@ static void apply_config(reshade::api::effect_runtime *runtime, const std::strin
 		}
 	}
 
-	// Parse technique states
-	std::string techniques_str;
-	if (json_get_string(config_json, "techniques", techniques_str))
+	// Parse technique states (techniques is a JSON object, not a string)
 	{
-		// techniques is a JSON object: {"TechniqueName": true/false, ...}
 		auto pairs = json_get_object_pairs(config_json, "techniques");
 		for (const auto &p : pairs)
 		{
@@ -303,9 +300,7 @@ static void apply_config(reshade::api::effect_runtime *runtime, const std::strin
 		}
 	}
 
-	// Parse uniform values
-	std::string uniforms_str;
-	if (json_get_string(config_json, "uniforms", uniforms_str))
+	// Parse uniform values (uniforms is a JSON object, not a string)
 	{
 		auto pairs = json_get_object_pairs(config_json, "uniforms");
 		for (const auto &p : pairs)
@@ -318,19 +313,28 @@ static void apply_config(reshade::api::effect_runtime *runtime, const std::strin
 			runtime->get_uniform_variable_type(var, &base_type);
 
 			// Parse value based on type
-			if (base_type == reshade::api::format::r32_float || base_type == reshade::api::format::r32g32b32a32_float)
+			if (base_type == reshade::api::format::r32_float ||
+			    base_type == reshade::api::format::r32g32_float ||
+			    base_type == reshade::api::format::r32g32b32_float ||
+			    base_type == reshade::api::format::r32g32b32a32_float)
 			{
 				float val = 0.0f;
 				try { val = std::stof(p.second); } catch (...) { continue; }
 				runtime->set_uniform_value_float(var, val);
 			}
-			else if (base_type == reshade::api::format::r32_sint || base_type == reshade::api::format::r32g32b32a32_sint)
+			else if (base_type == reshade::api::format::r32_sint ||
+			         base_type == reshade::api::format::r32g32_sint ||
+			         base_type == reshade::api::format::r32g32b32_sint ||
+			         base_type == reshade::api::format::r32g32b32a32_sint)
 			{
 				int val = 0;
 				try { val = std::stoi(p.second); } catch (...) { continue; }
 				runtime->set_uniform_value_int(var, val);
 			}
-			else if (base_type == reshade::api::format::r32_uint || base_type == reshade::api::format::r32g32b32a32_uint)
+			else if (base_type == reshade::api::format::r32_uint ||
+			         base_type == reshade::api::format::r32g32_uint ||
+			         base_type == reshade::api::format::r32g32b32_uint ||
+			         base_type == reshade::api::format::r32g32b32a32_uint)
 			{
 				uint32_t val = 0;
 				try { val = (uint32_t)std::stoul(p.second); } catch (...) { continue; }
@@ -421,7 +425,10 @@ static void write_state(reshade::api::effect_runtime *runtime)
 		   << "\"cols\":" << cols << ",";
 
 		// Output values based on type
-		if (base_type == reshade::api::format::r32_float || base_type == reshade::api::format::r32g32b32a32_float)
+		if (base_type == reshade::api::format::r32_float ||
+		    base_type == reshade::api::format::r32g32_float ||
+		    base_type == reshade::api::format::r32g32b32_float ||
+		    base_type == reshade::api::format::r32g32b32a32_float)
 		{
 			float vals[4] = {0};
 			rt->get_uniform_value_float(var, vals, 4);
@@ -429,7 +436,10 @@ static void write_state(reshade::api::effect_runtime *runtime)
 			for (uint32_t i = 1; i < cols; i++) ss << "," << vals[i];
 			ss << "]";
 		}
-		else if (base_type == reshade::api::format::r32_sint || base_type == reshade::api::format::r32g32b32a32_sint)
+		else if (base_type == reshade::api::format::r32_sint ||
+		         base_type == reshade::api::format::r32g32_sint ||
+		         base_type == reshade::api::format::r32g32b32_sint ||
+		         base_type == reshade::api::format::r32g32b32a32_sint)
 		{
 			int32_t vals[4] = {0};
 			rt->get_uniform_value_int(var, vals, 4);
@@ -437,7 +447,10 @@ static void write_state(reshade::api::effect_runtime *runtime)
 			for (uint32_t i = 1; i < cols; i++) ss << "," << vals[i];
 			ss << "]";
 		}
-		else if (base_type == reshade::api::format::r32_uint || base_type == reshade::api::format::r32g32b32a32_uint)
+		else if (base_type == reshade::api::format::r32_uint ||
+		         base_type == reshade::api::format::r32g32_uint ||
+		         base_type == reshade::api::format::r32g32b32_uint ||
+		         base_type == reshade::api::format::r32g32b32a32_uint)
 		{
 			uint32_t vals[4] = {0};
 			rt->get_uniform_value_uint(var, vals, 4);
