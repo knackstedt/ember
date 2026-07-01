@@ -316,6 +316,10 @@ export interface TaintEntry {
   path: string;
   /** For backups: the original file path that was backed up */
   originalPath?: string;
+  /** For launch_options: the original launch options string (null if none existed) */
+  originalLaunchOptions?: string | null;
+  /** For launch_options: the Steam app ID the options were set for */
+  steamAppId?: number;
   /** Taint entry format version */
   version: number;
   /** Unix timestamp (ms) when this taint was applied */

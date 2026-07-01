@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Responsive, Layout, useContainerWidth } from "react-grid-layout";
+import { Responsive, Layout, useContainerWidth, noCompactor } from "react-grid-layout";
 import {
   Gamepad2,
   Trophy,
@@ -60,12 +60,12 @@ const DEFAULT_CHART_CONFIGS: OverlayChartConfig[] = [
 ];
 
 const DEFAULT_CHART_GRID: DashboardGridItem[] = [
-  { i: "cpu", x: 8, y: 0, w: 2, h: 2, minW: 1, minH: 2 },
-  { i: "mem", x: 10, y: 0, w: 2, h: 2, minW: 1, minH: 2 },
-  { i: "gpu", x: 8, y: 2, w: 2, h: 2, minW: 1, minH: 2 },
-  { i: "vram", x: 10, y: 2, w: 2, h: 2, minW: 1, minH: 2 },
-  { i: "disk", x: 8, y: 4, w: 2, h: 2, minW: 1, minH: 2 },
-  { i: "net", x: 10, y: 4, w: 2, h: 2, minW: 1, minH: 2 },
+  { i: "cpu", x: 32, y: 0, w: 8, h: 8, minW: 4, minH: 4 },
+  { i: "mem", x: 40, y: 0, w: 8, h: 8, minW: 4, minH: 4 },
+  { i: "gpu", x: 32, y: 8, w: 8, h: 8, minW: 4, minH: 4 },
+  { i: "vram", x: 40, y: 8, w: 8, h: 8, minW: 4, minH: 4 },
+  { i: "disk", x: 32, y: 16, w: 8, h: 8, minW: 4, minH: 4 },
+  { i: "net", x: 40, y: 16, w: 8, h: 8, minW: 4, minH: 4 },
 ];
 
 function getDefaultOverlayChartsConfig(): OverlayChartsConfig {
@@ -162,7 +162,12 @@ function useOverlayGame() {
   const [visible, setVisible] = useState(false);
   const [pinnedVisible, setPinnedVisible] = useState(false);
   useEffect(() => {
-    void window.htpc.overlay.getGame().then(setGame);
+    // Fetch initial state in case we missed a sendState before subscribing
+    void window.htpc.overlay.getState().then((state) => {
+      setGame(state.game);
+      setVisible(state.visible);
+      setPinnedVisible(state.pinnedVisible);
+    });
     const unsubscribe = window.htpc.overlay.onState((state) => {
       setGame(state.game);
       setVisible(state.visible);
@@ -298,12 +303,31 @@ function MiniChart({
   onTogglePin,
   onConfigure,
 }: MiniChartProps) {
-  const width = 120;
-  const height = 32;
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [dims, setDims] = useState({ w: 120, h: 32 });
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const el = containerRef.current;
+    const ro = new ResizeObserver(() => {
+      setDims({ w: Math.max(40, el.clientWidth), h: Math.max(20, el.clientHeight) });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const strokeW = 1.5;
+  const margin = Math.ceil(strokeW / 2) + 1; // 2px inset so stroke isn't clipped
+  const pad = pinned ? 6 : 0; // matches containerStyle padding
+  const gap = 4; // gap-1 (0.25rem) between header and SVG
+  const headerH = 20; // fixed header height
+  const svgW = Math.max(4, dims.w - pad * 2);
+  const svgH = Math.max(8, dims.h - headerH - gap - pad * 2);
+  const drawW = Math.max(4, svgW - margin * 2);
+  const drawH = Math.max(4, svgH - margin * 2);
   const points = data.length > 1
     ? data.map((v, i) => {
-        const x = (i / (data.length - 1)) * width;
-        const y = height - Math.min(1, v / max) * height;
+        const x = margin + (i / (data.length - 1)) * drawW;
+        const y = margin + drawH - Math.min(1, v / max) * drawH;
         return `${x.toFixed(1)},${y.toFixed(1)}`;
       }).join(" ")
     : "";
@@ -322,8 +346,8 @@ function MiniChart({
     : {};
 
   return (
-    <div className="flex flex-col gap-1 relative" style={{ minWidth: width + 28, ...containerStyle }}>
-      <div className="flex items-center gap-1.5">
+    <div ref={containerRef} className="flex flex-col gap-1 relative w-full h-full" style={containerStyle}>
+      <div className="flex items-center gap-1.5" style={{ minHeight: headerH }}>
         <Icon size={12} />
         <span className="text-[12px] font-medium opacity-80">{label}</span>
         {(isWarning || isKill) && (
@@ -351,7 +375,7 @@ function MiniChart({
           </button>
         )}
       </div>
-      <svg width={width} height={height} className="overflow-visible">
+      <svg width={svgW} height={svgH} className="overflow-hidden flex-1">
         <polyline
           points={points}
           fill="none"
@@ -362,8 +386,8 @@ function MiniChart({
         />
         {data.length > 0 && (
           <circle
-            cx={width}
-            cy={height - Math.min(1, data[data.length - 1] / max) * height}
+            cx={Math.min(margin + drawW, svgW - margin)}
+            cy={margin + drawH - Math.min(1, data[data.length - 1] / max) * drawH}
             r={2}
             fill={strokeColor}
           />
@@ -1409,7 +1433,7 @@ function ControllerHints() {
 
 /* ─── Main overlay component ────────────────────────────────── */
 
-export function OverlayApp(): React.ReactElement {
+export function OverlayApp(): React.ReactElement | null {
   useControllerWorker();
   const { game, visible, pinnedVisible } = useOverlayGame();
   const { paused, toggle: togglePaused } = useOverlayPaused();
@@ -1661,28 +1685,30 @@ export function OverlayApp(): React.ReactElement {
   if (!visible && pinnedVisible && pinnedCharts.charts.length > 0) {
     return (
       <>
-        <div className="fixed inset-0 pointer-events-none" style={{ zIndex: 9999 }}>
-          <div className="absolute top-4 right-4" ref={pinnedGridContainerRef as React.LegacyRef<HTMLDivElement>}>
-            <Responsive
-              className="layout"
-              width={pinnedGridWidth || 400}
-              layouts={{ lg: pinnedCharts.grid.map((l) => ({ ...l, static: true })) }}
-              breakpoints={{ lg: 0 }}
-              cols={{ lg: 12 }}
-              rowHeight={40}
-              margin={[8, 8]}
-              containerPadding={[0, 0]}
-              compactType={null}
-              isDraggable={false}
-              isResizable={false}
-            >
-              {pinnedCharts.charts.map((cfg) => (
-                <div key={cfg.id} className="overflow-visible">
-                  {renderChart(cfg, true)}
-                </div>
-              ))}
-            </Responsive>
-          </div>
+        <div
+          ref={pinnedGridContainerRef as React.LegacyRef<HTMLDivElement>}
+          className="fixed inset-0 pointer-events-none"
+          style={{ zIndex: 9999 }}
+        >
+          <Responsive
+            className="layout"
+            width={pinnedGridWidth || (typeof window !== "undefined" ? window.innerWidth : 1920)}
+            layouts={{ lg: pinnedCharts.grid.map((l) => ({ ...l, static: true })) }}
+            breakpoints={{ lg: 0 }}
+            cols={{ lg: 48 }}
+            rowHeight={10}
+            margin={[4, 4]}
+            containerPadding={[0, 0]}
+            compactor={noCompactor}
+            dragConfig={{ enabled: false }}
+            resizeConfig={{ enabled: false }}
+          >
+            {pinnedCharts.charts.map((cfg) => (
+              <div key={cfg.id} className="overflow-visible h-full">
+                {renderChart(cfg, true)}
+              </div>
+            ))}
+          </Responsive>
         </div>
         <ChartConfigDialog
           chart={chartConfigs.find((c) => c.id === configChartId) ?? null}
@@ -1707,20 +1733,20 @@ export function OverlayApp(): React.ReactElement {
       <div className="absolute inset-0">
         <Responsive
           className="layout"
-          width={gridWidth || window.innerWidth}
+          width={gridWidth || (typeof window !== "undefined" ? window.innerWidth : 1920)}
           layouts={{ lg: enabledCharts.grid.map((l) => ({ ...l, static: false })) }}
           breakpoints={{ lg: 0 }}
-          cols={{ lg: 12 }}
-          rowHeight={40}
-          margin={[8, 8]}
+          cols={{ lg: 48 }}
+          rowHeight={10}
+          margin={[4, 4]}
           containerPadding={[0, 0]}
-          compactType={null}
+          compactor={noCompactor}
+          dragConfig={{ enabled: true }}
+          resizeConfig={{ enabled: true, handles: ["s", "w", "e", "n", "sw", "nw", "se", "ne"] }}
           onLayoutChange={handleChartLayoutChange}
-          isDraggable
-          isResizable
         >
           {enabledCharts.charts.map((cfg) => (
-            <div key={cfg.id} className="overflow-visible">
+            <div key={cfg.id} className="overflow-visible h-full">
               {renderChart(cfg, cfg.pinned)}
             </div>
           ))}

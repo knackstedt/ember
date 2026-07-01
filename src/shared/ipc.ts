@@ -177,6 +177,7 @@ export const IPC_CHANNELS = {
     hide: "overlay:hide",
     close: "overlay:close",
     getGame: "overlay:getGame",
+    getState: "overlay:getState",
     stopGame: "overlay:stopGame",
     pauseGame: "overlay:pauseGame",
     resumeGame: "overlay:resumeGame",

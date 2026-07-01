@@ -93,7 +93,38 @@ async function findWindowsForPid(pid: number, title?: string): Promise<number[]>
     return found;
   }
 
-  // Match by title/class
+  // Match by title/class via xdotool (catches Wine/Proton windows whose
+  // _NET_WM_PID doesn't correspond to a Linux PID)
+  if (title) {
+    try {
+      const { stdout } = await execFileAsync("xdotool", ["search", "--name", title]);
+      const ids = stdout
+        .split("\n")
+        .map((line) => parseInt(line.trim(), 10))
+        .filter((n) => !Number.isNaN(n));
+      if (ids.length > 0) {
+        log.info("launcher", `found window(s) via xdotool --name match for "${title}"`);
+        return ids;
+      }
+    } catch {
+      // no match
+    }
+    try {
+      const { stdout } = await execFileAsync("xdotool", ["search", "--class", title]);
+      const ids = stdout
+        .split("\n")
+        .map((line) => parseInt(line.trim(), 10))
+        .filter((n) => !Number.isNaN(n));
+      if (ids.length > 0) {
+        log.info("launcher", `found window(s) via xdotool --class match for "${title}"`);
+        return ids;
+      }
+    } catch {
+      // no match
+    }
+  }
+
+  // Match by title/class via xprop enumeration
   if (title && clientList.length > 0) {
     const titleLower = title.toLowerCase();
     for (const id of clientList) {
@@ -108,7 +139,7 @@ async function findWindowsForPid(pid: number, title?: string): Promise<number[]>
       }
     }
     if (found.length > 0) {
-      log.info("launcher", `found window(s) via title/class match for "${title}"`);
+      log.info("launcher", `found window(s) via xprop title/class match for "${title}"`);
       return found;
     }
   }
@@ -608,6 +639,8 @@ export async function launchGame(game: Game): Promise<LaunchResult> {
       collectedTaints.push({
         type: "launch_options",
         path: result.configPath,
+        originalLaunchOptions: result.original,
+        steamAppId: steamCompatAppId,
         version: 1,
         createdAt: Date.now(),
       });
@@ -724,21 +757,24 @@ export async function launchGame(game: Game): Promise<LaunchResult> {
         }
 
         log.info("launcher", `Detected Steam game PID ${gamePid} for AppID ${game.steamAppId}`);
-        sendGameLaunchProgress(game.id, "Game process detected", "Waiting for game window…");
         setOverlayGameProcess(game.id, gamePid);
         startPlayTimeTracking(game.id);
         void runSessionHooks(game, "after-start");
-        const foundWindow = await waitForGameWindow(gamePid, 30000, game.title);
+        // Don't block the launch flow on window detection — the game is already
+        // running.  Send "started" immediately and detect the window in the
+        // background (matching the non-Steam launch path pattern).
         sendGameStarted(game.id);
         minimizeWindow();
-        if (foundWindow) {
-          void overlayGameStarted(game.id);
-        } else {
-          log.warn(
-            "launcher",
-            `Window for Steam game ${game.steamAppId} not detected; overlay will follow Ember's display`,
-          );
-        }
+        void waitForGameWindow(gamePid, 30000, game.title).then((found) => {
+          if (found) {
+            void overlayGameStarted(game.id);
+          } else {
+            log.warn(
+              "launcher",
+              `Window for Steam game ${game.steamAppId} not detected; overlay will follow Ember's display`,
+            );
+          }
+        });
 
         try {
           await pollProcUntilGone(gamePid, 2000);

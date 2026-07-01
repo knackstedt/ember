@@ -220,7 +220,7 @@ function forwardKeyEvent(webContents: WebContents, type: "keyDown" | "keyUp", ke
   }
 }
 
-function getX11WindowId(win: BrowserWindow): number | null {
+export function getX11WindowId(win: BrowserWindow): number | null {
   try {
     const handle = win.getNativeWindowHandle();
     if (!handle || handle.length < 4) return null;
@@ -229,6 +229,27 @@ function getX11WindowId(win: BrowserWindow): number | null {
     log.warn("x11-grab", `failed to read native window handle: ${err}`);
     return null;
   }
+}
+
+export async function isWindowViewableX11(wid: number): Promise<boolean> {
+  if (process.platform !== "linux") return true;
+  const x11 = await getX11Client();
+  if (!x11) return true;
+  const { client } = x11;
+  return new Promise((resolve) => {
+    let settled = false;
+    const done = (val: boolean) => {
+      if (!settled) { settled = true; resolve(val); }
+    };
+    try {
+      client.GetWindowAttributes(wid, (err: any, attrs: any) => {
+        if (err || !attrs) { done(true); return true; }
+        const mapState = attrs.mapState ?? attrs.map_state;
+        done(mapState === 2);
+        return true;
+      });
+    } catch { done(true); }
+  });
 }
 
 export async function grabOverlayInputs(win: BrowserWindow): Promise<boolean> {
@@ -390,4 +411,22 @@ export async function ungrabOverlayInputs(): Promise<void> {
   grabWindow = null;
   overlayWindow = null;
   log.info("x11-grab", "ungrabbed keyboard");
+}
+
+export async function isWindowActiveX11(wid: number, overlayWid?: number): Promise<boolean> {
+  if (process.platform !== "linux") return false;
+  try {
+    const { execFile } = require("child_process");
+    const { promisify } = require("util");
+    const execFileAsync = promisify(execFile);
+    const { stdout } = await execFileAsync("xprop", ["-root", "_NET_ACTIVE_WINDOW"]);
+    const match = stdout.match(/window id # (0x[0-9a-fA-F]+)/);
+    if (!match) return false;
+    const activeWid = parseInt(match[1], 16);
+    if (activeWid === wid) return true;
+    if (overlayWid !== undefined && activeWid === overlayWid) return true;
+    return false;
+  } catch {
+    return false;
+  }
 }

@@ -1081,6 +1081,8 @@ const htpc = {
       ipcRenderer.invoke(IPC_CHANNELS.overlay.close),
     getGame: (): Promise<import("../shared/types").Game | null> =>
       ipcRenderer.invoke(IPC_CHANNELS.overlay.getGame),
+    getState: (): Promise<{ visible: boolean; pinnedVisible: boolean; game: import("../shared/types").Game | null }> =>
+      ipcRenderer.invoke(IPC_CHANNELS.overlay.getState),
     stopGame: (): Promise<void> =>
       ipcRenderer.invoke(IPC_CHANNELS.overlay.stopGame),
     pause: (): Promise<void> =>

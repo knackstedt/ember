@@ -16,7 +16,7 @@ import { getXdgVideosDir } from "./scanners/xdg";
 import { GameRepo, MovieRepo, RemoteSourceRepo } from "./db/repository";
 import { launchGame } from "./services/launcher.service";
 import { initOverlayService } from "./services/overlay.service";
-import { cleanupStaleTaints } from "./services/shader-injection.service";
+import { cleanupStaleTaints, cleanupUserSettingsPy, cleanupStaleLaunchOptions } from "./services/shader-injection.service";
 import { ensureReShadeShaders, ensureReShadeDll } from "./services/reshade.service";
 import { getServePort, shutdownRcloneManager } from "./services/rclone-manager";
 import { startRemoteAvailabilityWorker, stopRemoteAvailabilityWorker } from "./services/remote-availability.service";
@@ -634,7 +634,11 @@ protocol.registerSchemesAsPrivileged([
 app.whenReady().then(async () => {
   app.setAppUserModelId("com.ember.app");
 
-  // Clean up stale shader injection taints from crashed/killed sessions
+  // Clean up stale shader injection side-effects from crashed/killed sessions.
+  // These are safe to remove unconditionally — user_settings.py and launch
+  // options are only read at game launch time, not during a running session.
+  cleanupUserSettingsPy();
+  cleanupStaleLaunchOptions();
   cleanupStaleTaints();
 
   // Download and install ReShade shaders + DLL on startup (non-blocking)

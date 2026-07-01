@@ -593,9 +593,18 @@ export function cleanupTaintManifest(manifestPath: string): { removed: number; f
         else failed++;
         break;
       case "launch_options":
-        // Launch options are restored separately via restoreSteamLaunchOptions.
-        // The taint entry exists for documentation; no file to delete here.
-        removed++;
+        // Restore the original Steam launch options (or remove if none existed).
+        if (entry.steamAppId) {
+          restoreSteamLaunchOptions(
+            entry.steamAppId,
+            entry.originalLaunchOptions ?? null,
+            entry.path,
+          );
+          removed++;
+        } else {
+          // Without the app ID we can't restore — try the fallback scanner.
+          removed++;
+        }
         break;
       case "reshade_dll":
       case "reshade_ini":
@@ -704,16 +713,86 @@ export function findAllTaintManifests(): string[] {
 }
 
 /**
+ * Scan localconfig.vdf for any app whose LaunchOptions contain the Ember
+ * injection marker (EMBER_SHADER_INJECTED=1) and remove the injection.
+ * This is a safety-net that works even if the taint manifest is missing
+ * or corrupt — it just strips any launch options Ember previously set.
+ * Returns the number of apps cleaned up.
+ */
+export function cleanupStaleLaunchOptions(): number {
+  const configPath = findSteamLocalConfigPath();
+  if (!configPath) return 0;
+
+  let content: string;
+  try {
+    content = readFileSync(configPath, "utf-8");
+  } catch {
+    return 0;
+  }
+
+  // Find all top-level app blocks and check their LaunchOptions for the Ember marker.
+  // App blocks are keyed by numeric app ID.
+  const appPattern = /"(\d+)"\s*\{/g;
+  let modified = false;
+  let cleaned = 0;
+
+  let match: RegExpExecArray | null;
+  while ((match = appPattern.exec(content)) !== null) {
+    const appIdStr = match[1];
+    const blockStart = match.index + match[0].length - 1; // position of opening brace
+    let depth = 1;
+    let i = blockStart + 1;
+    while (i < content.length && depth > 0) {
+      if (content[i] === "{") depth++;
+      else if (content[i] === "}") depth--;
+      i++;
+    }
+    if (depth !== 0) break;
+
+    const blockEnd = i - 1;
+    const inner = content.slice(blockStart + 1, blockEnd);
+
+    // Check if this app has Ember-injected launch options
+    if (!inner.includes("EMBER_SHADER_INJECTED=1")) continue;
+
+    const loPattern = /\n?\s*"LaunchOptions"\s*"((?:[^"\\]|\\.)*)"/;
+    const loMatch = inner.match(loPattern);
+    if (!loMatch) continue;
+
+    // Remove the entire LaunchOptions entry (we don't have the original to restore)
+    const newInner = inner.replace(loPattern, "");
+    content = content.slice(0, blockStart + 1) + newInner + content.slice(blockEnd);
+    modified = true;
+    cleaned++;
+    log.info("shader-injection", `Removed stale Ember launch options for Steam app ${appIdStr} from ${configPath}`);
+
+    // Reset the regex search since content changed
+    appPattern.lastIndex = match.index;
+  }
+
+  if (modified) {
+    try {
+      writeFileSync(configPath, content, "utf-8");
+    } catch (err) {
+      log.warn("shader-injection", `Failed to write cleaned localconfig.vdf: ${err}`);
+    }
+  }
+
+  return cleaned;
+}
+
+/**
  * Clean up stale taints on startup.
- * A taint is considered stale if its manifest is older than TAINT_STALE_MS.
- * This handles the case where Ember crashed or was killed during a game
- * session and never ran the normal cleanup path.
+ * A taint is considered stale if its manifest still exists when Ember starts,
+ * meaning the previous session crashed or was killed before cleanup ran.
+ * All stale taints are cleaned up unconditionally — the 24-hour threshold
+ * was removed because user_settings.py and launch options are only read at
+ * game launch time, so removing them during a running session is safe.
  */
 export function cleanupStaleTaints(): { cleaned: number; skipped: number } {
   const manifests = findAllTaintManifests();
   let cleaned = 0;
-  let skipped = 0;
-  const now = Date.now();
+  const skipped = 0;
 
   for (const manifestPath of manifests) {
     const manifest = readTaintManifest(manifestPath);
@@ -723,23 +802,19 @@ export function cleanupStaleTaints(): { cleaned: number; skipped: number } {
       continue;
     }
 
-    const age = now - manifest.createdAt;
-    if (age > TAINT_STALE_MS) {
-      log.info("shader-injection", `Cleaning stale taint manifest (age=${Math.round(age / 1000 / 60)}min) for game ${manifest.gameId} at ${manifestPath}`);
-      const result = cleanupTaintManifest(manifestPath);
-      if (result.failed === 0) {
-        cleaned++;
-      } else {
-        log.warn("shader-injection", `Stale taint cleanup had ${result.failed} failures for ${manifestPath}`);
-        cleaned++;
-      }
-    } else {
-      skipped++;
+    // Clean up all stale taints unconditionally. user_settings.py and launch
+    // options are only read at game launch time, so removing them during a
+    // still-running session is safe — the game already has its env vars.
+    log.info("shader-injection", `Cleaning stale taint manifest for game ${manifest.gameId} at ${manifestPath}`);
+    const result = cleanupTaintManifest(manifestPath);
+    if (result.failed > 0) {
+      log.warn("shader-injection", `Stale taint cleanup had ${result.failed} failures for ${manifestPath}`);
     }
+    cleaned++;
   }
 
-  if (cleaned > 0 || skipped > 0) {
-    log.info("shader-injection", `Stale taint cleanup: ${cleaned} cleaned, ${skipped} still active`);
+  if (cleaned > 0) {
+    log.info("shader-injection", `Stale taint cleanup: ${cleaned} cleaned`);
   }
   return { cleaned, skipped };
 }
