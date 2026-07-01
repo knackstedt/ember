@@ -36,6 +36,10 @@ import {
   writeRuntimeShaderConfig,
   cleanupRuntimeShaderConfig,
 } from "./shader-injection.service";
+import {
+  installReShadeForGame,
+  buildReShadeDllOverride,
+} from "./reshade.service";
 
 const log = createLogger("info");
 
@@ -522,6 +526,25 @@ export async function launchGame(game: Game): Promise<LaunchResult> {
             log.warn("launcher", `DLL copy errors: ${result.errors.join("; ")}`);
           }
           if (result.taints) collectedTaints.push(...result.taints);
+        }
+      }
+      if (injectionConfig.reshade) {
+        sendGameLaunchProgress(game.id, "Installing ReShade", "Setting up ReShade injection…");
+        const reshadeResult = await installReShadeForGame(game, injectionConfig.reshade);
+        if (!reshadeResult.success) {
+          log.warn("launcher", `ReShade install failed: ${reshadeResult.error}`);
+        } else {
+          collectedTaints.push(...reshadeResult.taints);
+          // Merge ReShade DLL override into WINEDLLOVERRIDES
+          const existingOverride = injectionEnv["WINEDLLOVERRIDES"] ?? "";
+          const reshadeOverride = buildReShadeDllOverride(game, injectionConfig.reshade, existingOverride || undefined);
+          injectionEnv["WINEDLLOVERRIDES"] = reshadeOverride;
+          // For Steam games, ensure we have a prefix path for taint cleanup
+          if (game.platform === "steam" && game.steamAppId && !prefixPath) {
+            prefixPath = findSteamPrefixPath(game.steamAppId);
+          } else if (game.platform === "windows" && !prefixPath) {
+            prefixPath = findUmuPrefixPath(game);
+          }
         }
       }
       if (game.platform === "steam" && game.steamAppId) {

@@ -1324,6 +1324,102 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     }
   });
 
+  // ReShade management
+  ipcMain.handle("reshade:openFolder", async () => {
+    const { openReShadeFolder } = await import("../services/reshade.service.js");
+    await openReShadeFolder();
+  });
+
+  ipcMain.handle("reshade:getStatus", async () => {
+    const { getReShadeStatus } = await import("../services/reshade.service.js");
+    return getReShadeStatus();
+  });
+
+  ipcMain.handle("reshade:reinstall", async () => {
+    const { ensureReShadeShaders, ensureReShadeDll, getReShadeShadersDir, getReShadeTexturesDir, getReShadeDllPath, getReShadeStatus } = await import("../services/reshade.service.js");
+    const { rmSync } = await import("fs");
+    const sendProgress = (p: { step: string; message: string }) => {
+      sendToWindow(window, "reshade:reinstall:progress", p);
+    };
+    sendProgress({ step: "cleanup", message: "Clearing existing files..." });
+    try {
+      const shadersDir = await getReShadeShadersDir();
+      rmSync(shadersDir, { recursive: true, force: true });
+    } catch { /* ignore */ }
+    try {
+      const texturesDir = await getReShadeTexturesDir();
+      rmSync(texturesDir, { recursive: true, force: true });
+    } catch { /* ignore */ }
+    try {
+      const dllPath = getReShadeDllPath();
+      if (existsSync(dllPath)) rmSync(dllPath, { force: true });
+    } catch { /* ignore */ }
+    await ensureReShadeShaders(sendProgress);
+    await ensureReShadeDll(sendProgress);
+    sendProgress({ step: "done", message: "Complete" });
+    return getReShadeStatus();
+  });
+
+  ipcMain.handle("reshade:isCompatible", async (_e, game: import("../../shared/types").Game) => {
+    const { isReShadeCompatible } = await import("../services/reshade.service.js");
+    return isReShadeCompatible(game);
+  });
+
+  // ─── ReShade runtime control (addon file-polling bridge) ───────────────
+  // The addon DLL polls ember-reshade-control.json and writes ember-reshade-state.json
+  // in the game's exe directory. These IPC handlers bridge the overlay UI to those files.
+
+  ipcMain.handle("reshade:getRuntimeState", async (_e, game: import("../../shared/types").Game) => {
+    const { getReShadeGameDir } = await import("../services/reshade.service.js");
+    const { existsSync, readFileSync } = await import("fs");
+    const { join } = await import("path");
+    const gameDir = getReShadeGameDir(game);
+    if (!gameDir) return null;
+    const statePath = join(gameDir, "ember-reshade-state.json");
+    if (!existsSync(statePath)) return null;
+    try {
+      const content = readFileSync(statePath, "utf-8");
+      return JSON.parse(content);
+    } catch {
+      return null;
+    }
+  });
+
+  ipcMain.handle("reshade:writeRuntimeControl", async (
+    _e,
+    game: import("../../shared/types").Game,
+    control: Record<string, unknown>,
+  ) => {
+    const { getReShadeGameDir } = await import("../services/reshade.service.js");
+    const { writeFileSync } = await import("fs");
+    const { join } = await import("path");
+    const gameDir = getReShadeGameDir(game);
+    if (!gameDir) return { success: false, error: "Could not determine game directory" };
+    const controlPath = join(gameDir, "ember-reshade-control.json");
+    try {
+      writeFileSync(controlPath, JSON.stringify(control, null, 2), "utf-8");
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: String(err) };
+    }
+  });
+
+  ipcMain.handle("reshade:savePreset", async (_e, game: import("../../shared/types").Game) => {
+    // Writing a control file with savePreset=true triggers the addon to call save_current_preset()
+    const { getReShadeGameDir } = await import("../services/reshade.service.js");
+    const { writeFileSync } = await import("fs");
+    const { join } = await import("path");
+    const gameDir = getReShadeGameDir(game);
+    if (!gameDir) return { success: false, error: "Could not determine game directory" };
+    const controlPath = join(gameDir, "ember-reshade-control.json");
+    try {
+      writeFileSync(controlPath, JSON.stringify({ savePreset: true }), "utf-8");
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: String(err) };
+    }
+  });
+
   ipcMain.handle("games:playTime:start", async (_e, id: string) => {
     startPlayTimeTracking(id);
   });

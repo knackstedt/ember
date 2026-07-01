@@ -253,3 +253,8 @@ section {
 .skeleton-shimmer:nth-child(10)::after { animation-delay: 1.08s; }
 .skeleton-shimmer:nth-child(11)::after { animation-delay: 1.20s; }
 .skeleton-shimmer:nth-child(12)::after { animation-delay: 1.32s; }
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}

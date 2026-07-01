@@ -17,6 +17,7 @@ import { GameRepo, MovieRepo, RemoteSourceRepo } from "./db/repository";
 import { launchGame } from "./services/launcher.service";
 import { initOverlayService } from "./services/overlay.service";
 import { cleanupStaleTaints } from "./services/shader-injection.service";
+import { ensureReShadeShaders, ensureReShadeDll } from "./services/reshade.service";
 import { getServePort, shutdownRcloneManager } from "./services/rclone-manager";
 import { startRemoteAvailabilityWorker, stopRemoteAvailabilityWorker } from "./services/remote-availability.service";
 import { bootPlugins, shutdownPlugins } from "./plugins/loader";
@@ -635,6 +636,14 @@ app.whenReady().then(async () => {
 
   // Clean up stale shader injection taints from crashed/killed sessions
   cleanupStaleTaints();
+
+  // Download and install ReShade shaders + DLL on startup (non-blocking)
+  void ensureReShadeShaders().catch((err) => {
+    log.warn("startup", `ReShade shader download failed: ${err}`);
+  });
+  void ensureReShadeDll().catch((err) => {
+    log.warn("startup", `ReShade DLL download failed: ${err}`);
+  });
 
   if (!isDev) {
     initUpdater();

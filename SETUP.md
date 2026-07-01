@@ -198,6 +198,22 @@ Only needed if modifying the Vulkan layer's built-in shaders. Pre-compiled SPIR-
 - **Fedora** — `sudo dnf install glslang vim-common`
 - **Arch** — `sudo pacman -S glslang vim`
 
+### MinGW-w64 Cross-Compiler (for ReShade Addon)
+Required to cross-compile `EmberReShadeAddon.dll` — the addon DLL that Ember copies next to a game's exe to enable real-time ReShade control from the overlay. Without MinGW, the DLL build is silently skipped and ReShade overlay control won't be available.
+
+- **Debian / Ubuntu**
+  ```bash
+  sudo apt install mingw-w64
+  ```
+- **Fedora**
+  ```bash
+  sudo dnf install mingw64-gcc-c++ mingw64-binutils
+  ```
+- **Arch**
+  ```bash
+  sudo pacman -S mingw-w64
+  ```
+
 ---
 
 ## Quick Install — All Required Dependencies
@@ -207,7 +223,7 @@ Copy and paste the block for your distro:
 ### Debian / Ubuntu
 ```bash
 sudo apt update
-sudo apt install xdg-utils ffmpeg xdotool wine gcc g++ libgl-dev libegl-dev libvulkan-dev
+sudo apt install xdg-utils ffmpeg xdotool wine gcc g++ libgl-dev libegl-dev libvulkan-dev mingw-w64
 sudo usermod -aG input $USER
 # Then install bun: curl -fsSL https://bun.sh/install | bash
 # Then install Dolphin (pick one):
@@ -217,7 +233,7 @@ sudo usermod -aG input $USER
 
 ### Fedora
 ```bash
-sudo dnf install xdg-utils ffmpeg xdotool wine gcc gcc-c++ mesa-libGL-devel mesa-libEGL-devel vulkan-headers vulkan-loader-devel
+sudo dnf install xdg-utils ffmpeg xdotool wine gcc gcc-c++ mesa-libGL-devel mesa-libEGL-devel vulkan-headers vulkan-loader-devel mingw64-gcc-c++ mingw64-binutils
 sudo usermod -aG input $USER
 # Then install bun: curl -fsSL https://bun.sh/install | bash
 # Then install Dolphin (pick one):
@@ -227,7 +243,7 @@ sudo usermod -aG input $USER
 
 ### Arch
 ```bash
-sudo pacman -S xdg-utils ffmpeg xdotool wine gcc mesa libglvnd vulkan-headers vulkan-icd-loader
+sudo pacman -S xdg-utils ffmpeg xdotool wine gcc mesa libglvnd vulkan-headers vulkan-icd-loader mingw-w64
 sudo usermod -aG input $USER
 # Then install bun: yay -S bun-bin  (or curl install)
 # Then install Dolphin (pick one):

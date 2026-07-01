@@ -42,6 +42,7 @@ import {
   OAuthResult,
   BluetoothDevice,
   BluetoothAdapterState,
+  ReShadeRuntimeState,
 } from "../shared/types";
 import { GameMetadata } from "../shared/metadata";
 import { IPC_CHANNELS } from "../shared/ipc";
@@ -530,6 +531,27 @@ const htpc = {
         ipcRenderer.invoke("games:findMainExe", id),
       updateRuntimeShader: (id: string, config: VulkanShaderConfig): Promise<boolean> =>
         ipcRenderer.invoke("games:injectionConfig:updateRuntimeShader", id, config),
+    },
+    reshade: {
+      openFolder: (): Promise<void> =>
+        ipcRenderer.invoke("reshade:openFolder"),
+      getStatus: (): Promise<{ shadersInstalled: boolean; dllInstalled: boolean; shadersPath: string; texturesPath: string; dllPath: string }> =>
+        ipcRenderer.invoke("reshade:getStatus"),
+      reinstall: (): Promise<{ shadersInstalled: boolean; dllInstalled: boolean; shadersPath: string; texturesPath: string; dllPath: string }> =>
+        ipcRenderer.invoke("reshade:reinstall"),
+      onReinstallProgress: (cb: (progress: { step: string; message: string }) => void) => {
+        const handler = (_: Electron.IpcRendererEvent, p: { step: string; message: string }) => cb(p);
+        ipcRenderer.on("reshade:reinstall:progress", handler);
+        return () => ipcRenderer.removeListener("reshade:reinstall:progress", handler);
+      },
+      isCompatible: (game: Game): Promise<boolean> =>
+        ipcRenderer.invoke("reshade:isCompatible", game),
+      getRuntimeState: (game: Game): Promise<ReShadeRuntimeState | null> =>
+        ipcRenderer.invoke("reshade:getRuntimeState", game),
+      writeRuntimeControl: (game: Game, control: Record<string, unknown>): Promise<{ success: boolean; error?: string }> =>
+        ipcRenderer.invoke("reshade:writeRuntimeControl", game, control),
+      savePreset: (game: Game): Promise<{ success: boolean; error?: string }> =>
+        ipcRenderer.invoke("reshade:savePreset", game),
     },
     playTime: {
       start: (id: string): Promise<void> =>

@@ -217,6 +217,55 @@ async function buildVulkanLayer(): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// ReShade Addon (EmberReShadeAddon.dll) — cross-compiled for Windows x64
+// ---------------------------------------------------------------------------
+
+async function buildReShadeAddon(): Promise<void> {
+  const srcDir = resolve(PROJECT_ROOT, "native/reshade-addon");
+  const srcFile = resolve(srcDir, "src/ember_reshade_addon.cpp");
+  const destDir = resolve(PROJECT_ROOT, "resources/reshade");
+  const destFile = resolve(destDir, "EmberReShadeAddon.dll");
+
+  if (!existsSync(srcFile)) {
+    console.log("Skipping ReShade addon: source not found.");
+    return;
+  }
+
+  // Check for MinGW cross-compiler
+  const cxx = hasCommand("x86_64-w64-mingw32-g++") ? "x86_64-w64-mingw32-g++" : null;
+  if (!cxx) {
+    console.log("Skipping ReShade addon: MinGW cross-compiler not found (x86_64-w64-mingw32-g++).");
+    console.log("  Install: mingw-w64 (Debian/Ubuntu) or mingw64-gcc (Fedora)");
+    return;
+  }
+
+  const srcMtime = fileMtime(srcFile);
+  const destMtime = fileMtime(destFile);
+  if (destMtime > 0 && destMtime >= srcMtime) {
+    console.log("Skipping ReShade addon: up-to-date.");
+    return;
+  }
+
+  if (!existsSync(destDir)) mkdirSync(destDir, { recursive: true });
+
+  const exitCode = await run(
+    [cxx, "-std=c++17", "-O2", "-Wall", "-Wno-unused-function", "-shared",
+     "-I" + resolve(srcDir, "include"), "-DUNICODE", "-D_UNICODE",
+     "-static-libgcc", "-static-libstdc++",
+     "-o", destFile, srcFile],
+    srcDir,
+    "ReShade addon (EmberReShadeAddon.dll)",
+  );
+
+  if (exitCode !== 0) {
+    console.warn(`Warning: ReShade addon build failed (exit ${exitCode}).`);
+    return;
+  }
+
+  console.log(`Copied -> ${destFile}`);
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
@@ -225,6 +274,8 @@ async function main() {
   await buildGlHook();
   console.log();
   await buildVulkanLayer();
+  console.log();
+  await buildReShadeAddon();
   console.log("\nDone. Native graphics components are ready.");
 }
 

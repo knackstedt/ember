@@ -21,7 +21,7 @@ import { scaledImageUrl } from "../../lib/image-url";
 import { DetailPanel } from "../../components/DetailPanel/DetailPanel";
 import { ImageLightbox } from "../../components/ImageLightbox/ImageLightbox";
 import { CoreSelector } from "../../components/CoreSelector/CoreSelector";
-import { Game, GamePlatform, GameEmulatorConfig, GameInjectionConfig, VulkanShaderConfig, DllInjectionConfig, WineRunner } from "@shared/types";
+import { Game, GamePlatform, GameEmulatorConfig, GameInjectionConfig, VulkanShaderConfig, DllInjectionConfig, ReShadeConfig, WineRunner } from "@shared/types";
 import { useGridFocus, NavAction } from "../../hooks/useGridFocus";
 import { useDetailController } from "../../hooks/useDetailController";
 import { useContextMenu } from "../../hooks/useContextMenu";
@@ -252,6 +252,60 @@ function uninstallMessageForGame(game: Game): string {
   return `Delete ${game.title}? This will move the install files to trash.`;
 }
 
+function IniOverrideEditor({ onAdd }: { onAdd: (section: string, key: string, value: string) => void }) {
+  const [section, setSection] = useState("");
+  const [key, setKey] = useState("");
+  const [value, setValue] = useState("");
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex gap-1.5">
+        <input
+          type="text"
+          placeholder="Section (e.g. GENERAL)"
+          value={section}
+          onChange={(e) => setSection(e.target.value)}
+          className="flex-1 text-xs px-2 py-1.5 rounded"
+          style={{ background: "var(--surface-1)", border: "1px solid var(--border-default)", color: "var(--text-primary)", outline: "none" }}
+        />
+        <input
+          type="text"
+          placeholder="Key (e.g. DepthCopyBeforeClears)"
+          value={key}
+          onChange={(e) => setKey(e.target.value)}
+          className="flex-1 text-xs px-2 py-1.5 rounded"
+          style={{ background: "var(--surface-1)", border: "1px solid var(--border-default)", color: "var(--text-primary)", outline: "none" }}
+        />
+      </div>
+      <div className="flex gap-1.5">
+        <input
+          type="text"
+          placeholder="Value (e.g. 1)"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          className="flex-1 text-xs px-2 py-1.5 rounded"
+          style={{ background: "var(--surface-1)", border: "1px solid var(--border-default)", color: "var(--text-primary)", outline: "none" }}
+        />
+        <button
+          onClick={() => {
+            if (section.trim() && key.trim()) {
+              onAdd(section.trim(), key.trim(), value.trim());
+              setSection(""); setKey(""); setValue("");
+            }
+          }}
+          disabled={!section.trim() || !key.trim()}
+          className="px-3 py-1.5 rounded text-xs font-medium"
+          style={{
+            background: section.trim() && key.trim() ? "var(--accent)" : "var(--surface-2)",
+            color: section.trim() && key.trim() ? "var(--surface-base)" : "var(--text-secondary)",
+          }}
+        >
+          Add Override
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export const GamingTab: React.FC = () => {
   const games = useGamesStore((s) => s.games);
   const loading = useGamesStore((s) => s.loading);
@@ -300,10 +354,24 @@ export const GamingTab: React.FC = () => {
   const [collectionItemIds, setCollectionItemIds] = useState<Set<string>>(new Set());
   const [localScreenshots, setLocalScreenshots] = useState<string[]>([]);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [reshadeReinstall, setReshadeReinstall] = useState<{ status: "idle" | "in-progress" | "done" | "error"; message: string }>({ status: "idle", message: "" });
   const gridRef = useRef<VirtualGridHandle>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const galleryView = useGalleryView();
   const isNeonGrid = useIsNeonGrid();
+
+  useEffect(() => {
+    const unsub = window.htpc.games.reshade.onReinstallProgress((p) => {
+      if (p.step === "done") {
+        setReshadeReinstall({ status: "done", message: p.message });
+      } else if (p.step === "error") {
+        setReshadeReinstall({ status: "error", message: p.message });
+      } else {
+        setReshadeReinstall({ status: "in-progress", message: p.message });
+      }
+    });
+    return unsub;
+  }, []);
 
   const [facetFilters, setFacetFilters] = useState<Record<string, string | null>>({});
 
@@ -1915,6 +1983,174 @@ export const GamingTab: React.FC = () => {
                             <p className="text-[12px] mt-1" style={{ color: "var(--text-secondary)" }}>
                               DLLs are copied to the Wine prefix's <code>system32</code> directory before launch.
                             </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    {/* ReShade Post-Processing */}
+                    <div className="flex flex-col gap-2">
+                      <label className="flex items-center gap-2 text-sm" style={{ color: "var(--text-primary)" }}>
+                        <input
+                          type="checkbox"
+                          checked={selectedInjectionConfig?.reshade?.enabled ?? false}
+                          onChange={(e) => {
+                            const next: GameInjectionConfig = {
+                              ...selectedInjectionConfig,
+                              reshade: {
+                                enabled: e.target.checked,
+                                api: selectedInjectionConfig?.reshade?.api ?? "auto",
+                              },
+                            };
+                            setSelectedInjectionConfig(next);
+                            void window.htpc.games.injectionConfig.set(selected.id, next);
+                          }}
+                        />
+                        ReShade Post-Processing (Experimental)
+                      </label>
+                      {selectedInjectionConfig?.reshade?.enabled && (
+                        <div className="flex flex-col gap-2 pl-6">
+                          <div>
+                            <label className="text-[12px] block mb-1" style={{ color: "var(--text-secondary)" }}>
+                              Graphics API
+                            </label>
+                            <select
+                              value={selectedInjectionConfig.reshade.api ?? "auto"}
+                              onChange={(e) => {
+                                const next: GameInjectionConfig = {
+                                  ...selectedInjectionConfig,
+                                  reshade: { ...selectedInjectionConfig.reshade!, api: e.target.value as ReShadeConfig["api"] },
+                                };
+                                setSelectedInjectionConfig(next);
+                                void window.htpc.games.injectionConfig.set(selected.id, next);
+                              }}
+                              className="w-full text-sm px-2 py-1.5 rounded"
+                              style={{
+                                background: "var(--surface-1)",
+                                border: "1px solid var(--border-default)",
+                                color: "var(--text-primary)",
+                                outline: "none",
+                              }}
+                            >
+                              <option value="auto">Auto-detect</option>
+                              <option value="dxgi">DirectX 10/11/12 (dxgi.dll)</option>
+                              <option value="d3d11">DirectX 11 (d3d11.dll)</option>
+                              <option value="d3d9">DirectX 9 (d3d9.dll)</option>
+                              <option value="opengl32">OpenGL (opengl32.dll)</option>
+                            </select>
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => void window.htpc.games.reshade.openFolder()}
+                              className="text-sm px-3 py-1.5 rounded"
+                              style={{
+                                background: "var(--surface-1)",
+                                border: "1px solid var(--border-default)",
+                                color: "var(--text-primary)",
+                              }}
+                            >
+                              Open ReShade Folder
+                            </button>
+                            <button
+                              onClick={() => {
+                                setReshadeReinstall({ status: "in-progress", message: "Starting..." });
+                                void window.htpc.games.reshade.reinstall().then(() => {
+                                  void window.htpc.games.reshade.getStatus().then((status) => {
+                    if (status.shadersInstalled && status.dllInstalled) {
+                      useToastStore.getState().push({ type: "success", message: "ReShade reinstalled successfully" });
+                      setReshadeReinstall({ status: "done", message: "Complete" });
+                    } else {
+                      useToastStore.getState().push({ type: "error", message: "ReShade reinstall incomplete — check logs" });
+                      setReshadeReinstall({ status: "error", message: "Incomplete" });
+                    }
+                  });
+                }).catch(() => {
+                  useToastStore.getState().push({ type: "error", message: "ReShade reinstall failed" });
+                  setReshadeReinstall({ status: "error", message: "Failed" });
+                });
+                              }}
+                              disabled={reshadeReinstall.status === "in-progress"}
+                              className="text-sm px-3 py-1.5 rounded flex items-center gap-2"
+                              style={{
+                                background: "var(--surface-1)",
+                                border: "1px solid var(--border-default)",
+                                color: "var(--text-primary)",
+                                opacity: reshadeReinstall.status === "in-progress" ? 0.6 : 1,
+                              }}
+                            >
+                              {reshadeReinstall.status === "in-progress" && (
+                                <span
+                                  className="inline-block w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full"
+                                  style={{ animation: "spin 0.8s linear infinite" }}
+                                />
+                              )}
+                              {reshadeReinstall.status === "done" && (
+                                <span style={{ color: "var(--accent-success, #4caf50)" }}>
+                                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style={{ display: "inline-block", verticalAlign: "middle" }}>
+                                    <path d="M3 8.5l3.5 3.5L13 5.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                  </svg>
+                                </span>
+                              )}
+                              {reshadeReinstall.status === "error" && (
+                                <span style={{ color: "var(--accent-danger, #f44336)" }}>
+                                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style={{ display: "inline-block", verticalAlign: "middle" }}>
+                                    <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                                  </svg>
+                                </span>
+                              )}
+                              {reshadeReinstall.status === "in-progress" ? reshadeReinstall.message : "Re-download Shaders"}
+                            </button>
+                          </div>
+                          <p className="text-[12px]" style={{ color: "var(--text-secondary)" }}>
+                            ReShade DLL and ReShade.ini are placed next to the game executable. Shaders are loaded from Ember's central shaders folder. Cleaned up automatically when the game closes.
+                          </p>
+                          {/* Custom INI Overrides */}
+                          <div className="flex flex-col gap-2 mt-2">
+                            <label className="text-[12px] font-semibold uppercase tracking-wide" style={{ color: "var(--text-secondary)" }}>
+                              Custom INI Overrides
+                            </label>
+                            <p className="text-[12px]" style={{ color: "var(--text-secondary)" }}>
+                              Apply arbitrary settings to ReShade.ini when the game launches. Format: section, key, value.
+                            </p>
+                            {(selectedInjectionConfig.reshade?.iniOverrides ?? []).map((ov, idx) => (
+                              <div key={idx} className="flex items-center gap-2">
+                                <span className="text-xs font-mono px-2 py-1 rounded" style={{ background: "var(--surface-1)" }}>
+                                  [{ov.section}] {ov.key}={ov.value}
+                                </span>
+                                <button
+                                  onClick={() => {
+                                    const next: GameInjectionConfig = {
+                                      ...selectedInjectionConfig,
+                                      reshade: {
+                                        ...selectedInjectionConfig.reshade!,
+                                        iniOverrides: (selectedInjectionConfig.reshade?.iniOverrides ?? []).filter((_, i) => i !== idx),
+                                      },
+                                    };
+                                    setSelectedInjectionConfig(next);
+                                    void window.htpc.games.injectionConfig.set(selected.id, next);
+                                  }}
+                                  className="text-xs px-2 py-1 rounded"
+                                  style={{ background: "var(--surface-2)", color: "var(--text-secondary)" }}
+                                >
+                                  Remove
+                                </button>
+                              </div>
+                            ))}
+                            <IniOverrideEditor
+                              onAdd={(section, key, value) => {
+                                const next: GameInjectionConfig = {
+                                  ...selectedInjectionConfig,
+                                  reshade: {
+                                    ...selectedInjectionConfig.reshade!,
+                                    iniOverrides: [
+                                      ...(selectedInjectionConfig.reshade?.iniOverrides ?? []),
+                                      { section, key, value },
+                                    ],
+                                  },
+                                };
+                                setSelectedInjectionConfig(next);
+                                void window.htpc.games.injectionConfig.set(selected.id, next);
+                              }}
+                            />
                           </div>
                         </div>
                       )}

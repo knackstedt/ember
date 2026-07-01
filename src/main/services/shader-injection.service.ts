@@ -7,6 +7,7 @@ import {
   GameInjectionConfig,
   VulkanShaderConfig,
   DllInjectionConfig,
+  ReShadeConfig,
   TaintManifest,
   TaintEntry,
   TaintType,
@@ -595,6 +596,11 @@ export function cleanupTaintManifest(manifestPath: string): { removed: number; f
         // Launch options are restored separately via restoreSteamLaunchOptions.
         // The taint entry exists for documentation; no file to delete here.
         removed++;
+        break;
+      case "reshade_dll":
+      case "reshade_ini":
+        if (removeTaintFile(entry)) removed++;
+        else failed++;
         break;
     }
   }
@@ -1205,10 +1211,12 @@ export async function resolveInjectionConfig(
 
   const vulkanShader = gameConfig?.vulkanShader ?? settings.defaultVulkanShader ?? undefined;
   const dllInjection = gameConfig?.dllInjection ?? settings.defaultDllInjection ?? undefined;
+  const reshade = gameConfig?.reshade ?? settings.defaultReShade ?? undefined;
 
   return {
     vulkanShader: vulkanShader?.enabled ? vulkanShader : undefined,
     dllInjection: dllInjection?.enabled ? dllInjection : undefined,
+    reshade: reshade?.enabled ? reshade : undefined,
   };
 }
 
@@ -1217,7 +1225,7 @@ export async function resolveInjectionConfig(
  */
 export function hasActiveInjection(config: GameInjectionConfig | null): boolean {
   if (!config) return false;
-  return !!(config.vulkanShader?.enabled || config.dllInjection?.enabled);
+  return !!(config.vulkanShader?.enabled || config.dllInjection?.enabled || config.reshade?.enabled);
 }
 
 /**
@@ -1230,7 +1238,7 @@ export function findMainExe(installPath: string, gameTitle?: string): string | n
   const exes: { path: string; size: number; name: string }[] = [];
 
   function scanDir(dir: string, depth: number) {
-    if (depth > 2) return; // Don't go too deep
+    if (depth > 3) return; // Don't go too deep
     try {
       const entries = readdirSync(dir);
       for (const entry of entries) {

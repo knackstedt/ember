@@ -244,10 +244,45 @@ export interface DllInjectionConfig {
   customDlls: string[];
 }
 
+/** ReShade post-processing injection settings */
+export interface ReShadeConfig {
+  /** Enable ReShade for this game */
+  enabled: boolean;
+  /** Which graphics API DLL to inject as (auto-detected if not specified) */
+  api?: "auto" | "dxgi" | "d3d11" | "d3d9" | "opengl32";
+  /** Custom ini overrides: array of {section, key, value} applied to ReShade.ini */
+  iniOverrides?: { section: string; key: string; value: string }[];
+}
+
+/** A technique (shader effect) reported by the ReShade addon at runtime */
+export interface ReShadeTechniqueState {
+  name: string;
+  effect: string;
+  enabled: boolean;
+}
+
+/** A uniform variable reported by the ReShade addon at runtime */
+export interface ReShadeUniformState {
+  name: string;
+  /** ReShade format enum value (r32_float=0x61, r32g32b32a32_float=0x65, etc.) */
+  type: number;
+  rows: number;
+  cols: number;
+  values: number[];
+}
+
+/** State read from the addon's ember-reshade-state.json file */
+export interface ReShadeRuntimeState {
+  effectsEnabled: boolean;
+  techniques: ReShadeTechniqueState[];
+  uniforms: ReShadeUniformState[];
+}
+
 /** Per-game injection configuration */
 export interface GameInjectionConfig {
   vulkanShader?: VulkanShaderConfig;
   dllInjection?: DllInjectionConfig;
+  reshade?: ReShadeConfig;
 }
 
 // ---------------------------------------------------------------------------
@@ -268,7 +303,10 @@ export type TaintType =
   | "user_settings_py"
   | "user_settings_backup"
   | "dll"
-  | "launch_options";
+  | "launch_options"
+  | "reshade_dll"
+  | "reshade_ini"
+  | "reshade_addon";
 
 /** A single taint entry — one file or config modification Ember made. */
 export interface TaintEntry {
@@ -790,6 +828,12 @@ export interface AppSettings {
   defaultDllInjection?: DllInjectionConfig;
   /** Path to the Ember Vulkan layer shared library */
   vulkanLayerPath?: string;
+  /** Global default ReShade config */
+  defaultReShade?: ReShadeConfig;
+  /** Path to ReShade shaders directory (defaults to userData/reshade/reshade-shaders) */
+  reshadeShadersPath?: string;
+  /** Path to ReShade textures directory (defaults to userData/reshade/reshade-textures) */
+  reshadeTexturesPath?: string;
   /** User-defined labels for audio sinks (sinkId → label) */
   audioSinkLabels?: Record<string, string>;
   /** Last used splitscreen layout type */

@@ -1,0 +1,28 @@
+# ReShade Addon DLL — cross-compiled for Windows x64 with MinGW
+#
+# Requires: mingw-w64 (apt install mingw-w64 on Debian/Ubuntu)
+#
+# The output DLL (EmberReShadeAddon.dll) must be placed next to the game's
+# main exe, inside a subdirectory named "reshade-shaders" (ReShade's addon
+# search path).  Ember's launcher copies it there automatically.
+
+CXX = x86_64-w64-mingw32-g++
+CXXFLAGS = -std=c++17 -O2 -Wall -Wno-unused-function -shared \
+           -Iinclude -DUNICODE -D_UNICODE \
+           -static-libgcc -static-libstdc++
+TARGET = EmberReShadeAddon.dll
+SRC = src/ember_reshade_addon.cpp
+
+.PHONY: all clean install
+
+all: $(TARGET)
+
+$(TARGET): $(SRC)
+	$(CXX) $(CXXFLAGS) -o $(TARGET) $(SRC)
+
+install: all
+	mkdir -p ../../resources/reshade
+	cp $(TARGET) ../../resources/reshade/
+
+clean:
+	rm -f $(TARGET)

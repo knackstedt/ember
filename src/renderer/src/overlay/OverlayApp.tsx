@@ -28,7 +28,7 @@ import {
 } from "lucide-react";
 import { useInputNav } from "../hooks/useInputNav";
 import { useControllerWorker } from "../hooks/useControllerWorker";
-import { Game, AppSettings, OverlayStyle, BluetoothDevice, VulkanShaderConfig, GameInjectionConfig } from "../../../shared/types";
+import { Game, AppSettings, OverlayStyle, BluetoothDevice, VulkanShaderConfig, GameInjectionConfig, ReShadeRuntimeState, ReShadeTechniqueState, ReShadeUniformState } from "../../../shared/types";
 import { SplitscreenOverlay } from "../components/Splitscreen/SplitscreenOverlay";
 import { useSplitscreenStore } from "../store/splitscreen.store";
 
@@ -41,6 +41,7 @@ type SidebarId =
   | "gameinfo"
   | "controllers"
   | "shaders"
+  | "reshade"
   | "settings"
   | "splitscreen"
   | "exit";
@@ -58,6 +59,7 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
   { id: "gameinfo", label: "Game Info", Icon: Info },
   { id: "controllers", label: "Controllers", Icon: Gamepad2 },
   { id: "shaders", label: "Shaders", Icon: Zap },
+  { id: "reshade", label: "ReShade", Icon: Activity },
   { id: "settings", label: "Quick Settings", Icon: Settings },
   { id: "splitscreen", label: "Splitscreen", Icon: Columns },
   { id: "exit", label: "Exit to Ember", Icon: Power },
@@ -814,6 +816,282 @@ function ShaderPanel({ game }: { game: Game }) {
   );
 }
 
+/* ─── ReShade panel ────────────────────────────────────────── */
+
+function ReShadePanel({ game }: { game: Game }) {
+  const [state, setState] = useState<ReShadeRuntimeState | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [customSection, setCustomSection] = useState("");
+  const [customKey, setCustomKey] = useState("");
+  const [customValue, setCustomValue] = useState("");
+  const [overrides, setOverrides] = useState<{ section: string; key: string; value: string }[]>([]);
+
+  const isEmulator = EMULATOR_PLATFORMS.has(game.platform);
+
+  // Poll state from addon every 3 seconds
+  useEffect(() => {
+    if (isEmulator) { setLoading(false); return; }
+    let cancelled = false;
+    const poll = () => {
+      void window.htpc.games.reshade.getRuntimeState(game).then((s) => {
+        if (cancelled) return;
+        setState(s);
+        setError(null);
+        setLoading(false);
+      }).catch((err) => {
+        if (cancelled) return;
+        setError(String(err));
+        setLoading(false);
+      });
+    };
+    poll();
+    const interval = setInterval(poll, 3000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [game, isEmulator]);
+
+  const sendControl = useCallback((control: Record<string, unknown>) => {
+    void window.htpc.games.reshade.writeRuntimeControl(game, control);
+  }, [game]);
+
+  const toggleEffects = useCallback((enabled: boolean) => {
+    sendControl({ effectsEnabled: enabled });
+    setState((prev) => prev ? { ...prev, effectsEnabled: enabled } : prev);
+  }, [sendControl]);
+
+  const toggleTechnique = useCallback((tech: ReShadeTechniqueState, enabled: boolean) => {
+    const techniques: Record<string, boolean> = {};
+    if (state) {
+      for (const t of state.techniques) {
+        techniques[t.name] = t.name === tech.name ? enabled : t.enabled;
+      }
+    } else {
+      techniques[tech.name] = enabled;
+    }
+    sendControl({ techniques });
+    setState((prev) => prev ? {
+      ...prev,
+      techniques: prev.techniques.map((t) => t.name === tech.name ? { ...t, enabled } : t),
+    } : prev);
+  }, [sendControl, state]);
+
+  const setUniformValue = useCallback((uniform: ReShadeUniformState, value: number) => {
+    const uniforms: Record<string, number> = {};
+    uniforms[uniform.name] = value;
+    sendControl({ uniforms });
+  }, [sendControl]);
+
+  const addOverride = useCallback(() => {
+    if (!customSection.trim() || !customKey.trim()) return;
+    const newOverride = { section: customSection.trim(), key: customKey.trim(), value: customValue.trim() };
+    setOverrides((prev) => [...prev, newOverride]);
+    sendControl({
+      configOverrides: [...overrides, newOverride],
+    });
+    setCustomSection("");
+    setCustomKey("");
+    setCustomValue("");
+  }, [customSection, customKey, customValue, overrides, sendControl]);
+
+  const removeOverride = useCallback((idx: number) => {
+    const next = overrides.filter((_, i) => i !== idx);
+    setOverrides(next);
+    sendControl({ configOverrides: next });
+  }, [overrides, sendControl]);
+
+  const savePreset = useCallback(() => {
+    void window.htpc.games.reshade.savePreset(game);
+  }, [game]);
+
+  if (isEmulator) {
+    return (
+      <div className="flex flex-col items-center justify-center h-40 gap-3 opacity-70">
+        <Activity size={40} />
+        <div className="text-sm">ReShade is not available for emulator games.</div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-40 opacity-60">
+        <div className="w-8 h-8 border-2 border-[var(--border-default)] border-t-[var(--accent)] rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!state) {
+    return (
+      <div className="flex flex-col items-center justify-center h-40 gap-3 opacity-70">
+        <Activity size={40} />
+        <div className="text-sm">ReShade addon not detected.</div>
+        {error && (
+          <div className="text-xs opacity-60 max-w-md text-center">{error}</div>
+        )}
+        <div className="text-xs opacity-60 max-w-md text-center">
+          Make sure ReShade is installed and the game is running. The addon DLL writes state to ember-reshade-state.json next to the game exe.
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-4 overflow-y-auto p-1 max-w-md">
+      {/* Header */}
+      <div className="flex items-center gap-2">
+        <Activity size={18} style={{ color: "var(--accent)" }} />
+        <span className="text-sm font-semibold">ReShade Controls</span>
+        <button
+          onClick={() => toggleEffects(!state.effectsEnabled)}
+          className="ml-auto px-3 py-1 rounded text-xs font-medium"
+          style={{
+            background: state.effectsEnabled ? "var(--surface-2)" : "var(--accent)",
+            color: state.effectsEnabled ? "var(--text-secondary)" : "var(--surface-base)",
+          }}
+        >
+          {state.effectsEnabled ? "Effects On" : "Effects Off"}
+        </button>
+      </div>
+
+      {/* Techniques */}
+      {state.techniques.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <div className="text-xs font-semibold uppercase tracking-wide opacity-60">Effects</div>
+          {state.techniques.map((tech) => (
+            <div
+              key={tech.name}
+              className="flex items-center gap-2 p-2 rounded-lg"
+              style={{ background: "var(--surface-0)", border: "1px solid var(--border-default)" }}
+            >
+              <button
+                onClick={() => toggleTechnique(tech, !tech.enabled)}
+                className="w-5 h-5 rounded flex items-center justify-center shrink-0"
+                style={{
+                  background: tech.enabled ? "var(--accent)" : "var(--surface-2)",
+                  border: "1px solid var(--border-default)",
+                }}
+              >
+                {tech.enabled && <span style={{ color: "var(--surface-base)", fontSize: "12px", fontWeight: 700 }}>\u2713</span>}
+              </button>
+              <div className="flex flex-col min-w-0">
+                <span className="text-sm font-medium truncate">{tech.name}</span>
+                <span className="text-[12px] opacity-50 truncate">{tech.effect}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Uniforms (sliders) */}
+      {state.uniforms.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <div className="text-xs font-semibold uppercase tracking-wide opacity-60">Parameters</div>
+          {state.uniforms.map((uniform) => {
+            const isFloat = uniform.type === 0x61 || uniform.type === 0x65;
+            const isInt = uniform.type === 0x6d || uniform.type === 0x71;
+            if (!isFloat && !isInt) return null;
+            const val = uniform.values[0] ?? 0;
+            const min = isFloat ? 0 : -100;
+            const max = isFloat ? 1 : 100;
+            const step = isFloat ? 0.01 : 1;
+            return (
+              <div key={uniform.name} className="flex flex-col gap-1">
+                <label className="text-[12px] flex items-center justify-between" style={{ color: "var(--text-secondary)" }}>
+                  <span className="truncate">{uniform.name}</span>
+                  <span className="tabular-nums ml-2 shrink-0">{isFloat ? val.toFixed(3) : val}</span>
+                </label>
+                <input
+                  type="range"
+                  min={min}
+                  max={max}
+                  step={step}
+                  value={val}
+                  onChange={(e) => {
+                    const newVal = isFloat ? parseFloat(e.target.value) : parseInt(e.target.value);
+                    setUniformValue(uniform, newVal);
+                  }}
+                  className="w-full"
+                />
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Custom ini overrides */}
+      <div className="flex flex-col gap-2">
+        <div className="text-xs font-semibold uppercase tracking-wide opacity-60">Custom INI Overrides</div>
+        {overrides.map((ov, idx) => (
+          <div
+            key={idx}
+            className="flex items-center gap-2 p-2 rounded-lg text-xs"
+            style={{ background: "var(--surface-0)", border: "1px solid var(--border-default)" }}
+          >
+            <span className="font-mono opacity-80">[{ov.section}] {ov.key}={ov.value}</span>
+            <button
+              onClick={() => removeOverride(idx)}
+              className="ml-auto px-1.5 py-0.5 rounded opacity-60 hover:opacity-100"
+              style={{ background: "var(--surface-2)" }}
+            >
+              <X size={12} />
+            </button>
+          </div>
+        ))}
+        <div className="flex flex-col gap-1.5">
+          <div className="flex gap-1.5">
+            <input
+              type="text"
+              placeholder="Section"
+              value={customSection}
+              onChange={(e) => setCustomSection(e.target.value)}
+              className="flex-1 text-xs px-2 py-1.5 rounded"
+              style={{ background: "var(--surface-1)", border: "1px solid var(--border-default)", color: "var(--text-primary)", outline: "none" }}
+            />
+            <input
+              type="text"
+              placeholder="Key"
+              value={customKey}
+              onChange={(e) => setCustomKey(e.target.value)}
+              className="flex-1 text-xs px-2 py-1.5 rounded"
+              style={{ background: "var(--surface-1)", border: "1px solid var(--border-default)", color: "var(--text-primary)", outline: "none" }}
+            />
+          </div>
+          <div className="flex gap-1.5">
+            <input
+              type="text"
+              placeholder="Value"
+              value={customValue}
+              onChange={(e) => setCustomValue(e.target.value)}
+              className="flex-1 text-xs px-2 py-1.5 rounded"
+              style={{ background: "var(--surface-1)", border: "1px solid var(--border-default)", color: "var(--text-primary)", outline: "none" }}
+            />
+            <button
+              onClick={addOverride}
+              disabled={!customSection.trim() || !customKey.trim()}
+              className="px-3 py-1.5 rounded text-xs font-medium"
+              style={{
+                background: customSection.trim() && customKey.trim() ? "var(--accent)" : "var(--surface-2)",
+                color: customSection.trim() && customKey.trim() ? "var(--surface-base)" : "var(--text-secondary)",
+              }}
+            >
+              Add
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Save preset button */}
+      <button
+        onClick={savePreset}
+        className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium mt-2"
+        style={{ background: "var(--surface-2)", color: "var(--text-secondary)" }}
+      >
+        <Settings size={16} /> Save Current Preset
+      </button>
+    </div>
+  );
+}
+
 /* ─── Controller hints ──────────────────────────────────────── */
 
 function ControllerHints() {
@@ -966,6 +1244,8 @@ export function OverlayApp(): React.ReactElement {
         return <ControllersPanel />;
       case "shaders":
         return <ShaderPanel game={game} />;
+      case "reshade":
+        return <ReShadePanel game={game} />;
       case "settings":
         return <QuickSettingsPanel style={style} onAdjustOpacity={adjustOpacity} />;
       case "splitscreen":
@@ -975,7 +1255,7 @@ export function OverlayApp(): React.ReactElement {
     }
   }, [activeId, game, style, adjustOpacity]);
 
-  const showContent = activeId === "achievements" || activeId === "gameinfo" || activeId === "controllers" || activeId === "shaders" || activeId === "settings" || activeId === "splitscreen";
+  const showContent = activeId === "achievements" || activeId === "gameinfo" || activeId === "controllers" || activeId === "shaders" || activeId === "reshade" || activeId === "settings" || activeId === "splitscreen";
 
   return (
     <div
