@@ -121,6 +121,30 @@ function getTracksInFolder(tracks: MusicTrack[], folderPath: string, roots: stri
   return tracks.filter((t) => getRelativeDir(t.filePath, roots) === folderPath);
 }
 
+function getSearchFolderGroups(
+  tracks: MusicTrack[],
+  roots: string[],
+): { name: string; path: string; tracks: MusicTrack[]; coverUrl?: string }[] {
+  const map = new Map<string, { name: string; path: string; tracks: MusicTrack[]; coverUrl?: string }>();
+
+  for (const t of tracks) {
+    const relDir = getRelativeDir(t.filePath, roots);
+    const key = relDir || "";
+    if (!map.has(key)) {
+      const name = relDir ? relDir.split("/").pop() || relDir : "(root)";
+      map.set(key, { name, path: relDir, tracks: [] });
+    }
+    map.get(key)!.tracks.push(t);
+  }
+
+  return Array.from(map.values())
+    .map((g) => ({
+      ...g,
+      coverUrl: g.tracks.find((t) => t.albumArtUrl)?.albumArtUrl,
+    }))
+    .sort((a, b) => a.path.localeCompare(b.path));
+}
+
 function folderHasSubdirs(tracks: MusicTrack[], folderPath: string, roots: string[]): boolean {
   for (const t of tracks) {
     const relDir = getRelativeDir(t.filePath, roots);
@@ -219,6 +243,14 @@ export const MusicTab: React.FC = () => {
             t.artist?.toLowerCase().includes(q) ||
             t.album?.toLowerCase().includes(q)
         );
+        const folderGroups = getSearchFolderGroups(source, roots);
+        return folderGroups.map((g) => ({
+          id: g.path,
+          name: g.name,
+          subtitle: g.path.includes("/") ? g.path.slice(0, g.path.lastIndexOf("/")) : undefined,
+          coverUrl: g.coverUrl,
+          trackCount: g.tracks.length,
+        }));
       }
       const subdirs = getFolderSubdirs(source, selectedGroup ?? "", roots);
       return subdirs.map((g) => ({
@@ -397,9 +429,11 @@ export const MusicTab: React.FC = () => {
 
   const roots = getMusicRoots(tracks.filter((t) => !t.hidden));
   const showingGroups = activeNav === "folders"
-    ? selectedGroup
-      ? folderHasSubdirs(tracks.filter((t) => !t.hidden), selectedGroup, roots)
-      : true
+    ? searchQuery.trim()
+      ? !selectedGroup
+      : selectedGroup
+        ? folderHasSubdirs(tracks.filter((t) => !t.hidden), selectedGroup, roots)
+        : true
     : (GROUP_NAVS.includes(activeNav) || activeNav === "playlists") && !selectedGroup;
   const canEditTags = !showingGroups && trackItems.length > 0;
   const toolbarItemCount = (activeNav === "playlists" ? 4 : 3) + (canEditTags ? 1 : 0);
@@ -537,14 +571,24 @@ export const MusicTab: React.FC = () => {
     }
     if (activeNav === "folders") {
       const roots = getMusicRoots(source);
-      return getTracksInFolder(source, group.id, roots);
+      let folderTracks = getTracksInFolder(source, group.id, roots);
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        folderTracks = folderTracks.filter(
+          (t) =>
+            getTrackDisplayName(t).toLowerCase().includes(q) ||
+            t.artist?.toLowerCase().includes(q) ||
+            t.album?.toLowerCase().includes(q)
+        );
+      }
+      return folderTracks;
     }
     const lower = group.id.toLowerCase();
     if (activeNav === "artists") return source.filter((t) => t.artist?.toLowerCase() === lower);
     if (activeNav === "albums") return source.filter((t) => t.album?.toLowerCase() === lower);
     if (activeNav === "genre") return source.filter((t) => t.genre?.toLowerCase() === lower);
     return [];
-  }, [tracks, playlists, activeNav]);
+  }, [tracks, playlists, activeNav, searchQuery]);
 
   const { menu, bindItem } = useContextMenu({
     items: trackItems,
