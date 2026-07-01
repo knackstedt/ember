@@ -213,7 +213,8 @@ function shortcutMatches(shortcut: string, keyCode: string, modifiers: string[])
 
 function forwardKeyEvent(webContents: WebContents, type: "keyDown" | "keyUp", keyCode: string, modifiers: string[]): void {
   try {
-    webContents.sendInputEvent({ type, keyCode, modifiers: modifiers as ("shift" | "control" | "alt" | "meta" | "cmd" | "isAutoRepeat" | "leftButtonDown" | "middleButtonDown" | "rightButtonDown" | "capsLock" | "numLock")[] });
+    const lowerMods = modifiers.map((m) => m.toLowerCase()) as ("shift" | "control" | "alt" | "meta" | "cmd" | "isAutoRepeat" | "leftButtonDown" | "middleButtonDown" | "rightButtonDown" | "capsLock" | "numLock")[];
+    webContents.sendInputEvent({ type, keyCode, modifiers: lowerMods });
   } catch (err) {
     log.warn("x11-grab", `failed to forward key event: ${err}`);
   }
@@ -249,7 +250,12 @@ export async function grabOverlayInputs(win: BrowserWindow): Promise<boolean> {
     client.GrabKeyboard(wid, false, 1, 1, 0);
   } catch (err) {
     log.warn("x11-grab", `failed to grab keyboard: ${err}`);
-    return false;
+  }
+  try {
+    client.SetInputFocus(0, wid, 0);
+    log.info("x11-grab", `set input focus to overlay window ${wid}`);
+  } catch (err) {
+    log.warn("x11-grab", `failed to set input focus: ${err}`);
   }
   grabWindow = wid;
   overlayWindow = win;
@@ -352,6 +358,20 @@ export async function isWindowFocusedX11(wid: number): Promise<boolean> {
       done(false);
     }
   });
+}
+
+export async function refocusWindowX11(wid: number): Promise<boolean> {
+  if (process.platform !== "linux") return false;
+  const x11 = await getX11Client();
+  if (!x11) return false;
+  const { client } = x11;
+  try {
+    client.SetInputFocus(0, wid, 0);
+    return true;
+  } catch (err) {
+    log.warn("x11-grab", `failed to refocus window ${wid}: ${err}`);
+    return false;
+  }
 }
 
 export async function ungrabOverlayInputs(): Promise<void> {

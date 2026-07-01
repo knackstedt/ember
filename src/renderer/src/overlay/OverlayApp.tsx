@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Responsive, Layout, useContainerWidth } from "react-grid-layout";
 import {
   Gamepad2,
   Trophy,
@@ -25,12 +26,83 @@ import {
   Search,
   Trash2,
   Columns,
+  LayoutDashboard,
+  Pin,
+  PinOff,
+  AlertTriangle,
+  Palette,
 } from "lucide-react";
 import { useInputNav } from "../hooks/useInputNav";
 import { useControllerWorker } from "../hooks/useControllerWorker";
-import { Game, AppSettings, OverlayStyle, BluetoothDevice, VulkanShaderConfig, GameInjectionConfig, ReShadeRuntimeState, ReShadeTechniqueState, ReShadeUniformState } from "../../../shared/types";
+import { Game, AppSettings, OverlayStyle, BluetoothDevice, VulkanShaderConfig, GameInjectionConfig, ReShadeRuntimeState, ReShadeTechniqueState, ReShadeUniformState, OverlayChartConfig, OverlayChartId, OverlayChartsConfig, DashboardGridItem } from "../../../shared/types";
 import { SplitscreenOverlay } from "../components/Splitscreen/SplitscreenOverlay";
 import { useSplitscreenStore } from "../store/splitscreen.store";
+import "react-grid-layout/css/styles.css";
+
+/* ─── Chart config defaults ─────────────────────────────────── */
+
+const CHART_ICONS: Record<OverlayChartId, React.ComponentType<{ size?: number | string; className?: string }>> = {
+  cpu: Cpu,
+  mem: HardDrive,
+  gpu: Zap,
+  vram: MemoryStick,
+  disk: Activity,
+  net: Wifi,
+};
+
+const DEFAULT_CHART_CONFIGS: OverlayChartConfig[] = [
+  { id: "cpu", label: "CPU", color: "var(--accent)", pinnedBg: "rgba(0,0,0,0.75)", pinnedBorder: "var(--accent)", pinned: false, warnThreshold: 0, killThreshold: 0, enabled: true },
+  { id: "mem", label: "Mem", color: "#4ade80", pinnedBg: "rgba(0,0,0,0.75)", pinnedBorder: "#4ade80", pinned: false, warnThreshold: 0, killThreshold: 0, enabled: true },
+  { id: "gpu", label: "GPU", color: "#a78bfa", pinnedBg: "rgba(0,0,0,0.75)", pinnedBorder: "#a78bfa", pinned: false, warnThreshold: 0, killThreshold: 0, enabled: true },
+  { id: "vram", label: "VRAM", color: "#fb923c", pinnedBg: "rgba(0,0,0,0.75)", pinnedBorder: "#fb923c", pinned: false, warnThreshold: 0, killThreshold: 0, enabled: true },
+  { id: "disk", label: "Disk", color: "#60a5fa", pinnedBg: "rgba(0,0,0,0.75)", pinnedBorder: "#60a5fa", pinned: false, warnThreshold: 0, killThreshold: 0, enabled: true },
+  { id: "net", label: "Net", color: "#f472b6", pinnedBg: "rgba(0,0,0,0.75)", pinnedBorder: "#f472b6", pinned: false, warnThreshold: 0, killThreshold: 0, enabled: true },
+];
+
+const DEFAULT_CHART_GRID: DashboardGridItem[] = [
+  { i: "cpu", x: 8, y: 0, w: 2, h: 2, minW: 1, minH: 2 },
+  { i: "mem", x: 10, y: 0, w: 2, h: 2, minW: 1, minH: 2 },
+  { i: "gpu", x: 8, y: 2, w: 2, h: 2, minW: 1, minH: 2 },
+  { i: "vram", x: 10, y: 2, w: 2, h: 2, minW: 1, minH: 2 },
+  { i: "disk", x: 8, y: 4, w: 2, h: 2, minW: 1, minH: 2 },
+  { i: "net", x: 10, y: 4, w: 2, h: 2, minW: 1, minH: 2 },
+];
+
+function getDefaultOverlayChartsConfig(): OverlayChartsConfig {
+  return { charts: DEFAULT_CHART_CONFIGS.map((c) => ({ ...c })), grid: DEFAULT_CHART_GRID.map((g) => ({ ...g })) };
+}
+
+function getChartCurrentValue(id: OverlayChartId, stats: ProcessStats): number {
+  switch (id) {
+    case "cpu": return stats.cpuPercent;
+    case "mem": return stats.memMB;
+    case "gpu": return stats.gpuPercent;
+    case "vram": return stats.gpuMemUsedMB;
+    case "disk": return stats.diskReadKBps + stats.diskWriteKBps;
+    case "net": return stats.netRxKBps + stats.netTxKBps;
+  }
+}
+
+function getChartData(id: OverlayChartId, stats: ProcessStats, history: ProcessHistory): { data: number[]; value: string; max: number; unit: string } {
+  switch (id) {
+    case "cpu":
+      return { data: history.cpu, value: stats.cpuPercent.toFixed(1), max: 100 * (stats.processCount || 1), unit: "%" };
+    case "mem":
+      return { data: history.mem, value: stats.memMB.toFixed(0), max: Math.max(1024, ...history.mem, stats.memMB), unit: "MB" };
+    case "gpu":
+      return { data: history.gpu, value: stats.gpuPercent.toFixed(0), max: 100, unit: "%" };
+    case "vram":
+      return { data: history.gpuMem, value: stats.gpuMemUsedMB.toFixed(0), max: Math.max(256, ...history.gpuMem, stats.gpuMemTotalMB), unit: `/${stats.gpuMemTotalMB || "?"}MB` };
+    case "disk":
+      return { data: history.diskR.map((v, i) => v + (history.diskW[i] ?? 0)), value: (stats.diskReadKBps + stats.diskWriteKBps).toFixed(0), max: Math.max(1024, ...history.diskR, ...history.diskW), unit: "KB/s" };
+    case "net":
+      return { data: history.netRx.map((v, i) => v + (history.netTx[i] ?? 0)), value: (stats.netRxKBps + stats.netTxKBps).toFixed(0), max: Math.max(1024, ...history.netRx, ...history.netTx), unit: "KB/s" };
+  }
+}
+
+function logKillThreshold(cfg: OverlayChartConfig, value: number): void {
+  console.warn(`[Overlay] Kill threshold exceeded for ${cfg.label}: ${value} > ${cfg.killThreshold}. Stopping game.`);
+}
 
 /* ─── Sidebar items ─────────────────────────────────────────── */
 
@@ -65,6 +137,10 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
   { id: "exit", label: "Exit to Ember", Icon: Power },
 ];
 
+const CONTENT_IDS = new Set<SidebarId>([
+  "achievements", "gameinfo", "controllers", "shaders", "reshade", "settings", "splitscreen",
+]);
+
 /* ─── Helpers ───────────────────────────────────────────────── */
 
 function formatPlayTime(seconds?: number): string {
@@ -83,16 +159,20 @@ function formatDate(ts?: number): string {
 
 function useOverlayGame() {
   const [game, setGame] = useState<Game | null>(null);
+  const [visible, setVisible] = useState(false);
+  const [pinnedVisible, setPinnedVisible] = useState(false);
   useEffect(() => {
     void window.htpc.overlay.getGame().then(setGame);
     const unsubscribe = window.htpc.overlay.onState((state) => {
       setGame(state.game);
+      setVisible(state.visible);
+      setPinnedVisible(state.pinnedVisible ?? false);
     });
     return () => {
       unsubscribe();
     };
   }, []);
-  return game;
+  return { game, visible, pinnedVisible };
 }
 
 function useOverlaySettings() {
@@ -132,6 +212,17 @@ interface ProcessStats {
   gpuMemTotalMB: number;
 }
 
+interface ProcessHistory {
+  cpu: number[];
+  mem: number[];
+  diskR: number[];
+  diskW: number[];
+  netRx: number[];
+  netTx: number[];
+  gpu: number[];
+  gpuMem: number[];
+}
+
 function useProcessStats(enabled: boolean) {
   const [stats, setStats] = useState<ProcessStats>({
     cpuPercent: 0,
@@ -145,16 +236,7 @@ function useProcessStats(enabled: boolean) {
     gpuMemUsedMB: 0,
     gpuMemTotalMB: 0,
   });
-  const [history, setHistory] = useState<{
-    cpu: number[];
-    mem: number[];
-    diskR: number[];
-    diskW: number[];
-    netRx: number[];
-    netTx: number[];
-    gpu: number[];
-    gpuMem: number[];
-  }>({ cpu: [], mem: [], diskR: [], diskW: [], netRx: [], netTx: [], gpu: [], gpuMem: [] });
+  const [history, setHistory] = useState<ProcessHistory>({ cpu: [], mem: [], diskR: [], diskW: [], netRx: [], netTx: [], gpu: [], gpuMem: [] });
 
   useEffect(() => {
     if (!enabled) return;
@@ -181,6 +263,24 @@ function useProcessStats(enabled: boolean) {
 
 /* ─── Mini chart component ──────────────────────────────────── */
 
+interface MiniChartProps {
+  data: number[];
+  color: string;
+  max: number;
+  label: string;
+  value: string;
+  unit: string;
+  Icon: React.ComponentType<{ size?: number | string }>;
+  pinned?: boolean;
+  pinnedBg?: string;
+  pinnedBorder?: string;
+  warnThreshold?: number;
+  killThreshold?: number;
+  currentValue?: number;
+  onTogglePin?: () => void;
+  onConfigure?: () => void;
+}
+
 function MiniChart({
   data,
   color,
@@ -189,15 +289,15 @@ function MiniChart({
   value,
   unit,
   Icon,
-}: {
-  data: number[];
-  color: string;
-  max: number;
-  label: string;
-  value: string;
-  unit: string;
-  Icon: React.ComponentType<{ size?: number | string }>;
-}) {
+  pinned = false,
+  pinnedBg = "rgba(0,0,0,0.75)",
+  pinnedBorder = "var(--accent)",
+  warnThreshold = 0,
+  killThreshold = 0,
+  currentValue = 0,
+  onTogglePin,
+  onConfigure,
+}: MiniChartProps) {
   const width = 120;
   const height = 32;
   const points = data.length > 1
@@ -207,20 +307,55 @@ function MiniChart({
         return `${x.toFixed(1)},${y.toFixed(1)}`;
       }).join(" ")
     : "";
+
+  const isWarning = warnThreshold > 0 && currentValue > warnThreshold && !(killThreshold > 0 && currentValue > killThreshold);
+  const isKill = killThreshold > 0 && currentValue > killThreshold;
+  const strokeColor = isKill ? "#ef4444" : isWarning ? "#fbbf24" : color;
+
+  const containerStyle: React.CSSProperties = pinned
+    ? {
+        background: pinnedBg,
+        border: `1px solid ${isKill ? "#ef4444" : isWarning ? "#fbbf24" : pinnedBorder}`,
+        borderRadius: 8,
+        padding: 6,
+      }
+    : {};
+
   return (
-    <div className="flex flex-col gap-1" style={{ minWidth: width + 28 }}>
+    <div className="flex flex-col gap-1 relative" style={{ minWidth: width + 28, ...containerStyle }}>
       <div className="flex items-center gap-1.5">
         <Icon size={12} />
         <span className="text-[12px] font-medium opacity-80">{label}</span>
-        <span className="ml-auto text-[12px] font-semibold tabular-nums" style={{ color }}>
+        {(isWarning || isKill) && (
+          <AlertTriangle size={12} style={{ color: isKill ? "#ef4444" : "#fbbf24" }} />
+        )}
+        <span className="ml-auto text-[12px] font-semibold tabular-nums" style={{ color: strokeColor }}>
           {value}<span className="opacity-50 text-[12px] ml-0.5">{unit}</span>
         </span>
+        {onTogglePin && (
+          <button
+            onClick={onTogglePin}
+            className="ml-1 p-0.5 rounded opacity-50 hover:opacity-100 transition-opacity"
+            title={pinned ? "Unpin" : "Pin"}
+          >
+            {pinned ? <PinOff size={12} /> : <Pin size={12} />}
+          </button>
+        )}
+        {onConfigure && (
+          <button
+            onClick={onConfigure}
+            className="p-0.5 rounded opacity-50 hover:opacity-100 transition-opacity"
+            title="Configure"
+          >
+            <Palette size={12} />
+          </button>
+        )}
       </div>
       <svg width={width} height={height} className="overflow-visible">
         <polyline
           points={points}
           fill="none"
-          stroke={color}
+          stroke={strokeColor}
           strokeWidth={1.5}
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -230,10 +365,154 @@ function MiniChart({
             cx={width}
             cy={height - Math.min(1, data[data.length - 1] / max) * height}
             r={2}
-            fill={color}
+            fill={strokeColor}
           />
         )}
       </svg>
+    </div>
+  );
+}
+
+/* ─── Chart config dialog ───────────────────────────────────── */
+
+function ChartConfigDialog({
+  chart,
+  open,
+  onClose,
+  onSave,
+}: {
+  chart: OverlayChartConfig | null;
+  open: boolean;
+  onClose: () => void;
+  onSave: (cfg: OverlayChartConfig) => void;
+}) {
+  const [local, setLocal] = useState<OverlayChartConfig | null>(chart);
+  useEffect(() => { setLocal(chart); }, [chart]);
+  if (!open || !local) return null;
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ background: "rgba(0,0,0,0.6)" }}
+      onClick={onClose}
+    >
+      <div
+        className="rounded-xl p-5 flex flex-col gap-3 max-w-sm w-full"
+        style={{ background: "var(--surface-base)", border: "1px solid var(--border-default)" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center gap-2">
+          <Palette size={16} style={{ color: "var(--accent)" }} />
+          <span className="text-sm font-semibold">Configure {local.label}</span>
+          <button onClick={onClose} className="ml-auto p-1 rounded opacity-60 hover:opacity-100">
+            <X size={16} />
+          </button>
+        </div>
+        <div className="flex flex-col gap-2">
+          <label className="text-[12px]" style={{ color: "var(--text-secondary)" }}>Label</label>
+          <input
+            type="text"
+            value={local.label}
+            onChange={(e) => setLocal({ ...local, label: e.target.value })}
+            className="text-sm px-2 py-1.5 rounded"
+            style={{ background: "var(--surface-1)", border: "1px solid var(--border-default)", color: "var(--text-primary)", outline: "none" }}
+          />
+        </div>
+        <div className="flex flex-col gap-2">
+          <label className="text-[12px]" style={{ color: "var(--text-secondary)" }}>Sparkline Color</label>
+          <div className="flex items-center gap-2">
+            <input
+              type="color"
+              value={local.color.startsWith("var(") ? "#6366f1" : local.color}
+              onChange={(e) => setLocal({ ...local, color: e.target.value })}
+              className="w-8 h-8 rounded cursor-pointer"
+              style={{ border: "1px solid var(--border-default)" }}
+            />
+            <input
+              type="text"
+              value={local.color}
+              onChange={(e) => setLocal({ ...local, color: e.target.value })}
+              className="flex-1 text-sm px-2 py-1.5 rounded"
+              style={{ background: "var(--surface-1)", border: "1px solid var(--border-default)", color: "var(--text-primary)", outline: "none" }}
+            />
+          </div>
+        </div>
+        <div className="flex flex-col gap-2">
+          <label className="text-[12px]" style={{ color: "var(--text-secondary)" }}>Pinned Background</label>
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={local.pinnedBg}
+              onChange={(e) => setLocal({ ...local, pinnedBg: e.target.value })}
+              className="flex-1 text-sm px-2 py-1.5 rounded font-mono"
+              style={{ background: "var(--surface-1)", border: "1px solid var(--border-default)", color: "var(--text-primary)", outline: "none" }}
+            />
+          </div>
+        </div>
+        <div className="flex flex-col gap-2">
+          <label className="text-[12px]" style={{ color: "var(--text-secondary)" }}>Pinned Border Color</label>
+          <div className="flex items-center gap-2">
+            <input
+              type="color"
+              value={local.pinnedBorder.startsWith("var(") ? "#6366f1" : local.pinnedBorder}
+              onChange={(e) => setLocal({ ...local, pinnedBorder: e.target.value })}
+              className="w-8 h-8 rounded cursor-pointer"
+              style={{ border: "1px solid var(--border-default)" }}
+            />
+            <input
+              type="text"
+              value={local.pinnedBorder}
+              onChange={(e) => setLocal({ ...local, pinnedBorder: e.target.value })}
+              className="flex-1 text-sm px-2 py-1.5 rounded"
+              style={{ background: "var(--surface-1)", border: "1px solid var(--border-default)", color: "var(--text-primary)", outline: "none" }}
+            />
+          </div>
+        </div>
+        <div className="flex flex-col gap-2">
+          <label className="text-[12px]" style={{ color: "var(--text-secondary)" }}>
+            Warn Threshold (0 = disabled)
+          </label>
+          <input
+            type="number"
+            min={0}
+            value={local.warnThreshold}
+            onChange={(e) => setLocal({ ...local, warnThreshold: parseFloat(e.target.value) || 0 })}
+            className="text-sm px-2 py-1.5 rounded"
+            style={{ background: "var(--surface-1)", border: "1px solid var(--border-default)", color: "var(--text-primary)", outline: "none" }}
+          />
+        </div>
+        <div className="flex flex-col gap-2">
+          <label className="text-[12px]" style={{ color: "var(--text-secondary)" }}>
+            Kill Threshold (0 = disabled)
+          </label>
+          <input
+            type="number"
+            min={0}
+            value={local.killThreshold}
+            onChange={(e) => setLocal({ ...local, killThreshold: parseFloat(e.target.value) || 0 })}
+            className="text-sm px-2 py-1.5 rounded"
+            style={{ background: "var(--surface-1)", border: "1px solid var(--border-default)", color: "var(--text-primary)", outline: "none" }}
+          />
+        </div>
+        <div className="flex items-center gap-2 mt-1">
+          <button
+            onClick={() => setLocal({ ...local, enabled: !local.enabled })}
+            className="px-3 py-1.5 rounded text-xs font-medium"
+            style={{
+              background: local.enabled ? "var(--surface-2)" : "var(--accent)",
+              color: local.enabled ? "var(--text-secondary)" : "var(--surface-base)",
+            }}
+          >
+            {local.enabled ? "Disable Chart" : "Enable Chart"}
+          </button>
+          <button
+            onClick={() => { if (local) onSave(local); onClose(); }}
+            className="ml-auto px-4 py-1.5 rounded text-xs font-medium"
+            style={{ background: "var(--accent)", color: "var(--surface-base)" }}
+          >
+            Save
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -826,14 +1105,16 @@ function ReShadePanel({ game }: { game: Game }) {
   const [customKey, setCustomKey] = useState("");
   const [customValue, setCustomValue] = useState("");
   const [overrides, setOverrides] = useState<{ section: string; key: string; value: string }[]>([]);
+  const lastLocalChangeRef = useRef(0);
 
   const isEmulator = EMULATOR_PLATFORMS.has(game.platform);
 
-  // Poll state from addon every 3 seconds
+  // Poll state from addon every 3 seconds, but skip for 5s after a local change
   useEffect(() => {
     if (isEmulator) { setLoading(false); return; }
     let cancelled = false;
     const poll = () => {
+      if (Date.now() - lastLocalChangeRef.current < 5000) return;
       void window.htpc.games.reshade.getRuntimeState(game).then((s) => {
         if (cancelled) return;
         setState(s);
@@ -855,11 +1136,13 @@ function ReShadePanel({ game }: { game: Game }) {
   }, [game]);
 
   const toggleEffects = useCallback((enabled: boolean) => {
+    lastLocalChangeRef.current = Date.now();
     sendControl({ effectsEnabled: enabled });
     setState((prev) => prev ? { ...prev, effectsEnabled: enabled } : prev);
   }, [sendControl]);
 
   const toggleTechnique = useCallback((tech: ReShadeTechniqueState, enabled: boolean) => {
+    lastLocalChangeRef.current = Date.now();
     const techniques: Record<string, boolean> = {};
     if (state) {
       for (const t of state.techniques) {
@@ -876,6 +1159,7 @@ function ReShadePanel({ game }: { game: Game }) {
   }, [sendControl, state]);
 
   const setUniformValue = useCallback((uniform: ReShadeUniformState, value: number) => {
+    lastLocalChangeRef.current = Date.now();
     const uniforms: Record<string, number> = {};
     uniforms[uniform.name] = value;
     sendControl({ uniforms });
@@ -965,13 +1249,17 @@ function ReShadePanel({ game }: { game: Game }) {
             >
               <button
                 onClick={() => toggleTechnique(tech, !tech.enabled)}
-                className="w-5 h-5 rounded flex items-center justify-center shrink-0"
+                className="w-5 h-5 rounded flex items-center justify-center shrink-0 transition-colors"
                 style={{
                   background: tech.enabled ? "var(--accent)" : "var(--surface-2)",
                   border: "1px solid var(--border-default)",
                 }}
               >
-                {tech.enabled && <span style={{ color: "var(--surface-base)", fontSize: "12px", fontWeight: 700 }}>\u2713</span>}
+                {tech.enabled && (
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                    <path d="M2.5 6L5 8.5L9.5 3.5" stroke="var(--surface-base)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                )}
               </button>
               <div className="flex flex-col min-w-0">
                 <span className="text-sm font-medium truncate">{tech.name}</span>
@@ -987,8 +1275,12 @@ function ReShadePanel({ game }: { game: Game }) {
         <div className="flex flex-col gap-2">
           <div className="text-xs font-semibold uppercase tracking-wide opacity-60">Parameters</div>
           {state.uniforms.map((uniform) => {
-            const isFloat = uniform.type === 0x61 || uniform.type === 0x65;
-            const isInt = uniform.type === 0x6d || uniform.type === 0x71;
+            // ReShade format enum values: r32_float=41, r32g32_float=16, r32g32b32_float=6, r32g32b32a32_float=2
+            const FLOAT_TYPES = new Set([41, 16, 6, 2]);
+            // r32_sint=43, r32g32_sint=18, r32g32b32_sint=8, r32g32b32a32_sint=4
+            const INT_TYPES = new Set([43, 18, 8, 4]);
+            const isFloat = FLOAT_TYPES.has(uniform.type);
+            const isInt = INT_TYPES.has(uniform.type);
             if (!isFloat && !isInt) return null;
             const val = uniform.values[0] ?? 0;
             const min = isFloat ? 0 : -100;
@@ -1098,8 +1390,8 @@ function ControllerHints() {
   const hints = [
     { keys: "↑ / ↓", action: "Navigate" },
     { keys: "A", action: "Select" },
-    { keys: "B", action: "Close" },
-    { keys: "F1 / Esc", action: "Close" },
+    { keys: "B / Esc", action: "Back" },
+    { keys: "F1", action: "Close" },
   ];
   return (
     <div className="flex items-center gap-4 text-xs opacity-50">
@@ -1119,12 +1411,27 @@ function ControllerHints() {
 
 export function OverlayApp(): React.ReactElement {
   useControllerWorker();
-  const game = useOverlayGame();
+  const { game, visible, pinnedVisible } = useOverlayGame();
   const { paused, toggle: togglePaused } = useOverlayPaused();
   const { settings, update } = useOverlaySettings();
   const [selectedItem, setSelectedItem] = useState(0);
   const selectedItemRef = useRef(0);
   const [isExiting, setIsExiting] = useState(false);
+  const [configChartId, setConfigChartId] = useState<OverlayChartId | null>(null);
+  const [sidebarHidden, setSidebarHidden] = useState(false);
+
+  /* Chart config from settings */
+  const chartsConfig = settings?.overlayChartsConfig ?? getDefaultOverlayChartsConfig();
+  const chartConfigs = chartsConfig.charts;
+  const chartGrid = chartsConfig.grid as Layout;
+
+  const persistChartsConfig = useCallback((nextCharts: OverlayChartConfig[], nextGrid: Layout) => {
+    const cfg: OverlayChartsConfig = {
+      charts: nextCharts,
+      grid: nextGrid.map((l) => ({ i: l.i, x: l.x, y: l.y, w: l.w, h: l.h, minW: l.minW, minH: l.minH })),
+    };
+    update({ overlayChartsConfig: cfg });
+  }, [update]);
 
   const style = settings?.overlayStyle ?? { mode: "glass", color: "#000000", opacity: 0.7 };
 
@@ -1177,6 +1484,16 @@ export function OverlayApp(): React.ReactElement {
     [togglePaused]
   );
 
+  const backOrClose = useCallback(() => {
+    const currentId = SIDEBAR_ITEMS[selectedItemRef.current].id;
+    if (CONTENT_IDS.has(currentId)) {
+      selectedItemRef.current = 0;
+      setSelectedItem(0);
+    } else {
+      window.htpc.overlay.close();
+    }
+  }, []);
+
   useInputNav(
     useCallback((action) => {
       if (action === "up") {
@@ -1188,16 +1505,19 @@ export function OverlayApp(): React.ReactElement {
       } else if (action === "confirm") {
         handleSelect(SIDEBAR_ITEMS[selectedItemRef.current].id);
       } else if (action === "cancel") {
-        window.htpc.overlay.close();
+        backOrClose();
       }
-    }, [handleSelect])
+    }, [handleSelect, backOrClose])
   );
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" || e.key === "F1") {
+      if (e.key === "F1") {
         e.preventDefault();
         window.htpc.overlay.close();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        backOrClose();
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
         selectedItemRef.current = Math.max(0, selectedItemRef.current - 1);
@@ -1213,10 +1533,23 @@ export function OverlayApp(): React.ReactElement {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [handleSelect]);
+  }, [handleSelect, backOrClose]);
 
-  /* Process stats */
+  /* Process stats — always running so pinned charts work even when overlay is hidden */
   const { stats, history } = useProcessStats(true);
+
+  /* Kill threshold monitoring */
+  useEffect(() => {
+    for (const cfg of chartConfigs) {
+      if (!cfg.enabled || cfg.killThreshold <= 0) continue;
+      const val = getChartCurrentValue(cfg.id, stats);
+      if (val > cfg.killThreshold) {
+        logKillThreshold(cfg, val);
+        void window.htpc.overlay.stopGame();
+        return;
+      }
+    }
+  }, [stats, chartConfigs]);
 
   /* Game cover */
   const [cover, setCover] = useState<string | null>(null);
@@ -1230,6 +1563,47 @@ export function OverlayApp(): React.ReactElement {
       if (url) setCover(url);
     });
   }, [game]);
+
+  /* Chart config helpers */
+  const togglePin = useCallback((id: OverlayChartId) => {
+    const nextCharts = chartConfigs.map((c) =>
+      c.id === id ? { ...c, pinned: !c.pinned } : c
+    );
+    persistChartsConfig(nextCharts, chartGrid);
+  }, [chartConfigs, chartGrid, persistChartsConfig]);
+
+  const saveChartConfig = useCallback((cfg: OverlayChartConfig) => {
+    const nextCharts = chartConfigs.map((c) => (c.id === cfg.id ? cfg : c));
+    persistChartsConfig(nextCharts, chartGrid);
+  }, [chartConfigs, chartGrid, persistChartsConfig]);
+
+  const handleChartLayoutChange = useCallback((newLayout: Layout) => {
+    persistChartsConfig(chartConfigs, newLayout);
+  }, [chartConfigs, persistChartsConfig]);
+
+  /* Container width for react-grid-layout (full overlay) */
+  const { width: gridWidth, containerRef: gridContainerRef } = useContainerWidth({ measureBeforeMount: false });
+
+  /* Container width for pinned-only mode */
+  const { width: pinnedGridWidth, containerRef: pinnedGridContainerRef } = useContainerWidth({ measureBeforeMount: false });
+
+  /* Enabled chart configs and their grid items */
+  const enabledCharts = useMemo(() => {
+    const enabledIds = new Set(chartConfigs.filter((c) => c.enabled).map((c) => c.id));
+    return {
+      charts: chartConfigs.filter((c) => c.enabled),
+      grid: chartGrid.filter((g) => enabledIds.has(g.i as OverlayChartId)),
+    };
+  }, [chartConfigs, chartGrid]);
+
+  /* Pinned chart configs and their grid items */
+  const pinnedCharts = useMemo(() => {
+    const pinnedIds = new Set(chartConfigs.filter((c) => c.enabled && c.pinned).map((c) => c.id));
+    return {
+      charts: chartConfigs.filter((c) => c.enabled && c.pinned),
+      grid: chartGrid.filter((g) => pinnedIds.has(g.i as OverlayChartId)),
+    };
+  }, [chartConfigs, chartGrid]);
 
   /* Determine which content panel to show */
   const activeId = SIDEBAR_ITEMS[selectedItem].id;
@@ -1257,199 +1631,235 @@ export function OverlayApp(): React.ReactElement {
 
   const showContent = activeId === "achievements" || activeId === "gameinfo" || activeId === "controllers" || activeId === "shaders" || activeId === "reshade" || activeId === "settings" || activeId === "splitscreen";
 
+  /* Render a single chart inside a grid item */
+  const renderChart = useCallback((cfg: OverlayChartConfig, isPinned: boolean) => {
+    const Icon = CHART_ICONS[cfg.id] ?? Activity;
+    const { data, value, max, unit } = getChartData(cfg.id, stats, history);
+    const currentValue = getChartCurrentValue(cfg.id, stats);
+    return (
+      <MiniChart
+        data={data}
+        color={cfg.color}
+        max={max}
+        label={cfg.label}
+        value={value}
+        unit={unit}
+        Icon={Icon}
+        pinned={isPinned}
+        pinnedBg={cfg.pinnedBg}
+        pinnedBorder={cfg.pinnedBorder}
+        warnThreshold={cfg.warnThreshold}
+        killThreshold={cfg.killThreshold}
+        currentValue={currentValue}
+        onTogglePin={visible ? () => togglePin(cfg.id) : undefined}
+        onConfigure={visible ? () => setConfigChartId(cfg.id) : undefined}
+      />
+    );
+  }, [stats, history, visible, togglePin]);
+
+  /* Pinned-only overlay: just the pinned charts, floating, click-through */
+  if (!visible && pinnedVisible && pinnedCharts.charts.length > 0) {
+    return (
+      <>
+        <div className="fixed inset-0 pointer-events-none" style={{ zIndex: 9999 }}>
+          <div className="absolute top-4 right-4" ref={pinnedGridContainerRef as React.LegacyRef<HTMLDivElement>}>
+            <Responsive
+              className="layout"
+              width={pinnedGridWidth || 400}
+              layouts={{ lg: pinnedCharts.grid.map((l) => ({ ...l, static: true })) }}
+              breakpoints={{ lg: 0 }}
+              cols={{ lg: 12 }}
+              rowHeight={40}
+              margin={[8, 8]}
+              containerPadding={[0, 0]}
+              compactType={null}
+              isDraggable={false}
+              isResizable={false}
+            >
+              {pinnedCharts.charts.map((cfg) => (
+                <div key={cfg.id} className="overflow-visible">
+                  {renderChart(cfg, true)}
+                </div>
+              ))}
+            </Responsive>
+          </div>
+        </div>
+        <ChartConfigDialog
+          chart={chartConfigs.find((c) => c.id === configChartId) ?? null}
+          open={!!configChartId}
+          onClose={() => setConfigChartId(null)}
+          onSave={saveChartConfig}
+        />
+      </>
+    );
+  }
+
+  /* Full overlay hidden and no pinned charts */
+  if (!visible) return null;
+
   return (
     <div
+      ref={gridContainerRef as React.LegacyRef<HTMLDivElement>}
       className="fixed inset-0 flex text-[var(--text-primary)] overflow-hidden select-none"
       style={backgroundStyle}
     >
-      {/* ─── Sidebar (left) ─────────────────────────────────── */}
-      <aside
-        className="flex flex-col flex-shrink-0 w-72 border-r overflow-y-auto"
-        style={{ borderColor: "var(--border-default)", background: "var(--surface-base)" }}
-      >
-        {/* Game thumbnail + title + playtime (horizontal) */}
-        <div className="flex items-center gap-3 p-4">
-          {cover ? (
-            <img
-              src={cover}
-              alt={game?.title ?? ""}
-              className="w-16 h-16 object-cover rounded-lg border flex-shrink-0"
-              style={{ borderColor: "var(--border-default)" }}
-            />
-          ) : (
-            <div
-              className="w-16 h-16 rounded-lg flex items-center justify-center border flex-shrink-0"
-              style={{ background: "var(--surface-1)", borderColor: "var(--border-default)" }}
-            >
-              <Disc size={24} className="opacity-40" />
+      {/* ─── Grid layer (fills entire overlay) ─────────────── */}
+      <div className="absolute inset-0">
+        <Responsive
+          className="layout"
+          width={gridWidth || window.innerWidth}
+          layouts={{ lg: enabledCharts.grid.map((l) => ({ ...l, static: false })) }}
+          breakpoints={{ lg: 0 }}
+          cols={{ lg: 12 }}
+          rowHeight={40}
+          margin={[8, 8]}
+          containerPadding={[0, 0]}
+          compactType={null}
+          onLayoutChange={handleChartLayoutChange}
+          isDraggable
+          isResizable
+        >
+          {enabledCharts.charts.map((cfg) => (
+            <div key={cfg.id} className="overflow-visible">
+              {renderChart(cfg, cfg.pinned)}
             </div>
-          )}
-          <div className="flex flex-col gap-1 min-w-0">
-            <h2 className="text-sm font-bold leading-tight line-clamp-2">{game?.title ?? "Loading..."}</h2>
-            <div className="flex items-center gap-1.5 text-xs opacity-60">
-              <Clock size={12} />
-              {formatPlayTime(game?.playTime)}
+          ))}
+        </Responsive>
+      </div>
+
+      {/* ─── Edit charts toggle (floats right of sidebar) ─── */}
+      <button
+        onClick={() => setSidebarHidden((v) => !v)}
+        className="fixed top-2 z-30 flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors text-[12px] font-medium"
+        style={{
+          left: sidebarHidden ? 8 : 296,
+          background: sidebarHidden ? "var(--surface-2)" : "var(--surface-1)",
+          color: "var(--text-secondary)",
+          border: "1px solid var(--border-default)",
+        }}
+        title={sidebarHidden ? "Show sidebar" : "Edit charts"}
+      >
+        <LayoutDashboard size={14} />
+        <span>Edit Charts</span>
+      </button>
+
+      {/* ─── Sidebar + content (hidden when sidebarHidden) ── */}
+      {!sidebarHidden && (
+        <>
+          {/* ─── Sidebar (left) ─────────────────────────────────── */}
+          <aside
+            className="flex flex-col flex-shrink-0 w-72 border-r overflow-y-auto relative z-20"
+            style={{ borderColor: "var(--border-default)", background: "var(--surface-base)" }}
+          >
+            {/* Game thumbnail + title + playtime (horizontal) */}
+            <div className="flex items-center gap-3 p-4">
+              {cover ? (
+                <img
+                  src={cover}
+                  alt={game?.title ?? ""}
+                  className="w-16 h-16 object-cover rounded-lg border flex-shrink-0"
+                  style={{ borderColor: "var(--border-default)" }}
+                />
+              ) : (
+                <div
+                  className="w-16 h-16 rounded-lg flex items-center justify-center border flex-shrink-0"
+                  style={{ background: "var(--surface-1)", borderColor: "var(--border-default)" }}
+                >
+                  <Disc size={24} className="opacity-40" />
+                </div>
+              )}
+              <div className="flex flex-col gap-1 min-w-0">
+                <h2 className="text-sm font-bold leading-tight line-clamp-2">{game?.title ?? "Loading..."}</h2>
+                <div className="flex items-center gap-1.5 text-xs opacity-60">
+                  <Clock size={12} />
+                  {formatPlayTime(game?.playTime)}
+                </div>
+              </div>
+            </div>
+
+            {/* Separator */}
+            <div className="h-px mx-4" style={{ background: "var(--border-default)" }} />
+
+            {/* Sidebar items */}
+            <nav className="flex flex-col gap-1 p-2">
+              {SIDEBAR_ITEMS.map((item, idx) => {
+                const isActive = idx === selectedItem;
+                const Icon = item.Icon;
+                const isExit = item.id === "exit";
+                const isPause = item.id === "pause";
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      selectedItemRef.current = idx;
+                      setSelectedItem(idx);
+                      handleSelect(item.id);
+                    }}
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-left"
+                    style={{
+                      background: isActive ? "var(--surface-2)" : "transparent",
+                      color: isExit
+                        ? "#ff6b6b"
+                        : isPause && paused
+                          ? "var(--accent)"
+                          : isActive
+                            ? "var(--text-primary)"
+                            : "var(--text-secondary)",
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isActive)
+                        (e.currentTarget as HTMLButtonElement).style.background = "var(--surface-1)";
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isActive)
+                        (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+                    }}
+                  >
+                    <Icon size={18} />
+                    <span>{isPause ? (paused ? "Resume Game" : "Pause Game") : item.label}</span>
+                    {isActive && (
+                      <div
+                        className="ml-auto w-1 h-5 rounded-full"
+                        style={{ background: "var(--accent)" }}
+                      />
+                    )}
+                  </button>
+                );
+              })}
+            </nav>
+          </aside>
+
+          {/* ─── Main area (right) ─────────────────────────────── */}
+          <div className="flex-1 flex flex-col min-w-0 relative z-20">
+            {/* Content area */}
+            <div className="flex-1 p-6 overflow-hidden min-h-0">
+              {game ? (
+                showContent ? (
+                  <div className="h-full overflow-y-auto">{contentPanel}</div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-full gap-4 opacity-50">
+                    <Disc size={64} className="opacity-30" />
+                    <div className="text-sm">Select an item from the sidebar</div>
+                  </div>
+                )
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full gap-4 opacity-70">
+                  <div className="w-12 h-12 border-2 border-[var(--border-default)] border-t-[var(--accent)] rounded-full animate-spin" />
+                  <div className="text-sm">Waiting for game info...</div>
+                </div>
+              )}
+            </div>
+
+            {/* Bottom-right: controller hints */}
+            <div
+              className="flex items-center justify-end px-6 py-2 border-t flex-shrink-0"
+              style={{ borderColor: "var(--border-default)" }}
+            >
+              <ControllerHints />
             </div>
           </div>
-        </div>
-
-        {/* Separator */}
-        <div className="h-px mx-4" style={{ background: "var(--border-default)" }} />
-
-        {/* Sidebar items */}
-        <nav className="flex flex-col gap-1 p-2">
-          {SIDEBAR_ITEMS.map((item, idx) => {
-            const isActive = idx === selectedItem;
-            const Icon = item.Icon;
-            const isExit = item.id === "exit";
-            const isPause = item.id === "pause";
-            return (
-              <button
-                key={item.id}
-                onClick={() => {
-                  selectedItemRef.current = idx;
-                  setSelectedItem(idx);
-                  handleSelect(item.id);
-                }}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-left"
-                style={{
-                  background: isActive ? "var(--surface-2)" : "transparent",
-                  color: isExit
-                    ? "#ff6b6b"
-                    : isPause && paused
-                      ? "var(--accent)"
-                      : isActive
-                        ? "var(--text-primary)"
-                        : "var(--text-secondary)",
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActive)
-                    (e.currentTarget as HTMLButtonElement).style.background = "var(--surface-1)";
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActive)
-                    (e.currentTarget as HTMLButtonElement).style.background = "transparent";
-                }}
-              >
-                <Icon size={18} />
-                <span>{isPause ? (paused ? "Resume Game" : "Pause Game") : item.label}</span>
-                {isActive && (
-                  <div
-                    className="ml-auto w-1 h-5 rounded-full"
-                    style={{ background: "var(--accent)" }}
-                  />
-                )}
-              </button>
-            );
-          })}
-        </nav>
-      </aside>
-
-      {/* ─── Main area (right) ─────────────────────────────── */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Top-right: process stats */}
-        <div
-          className="flex items-start justify-end gap-4 px-4 py-3 border-b flex-shrink-0"
-          style={{ borderColor: "var(--border-default)" }}
-        >
-          <MiniChart
-            data={history.cpu}
-            color="var(--accent)"
-            max={100 * (stats.processCount || 1)}
-            label="CPU"
-            value={stats.cpuPercent.toFixed(1)}
-            unit="%"
-            Icon={Cpu}
-          />
-          <MiniChart
-            data={history.mem}
-            color="#4ade80"
-            max={Math.max(1024, ...history.mem, stats.memMB)}
-            label="Mem"
-            value={stats.memMB.toFixed(0)}
-            unit="MB"
-            Icon={HardDrive}
-          />
-          <MiniChart
-            data={history.gpu}
-            color="#a78bfa"
-            max={100}
-            label="GPU"
-            value={stats.gpuPercent.toFixed(0)}
-            unit="%"
-            Icon={Zap}
-          />
-          <MiniChart
-            data={history.gpuMem}
-            color="#fb923c"
-            max={Math.max(256, ...history.gpuMem, stats.gpuMemTotalMB)}
-            label="VRAM"
-            value={stats.gpuMemUsedMB.toFixed(0)}
-            unit={`/${stats.gpuMemTotalMB || "?"}MB`}
-            Icon={MemoryStick}
-          />
-          <MiniChart
-            data={history.diskR.map((v, i) => v + (history.diskW[i] ?? 0))}
-            color="#60a5fa"
-            max={Math.max(1024, ...history.diskR, ...history.diskW)}
-            label="Disk"
-            value={(stats.diskReadKBps + stats.diskWriteKBps).toFixed(0)}
-            unit="KB/s"
-            Icon={Activity}
-          />
-          <MiniChart
-            data={history.netRx.map((v, i) => v + (history.netTx[i] ?? 0))}
-            color="#f472b6"
-            max={Math.max(1024, ...history.netRx, ...history.netTx)}
-            label="Net"
-            value={(stats.netRxKBps + stats.netTxKBps).toFixed(0)}
-            unit="KB/s"
-            Icon={Wifi}
-          />
-          {/* Close button */}
-          <button
-            onClick={() => window.htpc.overlay.close()}
-            title="Close overlay"
-            className="px-3 py-1.5 rounded transition-colors flex items-center"
-            style={{ color: "var(--text-secondary)", background: "transparent" }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.background = "var(--surface-0)";
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.background = "transparent";
-            }}
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        {/* Content area */}
-        <div className="flex-1 p-6 overflow-hidden min-h-0">
-          {game ? (
-            showContent ? (
-              <div className="h-full overflow-y-auto">{contentPanel}</div>
-            ) : (
-              <div className="flex flex-col items-center justify-center h-full gap-4 opacity-50">
-                <Disc size={64} className="opacity-30" />
-                <div className="text-sm">Select an item from the sidebar</div>
-              </div>
-            )
-          ) : (
-            <div className="flex flex-col items-center justify-center h-full gap-4 opacity-70">
-              <div className="w-12 h-12 border-2 border-[var(--border-default)] border-t-[var(--accent)] rounded-full animate-spin" />
-              <div className="text-sm">Waiting for game info...</div>
-            </div>
-          )}
-        </div>
-
-        {/* Bottom-right: controller hints */}
-        <div
-          className="flex items-center justify-end px-6 py-2 border-t flex-shrink-0"
-          style={{ borderColor: "var(--border-default)" }}
-        >
-          <ControllerHints />
-        </div>
-      </div>
+        </>
+      )}
 
       {/* Exit progress overlay */}
       {isExiting && (
@@ -1461,6 +1871,14 @@ export function OverlayApp(): React.ReactElement {
           <div className="text-sm text-white/80">Stopping game…</div>
         </div>
       )}
+
+      {/* Chart config dialog */}
+      <ChartConfigDialog
+        chart={chartConfigs.find((c) => c.id === configChartId) ?? null}
+        open={!!configChartId}
+        onClose={() => setConfigChartId(null)}
+        onSave={saveChartConfig}
+      />
     </div>
   );
 }

@@ -9,7 +9,7 @@ import { getSettings } from "./settings.service";
 import { setOverlayWindow, setControllerButtonHandler } from "../input/evdev";
 import { createLogger } from "../util/logger";
 import { getDescendantPids, getSiblingPids } from "../util/process-tree";
-import { grabOverlayInputs, ungrabOverlayInputs, setToggleOverlayCallback, getWindowGeometryX11, isWindowFocusedX11 } from "./x11-input-grab.service";
+import { grabOverlayInputs, ungrabOverlayInputs, setToggleOverlayCallback, getWindowGeometryX11, isWindowFocusedX11, refocusWindowX11 } from "./x11-input-grab.service";
 
 const log = createLogger("info");
 const execFileAsync = promisify(execFile);
@@ -18,6 +18,7 @@ const isDev = !app.isPackaged;
 
 let mainWindow: BrowserWindow | null = null;
 let overlayWindow: BrowserWindow | null = null;
+let pinnedOnlyMode = false;
 
 let activeGame: Game | null = null;
 let activeGamePid: number | null = null;
@@ -40,20 +41,44 @@ function isWayland(): boolean {
   );
 }
 
+function refocusGameWindow(): void {
+  if (process.platform !== "linux") return;
+  if (!cachedGameWindowId) return;
+  const wid = cachedGameWindowId;
+  void refocusWindowX11(wid)
+    .then((ok) => {
+      if (ok) log.info("overlay", `refocused game window ${wid}`);
+      else log.warn("overlay", `failed to refocus game window ${wid}`);
+    })
+    .catch((err) => log.warn("overlay", `failed to refocus game window: ${err}`));
+}
+
 function pushToast(type: "info" | "success" | "error" | "progress", message: string): void {
   if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents.isDestroyed()) {
     mainWindow.webContents.send("toast:push", { type, message });
   }
 }
 
-function sendState(visible: boolean): void {
+function sendState(visible: boolean, pinnedVisible = false): void {
   if (!overlayWindow || overlayWindow.isDestroyed() || overlayWindow.webContents.isDestroyed()) {
     return;
   }
   overlayWindow.webContents.send(IPC_CHANNELS.overlay.state, {
     visible,
+    pinnedVisible,
     game: activeGame,
   });
+}
+
+async function hasPinnedCharts(): Promise<boolean> {
+  try {
+    const settings = await getSettings();
+    const cfg = settings.overlayChartsConfig;
+    if (!cfg) return false;
+    return cfg.charts.some((c) => c.enabled && c.pinned);
+  } catch {
+    return false;
+  }
 }
 
 async function getWindowGeometry(wid: number): Promise<Electron.Rectangle | null> {
@@ -285,7 +310,7 @@ async function createOverlayWindow(): Promise<BrowserWindow | null> {
     alwaysOnTop: true,
     skipTaskbar: true,
     hasShadow: false,
-    focusable: false,
+    focusable: true,
     show: false,
     autoHideMenuBar: true,
     webPreferences: {
@@ -350,14 +375,19 @@ function startGeometryTracking(): void {
     if (!overlayWindow || overlayWindow.isDestroyed() || !activeGamePid) return;
     if (!cachedGameWindowId) return;
 
-    // Check if game window has focus; toggle always-on-top accordingly
-    const focused = await isWindowFocusedX11(cachedGameWindowId);
-    if (focused !== cachedGameFocused) {
-      cachedGameFocused = focused;
-      if (focused) {
-        overlayWindow.setAlwaysOnTop(true, "screen-saver");
-      } else {
-        overlayWindow.setAlwaysOnTop(false);
+    // When overlay is active (not pinned-only), always stay on top.
+    // In pinned-only mode, only stay on top when the game has focus.
+    if (!pinnedOnlyMode) {
+      overlayWindow.setAlwaysOnTop(true, "screen-saver");
+    } else {
+      const focused = await isWindowFocusedX11(cachedGameWindowId);
+      if (focused !== cachedGameFocused) {
+        cachedGameFocused = focused;
+        if (focused) {
+          overlayWindow.setAlwaysOnTop(true, "screen-saver");
+        } else {
+          overlayWindow.setAlwaysOnTop(false);
+        }
       }
     }
 
@@ -369,12 +399,11 @@ function startGeometryTracking(): void {
     }
     cachedGameBounds = bounds;
     const currentBounds = overlayWindow.getBounds();
-    const needsMove =
-      currentBounds.x !== bounds.x ||
-      currentBounds.y !== bounds.y ||
-      currentBounds.width !== bounds.width ||
-      currentBounds.height !== bounds.height;
-    if (!needsMove) return;
+    const dx = Math.abs(currentBounds.x - bounds.x);
+    const dy = Math.abs(currentBounds.y - bounds.y);
+    const dw = Math.abs(currentBounds.width - bounds.width);
+    const dh = Math.abs(currentBounds.height - bounds.height);
+    if (dx < 2 && dy < 2 && dw < 2 && dh < 2) return;
     const display = screen.getDisplayNearestPoint({ x: bounds.x, y: bounds.y }) ?? screen.getPrimaryDisplay();
     const useFullscreen = isNearFullscreen(bounds, display);
     if (overlayWindow.isFullScreen() !== useFullscreen) {
@@ -401,6 +430,18 @@ export async function showOverlay(): Promise<void> {
 
   if (isWayland()) {
     pushToast("error", "In-game overlay is not supported on Wayland yet.");
+    return;
+  }
+
+  // If we're in pinned-only mode, just transition to full overlay
+  if (pinnedOnlyMode && overlayWindow && !overlayWindow.isDestroyed() && overlayWindow.isVisible()) {
+    pinnedOnlyMode = false;
+    overlayWindow.setFocusable(true);
+    overlayWindow.setIgnoreMouseEvents(false);
+    sendState(true);
+    void grabOverlayInputs(overlayWindow);
+    startGeometryTracking();
+    log.info("overlay", "overlay shown from pinned-only mode");
     return;
   }
 
@@ -458,9 +499,15 @@ export async function showOverlay(): Promise<void> {
     win.setBounds(targetBounds, false);
   }
   if (win.isMinimized()) win.restore();
+  win.setFocusable(true);
   win.showInactive();
   win.setAlwaysOnTop(true, "screen-saver");
   win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  if (!useFullscreen) {
+    win.setBounds(targetBounds, false);
+  }
+  pinnedOnlyMode = false;
+  win.setIgnoreMouseEvents(false);
   sendState(true);
   void grabOverlayInputs(win);
   startGeometryTracking();
@@ -474,14 +521,34 @@ export function hideOverlay(reason = "unknown"): void {
   if (!overlayWindow || overlayWindow.isDestroyed()) {
     overlayWindow = null;
     void ungrabOverlayInputs();
+    refocusGameWindow();
     log.info("overlay", `overlay hidden (${reason})`);
     return;
   }
   void ungrabOverlayInputs();
   stopGeometryTracking();
-  overlayWindow.hide();
-  sendState(false);
-  log.info("overlay", `overlay hidden (${reason})`);
+  // Check if we should stay visible for pinned charts
+  void hasPinnedCharts().then((hasPinned) => {
+    if (!overlayWindow || overlayWindow.isDestroyed()) {
+      overlayWindow = null;
+      return;
+    }
+    if (hasPinned) {
+      pinnedOnlyMode = true;
+      overlayWindow!.setFocusable(false);
+      overlayWindow!.setIgnoreMouseEvents(true, { forward: true });
+      sendState(false, true);
+      refocusGameWindow();
+      log.info("overlay", `overlay switched to pinned-only mode (${reason})`);
+    } else {
+      pinnedOnlyMode = false;
+      overlayWindow!.setFocusable(false);
+      overlayWindow!.hide();
+      sendState(false);
+      refocusGameWindow();
+      log.info("overlay", `overlay hidden (${reason})`);
+    }
+  });
 }
 
 export function toggleOverlay(): void {
@@ -497,8 +564,8 @@ export function toggleOverlay(): void {
   }
 
   const visible = overlayWindow && !overlayWindow.isDestroyed() && overlayWindow.isVisible();
-  log.info("overlay", `toggleOverlay called, currently visible=${visible ?? false}`);
-  if (visible) {
+  log.info("overlay", `toggleOverlay called, currently visible=${visible ?? false}, pinnedOnly=${pinnedOnlyMode}`);
+  if (visible && !pinnedOnlyMode) {
     hideOverlay("toggle");
   } else {
     void showOverlay();
@@ -701,6 +768,7 @@ export function clearOverlayGame(gameId: string): void {
     }
     unregisterShortcut();
     unregisterPauseShortcut();
+    pinnedOnlyMode = false;
     hideOverlay("game-cleared");
     if (overlayWindow && !overlayWindow.isDestroyed()) {
       overlayWindow.destroy();

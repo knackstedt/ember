@@ -840,6 +840,8 @@ export interface AppSettings {
   splitscreenDefaultLayout?: import("./splitscreen-types").SplitscreenLayoutType;
   /** Overlay toggle key for splitscreen mode (defaults to F1) */
   splitscreenOverlayShortcut?: string;
+  /** Overlay sparkline chart configuration (positions, colors, thresholds) */
+  overlayChartsConfig?: OverlayChartsConfig;
 }
 
 export type DashboardWidgetType =
@@ -877,6 +879,34 @@ export interface DashboardGridItem {
   h: number;
   minW?: number;
   minH?: number;
+}
+
+/* ─── Overlay sparkline charts ─────────────────────────────── */
+
+export type OverlayChartId = "cpu" | "mem" | "gpu" | "vram" | "disk" | "net";
+
+export interface OverlayChartConfig {
+  id: OverlayChartId;
+  label: string;
+  /** Sparkline stroke color (CSS color) */
+  color: string;
+  /** Background color when pinned (CSS color, incl. alpha) */
+  pinnedBg: string;
+  /** Border color when pinned */
+  pinnedBorder: string;
+  /** Whether the chart stays visible when the overlay is hidden */
+  pinned: boolean;
+  /** Warn if the current value exceeds this (0 = disabled) */
+  warnThreshold: number;
+  /** Kill the game if the current value exceeds this (0 = disabled) */
+  killThreshold: number;
+  /** Whether the chart is visible at all */
+  enabled: boolean;
+}
+
+export interface OverlayChartsConfig {
+  charts: OverlayChartConfig[];
+  grid: DashboardGridItem[];
 }
 
 export type RemoteSourceProtocol =

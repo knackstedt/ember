@@ -1101,8 +1101,8 @@ const htpc = {
       gpuMemUsedMB: number;
       gpuMemTotalMB: number;
     }> => ipcRenderer.invoke(IPC_CHANNELS.overlay.processStats),
-    onState: (cb: (state: { visible: boolean; game: import("../shared/types").Game | null }) => void) => {
-      const handler = (_: Electron.IpcRendererEvent, state: { visible: boolean; game: import("../shared/types").Game | null }) => cb(state);
+    onState: (cb: (state: { visible: boolean; pinnedVisible?: boolean; game: import("../shared/types").Game | null }) => void) => {
+      const handler = (_: Electron.IpcRendererEvent, state: { visible: boolean; pinnedVisible?: boolean; game: import("../shared/types").Game | null }) => cb(state);
       ipcRenderer.on(IPC_CHANNELS.overlay.state, handler);
       return () => ipcRenderer.removeListener(IPC_CHANNELS.overlay.state, handler);
     },
