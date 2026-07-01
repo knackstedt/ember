@@ -9,9 +9,28 @@
 
 import { join } from "path";
 import { existsSync } from "fs";
+import { Socket } from "net";
 
 const arch = process.arch === "arm64" ? "arm64" : "x64";
 const addonName = `video-decoder.linux-${arch}-gnu.node`;
+
+// fd 4 is the dedicated binary frame pipe (stdio[4] in the parent).
+const framePipe = new Socket({ fd: 4, writable: true, readable: false });
+const FRAME_MAGIC = 0x4652414d;
+const FRAME_HEADER_SIZE = 20;
+
+function writeFrameToPipe(decoderId: string, width: number, height: number, frameBuf: Buffer) {
+  const idBuf = Buffer.from(decoderId, "utf8");
+  const header = Buffer.allocUnsafe(FRAME_HEADER_SIZE);
+  header.writeUInt32LE(FRAME_MAGIC, 0);
+  header.writeUInt32LE(idBuf.length, 4);
+  header.writeUInt32LE(width, 8);
+  header.writeUInt32LE(height, 12);
+  header.writeUInt32LE(frameBuf.length, 16);
+  framePipe.write(header);
+  framePipe.write(idBuf);
+  framePipe.write(frameBuf);
+}
 
 function findAddon(): string | null {
   const candidates = [
@@ -128,24 +147,24 @@ function startPump(decoderId: string) {
         return;
       }
 
-      // Copy the frame slice into a standalone Buffer so V8 serialization
-      // doesn't try to send the entire underlying ArrayBuffer.
+      // Copy the frame slice into a standalone Buffer for the binary pipe.
       const frameBuf = Buffer.allocUnsafe(frameLen);
       frameBuf.set(new Uint8Array(s.ab, slotOffset, frameLen));
 
+      // Send frame metadata (timestamp) via IPC, and pixel data via the
+      // binary pipe (fd 4). This avoids V8 structured clone version
+      // mismatches between Electron and system Node.
       s.lastFrameTime = performance.now();
       try {
         s.currentTimeMs = s.decoder.getTimePosMs() ?? s.currentTimeMs;
       } catch { /* ignore */ }
 
       process.send!({
-        type: "frame",
+        type: "frame-meta",
         decoderId,
-        width,
-        height,
-        data: frameBuf,
         timestampMs: s.currentTimeMs,
       });
+      writeFrameToPipe(decoderId, width, height, frameBuf);
     } catch (err: any) {
       process.send!({ type: "event", decoderId, event: "error", message: err?.message ?? String(err) });
       return;
@@ -279,13 +298,11 @@ function handleCommand(req: any) {
                   const frameView = new Uint8Array(state.ab, slotOffset, frameLen);
                   frameBuf.set(frameView);
                   process.send!({
-                    type: "frame",
+                    type: "frame-meta",
                     decoderId,
-                    width,
-                    height,
-                    data: frameBuf,
                     timestampMs: ms,
                   });
+                  writeFrameToPipe(decoderId, width, height, frameBuf);
                 }
               }
             }

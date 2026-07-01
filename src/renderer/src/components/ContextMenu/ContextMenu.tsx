@@ -27,7 +27,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   onSelect,
   onClose,
 }) => {
-  const menuRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   // Auto-scroll active option into view
@@ -84,14 +84,12 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   );
 
   return (
+    <div ref={menuRef} className="fixed z-[100]" style={{ left: clampedX, top: clampedY }}>
     <AnimatePresence>
       {isOpen && (
         <motion.div
-          ref={menuRef}
-          className="context-menu fixed z-[100] flex flex-col rounded-[var(--radius-card)] py-1.5"
+          className="context-menu flex flex-col rounded-[var(--radius-card)] py-1.5"
           style={{
-            left: clampedX,
-            top: clampedY,
             minWidth: 200,
             maxWidth: 320,
             maxHeight: estimatedHeight,
@@ -156,5 +154,6 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
         </motion.div>
       )}
     </AnimatePresence>
+    </div>
   );
 };

@@ -38,6 +38,7 @@ export interface MusicPlayerStore {
 }
 
 export const audio = new Audio();
+audio.crossOrigin = "anonymous";
 
 function loadAndPlay(track: MusicTrack, autoplay: boolean): void {
   const url = resolveMediaUrl(track.filePath);

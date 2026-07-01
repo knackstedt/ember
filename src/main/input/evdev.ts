@@ -43,6 +43,10 @@ interface ActiveDeviceEntry {
   lastActivityAt: number;
   /** True if this is a touchpad auxiliary device for a controller */
   isTouchpad?: boolean;
+  /** Set to true when the device is being force-closed (forceRescanAll).
+   *  The stream's data handler checks this to stop processing events from
+   *  a stale fd that may still emit buffered data after USB re-enumeration. */
+  closing?: boolean;
 }
 const activeDevices = new Map<string, ActiveDeviceEntry>();
 
@@ -666,6 +670,22 @@ async function openDevice(
   // Pick the correct axis map for this controller model
   const axisMap = getAxisMap(info.name, extra.driverName);
 
+  // Log actual evdev capabilities for diagnostics (sleep/wake mapping issues)
+  if (!isTouchpad) {
+    const deviceNum = eventPath.replace("/dev/input/event", "");
+    try {
+      const absCapPath = `/sys/class/input/event${deviceNum}/device/capabilities/abs`;
+      const keyCapPath = `/sys/class/input/event${deviceNum}/device/capabilities/key`;
+      const absCap = existsSync(absCapPath)
+        ? (await fsPromises.readFile(absCapPath, "utf-8")).trim()
+        : "(none)";
+      const keyCap = existsSync(keyCapPath)
+        ? (await fsPromises.readFile(keyCapPath, "utf-8")).trim()
+        : "(none)";
+      log.info("evdev", `Opened ${eventPath} (${info.name}) type=${controllerType} driver=${extra.driverName ?? "?"} abs=${absCap} key=${keyCap}`);
+    } catch { /* ignore */ }
+  }
+
   // Pre-read touchpad abs ranges so we can normalise to 0..1
   const touchpadAbsMax: Record<number, number> = {};
   if (isTouchpad) {
@@ -691,6 +711,15 @@ async function openDevice(
 
     stream.on("data", (chunk) => {
       if (!targetWindow || targetWindow.isDestroyed()) {
+        stream.destroy();
+        return;
+      }
+      // Stop processing if this stream was force-closed (e.g. during
+      // forceRescanAll after system resume).  The fd may still emit
+      // buffered events from the re-enumerated USB device, but the closures
+      // (controllerType, axisMap) are stale and would produce wrong mappings.
+      const activeEntry = activeDevices.get(eventPath);
+      if (!activeEntry || activeEntry.device !== stream || activeEntry.closing) {
         stream.destroy();
         return;
       }
@@ -825,7 +854,13 @@ async function openDevice(
     });
 
     stream.on("close", () => {
-      activeDevices.delete(eventPath);
+      // Only delete if the current entry is still this stream.
+      // After forceRescanAll re-opens the device, a new entry may exist
+      // for the same path — we must not delete it.
+      const entry = activeDevices.get(eventPath);
+      if (entry && entry.device === stream) {
+        activeDevices.delete(eventPath);
+      }
     });
 
     return {
@@ -1012,7 +1047,9 @@ export function clearFailureCooldowns(): void {
  *  capability detection. Closing all devices first ensures correct axis and
  *  button maps are re-derived for the post-wake device state. */
 export function forceRescanAll(): void {
+  log.info("evdev", "forceRescanAll: closing all devices for re-scan");
   for (const [path, handle] of activeDevices) {
+    handle.closing = true;
     handle.close();
   }
   activeDevices.clear();

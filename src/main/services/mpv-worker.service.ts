@@ -10,19 +10,33 @@ import { spawn, ChildProcess, execSync } from "child_process";
 import { createLogger } from "../util/logger";
 
 function findNodeExecutable(): string {
-  // Prefer system Node.js or Bun over Electron's executable.
-  // Electron bundles libffmpeg.so which exports libavutil 59 symbols,
-  // conflicting with libmpv's libavutil 58 and causing heap corruption.
+  // Use system Node.js (not Electron) to avoid loading Electron's bundled
+  // libffmpeg.so, which exports libavutil 59 symbols that conflict with
+  // libmpv's libavutil 58 and cause heap corruption.
   for (const cmd of ["node", "bun"]) {
     try {
       const path = execSync(`which ${cmd}`, { encoding: "utf8", stdio: ["pipe", "pipe", "ignore"] }).trim();
-      if (path && existsSync(path)) {
-        return path;
-      }
+      if (path && existsSync(path)) return path;
     } catch { /* ignore */ }
   }
   return process.execPath;
 }
+
+// --- Binary frame pipe protocol (fd 4) ---
+// All integers are little-endian.
+// Header (20 bytes):
+//   [0:4]   magic = 0x4652414d ('FRAM')
+//   [4:8]   decoderId length (u32)
+//   [8:12]  width (u32)
+//   [12:16] height (u32)
+//   [16:20] frame length (u32)
+// Then: decoderId bytes + frame data
+// (timestampMs is sent via IPC as frame-meta to avoid float encoding in binary)
+const FRAME_MAGIC = 0x4652414d;
+const FRAME_HEADER_SIZE = 20;
+
+let pendingFrameMeta: { decoderId: string; timestampMs: number } | null = null;
+let framePipeBuf: Buffer = Buffer.alloc(0);
 
 const log = createLogger("info");
 
@@ -95,18 +109,19 @@ function ensureWorker(): ChildProcess {
     throw new Error(`MPV worker not found at ${workerScript}`);
   }
 
+  // Use system Node.js to avoid Electron's libffmpeg.so symbol conflicts.
+  // Frame data is transferred via a dedicated binary pipe (fd 4) instead of
+  // IPC serialization, so V8 version differences don't matter.
   const nodeExec = findNodeExecutable();
   const isSystemNode = nodeExec !== process.execPath;
   const env: Record<string, string | undefined> = { ...process.env };
   if (!isSystemNode) {
-    // Only set ELECTRON_RUN_AS_NODE when we're actually using Electron.
     env.ELECTRON_RUN_AS_NODE = "1";
   }
 
   const w = spawn(nodeExec, [workerScript], {
     env,
-    stdio: ["pipe", "pipe", "pipe", "ipc"],
-    serialization: "advanced",
+    stdio: ["pipe", "pipe", "pipe", "ipc", "pipe"],
   });
 
   w.on("message", (msg: any) => {
@@ -120,29 +135,11 @@ function ensureWorker(): ChildProcess {
           pending.resolve(msg.result);
         }
       }
-    } else if (msg.type === "frame") {
-      const frameData = Buffer.isBuffer(msg.data) ? msg.data : Buffer.from(msg.data);
-      const q = getFrameQueue(msg.decoderId);
-      q.push({
-        width: msg.width,
-        height: msg.height,
-        data: frameData,
-        timestampMs: msg.timestampMs,
-      });
-      if (q.length > MAX_QUEUE_LEN) {
-        q.shift();
-      }
-      // Forward latest frame to renderer immediately.
-      const win = BrowserWindow.getAllWindows().find((w) => !w.isDestroyed());
-      if (win) {
-        win.webContents.send("mpv:frame", {
-          id: msg.decoderId,
-          width: msg.width,
-          height: msg.height,
-          data: frameData,
-          timestampMs: msg.timestampMs,
-        });
-      }
+    } else if (msg.type === "frame-meta") {
+      // Frame metadata (decoderId, timestamp) arrives via IPC; the actual
+      // pixel data arrives on the binary pipe (fd 4). They are matched up
+      // in the binary pipe handler below.
+      pendingFrameMeta = msg;
     } else if (msg.type === "event") {
       log.info("mpv-worker", `event ${msg.event} for ${msg.decoderId}${msg.message ? ": " + msg.message : ""}`);
       // Notify renderer of all events (end-file, error, etc.).
@@ -170,6 +167,56 @@ function ensureWorker(): ChildProcess {
       if (line.trim()) log.warn("mpv-worker", line.trim());
     }
   });
+
+  // Binary frame pipe reader (fd 4 = stdio[4]).
+  // Parses the binary frame protocol and matches frames with metadata
+  // received via IPC (frame-meta messages).
+  const framePipe = w.stdio[4];
+  if (framePipe) {
+    framePipe.on("data", (chunk: Buffer) => {
+      framePipeBuf = Buffer.concat([framePipeBuf, chunk]);
+      while (framePipeBuf.length >= FRAME_HEADER_SIZE) {
+        const magic = framePipeBuf.readUInt32LE(0);
+        if (magic !== FRAME_MAGIC) {
+          // Out of sync — find next magic
+          const idx = framePipeBuf.indexOf(Buffer.from("FRAM"), 1);
+          if (idx === -1) { framePipeBuf = Buffer.alloc(0); break; }
+          framePipeBuf = framePipeBuf.subarray(idx);
+          continue;
+        }
+        const idLen = framePipeBuf.readUInt32LE(4);
+        const width = framePipeBuf.readUInt32LE(8);
+        const height = framePipeBuf.readUInt32LE(12);
+        const frameLen = framePipeBuf.readUInt32LE(16);
+        const totalLen = FRAME_HEADER_SIZE + idLen + frameLen;
+        if (framePipeBuf.length < totalLen) break; // need more data
+
+        const decoderId = framePipeBuf.subarray(FRAME_HEADER_SIZE, FRAME_HEADER_SIZE + idLen).toString("utf8");
+        const frameData = Buffer.allocUnsafe(frameLen);
+        framePipeBuf.copy(frameData, 0, FRAME_HEADER_SIZE + idLen, totalLen);
+        framePipeBuf = framePipeBuf.subarray(totalLen);
+
+        const meta = pendingFrameMeta;
+        pendingFrameMeta = null;
+        const timestampMs = meta?.timestampMs ?? 0;
+
+        const q = getFrameQueue(decoderId);
+        q.push({ width, height, data: frameData, timestampMs });
+        if (q.length > MAX_QUEUE_LEN) q.shift();
+
+        const win = BrowserWindow.getAllWindows().find((win) => !win.isDestroyed());
+        if (win) {
+          win.webContents.send("mpv:frame", {
+            id: decoderId,
+            width,
+            height,
+            data: frameData,
+            timestampMs,
+          });
+        }
+      }
+    });
+  }
 
   w.on("exit", (code: number | null, signal: NodeJS.Signals | null) => {
     const isCurrent = worker === w;

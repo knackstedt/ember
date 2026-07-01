@@ -35,7 +35,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
 }) => {
   const [tagInput, setTagInput] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
   useFocusTrap(containerRef, open, onClose);
 
@@ -58,14 +58,12 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
   };
 
   return (
+    <div ref={containerRef} className="absolute top-0 bottom-0 z-20" style={{ width: "min(480px, 90%)", right: 0 }}>
     <AnimatePresence>
       {open && (
         <motion.div
-          ref={containerRef}
-          className="absolute top-0 bottom-0 flex flex-col overflow-hidden z-20"
+          className="top-0 bottom-0 flex flex-col overflow-hidden h-full"
           style={{
-            width: "min(480px, 90%)",
-            right: 0,
             background: "var(--surface-2)",
             backdropFilter: "blur(var(--blur-panel))",
             borderLeft: "1px solid var(--border-default)",
@@ -212,5 +210,6 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
           </motion.div>
       )}
     </AnimatePresence>
+    </div>
   );
 };

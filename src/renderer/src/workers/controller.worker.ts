@@ -242,6 +242,21 @@ function ensureSlot(idx: number, deviceId: string, name: string, type: Controlle
       lastButtonCode: 0,
     };
     slots[idx] = s;
+  } else {
+    // Always refresh slot properties on (re)connect.  After system sleep/wake,
+    // a device may re-enumerated with different evdev codes, and the disconnect
+    // message may not have been processed before the connect arrives.
+    // Without this, the stale axisMap from the previous session persists.
+    s.deviceId = deviceId;
+    s.name = name;
+    s.type = type;
+    s.connected = true;
+    s.axisMap = getAxisMap(name, driverName);
+    s.axes.fill(0);
+    s.buttons = {};
+    s.rawButtons = {};
+    s.lastAxisCode = 0;
+    s.lastButtonCode = 0;
   }
   return s;
 }
