@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.6.0](https://github.com/knackstedt/ember/compare/v0.5.0...v0.6.0) (2026-07-01)
+
+
+### Features
+
+* **game-detection:** add comprehensive game engine and platform detection system ([12fbbc0](https://github.com/knackstedt/ember/commit/12fbbc00437e621f96c216a38bc09928ad49a04e))
+* **overlay:** add pinned-only mode with persistent performance charts and configurable thresholds ([761704a](https://github.com/knackstedt/ember/commit/761704a05e3da2a943dde8482d1e5590733ae15a))
+* **overlay:** improve window detection, visibility tracking, and stale taint cleanup for shader injection ([43f4f91](https://github.com/knackstedt/ember/commit/43f4f917b79de0e077e585f8792dade0f5ee197d))
+* **reshade:** add ReShade addon DLL for windows game shader injection ([8f0b5b6](https://github.com/knackstedt/ember/commit/8f0b5b6905631669f26787b60ece3c08c24ba903))
+* **splitscreen:** add experimental multi-player splitscreen system with input routing and audio management ([08635e0](https://github.com/knackstedt/ember/commit/08635e0398dc8242e4131a9768f80c33524fcaa3))
+
+
+### Bug Fixes
+
+* barrage of miscellaneous bugfixes ([68fcfd3](https://github.com/knackstedt/ember/commit/68fcfd3c41ffdd9efb2153b4b0459b51b377a27d))
+* **reshade:** fix backend to enable overlay connection to ReShade ([6ebf9ae](https://github.com/knackstedt/ember/commit/6ebf9aea13b06095db9e33a0f194912a0ceda485))
+* **thumbnails:** remove toast notification when loading libretro thumbnails without installed core ([46e4e0c](https://github.com/knackstedt/ember/commit/46e4e0cf350bc02a9c72dea567560dabd7c61466))
+
 ## [0.5.0](https://github.com/knackstedt/ember/compare/v0.4.7...v0.5.0) (2026-06-28)
 
 
