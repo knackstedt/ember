@@ -207,6 +207,10 @@ export default defineConfig({
     build: {
       // @ts-expect-error electron-vite build.rollupOptions typing mismatch
       rollupOptions: {
+        onwarn(warning: any, defaultHandler: any) {
+          if (warning.message?.includes("dynamic import will not move module into another chunk")) return;
+          defaultHandler(warning);
+        },
         input: {
           index: resolve("src/main/index.ts"),
           "workers/game-scan.worker": resolve(

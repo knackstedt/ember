@@ -493,15 +493,21 @@ async function createWindow(): Promise<void> {
     log.error("renderer", `render-process-gone: ${details.reason} (exitCode=${details.exitCode})`);
   });
 
-  mainWindow.webContents.on("console-message", (_event, level, message, line, sourceId) => {
+  mainWindow.webContents.on("console-message", (event) => {
+    const { level, message, lineNumber, sourceId } = event;
     // Suppress harmless Chromium ResizeObserver warnings that flood the logs
     // during zoom or rapid layout changes (virtua, framer-motion, etc.).
     if (message.includes("ResizeObserver loop completed with undelivered notifications")) {
       return;
     }
-    const labels = ["debug","info", "warn", "error"];
-    const moduleStr = sourceId ? `${sourceId}:${line}` : `line:${line}`;
-    (log[labels[level] as "info"])(moduleStr, message);
+    if (message.includes("Insecure Content-Security-Policy")) {
+      return;
+    }
+    const levelMap: Record<string, "debug" | "info" | "warn" | "error"> = {
+      debug: "debug", info: "info", warning: "warn", error: "error",
+    };
+    const moduleStr = sourceId ? `${sourceId}:${lineNumber}` : `line:${lineNumber}`;
+    (log[levelMap[level] ?? "info"])(moduleStr, message);
   });
 
   mainWindow.webContents.on("before-input-event", (_event, input) => {
