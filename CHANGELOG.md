@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.6.2](https://github.com/knackstedt/ember/compare/v0.6.1...v0.6.2) (2026-07-01)
+
+
+### Features
+
+* **about:** add ReShade and ReShade Shaders to bundled dependencies list ([309f28c](https://github.com/knackstedt/ember/commit/309f28c00618af62e56cce5ba6a03ba7626d3d07))
+* **gaming:** add html5 and unity platforms to web games category ([9a6cf11](https://github.com/knackstedt/ember/commit/9a6cf1172f2318e640ec04c02e03348a0476207c))
+
+
+### Bug Fixes
+
+* **build:** suppress rollup dynamic import warnings and filter CSP console messages ([9300b53](https://github.com/knackstedt/ember/commit/9300b53dba3d2ee0831a2ae7459a2bb1f51fe153))
+
 ### [0.6.1](https://github.com/knackstedt/ember/compare/v0.6.0...v0.6.1) (2026-07-01)
 
 
