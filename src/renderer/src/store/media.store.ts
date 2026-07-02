@@ -93,6 +93,7 @@ interface MoviesState {
   delete: (id: string) => Promise<void>;
   uninstall: (movie: Movie) => Promise<{ success: boolean; error?: string; method?: string }>;
   regenerateThumbnail: (id: string) => Promise<void>;
+  setCustomCover: (id: string) => Promise<void>;
   filtered: () => Movie[];
 }
 
@@ -223,6 +224,20 @@ export const useMoviesStore = create<MoviesState>((set, get) => ({
     }
   },
 
+  setCustomCover: async (id) => {
+    const movie = get().movies.find((m) => m.id === id);
+    if (!movie) return;
+    const url = await window.htpc.movies.setCustomCover(movie);
+    if (url) {
+      const busted = `${url}#t=${Date.now()}`;
+      set((s) => ({
+        movies: s.movies.map((m) =>
+          m.id === id ? { ...m, coverUrl: busted } : m,
+        ),
+      }));
+    }
+  },
+
   updateProgress: (id, progress) => {
     set((s) => ({
       movies: s.movies.map((m) =>
@@ -281,6 +296,7 @@ interface MusicState {
   setYear: (y: number | null) => void;
   searchCoverArt: (id: string) => Promise<void>;
   pickCoverImage: (id: string) => Promise<void>;
+  generateProceduralCover: (id: string) => Promise<void>;
   loadThumbnail: (id: string) => Promise<void>;
   regenerateThumbnail: (id: string) => Promise<void>;
   loadArtistThumbnail: (artist: string) => Promise<void>;
@@ -394,6 +410,20 @@ export const useMusicStore = create<MusicState>((set, get) => ({
       ),
     }));
     useMusicPlayerStore.getState().updateTrackCover(id, url);
+  },
+
+  generateProceduralCover: async (id) => {
+    const track = get().tracks.find((t) => t.id === id);
+    if (!track) return;
+    const url = await window.htpc.music.generateProceduralCover(track);
+    if (!url) return;
+    const busted = `${url}#t=${Date.now()}`;
+    set((s) => ({
+      tracks: s.tracks.map((t) =>
+        t.id === id ? { ...t, albumArtUrl: busted } : t,
+      ),
+    }));
+    useMusicPlayerStore.getState().updateTrackCover(id, busted);
   },
 
   loadThumbnail: async (id) => {

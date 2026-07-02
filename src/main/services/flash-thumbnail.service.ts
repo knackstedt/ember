@@ -5,17 +5,17 @@ import {
   readFileSync,
   writeFileSync,
   mkdirSync,
-  unlinkSync,
-  openSync,
-  closeSync,
-  readSync,
 } from "fs";
-import { createHash } from "crypto";
-import { getDb } from "../db";
 import { Game } from "../../shared/types";
+import { getDb } from "../db";
 import { searchGame } from "./rawg.service";
 import { getSettings, applyCorruptPolicy } from "./settings.service";
 import { createLogger } from "../util/logger";
+import {
+  hashFileHead,
+  byteHue,
+  bytePct,
+} from "./thumbnailer.service";
 
 const log = createLogger("info");
 
@@ -76,26 +76,6 @@ function loadCaptureConfig(swfPath: string): FlashCaptureConfig {
   } catch {
     return DEFAULT_CAPTURE_CONFIG;
   }
-}
-
-function hashFileHead(filePath: string): Buffer {
-  try {
-    const fd = openSync(filePath, "r");
-    const buf = Buffer.alloc(4096);
-    const n = readSync(fd, buf, 0, 4096, 0);
-    closeSync(fd);
-    return createHash("sha256").update(buf.subarray(0, n)).digest();
-  } catch {
-    return createHash("sha256").update(filePath).digest();
-  }
-}
-
-function byteHue(b: number): number {
-  return Math.round((b / 255) * 360);
-}
-
-function bytePct(b: number, min: number, max: number): number {
-  return min + (b / 255) * (max - min);
 }
 
 /* ------------------------------------------------------------------ */
@@ -578,7 +558,7 @@ function coverExistsOnDisk(id: string): string | undefined {
 }
 
 /* ------------------------------------------------------------------ */
-/*  5. Procedural thumbnail (music-style)                              */
+/*  5. Procedural thumbnail (flash-specific style)                    */
 /* ------------------------------------------------------------------ */
 
 function buildProceduralSVG(hash: Buffer): string {

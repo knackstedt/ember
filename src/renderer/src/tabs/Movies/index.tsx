@@ -45,6 +45,7 @@ import {
   Globe,
   Trash2,
   ArrowLeft,
+  ImageIcon,
 } from "lucide-react";
 import { useCollectionsStore, evaluateSmartFilter, sortByCollection } from "../../store/collections.store";
 import { CollectionsBar } from "../../components/CollectionsBar/CollectionsBar";
@@ -81,6 +82,7 @@ export const MoviesTab: React.FC = () => {
   const deleteMovie = useMoviesStore((s) => s.delete);
   const uninstallMovie = useMoviesStore((s) => s.uninstall);
   const regenerateThumbnail = useMoviesStore((s) => s.regenerateThumbnail);
+  const setCustomCover = useMoviesStore((s) => s.setCustomCover);
   const regeneratingIds = useMoviesStore((s) => s.regeneratingIds);
   const openVideo = useVideoPlayerStore((s) => s.open);
   const [selected, setSelected] = useState<Movie | null>(null);
@@ -456,6 +458,11 @@ export const MoviesTab: React.FC = () => {
           disabled: !movie.filePath,
         },
         {
+          id: "overrideThumbnail",
+          label: "Generate thumbnail",
+          icon: <ImageIcon size={16} />,
+        },
+        {
           id: "folder",
           label: "Open containing folder",
           icon: <FolderOpen size={16} />,
@@ -519,6 +526,9 @@ export const MoviesTab: React.FC = () => {
           break;
         case "regenerate":
           void regenerateThumbnail(movie.id);
+          break;
+        case "overrideThumbnail":
+          void setCustomCover(movie.id);
           break;
         case "folder":
           if (movie.filePath) {

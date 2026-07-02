@@ -47,6 +47,7 @@ interface GamesState {
   uninstall: (game: Game) => Promise<{ success: boolean; error?: string; method?: string }>;
   loadThumbnail: (id: string) => Promise<void>;
   regenerateThumbnail: (id: string) => Promise<void>;
+  setCustomCover: (id: string) => Promise<void>;
   getEmulatorConfig: (id: string) => Promise<GameEmulatorConfig>;
   setEmulatorConfig: (id: string, config: GameEmulatorConfig) => Promise<void>;
   setWineRunner: (id: string, runner: WineRunner) => Promise<void>;
@@ -312,6 +313,20 @@ export const useGamesStore = create<GamesState>((set, get) => ({
         next.delete(id);
         return { regeneratingIds: next };
       });
+    }
+  },
+
+  setCustomCover: async (id) => {
+    const game = get().games.find((g) => g.id === id);
+    if (!game) return;
+    const url = await window.htpc.games.setCustomCover(game);
+    if (url) {
+      const busted = `${url}#t=${Date.now()}`;
+      set((s) => ({
+        games: s.games.map((g) =>
+          g.id === id ? { ...g, coverUrl: busted } : g,
+        ),
+      }));
     }
   },
 

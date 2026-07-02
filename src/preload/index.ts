@@ -565,6 +565,8 @@ const htpc = {
       ipcRenderer.invoke("games:loadThumbnail", game),
     regenerateThumbnail: (game: Game): Promise<string | null> =>
       ipcRenderer.invoke("games:regenerateThumbnail", game),
+    setCustomCover: (game: Game): Promise<string | null> =>
+      ipcRenderer.invoke("games:generateProceduralCover", game),
     compress: (game: Game): Promise<{ success: boolean; outputPath?: string; format?: string; error?: string; originalSize?: number; compressedSize?: number }> =>
       ipcRenderer.invoke("games:compress", game),
     compressAll: (): Promise<{ success: number; failed: number; skipped: number; errors: string[] }> =>
@@ -664,6 +666,8 @@ const htpc = {
       ipcRenderer.invoke("movies:uninstall", movie),
     regenerateThumbnail: (movie: Movie): Promise<string | null> =>
       ipcRenderer.invoke("movies:regenerateThumbnail", movie),
+    setCustomCover: (movie: Movie): Promise<string | null> =>
+      ipcRenderer.invoke("movies:generateProceduralCover", movie),
   },
 
   music: {
@@ -682,6 +686,8 @@ const htpc = {
       ipcRenderer.invoke("music:searchCoverArt", track),
     pickCoverImage: (track: MusicTrack): Promise<string | null> =>
       ipcRenderer.invoke("music:pickCoverImage", track),
+    generateProceduralCover: (track: MusicTrack): Promise<string | null> =>
+      ipcRenderer.invoke("music:generateProceduralCover", track),
     loadThumbnail: (track: MusicTrack): Promise<string | null> =>
       ipcRenderer.invoke("music:loadThumbnail", track),
     regenerateThumbnail: (track: MusicTrack): Promise<string | null> =>
@@ -794,6 +800,7 @@ const htpc = {
     setEnabled: (id: string, enabled: boolean): Promise<boolean> => ipcRenderer.invoke("plugins:set-enabled", id, enabled),
     launchGame: (game: unknown): Promise<{ type: string; url?: string; pluginId: string } | null> =>
       ipcRenderer.invoke("plugins:launch-game", game),
+    visualizers: (): Promise<unknown[]> => ipcRenderer.invoke("plugins:visualizers"),
   },
 
   themes: {

@@ -67,6 +67,7 @@ import {
   Box,
   Terminal,
   Wrench,
+  ImageIcon,
 } from "lucide-react";
 import { DynamicFacetFilters, FacetField } from "../../components/DynamicFacetFilters/DynamicFacetFilters";
 import type { GameVideo } from "../../../../shared/metadata";
@@ -338,6 +339,7 @@ export const GamingTab: React.FC = () => {
   const deleteGame = useGamesStore((s) => s.delete);
   const uninstallGame = useGamesStore((s) => s.uninstall);
   const regenerateThumbnail = useGamesStore((s) => s.regenerateThumbnail);
+  const setCustomCover = useGamesStore((s) => s.setCustomCover);
   const updateLastPlayed = useGamesStore((s) => s.updateLastPlayed);
   const loadThumbnail = useGamesStore((s) => s.loadThumbnail);
   const pendingThumbnailIds = useGamesStore((s) => s.pendingThumbnailIds);
@@ -591,6 +593,11 @@ export const GamingTab: React.FC = () => {
           icon: <RotateCw size={16} />,
         },
         {
+          id: "overrideThumbnail",
+          label: "Generate thumbnail",
+          icon: <ImageIcon size={16} />,
+        },
+        {
           id: "folder",
           label: "Open containing folder",
           icon: <FolderOpen size={16} />,
@@ -676,6 +683,9 @@ export const GamingTab: React.FC = () => {
           break;
         case "regenerate":
           void regenerateThumbnail(game.id);
+          break;
+        case "overrideThumbnail":
+          void setCustomCover(game.id);
           break;
         case "folder": {
           let path = game.romPath;
