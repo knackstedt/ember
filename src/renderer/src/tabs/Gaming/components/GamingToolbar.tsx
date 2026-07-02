@@ -1,6 +1,6 @@
 import React from "react";
 import { motion } from "framer-motion";
-import { Search, X, RotateCw, Loader } from "lucide-react";
+import { Search, X, RotateCw, Loader, Folder } from "lucide-react";
 import type {
   GamingNavItem,
   GamingLibraryFilter,
@@ -10,6 +10,7 @@ import type {
   GamingCompletionFilter,
 } from "../types";
 import { ONLINE_PLATFORMS, NAV_PLATFORM_GROUPS } from "../types";
+import { Dropdown } from "../../../components/Dropdown/Dropdown";
 
 interface GamingToolbarProps {
   searchQuery: string;
@@ -29,6 +30,10 @@ interface GamingToolbarProps {
   gameCount: number;
   scanning: boolean;
   onScan: () => void;
+  activeCollectionId: string | null;
+  collectionOptions: { value: string; label: string }[];
+  onCollectionChange: (id: string | null) => void;
+  onManageCollections: () => void;
 }
 
 const PLAYER_COUNT_OPTIONS: { value: GamingPlayerCountFilter; label: string }[] = [
@@ -117,6 +122,10 @@ export const GamingToolbar: React.FC<GamingToolbarProps> = React.memo(({
   gameCount,
   scanning,
   onScan,
+  activeCollectionId,
+  collectionOptions,
+  onCollectionChange,
+  onManageCollections,
 }) => {
   const showLibraryFilter = isOnlinePlatformNav(activeNav);
   const hasActiveFilters =
@@ -125,7 +134,8 @@ export const GamingToolbar: React.FC<GamingToolbarProps> = React.memo(({
     playStatusFilter !== "all" ||
     completionFilter !== "all" ||
     libraryFilter !== "all" ||
-    searchQuery.trim().length > 0;
+    searchQuery.trim().length > 0 ||
+    activeCollectionId !== null;
 
   return (
     <div
@@ -222,6 +232,42 @@ export const GamingToolbar: React.FC<GamingToolbarProps> = React.memo(({
         onChange={onCompletionFilterChange}
       />
 
+      {/* Collection filter */}
+      {collectionOptions.length > 0 && (
+        <div className="flex items-center gap-1.5">
+          <div style={{ width: 140 }}>
+            <Dropdown
+              value={activeCollectionId ?? "__none__"}
+              options={[
+                { value: "__none__", label: "All Collections" },
+                ...collectionOptions,
+                { value: "__manage__", label: "+ Manage Collections" },
+              ]}
+              placeholder="Collections"
+              onChange={(v) => {
+                if (v === "__manage__") { onManageCollections(); return; }
+                onCollectionChange(v === "__none__" ? null : v);
+              }}
+            />
+          </div>
+          {activeCollectionId && (
+            <button
+              className="flex-shrink-0 px-1.5 py-1 rounded text-xs font-medium flex items-center gap-0.5"
+              style={{
+                background: "var(--accent-muted)",
+                color: "var(--accent)",
+                border: "1px solid color-mix(in srgb, var(--accent) 30%, transparent)",
+              }}
+              onClick={() => onCollectionChange(null)}
+              title="Clear collection filter"
+            >
+              <Folder size={12} />
+              <X size={10} />
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Clear all */}
       {hasActiveFilters && (
         <motion.button
@@ -237,6 +283,7 @@ export const GamingToolbar: React.FC<GamingToolbarProps> = React.memo(({
             onMultiplayerTypeFilterChange("all");
             onPlayStatusFilterChange("all");
             onCompletionFilterChange("all");
+            onCollectionChange(null);
           }}
           whileTap={{ scale: 0.95 }}
         >

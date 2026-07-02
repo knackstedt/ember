@@ -38,7 +38,6 @@ import { useToastStore } from "../../store/toast.store";
 import { useGameLaunchStore } from "../../store/gameLaunch.store";
 import { useSettingsStore } from "../../store/settings.store";
 import { useCollectionsStore, evaluateSmartFilter, sortByCollection } from "../../store/collections.store";
-import { CollectionsBar } from "../../components/CollectionsBar/CollectionsBar";
 import { CollectionManager } from "../../components/CollectionManager/CollectionManager";
 import { HexCellData } from "../../components/GalleryView/HexGridView";
 import { Tooltip } from "../../components/Tooltip/Tooltip";
@@ -1150,23 +1149,16 @@ export const GamingTab: React.FC = () => {
             gameCount={gridItems.length}
             scanning={scanning}
             onScan={scan}
+            activeCollectionId={activeCollectionId}
+            collectionOptions={gameCollections.map((c) => ({ value: c.id, label: `${c.type === "smart" ? "✨ " : ""}${c.icon ? `${c.icon} ` : ""}${c.name}` }))}
+            onCollectionChange={setActiveCollectionId}
+            onManageCollections={() => setShowCollectionManager(true)}
           />
           <div
             ref={scrollContainerRef}
             className="flex-1 min-h-0 overflow-auto relative"
             style={{ padding: 16 }}
           >
-            {/* Collections */}
-            <div className="mb-3">
-              <CollectionsBar
-                itemType="game"
-                activeCollectionId={activeCollectionId}
-                onSelect={setActiveCollectionId}
-                onManage={() => setShowCollectionManager(true)}
-                className="flex-shrink-0"
-              />
-            </div>
-
             {/* Dynamic metadata facets */}
             {gridItems.length > 0 && (
               <div className="mb-3">
@@ -1187,9 +1179,11 @@ export const GamingTab: React.FC = () => {
                   case "list":
                     return (
                       <ListView
+                        ref={gridRef}
                         items={Array.from({ length: 6 })}
                         renderItem={renderSkeletonListItem}
                         rowHeight={80}
+                        scrollRef={scrollContainerRef}
                       />
                     );
                   case "hex-grid":
@@ -1200,6 +1194,7 @@ export const GamingTab: React.FC = () => {
                         minItemWidth={200}
                         onColumnCountChange={setColumnCount}
                         renderHex={renderSkeletonHex}
+                        scrollRef={scrollContainerRef}
                       />
                     );
                   case "bookshelf":
@@ -1209,6 +1204,7 @@ export const GamingTab: React.FC = () => {
                         items={Array.from({ length: viewColumnCount * 2 })}
                         renderSpine={renderSkeletonSpine}
                         onItemsPerRowChange={(count) => setViewColumnCount(count)}
+                        scrollRef={scrollContainerRef}
                       />
                     );
                   case "spread-deck":
@@ -1218,6 +1214,7 @@ export const GamingTab: React.FC = () => {
                         items={Array.from({ length: viewColumnCount * 2 })}
                         renderCard={renderSkeletonDeckCard}
                         onItemsPerRowChange={(count) => setViewColumnCount(count)}
+                        scrollRef={scrollContainerRef}
                       />
                     );
                   default:
@@ -1230,6 +1227,7 @@ export const GamingTab: React.FC = () => {
                           onColumnCountChange={setColumnCount}
                           rowHeight={260}
                           renderItem={renderSkeletonNeonCard}
+                          scrollRef={scrollContainerRef}
                         />
                       );
                     }
@@ -1241,6 +1239,7 @@ export const GamingTab: React.FC = () => {
                         onColumnCountChange={setColumnCount}
                         rowHeight={260}
                         renderItem={renderSkeletonItem}
+                        scrollRef={scrollContainerRef}
                       />
                     );
                 }
@@ -1273,6 +1272,7 @@ export const GamingTab: React.FC = () => {
                         items={gridItems}
                         renderItem={renderListItem}
                         rowHeight={80}
+                        scrollRef={scrollContainerRef}
                       />
                     );
                   case "hex-grid":
@@ -1285,6 +1285,7 @@ export const GamingTab: React.FC = () => {
                         renderHex={renderHex}
                         focusedIndex={focusedIndex}
                         bindItem={bindItem}
+                        scrollRef={scrollContainerRef}
                       />
                     );
                   case "bookshelf":
@@ -1297,6 +1298,7 @@ export const GamingTab: React.FC = () => {
                         onItemsPerRowChange={(count) => setViewColumnCount(count)}
                         onItemClick={(game, index) => { setFocusedIndex(index); setSelected(game); }}
                         bindItem={bindItem}
+                        scrollRef={scrollContainerRef}
                       />
                     );
                   case "spread-deck":
@@ -1309,6 +1311,7 @@ export const GamingTab: React.FC = () => {
                         onItemsPerRowChange={(count) => setViewColumnCount(count)}
                         onItemClick={(game, index) => { setFocusedIndex(index); setSelected(game); }}
                         bindItem={bindItem}
+                        scrollRef={scrollContainerRef}
                       />
                     );
                   default:
@@ -1321,6 +1324,7 @@ export const GamingTab: React.FC = () => {
                           onColumnCountChange={setColumnCount}
                           rowHeight={260}
                           renderItem={renderNeonCard}
+                          scrollRef={scrollContainerRef}
                         />
                       );
                     }
@@ -1332,6 +1336,7 @@ export const GamingTab: React.FC = () => {
                         onColumnCountChange={setColumnCount}
                         rowHeight={260}
                         renderItem={renderItem}
+                        scrollRef={scrollContainerRef}
                       />
                     );
                 }
