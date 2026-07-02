@@ -22,6 +22,7 @@ import {
 } from "../services/updater.service";
 import {
   launchGame,
+  abortLaunch,
   launchMovie,
   launchTrack,
   startPlayTimeTracking,
@@ -720,6 +721,15 @@ export function registerIpcHandlers(window: BrowserWindow): void {
 
   ipcMain.handle("games:launch", (_e, game: Game) => {
     return launchGame(game);
+  });
+
+  ipcMain.handle("games:abort", async () => {
+    abortLaunch();
+    try {
+      await window.webContents.executeJavaScript("window.htpc.overlay.stopGame()");
+    } catch {
+      // ignore
+    }
   });
 
   ipcMain.handle("libretro:launch", (_e, opts: {

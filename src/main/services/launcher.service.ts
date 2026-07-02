@@ -1062,6 +1062,22 @@ export async function launchGame(game: Game): Promise<LaunchResult> {
   });
 }
 
+export function abortLaunch(): void {
+  for (const [gameId, proc] of activeProcesses) {
+    try {
+      process.kill(proc.pid!, "SIGTERM");
+    } catch {
+      // already dead
+    }
+    activeProcesses.delete(gameId);
+    stopPlayTimeTracking(gameId);
+    clearOverlayGame(gameId);
+    sendGameStopped(gameId);
+    log.info("launcher", `Aborted launch for game ${gameId}`);
+  }
+  restoreAndFocusWindow();
+}
+
 export function startPlayTimeTracking(gameId: string): void {
   stopPlayTimeTracking(gameId);
   const startTime = Date.now();

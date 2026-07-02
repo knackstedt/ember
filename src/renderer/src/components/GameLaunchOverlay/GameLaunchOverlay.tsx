@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useGameLaunchStore } from "../../store/gameLaunch.store";
 
 const DEBUG_SHOW_OVERLAY = false;
@@ -34,7 +34,33 @@ function StepIcon({ name, completed }: { name: string; completed: boolean }) {
 export const GameLaunchOverlay: React.FC = React.memo(() => {
   const launchingMap = useGameLaunchStore((s) => s.launchingMap);
   const progressMap = useGameLaunchStore((s) => s.progressMap);
+  const clear = useGameLaunchStore((s) => s.clear);
   const games = Object.entries(launchingMap);
+  const isVisible = games.length > 0 || DEBUG_SHOW_OVERLAY;
+
+  const visibleSinceRef = useRef<number | null>(null);
+  const [showButtons, setShowButtons] = useState(false);
+
+  useEffect(() => {
+    if (isVisible) {
+      if (visibleSinceRef.current === null) {
+        visibleSinceRef.current = Date.now();
+      }
+      const elapsed = Date.now() - visibleSinceRef.current;
+      const remaining = 30000 - elapsed;
+      if (remaining <= 0) {
+        setShowButtons(true);
+        return;
+      }
+      setShowButtons(false);
+      const timer = setTimeout(() => setShowButtons(true), remaining);
+      return () => clearTimeout(timer);
+    } else {
+      visibleSinceRef.current = null;
+      setShowButtons(false);
+    }
+  }, [isVisible]);
+
   const titles = games.length > 0
     ? games.map(([, title]) => title)
     : DEBUG_SHOW_OVERLAY
@@ -45,6 +71,19 @@ export const GameLaunchOverlay: React.FC = React.memo(() => {
   const label = titles.length === 1 ? titles[0] : `${titles.length} games launching`;
   const firstGameId = games[0]?.[0];
   const steps = firstGameId ? (progressMap[firstGameId] ?? []) : [];
+
+  const handleClose = () => {
+    clear();
+  };
+
+  const handleAbort = async () => {
+    try {
+      await window.htpc.games.abort();
+    } catch {
+      // ignore
+    }
+    clear();
+  };
 
   return (
     <div
@@ -113,6 +152,32 @@ export const GameLaunchOverlay: React.FC = React.memo(() => {
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {showButtons && (
+          <div className="w-full flex gap-3 mt-2">
+            <button
+              onClick={handleClose}
+              className="flex-1 py-2.5 rounded-lg font-medium text-sm transition-colors"
+              style={{
+                background: "rgba(255,255,255,0.08)",
+                color: "var(--text-primary)",
+              }}
+            >
+              Close
+            </button>
+            <button
+              onClick={handleAbort}
+              className="flex-1 py-2.5 rounded-lg font-medium text-sm transition-colors"
+              style={{
+                background: "rgba(239,68,68,0.2)",
+                color: "#ef4444",
+                border: "1px solid rgba(239,68,68,0.3)",
+              }}
+            >
+              Abort
+            </button>
           </div>
         )}
       </div>

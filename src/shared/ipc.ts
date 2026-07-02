@@ -13,6 +13,7 @@ export const IPC_CHANNELS = {
     scan: "games:scan",
     list: "games:list",
     launch: "games:launch",
+    abort: "games:abort",
     favorite: "games:favorite",
     tag: "games:tag",
     hide: "games:hide",

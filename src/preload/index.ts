@@ -405,6 +405,8 @@ const htpc = {
     list: (): Promise<Game[]> => ipcRenderer.invoke("games:list"),
     launch: (game: Game): Promise<void> =>
       ipcRenderer.invoke("games:launch", game),
+    abort: (): Promise<void> =>
+      ipcRenderer.invoke("games:abort"),
     favorite: (id: string, value: boolean): Promise<void> =>
       ipcRenderer.invoke("games:favorite", id, value),
     tag: (id: string, tags: string[]): Promise<void> =>
