@@ -14,6 +14,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { useSettingsStore } from "../../store/settings.store";
+import { Switch } from "../../components/Switch/Switch";
 import type { UpdateCheckFrequency } from "../../../../shared/types";
 
 function SectionCard({
@@ -354,32 +355,26 @@ export const AboutTab: React.FC = () => {
             </div>
 
             {/* Auto download */}
-            <label className="flex items-center justify-between cursor-pointer">
+            <div className="flex items-center justify-between">
               <span className="text-sm" style={{ color: "var(--text-primary)" }}>
                 Auto download updates
               </span>
-              <input
-                type="checkbox"
+              <Switch
                 checked={autoDownload}
-                onChange={(e) => setAutoDownload(e.target.checked)}
-                className="w-4 h-4 accent-current"
-                style={{ accentColor: "var(--accent)" }}
+                onChange={setAutoDownload}
               />
-            </label>
+            </div>
 
             {/* Auto install */}
-            <label className="flex items-center justify-between cursor-pointer">
+            <div className="flex items-center justify-between">
               <span className="text-sm" style={{ color: "var(--text-primary)" }}>
                 Auto install updates
               </span>
-              <input
-                type="checkbox"
+              <Switch
                 checked={autoInstall}
-                onChange={(e) => setAutoInstall(e.target.checked)}
-                className="w-4 h-4 accent-current"
-                style={{ accentColor: "var(--accent)" }}
+                onChange={setAutoInstall}
               />
-            </label>
+            </div>
 
             {/* Pin version */}
             <div className="flex items-center justify-between">

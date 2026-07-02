@@ -1267,8 +1267,16 @@ const AddRemoteSourceModal: React.FC<AddRemoteSourceModalProps> = ({ onClose, on
             </span>
             <div className="flex gap-2">
               {(["movie", "music", "rom"] as const).map((t) => (
-                <label
+                <button
                   key={t}
+                  type="button"
+                  onClick={() => {
+                    if (mediaTypes.includes(t)) {
+                      setMediaTypes((prev) => prev.filter((x) => x !== t));
+                    } else {
+                      setMediaTypes((prev) => [...prev, t]);
+                    }
+                  }}
                   className="flex items-center gap-1 px-3 py-1.5 rounded-[var(--radius-card)] cursor-pointer text-xs"
                   style={{
                     background: mediaTypes.includes(t) ? "var(--accent)" : "var(--surface-0)",
@@ -1276,20 +1284,8 @@ const AddRemoteSourceModal: React.FC<AddRemoteSourceModalProps> = ({ onClose, on
                     border: "1px solid var(--border-default)",
                   }}
                 >
-                  <input
-                    type="checkbox"
-                    className="hidden"
-                    checked={mediaTypes.includes(t)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setMediaTypes((prev) => [...prev, t]);
-                      } else {
-                        setMediaTypes((prev) => prev.filter((x) => x !== t));
-                      }
-                    }}
-                  />
                   {t}
-                </label>
+                </button>
               ))}
             </div>
           </div>

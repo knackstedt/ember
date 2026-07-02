@@ -2,6 +2,7 @@ import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSettingsStore } from "../../store/settings.store";
 import { KeybindEditor } from "../../components/KeybindEditor/KeybindEditor";
+import { Switch } from "../../components/Switch/Switch";
 import { Keyboard, Gamepad2, AlertCircle, Info, Mouse, Globe, Sliders, Bluetooth, RefreshCw, Power, Trash2, Link2, Unlink, Search, Battery, Activity } from "lucide-react";
 import { BluetoothDevice, BluetoothAdapterState } from "../../../../shared/types";
 
@@ -231,18 +232,11 @@ export const InputTab: React.FC = () => {
               </span>
             </div>
             <div className="flex items-center gap-3">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={settings.controllerBrowser?.snapToElement ?? true}
-                  onChange={(e) => handleBrowserSettingChange("snapToElement", e.target.checked)}
-                  className="w-4 h-4 rounded"
-                  style={{ accentColor: "var(--accent)" }}
-                />
-                <span className="text-sm" style={{ color: "var(--text-secondary)" }}>
-                  Enable snap-to-element on left click
-                </span>
-              </label>
+              <Switch
+                checked={settings.controllerBrowser?.snapToElement ?? true}
+                onChange={(v) => handleBrowserSettingChange("snapToElement", v)}
+                label="Enable snap-to-element on left click"
+              />
             </div>
           </div>
 
@@ -305,18 +299,11 @@ export const InputTab: React.FC = () => {
               </span>
             </div>
             <div className="flex items-center gap-3">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={settings.controllerBrowser?.swapRightStickAxes ?? false}
-                  onChange={(e) => handleBrowserSettingChange("swapRightStickAxes", e.target.checked)}
-                  className="w-4 h-4 rounded"
-                  style={{ accentColor: "var(--accent)" }}
-                />
-                <span className="text-sm" style={{ color: "var(--text-secondary)" }}>
-                  Swap axes (try this if cursor moves wrong direction)
-                </span>
-              </label>
+              <Switch
+                checked={settings.controllerBrowser?.swapRightStickAxes ?? false}
+                onChange={(v) => handleBrowserSettingChange("swapRightStickAxes", v)}
+                label="Swap axes (try this if cursor moves wrong direction)"
+              />
             </div>
             <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
               Default: axis 2 = horizontal, axis 3 = vertical. Enable to swap to axis 3 = horizontal, axis 2 = vertical.

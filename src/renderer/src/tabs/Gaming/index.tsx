@@ -42,6 +42,7 @@ import { CollectionsBar } from "../../components/CollectionsBar/CollectionsBar";
 import { CollectionManager } from "../../components/CollectionManager/CollectionManager";
 import { HexCellData } from "../../components/GalleryView/HexGridView";
 import { Tooltip } from "../../components/Tooltip/Tooltip";
+import { Switch } from "../../components/Switch/Switch";
 import {
   Star,
   StarOff,
@@ -1794,15 +1795,13 @@ export const GamingTab: React.FC = () => {
                     </div>
                     {/* Vulkan Layer Shader Injection */}
                     <div className="flex flex-col gap-2">
-                      <label className="flex items-center gap-2 text-sm" style={{ color: "var(--text-primary)" }}>
-                        <input
-                          type="checkbox"
-                          checked={selectedInjectionConfig?.vulkanShader?.enabled ?? false}
-                          onChange={(e) => {
+                      <Switch
+                        checked={selectedInjectionConfig?.vulkanShader?.enabled ?? false}
+                        onChange={(checked) => {
                             const next: GameInjectionConfig = {
                               ...selectedInjectionConfig,
                               vulkanShader: {
-                                enabled: e.target.checked,
+                                enabled: checked,
                                 preset: selectedInjectionConfig?.vulkanShader?.preset ?? "crt",
                                 intensity: selectedInjectionConfig?.vulkanShader?.intensity ?? 1.0,
                               },
@@ -1813,9 +1812,8 @@ export const GamingTab: React.FC = () => {
                               void window.htpc.games.injectionConfig.updateRuntimeShader(selected.id, next.vulkanShader);
                             }
                           }}
-                        />
-                        Vulkan Layer Shader (Experimental)
-                      </label>
+                        label="Vulkan Layer Shader (Experimental)"
+                      />
                       {selectedInjectionConfig?.vulkanShader?.enabled && (
                         <div className="flex flex-col gap-2 pl-6">
                           <div>
@@ -1911,15 +1909,13 @@ export const GamingTab: React.FC = () => {
                     </div>
                     {/* DLL Override / Custom DLL Injection */}
                     <div className="flex flex-col gap-2">
-                      <label className="flex items-center gap-2 text-sm" style={{ color: "var(--text-primary)" }}>
-                        <input
-                          type="checkbox"
-                          checked={selectedInjectionConfig?.dllInjection?.enabled ?? false}
-                          onChange={(e) => {
+                      <Switch
+                        checked={selectedInjectionConfig?.dllInjection?.enabled ?? false}
+                        onChange={(checked) => {
                             const next: GameInjectionConfig = {
                               ...selectedInjectionConfig,
                               dllInjection: {
-                                enabled: e.target.checked,
+                                enabled: checked,
                                 overrideDlls: selectedInjectionConfig?.dllInjection?.overrideDlls ?? ["dxgi.dll", "d3d11.dll"],
                                 customDlls: selectedInjectionConfig?.dllInjection?.customDlls ?? [],
                               },
@@ -1927,9 +1923,8 @@ export const GamingTab: React.FC = () => {
                             setSelectedInjectionConfig(next);
                             void window.htpc.games.injectionConfig.set(selected.id, next);
                           }}
-                        />
-                        DLL Override (ReShade / Mods)
-                      </label>
+                        label="DLL Override (ReShade / Mods)"
+                      />
                       {selectedInjectionConfig?.dllInjection?.enabled && (
                         <div className="flex flex-col gap-2 pl-6">
                           <div>
@@ -1993,24 +1988,21 @@ export const GamingTab: React.FC = () => {
                     </div>
                     {/* ReShade Post-Processing */}
                     <div className="flex flex-col gap-2">
-                      <label className="flex items-center gap-2 text-sm" style={{ color: "var(--text-primary)" }}>
-                        <input
-                          type="checkbox"
-                          checked={selectedInjectionConfig?.reshade?.enabled ?? false}
-                          onChange={(e) => {
+                      <Switch
+                        checked={selectedInjectionConfig?.reshade?.enabled ?? false}
+                        onChange={(checked) => {
                             const next: GameInjectionConfig = {
                               ...selectedInjectionConfig,
                               reshade: {
-                                enabled: e.target.checked,
+                                enabled: checked,
                                 api: selectedInjectionConfig?.reshade?.api ?? "auto",
                               },
                             };
                             setSelectedInjectionConfig(next);
                             void window.htpc.games.injectionConfig.set(selected.id, next);
                           }}
-                        />
-                        ReShade Post-Processing (Experimental)
-                      </label>
+                        label="ReShade Post-Processing (Experimental)"
+                      />
                       {selectedInjectionConfig?.reshade?.enabled && (
                         <div className="flex flex-col gap-2 pl-6">
                           <div>
