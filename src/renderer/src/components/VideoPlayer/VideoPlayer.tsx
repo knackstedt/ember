@@ -15,6 +15,7 @@ import { useSettingsStore } from "../../store/settings.store";
 import { shouldClearProgress } from "../../../../shared/progress";
 import { useMoviesStore } from "../../store/media.store";
 import { useNativeVideo, shouldUseNativeDecoder } from "./useNativeVideo";
+import { DependencyErrorPanel } from "./DependencyErrorPanel";
 
 const INACTIVITY_MS = 3000;
 const PROGRESS_SAVE_INTERVAL_MS = 180000; // 3 minutes
@@ -52,7 +53,7 @@ export const VideoPlayer: React.FC = () => {
   const lastProgressRef = useRef<{ movieId: string; pct: number } | null>(null);
 
   const useNative = !!src && shouldUseNativeDecoder(src);
-  const native = useNativeVideo(src, nativeCanvasRef, watchProgress ?? undefined);
+  const native = useNativeVideo(src, nativeCanvasRef, watchProgress ?? undefined, retryCount);
 
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -65,6 +66,7 @@ export const VideoPlayer: React.FC = () => {
   const [activeSubtitle, setActiveSubtitle] = useState<number>(-1);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [seeking, setSeeking] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
 
   // Unified state from either backend
   const isPlaying = useNative ? native.state.playing : playing;
@@ -596,7 +598,16 @@ export const VideoPlayer: React.FC = () => {
         </video>
       )}
 
-      {errorDisplay && (
+      {useNative && native.state.missingDependency && errorDisplay ? (
+        <DependencyErrorPanel
+          dependency={native.state.missingDependency}
+          errorMessage={errorDisplay}
+          onRetry={() => {
+            setRetryCount((c) => c + 1);
+          }}
+          onClose={handleClose}
+        />
+      ) : errorDisplay && (
         <div
           style={{
             position: "absolute",

@@ -10,6 +10,14 @@ import { MovieRepo, MusicRepo, GameRepo } from "../db/repository";
 import { applyCorruptPolicy } from "./settings.service";
 import { generateMovieThumbnail } from "../scanners/video.scanner";
 
+export interface ScanItemEvent {
+  type: "movie" | "music" | "rom";
+  item: Movie | MusicTrack | Game;
+  pending: boolean;
+}
+
+type SendScanItem = (event: ScanItemEvent) => void;
+
 const log = createLogger("info");
 const execAsync = promisify(exec);
 
@@ -172,6 +180,7 @@ async function probVideoHttp(url: string, source?: RemoteSource): Promise<{
 export async function scanRemoteMovies(
   source: RemoteSource,
   onProgress?: (current: number, total: number) => void,
+  onItem?: (item: Movie, pending: boolean) => Promise<void> | void,
 ): Promise<Movie[]> {
   const files: string[] = [];
 
@@ -183,6 +192,17 @@ export async function scanRemoteMovies(
 
   log.info("remote:scan:movies", `found ${files.length} video files in ${source.name}`);
 
+  // Pre-load cached movies from DB to skip re-probing
+  const cached = new Map<string, Movie>();
+  try {
+    const all = await MovieRepo.list();
+    for (const m of all) {
+      if (m.filePath) cached.set(m.filePath, m);
+    }
+  } catch (err) {
+    log.warn("remote:scan:movies", `failed to pre-load cache: ${err}`);
+  }
+
   const movies: Movie[] = [];
   const total = files.length;
 
@@ -190,26 +210,55 @@ export async function scanRemoteMovies(
     const remotePath = files[i];
     onProgress?.(i, total);
 
+    const basePath = source.remotePath || "/";
+    const emberPath = `ember://remote/${source.id}${remotePath.split("/").map(encodeURIComponent).join("/")}`;
+    const id = createHash("md5").update(emberPath).digest("hex").slice(0, 16);
+    const name = basename(remotePath, extname(remotePath))
+      .replace(/\.\d{4}\..*$/, "")
+      .replace(/[._]/g, " ")
+      .trim();
+
+    // Check cache first — skip probe if metadata already exists
+    const cachedMovie = cached.get(emberPath);
+    if (cachedMovie && !cachedMovie.pendingMetadata && (cachedMovie.resolution || cachedMovie.runtime)) {
+      const movie: Movie = {
+        ...cachedMovie,
+        id,
+        filePath: emberPath,
+        sourceLocation: `rclone:${source.protocol}`,
+        remoteSourceId: source.id,
+        pendingMetadata: false,
+        missing: false,
+      };
+      movies.push(movie);
+      await onItem?.(movie, false);
+      continue;
+    }
+
+    // Emit placeholder immediately so UI shows a card with spinner
+    const placeholder: Movie = {
+      id,
+      title: name,
+      filePath: emberPath,
+      tags: [],
+      hidden: false,
+      sourceLocation: `rclone:${source.protocol}`,
+      remoteSourceId: source.id,
+      pendingMetadata: true,
+    };
+    await onItem?.(placeholder, true);
+
     const port = await ensureServe(source);
     if (!port) {
       log.error("remote:scan:movies", `serve unavailable for ${source.id}, aborting scan`);
       break;
     }
 
-    const basePath = source.remotePath || "/";
     const url = buildRemoteUrl(port, remotePath, basePath);
-    const emberPath = `ember://remote/${source.id}${remotePath.split("/").map(encodeURIComponent).join("/")}`;
-
     log.debug("remote:scan:movies", `url=${url}, emberPath=${emberPath}`);
 
     try {
       const probe = await probVideoHttp(url, source);
-      const name = basename(remotePath, extname(remotePath))
-        .replace(/\.\d{4}\..*$/, "")
-        .replace(/[._]/g, " ")
-        .trim();
-
-      const id = createHash("md5").update(emberPath).digest("hex").slice(0, 16);
       let coverUrl: string | undefined;
       try {
         coverUrl = await generateMovieThumbnail(url, id, probe?.duration);
@@ -226,7 +275,7 @@ export async function scanRemoteMovies(
         }
       }
 
-      movies.push({
+      const movie: Movie = {
         id,
         title: probe?.title || name,
         filePath: emberPath,
@@ -237,9 +286,16 @@ export async function scanRemoteMovies(
         tags: [],
         hidden: false,
         sourceLocation: `rclone:${source.protocol}`,
-      });
+        remoteSourceId: source.id,
+        pendingMetadata: false,
+      };
+      movies.push(movie);
+      await onItem?.(movie, false);
     } catch (err) {
       log.error("remote:scan:movies", `error processing ${remotePath}: ${summarizeExecError(err)}`);
+      const movie: Movie = { ...placeholder, pendingMetadata: false };
+      movies.push(movie);
+      await onItem?.(movie, false);
     }
   }
 
@@ -262,6 +318,7 @@ async function getMusicMetadata() {
 export async function scanRemoteMusic(
   source: RemoteSource,
   onProgress?: (current: number, total: number) => void,
+  onItem?: (item: MusicTrack, pending: boolean) => Promise<void> | void,
 ): Promise<MusicTrack[]> {
   const files: string[] = [];
 
@@ -273,6 +330,17 @@ export async function scanRemoteMusic(
 
   log.info("remote:scan:music", `found ${files.length} audio files in ${source.name}`);
 
+  // Pre-load cached tracks from DB to skip re-parsing
+  const cached = new Map<string, MusicTrack>();
+  try {
+    const all = await MusicRepo.list();
+    for (const t of all) {
+      if (t.filePath) cached.set(t.filePath, t);
+    }
+  } catch (err) {
+    log.warn("remote:scan:music", `failed to pre-load cache: ${err}`);
+  }
+
   const tracks: MusicTrack[] = [];
   const total = files.length;
 
@@ -280,15 +348,47 @@ export async function scanRemoteMusic(
     const remotePath = files[i];
     onProgress?.(i, total);
 
+    const basePath = source.remotePath || "/";
+    const emberPath = `ember://remote/${source.id}${remotePath.split("/").map(encodeURIComponent).join("/")}`;
+    const id = createHash("md5").update(emberPath).digest("hex").slice(0, 16);
+
+    // Check cache first — skip probe if metadata already exists
+    const cachedTrack = cached.get(emberPath);
+    if (cachedTrack && !cachedTrack.pendingMetadata && (cachedTrack.duration || cachedTrack.artist)) {
+      const track: MusicTrack = {
+        ...cachedTrack,
+        id,
+        filePath: emberPath,
+        sourceLocation: `rclone:${source.protocol}`,
+        remoteSourceId: source.id,
+        pendingMetadata: false,
+        missing: false,
+      };
+      tracks.push(track);
+      await onItem?.(track, false);
+      continue;
+    }
+
+    // Emit placeholder immediately so UI shows a card with spinner
+    const placeholder: MusicTrack = {
+      id,
+      title: basename(remotePath).replace(/\.[^.]+$/, ""),
+      filePath: emberPath,
+      tags: [],
+      hidden: false,
+      sourceLocation: `rclone:${source.protocol}`,
+      remoteSourceId: source.id,
+      pendingMetadata: true,
+    };
+    await onItem?.(placeholder, true);
+
     const port = await ensureServe(source);
     if (!port) {
       log.error("remote:scan:music", `serve unavailable for ${source.id}, aborting scan`);
       break;
     }
 
-    const basePath = source.remotePath || "/";
     const url = buildRemoteUrl(port, remotePath, basePath);
-    const emberPath = `ember://remote/${source.id}${remotePath.split("/").map(encodeURIComponent).join("/")}`;
 
     try {
       const mm = await getMusicMetadata();
@@ -302,13 +402,10 @@ export async function scanRemoteMusic(
       const buffer = Buffer.from(await response.arrayBuffer());
       const meta = await mm.parseBuffer(buffer, undefined, { skipCovers: true });
       const { title, artist, album, genre, year, track } = meta.common;
-      const id = createHash("md5").update(emberPath).digest("hex").slice(0, 16);
 
-      tracks.push({
+      const trackItem: MusicTrack = {
         id,
-        title:
-          title ??
-          basename(remotePath).replace(/\.[^.]+$/, ""),
+        title: title ?? basename(remotePath).replace(/\.[^.]+$/, ""),
         filePath: emberPath,
         artist,
         album,
@@ -320,11 +417,14 @@ export async function scanRemoteMusic(
         tags: [],
         hidden: false,
         sourceLocation: `rclone:${source.protocol}`,
-      });
+        remoteSourceId: source.id,
+        pendingMetadata: false,
+      };
+      tracks.push(trackItem);
+      await onItem?.(trackItem, false);
     } catch (err: any) {
       log.error("remote:scan:music", `failed to parse ${remotePath}: ${err?.message ?? String(err)}`);
-      const id = createHash("md5").update(emberPath).digest("hex").slice(0, 16);
-      tracks.push({
+      const trackItem: MusicTrack = {
         id,
         title: basename(remotePath).replace(/\.[^.]+$/, ""),
         filePath: emberPath,
@@ -332,7 +432,11 @@ export async function scanRemoteMusic(
         hidden: false,
         corrupt: true,
         sourceLocation: `rclone:${source.protocol}`,
-      });
+        remoteSourceId: source.id,
+        pendingMetadata: false,
+      };
+      tracks.push(trackItem);
+      await onItem?.(trackItem, false);
     }
   }
 
@@ -373,6 +477,7 @@ const PLATFORM_EXTS: Record<string, string> = {
 export async function scanRemoteRoms(
   source: RemoteSource,
   onProgress?: (current: number, total: number) => void,
+  onItem?: (item: Game, pending: boolean) => Promise<void> | void,
 ): Promise<Game[]> {
   const port = await ensureServe(source);
   if (!port) {
@@ -403,7 +508,7 @@ export async function scanRemoteRoms(
     const id = createHash("md5").update(emberPath).digest("hex").slice(0, 16);
     const title = basename(remotePath, ext).replace(/[._]/g, " ").trim();
 
-    games.push({
+    const game: Game = {
       id,
       title,
       platform,
@@ -414,7 +519,12 @@ export async function scanRemoteRoms(
       rating: 0,
       lastPlayed: 0,
       hidden: false,
-    });
+      sourceLocation: `rclone:${source.protocol}`,
+      remoteSourceId: source.id,
+      pendingMetadata: false,
+    };
+    games.push(game);
+    await onItem?.(game, false);
   }
 
   onProgress?.(total, total);
@@ -490,6 +600,7 @@ async function drainQueue(): Promise<void> {
 export function queueRemoteSourceScan(
   source: RemoteSource,
   sendProgress?: RemoteProgressSender,
+  sendItem?: SendScanItem,
 ): void {
   if (scanningSourceIds.has(source.id)) {
     log.info("remote:scan:queue", `skipping ${source.name}, already queued or scanning`);
@@ -527,14 +638,14 @@ export function queueRemoteSourceScan(
       if (source.mediaTypes.includes("movie")) {
         emitRemoteProgress(sendProgress, "movie", "scanning");
         try {
-          const movies = await scanRemoteMovies(source);
-          for (const movie of movies) {
+          await scanRemoteMovies(source, undefined, async (item, pending) => {
             try {
-              await MovieRepo.upsert(movie);
+              await MovieRepo.upsert(item);
             } catch (err) {
-              log.warn("remote:scan", `failed to upsert movie ${movie.id}: ${err}`);
+              log.warn("remote:scan", `failed to upsert movie ${item.id}: ${err}`);
             }
-          }
+            sendItem?.({ type: "movie", item, pending });
+          });
         } catch (err) {
           log.error("remote:scan", `movie scan failed for ${source.name}: ${err}`);
           emitRemoteProgress(sendProgress, "movie", "error", String(err));
@@ -546,15 +657,15 @@ export function queueRemoteSourceScan(
       if (source.mediaTypes.includes("music")) {
         emitRemoteProgress(sendProgress, "music", "scanning");
         try {
-          const tracks = await scanRemoteMusic(source);
-          for (const track of tracks) {
+          await scanRemoteMusic(source, undefined, async (item, pending) => {
             try {
-              await MusicRepo.upsert(track);
-              if (track.corrupt) await applyCorruptPolicy(track.id, "music");
+              await MusicRepo.upsert(item);
+              if ((item as MusicTrack).corrupt) await applyCorruptPolicy(item.id, "music");
             } catch (err) {
-              log.warn("remote:scan", `failed to upsert track ${track.id}: ${err}`);
+              log.warn("remote:scan", `failed to upsert track ${item.id}: ${err}`);
             }
-          }
+            sendItem?.({ type: "music", item, pending });
+          });
         } catch (err) {
           log.error("remote:scan", `music scan failed for ${source.name}: ${err}`);
           emitRemoteProgress(sendProgress, "music", "error", String(err));
@@ -566,14 +677,14 @@ export function queueRemoteSourceScan(
       if (source.mediaTypes.includes("rom")) {
         emitRemoteProgress(sendProgress, "rom", "scanning");
         try {
-          const games = await scanRemoteRoms(source);
-          for (const game of games) {
+          await scanRemoteRoms(source, undefined, async (item, pending) => {
             try {
-              await GameRepo.upsert(game);
+              await GameRepo.upsert(item);
             } catch (err) {
-              log.warn("remote:scan", `failed to upsert game ${game.id}: ${err}`);
+              log.warn("remote:scan", `failed to upsert game ${item.id}: ${err}`);
             }
-          }
+            sendItem?.({ type: "rom", item, pending });
+          });
         } catch (err) {
           log.error("remote:scan", `rom scan failed for ${source.name}: ${err}`);
           emitRemoteProgress(sendProgress, "rom", "error", String(err));
@@ -594,13 +705,14 @@ export function queueRemoteSourceScan(
 export async function scanAllRemoteSources(
   mediaType?: "movie" | "music" | "rom",
   sendProgress?: RemoteProgressSender,
+  sendItem?: SendScanItem,
 ): Promise<void> {
   try {
     const sources = await listRemotes();
     for (const source of sources) {
       if (!source.enabled) continue;
       if (mediaType && !source.mediaTypes.includes(mediaType)) continue;
-      queueRemoteSourceScan(source, sendProgress);
+      queueRemoteSourceScan(source, sendProgress, sendItem);
     }
   } catch (err) {
     log.error("remote:scan", `failed to scan all remotes: ${err}`);

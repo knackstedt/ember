@@ -198,6 +198,10 @@ export interface Game {
   launchEnv?: Record<string, string>;
   /** Session lifecycle hooks */
   sessionHooks?: SessionHook[];
+  /** True when the file has been discovered but metadata is still being probed */
+  pendingMetadata?: boolean;
+  /** ID of the remote source this item was discovered from */
+  remoteSourceId?: string;
   /** Whether the game source is local or remote */
   sourceLocation?: SourceLocation;
   /** Whether the remote file is missing */
@@ -375,6 +379,10 @@ export interface Movie {
   missing?: boolean;
   /** Whether the movie file is corrupt */
   corrupt?: boolean;
+  /** True when the file has been discovered but metadata (resolution, duration, etc.) is still being probed */
+  pendingMetadata?: boolean;
+  /** ID of the remote source this item was discovered from */
+  remoteSourceId?: string;
 }
 
 export interface MusicTrack {
@@ -413,6 +421,10 @@ export interface MusicTrack {
   corrupt?: boolean;
   /** Timestamp of last playback */
   lastPlayed?: number;
+  /** True when the file has been discovered but metadata (artist, album, duration, etc.) is still being probed */
+  pendingMetadata?: boolean;
+  /** ID of the remote source this item was discovered from */
+  remoteSourceId?: string;
 }
 
 export interface AudioTags {

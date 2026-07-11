@@ -264,6 +264,8 @@ async function runMigrations(db: Surreal): Promise<void> {
     DEFINE FIELD IF NOT EXISTS engineVersion ON game TYPE option<string>;
     DEFINE FIELD IF NOT EXISTS graphicsApi ON game TYPE option<string>;
     DEFINE FIELD IF NOT EXISTS entrypoints ON game TYPE option<array<object>> FLEXIBLE;
+    DEFINE FIELD IF NOT EXISTS pendingMetadata ON game TYPE option<bool>;
+    DEFINE FIELD IF NOT EXISTS remoteSourceId ON game TYPE option<string>;
 
     DEFINE TABLE IF NOT EXISTS movie SCHEMAFULL;
     DEFINE FIELD IF NOT EXISTS id ON movie TYPE string;
@@ -288,6 +290,8 @@ async function runMigrations(db: Surreal): Promise<void> {
     DEFINE FIELD IF NOT EXISTS sourceLocation ON movie TYPE option<string>;
     DEFINE FIELD IF NOT EXISTS missing ON movie TYPE option<bool>;
     DEFINE FIELD IF NOT EXISTS corrupt ON movie TYPE option<bool>;
+    DEFINE FIELD IF NOT EXISTS pendingMetadata ON movie TYPE option<bool>;
+    DEFINE FIELD IF NOT EXISTS remoteSourceId ON movie TYPE option<string>;
 
     DEFINE TABLE IF NOT EXISTS music_track SCHEMAFULL;
     DEFINE FIELD IF NOT EXISTS id ON music_track TYPE string;
@@ -321,6 +325,8 @@ async function runMigrations(db: Surreal): Promise<void> {
     DEFINE FIELD IF NOT EXISTS missing ON music_track TYPE option<bool>;
     DEFINE FIELD IF NOT EXISTS corrupt ON music_track TYPE option<bool>;
     DEFINE FIELD IF NOT EXISTS lastPlayed ON music_track TYPE option<int>;
+    DEFINE FIELD IF NOT EXISTS pendingMetadata ON music_track TYPE option<bool>;
+    DEFINE FIELD IF NOT EXISTS remoteSourceId ON music_track TYPE option<string>;
 
     DEFINE TABLE IF NOT EXISTS tv_show SCHEMAFULL;
     DEFINE FIELD IF NOT EXISTS id ON tv_show TYPE string;

@@ -30,6 +30,12 @@ export interface Chapter {
   timeMs: number;
 }
 
+export interface MissingDependencyInfo {
+  packageId: string;
+  displayName: string;
+  description: string;
+}
+
 export interface NativeVideoState {
   playing: boolean;
   currentTime: number;
@@ -40,6 +46,7 @@ export interface NativeVideoState {
   error: string | null;
   ready: boolean;
   backend?: string;
+  missingDependency: MissingDependencyInfo | null;
   subtitleTracks: SubtitleTrack[];
   activeSubtitleId: number | null;
   audioTracks: AudioTrack[];
@@ -82,10 +89,42 @@ export function shouldUseNativeDecoder(src: string | null): boolean {
   return !!src;
 }
 
+function detectMissingDependency(errorMsg: string): MissingDependencyInfo | null {
+  const lower = errorMsg.toLowerCase();
+  if (
+    lower.includes("ffmpeg") && (lower.includes("not installed") || lower.includes("enoent")) ||
+    lower.includes("ffprobe") && (lower.includes("not installed") || lower.includes("enoent")) ||
+    lower.includes("spawn ffprobe") ||
+    lower.includes("spawn ffmpeg")
+  ) {
+    return {
+      packageId: "apt-ffmpeg",
+      displayName: "FFmpeg",
+      description: "FFmpeg is required for video playback. It provides the ffprobe and ffmpeg tools used to decode and render video files.",
+    };
+  }
+  if (lower.includes("libmpv") || lower.includes("mpv") && (lower.includes("not available") || lower.includes("not found"))) {
+    return {
+      packageId: "apt-libmpv-dev",
+      displayName: "libmpv",
+      description: "libmpv is required for the native video decoder. Install it to enable hardware-accelerated video playback with subtitle and multi-track audio support.",
+    };
+  }
+  if (lower.includes("gstreamer") || lower.includes("libavcodec") || lower.includes("libavformat")) {
+    return {
+      packageId: "apt-gstreamer-libav",
+      displayName: "GStreamer libav plugin",
+      description: "GStreamer codec plugins are required for decoding certain video formats. Install the GStreamer libav plugin to enable playback.",
+    };
+  }
+  return null;
+}
+
 export function useNativeVideo(
   src: string | null,
   canvasRef: React.RefObject<HTMLCanvasElement | null>,
-  resumeProgress?: number
+  resumeProgress?: number,
+  retryCount?: number
 ): { state: NativeVideoState; controls: NativeVideoControls; canvasId: string } {
   const decoderId = stableId(src);
   const canvasId = `native-video-${decoderId}`;
@@ -111,6 +150,7 @@ export function useNativeVideo(
     height: 0,
     error: null,
     ready: false,
+    missingDependency: null,
     subtitleTracks: [],
     activeSubtitleId: null,
     audioTracks: [],
@@ -264,7 +304,8 @@ export function useNativeVideo(
 
         play();
       } catch (err: any) {
-        updateState({ error: err.message || String(err), ready: false });
+        const msg = err.message || String(err);
+        updateState({ error: msg, ready: false, missingDependency: detectMissingDependency(msg) });
       }
     }
 
@@ -300,7 +341,7 @@ export function useNativeVideo(
         openedRef.current = false;
       }
     };
-  }, [src, decoderId, canvasRef, updateState]);
+  }, [src, decoderId, canvasRef, updateState, retryCount]);
 
   // Frame pump via requestAnimationFrame.
   const pump = useCallback(() => {
@@ -351,7 +392,8 @@ export function useNativeVideo(
     } catch (err: any) {
       console.error("[NativeVideo] decode error:", err);
       playingRef.current = false;
-      updateState({ playing: false, error: err.message || String(err) });
+      const msg = err.message || String(err);
+      updateState({ playing: false, error: msg, missingDependency: detectMissingDependency(msg) });
     }
   }, [decoderId, updateState]);
 

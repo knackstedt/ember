@@ -104,6 +104,13 @@ async function ffprobe(path: string): Promise<VideoMetadata> {
     let stderr = "";
     probe.stdout.on("data", (d) => { stdout += d; });
     probe.stderr.on("data", (d) => { stderr += d; });
+    probe.on("error", (err: NodeJS.ErrnoException) => {
+      if (err.code === "ENOENT") {
+        reject(new Error("FFmpeg/ffprobe is not installed. Install the 'ffmpeg' package to enable video playback."));
+      } else {
+        reject(new Error(`ffprobe failed to start: ${err.message}`));
+      }
+    });
     probe.on("close", (code) => {
       if (code !== 0) {
         reject(new Error(`ffprobe exited ${code}: ${stderr}`));
@@ -338,9 +345,14 @@ function startFfmpeg(id: string, path: string, seekMs: number = 0) {
     }
   });
 
-  proc.on("error", (err) => {
+  proc.on("error", (err: NodeJS.ErrnoException) => {
     console.error("[ffmpeg-decoder] process error:", err);
-    if (state.process === proc) state.playing = false;
+    if (state.process === proc) {
+      state.playing = false;
+      if (err.code === "ENOENT") {
+        state.metadata = null;
+      }
+    }
   });
 
   proc.on("close", (code) => {

@@ -210,6 +210,7 @@ const LazyGameCard: React.FC<{
       playTime={game.playTime}
       lastPlayed={game.lastPlayed}
       missing={game.missing}
+      pendingMetadata={game.pendingMetadata}
       onSelect={onSelect}
       onFavorite={onFavorite}
     />
@@ -880,6 +881,7 @@ export const GamingTab: React.FC = () => {
         isLoading: pendingThumbnailIds.has(game.id) || regeneratingIds.has(game.id),
         missing: game.missing,
         platform: game.platform,
+        pendingMetadata: game.pendingMetadata,
         onClick: () => { setFocusedIndex(index); setSelected(game); },
         onFavorite: () => toggleFavorite(game.id),
         onVisible: () => {
@@ -1009,6 +1011,11 @@ export const GamingTab: React.FC = () => {
                 backgroundImage: "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.02) 2px, rgba(255,255,255,0.02) 4px)",
               }}
             />
+            {game.pendingMetadata && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-10">
+                <div className="w-6 h-6 rounded-full border-[2px] border-white/30 border-t-white animate-spin" />
+              </div>
+            )}
           </div>
           <div className="px-1.5 py-1">
             <div

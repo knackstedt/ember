@@ -19,6 +19,7 @@ export interface MediaCardProps {
   isLoading?: boolean;
   missing?: boolean;
   skeleton?: boolean;
+  pendingMetadata?: boolean;
 }
 
 const PLACEHOLDER_COLORS = [
@@ -62,6 +63,7 @@ export const MediaCard: React.FC<MediaCardProps> = React.memo(({
   isLoading,
   missing,
   skeleton,
+  pendingMetadata,
 }) => {
   const [imgError, setImgError] = useState(false);
   useEffect(() => {
@@ -136,6 +138,15 @@ export const MediaCard: React.FC<MediaCardProps> = React.memo(({
         {isLoading && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-10">
             <div className="w-7 h-7 rounded-full border-[3px] border-white/30 border-t-white animate-spin" />
+          </div>
+        )}
+
+        {pendingMetadata && !isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-10">
+            <div className="flex flex-col items-center gap-2">
+              <div className="w-6 h-6 rounded-full border-[2px] border-white/30 border-t-white animate-spin" />
+              <span className="text-[12px] text-white/70 font-medium">Scanning…</span>
+            </div>
           </div>
         )}
 

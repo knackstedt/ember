@@ -3,6 +3,22 @@ import { Movie, MusicTrack, TVShow, AudioTags } from "../../../shared/types";
 import { useMusicPlayerStore } from "./musicPlayer.store";
 import { useCoverCacheStore } from "./coverCache.store";
 
+function upsertMovie(existing: Movie[], incoming: Movie): Movie[] {
+  const idx = existing.findIndex((m) => m.id === incoming.id);
+  if (idx === -1) return [...existing, incoming];
+  const next = [...existing];
+  next[idx] = incoming;
+  return next;
+}
+
+function upsertTrack(existing: MusicTrack[], incoming: MusicTrack): MusicTrack[] {
+  const idx = existing.findIndex((t) => t.id === incoming.id);
+  if (idx === -1) return [...existing, incoming];
+  const next = [...existing];
+  next[idx] = incoming;
+  return next;
+}
+
 function shallowEqualMovie(a: Movie, b: Movie): boolean {
   const keys = Object.keys(a) as (keyof Movie)[];
   for (const key of keys) {
@@ -112,7 +128,7 @@ export const useMoviesStore = create<MoviesState>((set, get) => ({
     set({ loading: true });
     try {
       const odata =
-        "$select=id,title,filePath,coverUrl,backdropUrl,description,genres,releaseYear,director,runtime,resolution,codec,tmdbId,isFavorite,tags,lastPlayed,rating,watchProgress,hidden,sourceLocation,missing,corrupt&$orderby=title asc";
+        "$select=id,title,filePath,coverUrl,backdropUrl,description,genres,releaseYear,director,runtime,resolution,codec,tmdbId,isFavorite,tags,lastPlayed,rating,watchProgress,hidden,sourceLocation,missing,corrupt,pendingMetadata,remoteSourceId&$orderby=title asc";
       const result = await window.htpc.db.query<Movie>("movie", odata);
       set((state) => ({
         movies: mergeMovies(state.movies, result.results),
@@ -325,7 +341,7 @@ export const useMusicStore = create<MusicState>((set, get) => ({
     set({ loading: true });
     try {
       const odata =
-        "$select=id,title,filePath,artist,album,albumArtUrl,genre,year,trackNumber,duration,mbid,artistMbid,releaseMbid,releaseGroupMbid,label,albumArtist,discNumber,totalTracks,biography,mood,style,country,tadbArtistId,tadbAlbumId,isFavorite,tags,lastPlayed,rating,hidden,sourceLocation,missing,corrupt&$orderby=artist,album,trackNumber asc";
+        "$select=id,title,filePath,artist,album,albumArtUrl,genre,year,trackNumber,duration,mbid,artistMbid,releaseMbid,releaseGroupMbid,label,albumArtist,discNumber,totalTracks,biography,mood,style,country,tadbArtistId,tadbAlbumId,isFavorite,tags,lastPlayed,rating,hidden,sourceLocation,missing,corrupt,pendingMetadata,remoteSourceId&$orderby=artist,album,trackNumber asc";
       const result = await window.htpc.db.query<MusicTrack>("music_track", odata);
       set((state) => ({
         tracks: mergeTracks(state.tracks, result.results),
@@ -690,6 +706,23 @@ if (window.htpc.onBackgroundScanComplete) {
     }
     if (payload.type === "music") {
       void useMusicStore.getState().load();
+    }
+  });
+}
+
+// Incremental updates during remote scanning
+if (window.htpc.onScanItem) {
+  window.htpc.onScanItem((event) => {
+    if (event.type === "movie") {
+      const movie = event.item as Movie;
+      useMoviesStore.setState((s) => ({
+        movies: upsertMovie(s.movies, movie),
+      }));
+    } else if (event.type === "music") {
+      const track = event.item as MusicTrack;
+      useMusicStore.setState((s) => ({
+        tracks: upsertTrack(s.tracks, track),
+      }));
     }
   });
 }

@@ -171,6 +171,7 @@ import { isRcloneAvailable } from "../services/rclone.service";
 import {
   queueRemoteSourceScan,
   scanAllRemoteSources,
+  type ScanItemEvent,
 } from "../services/remote-scan.service";
 import {
   checkRemoteAvailability,
@@ -452,6 +453,10 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     sendToWindow(window, "scan:progress", progress);
   };
 
+  const sendScanItem = (event: ScanItemEvent) => {
+    sendToWindow(window, "scan:item", event);
+  };
+
   async function markMissingMovies(
     scannedPaths: string[],
     foundMovies: { id: string; filePath?: string }[],
@@ -711,7 +716,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
   ipcMain.handle("games:scan", async (_e, extraPaths?: string[]) => {
     await performGameScan(window, extraPaths);
     // Also scan remote sources configured for ROMs
-    void scanAllRemoteSources("rom", sendRemoteProgress);
+    void scanAllRemoteSources("rom", sendRemoteProgress, sendScanItem);
     sendToWindow(window, "scan:background:complete", { type: "games" });
   });
 
@@ -1901,6 +1906,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
         hidden,
         sourceLocation,
         remoteSourceId,
+        pendingMetadata,
       } = movie as any;
       const clean = {
         id,
@@ -1922,6 +1928,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
         hidden,
         sourceLocation,
         remoteSourceId,
+        pendingMetadata,
       };
       const defined: any = {};
       for (const [k, v] of Object.entries(clean)) {
@@ -1975,7 +1982,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
       status: "done",
     });
     // Also scan remote sources configured for movies
-    void scanAllRemoteSources("movie", sendRemoteProgress);
+    void scanAllRemoteSources("movie", sendRemoteProgress, sendScanItem);
     sendToWindow(window, "scan:background:complete", { type: "movies" });
   });
 
@@ -2132,7 +2139,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
       status: "done",
     });
     // Also scan remote sources configured for music
-    void scanAllRemoteSources("music", sendRemoteProgress);
+    void scanAllRemoteSources("music", sendRemoteProgress, sendScanItem);
     sendToWindow(window, "scan:background:complete", { type: "music" });
   });
 
@@ -3251,7 +3258,7 @@ export function registerIpcHandlers(window: BrowserWindow): void {
   ipcMain.handle("rclone:add", async (_e, source: Omit<import("../../shared/types").RemoteSource, "id">, creds: Record<string, string | undefined>) => {
     const added = await addRemote(source, creds);
     // Queue media scan for the newly added source
-    queueRemoteSourceScan(added, sendRemoteProgress);
+    queueRemoteSourceScan(added, sendRemoteProgress, sendScanItem);
     return added;
   });
 

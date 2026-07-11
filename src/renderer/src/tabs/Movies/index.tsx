@@ -559,6 +559,7 @@ export const MoviesTab: React.FC = () => {
             isLoading={regeneratingIds.has(movie.id)}
             progress={movie.watchProgress}
             missing={movie.missing}
+            pendingMetadata={movie.pendingMetadata}
             onSelect={() => { setFocusedIndex(index); setSelected(movie); }}
             onFavorite={() => toggleFavorite(movie.id)}
           />
@@ -583,6 +584,7 @@ export const MoviesTab: React.FC = () => {
         isLoading: regeneratingIds.has(movie.id),
         progress: movie.watchProgress,
         missing: movie.missing,
+        pendingMetadata: movie.pendingMetadata,
         onClick: () => { setFocusedIndex(index); setSelected(movie); },
         onFavorite: () => toggleFavorite(movie.id),
       };
@@ -727,6 +729,11 @@ export const MoviesTab: React.FC = () => {
                 backgroundImage: "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.02) 2px, rgba(255,255,255,0.02) 4px)",
               }}
             />
+            {movie.pendingMetadata && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-10">
+                <div className="w-6 h-6 rounded-full border-[2px] border-white/30 border-t-white animate-spin" />
+              </div>
+            )}
           </div>
           <div className="px-1.5 py-1">
             <div

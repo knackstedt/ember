@@ -26,6 +26,7 @@ export interface GameCardProps {
   lastPlayed?: number;
   missing?: boolean;
   skeleton?: boolean;
+  pendingMetadata?: boolean;
 }
 
 function formatLastPlayed(ts: number): string {
@@ -90,6 +91,7 @@ export const GameCard: React.FC<GameCardProps> = React.memo(({
   lastPlayed,
   missing,
   skeleton,
+  pendingMetadata,
 }) => {
   const [imgError, setImgError] = useState(false);
   useEffect(() => {
@@ -135,6 +137,12 @@ export const GameCard: React.FC<GameCardProps> = React.memo(({
         <section className="gc-card">
           <div className="gc-inside">
             {isThumbnailPending && (
+              <div className="gc-loading-overlay">
+                <div className="gc-spinner" />
+              </div>
+            )}
+
+            {pendingMetadata && !isThumbnailPending && (
               <div className="gc-loading-overlay">
                 <div className="gc-spinner" />
               </div>

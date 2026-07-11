@@ -10,6 +10,14 @@ import {
   NAV_PLATFORM_GROUPS,
 } from "../tabs/Gaming/types";
 
+function upsertGame(existing: Game[], incoming: Game): Game[] {
+  const idx = existing.findIndex((g) => g.id === incoming.id);
+  if (idx === -1) return [...existing, incoming];
+  const next = [...existing];
+  next[idx] = incoming;
+  return next;
+}
+
 interface GamesState {
   games: Game[];
   loading: boolean;
@@ -160,7 +168,7 @@ export const useGamesStore = create<GamesState>((set, get) => ({
     set({ loading: true });
     try {
       const odata =
-        "$select=id,title,platform,execPath,romPath,wineRunner,coverUrl,bannerUrl,description,genres,releaseYear,developer,publisher,playerCount,protonRating,steamAppId,rawgSlug,isFavorite,tags,lastPlayed,playTime,rating,hidden,sourceLocation,missing,source,launchCommand,launchArgs,launchWorkingDir,launchEnv,sessionHooks,compressedRomPath,compressionFormat,installPath,mainExe,osPlatform,engine,engineVersion,graphicsApi,entrypoints&$orderby=title asc";
+        "$select=id,title,platform,execPath,romPath,wineRunner,coverUrl,bannerUrl,description,genres,releaseYear,developer,publisher,playerCount,protonRating,steamAppId,rawgSlug,isFavorite,tags,lastPlayed,playTime,rating,hidden,sourceLocation,missing,source,launchCommand,launchArgs,launchWorkingDir,launchEnv,sessionHooks,compressedRomPath,compressionFormat,installPath,mainExe,osPlatform,engine,engineVersion,graphicsApi,entrypoints,pendingMetadata,remoteSourceId&$orderby=title asc";
       const result = await window.htpc.db.query<Game>("game", odata);
       set((state) => ({
         games: mergeGames(state.games, result.results),
@@ -512,6 +520,18 @@ if (window.htpc.onBackgroundScanComplete) {
   window.htpc.onBackgroundScanComplete((payload) => {
     if (payload.type === "games") {
       void useGamesStore.getState().load();
+    }
+  });
+}
+
+// Incremental updates during remote ROM scanning
+if (window.htpc.onScanItem) {
+  window.htpc.onScanItem((event) => {
+    if (event.type === "rom") {
+      const game = event.item as Game;
+      useGamesStore.setState((s) => ({
+        games: upsertGame(s.games, game),
+      }));
     }
   });
 }

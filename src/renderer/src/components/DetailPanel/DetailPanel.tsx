@@ -58,7 +58,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({
   };
 
   return (
-    <div ref={containerRef} className="absolute top-0 bottom-0 z-20" style={{ width: "min(480px, 90%)", right: 0 }}>
+    <div ref={containerRef} className="absolute top-0 bottom-0 z-20" style={{ width: "min(480px, 90%)", right: 0, pointerEvents: open ? "auto" : "none" }}>
     <AnimatePresence>
       {open && (
         <motion.div

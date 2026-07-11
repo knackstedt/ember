@@ -16,6 +16,7 @@ export interface HexCellData {
   missing?: boolean;
   progress?: number;
   platform?: string;
+  pendingMetadata?: boolean;
   onClick?: () => void;
   onFavorite?: () => void;
   onVisible?: () => void;
@@ -77,6 +78,7 @@ function hexDataEqual(a: HexCellData, b: HexCellData): boolean {
     a.missing === b.missing &&
     a.progress === b.progress &&
     a.platform === b.platform &&
+    a.pendingMetadata === b.pendingMetadata &&
     a.skeleton === b.skeleton
   );
 }
@@ -260,6 +262,21 @@ const HexCell = React.memo(function HexCellInner({ hex, isFocused, cellWidth, he
               }}
             >
               <div className="w-7 h-7 rounded-full border-[3px] border-white/30 border-t-white animate-spin" />
+            </div>
+          )}
+          {hex.pendingMetadata && !hex.isLoading && (
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: "rgba(0,0,0,0.5)",
+                zIndex: 4,
+              }}
+            >
+              <div className="w-6 h-6 rounded-full border-[2px] border-white/30 border-t-white animate-spin" />
             </div>
           )}
           {hex.resolution && (

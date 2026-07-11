@@ -1088,6 +1088,12 @@ const htpc = {
     return () => ipcRenderer.removeListener("scan:background:complete", handler);
   },
 
+  onScanItem: (cb: (event: { type: "movie" | "music" | "rom"; item: Movie | MusicTrack | Game; pending: boolean }) => void) => {
+    const handler = (_: Electron.IpcRendererEvent, event: { type: "movie" | "music" | "rom"; item: Movie | MusicTrack | Game; pending: boolean }) => cb(event);
+    ipcRenderer.on("scan:item", handler);
+    return () => ipcRenderer.removeListener("scan:item", handler);
+  },
+
   onMusicFilesMoved: (cb: (payload: { moves: import("../shared/types").ReorganizeMove[] }) => void) => {
     const handler = (_: Electron.IpcRendererEvent, payload: { moves: import("../shared/types").ReorganizeMove[] }) => cb(payload);
     ipcRenderer.on("music:filesMoved", handler);

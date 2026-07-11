@@ -1245,7 +1245,10 @@ export default function App(): React.ReactElement {
         )}
       </AnimatePresence>
 
-      <div className="relative z-10 flex flex-col h-full">
+      <div
+        className="relative z-10 flex flex-col h-full"
+        style={{ display: videoOpen ? "none" : "flex" }}
+      >
         {/* Tab bar */}
         <nav
           className="flex items-center gap-1 px-4 flex-shrink-0"
