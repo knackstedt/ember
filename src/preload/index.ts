@@ -48,7 +48,7 @@ import { GameMetadata } from "../shared/metadata";
 import { IPC_CHANNELS } from "../shared/ipc";
 
 import { libretroApi } from "./libretro";
-import { WebGLVideoRenderer } from "./webgl-renderer";
+import { WebGLVideoRenderer, computeRenderSize } from "./webgl-renderer";
 import { ffmpegVideoDecoder } from "./ffmpeg-decoder";
 
 function findFileRecursive(dir: string, targetName: string): string | null {
@@ -83,12 +83,7 @@ let mpvAvailable: boolean | null = null;
 function isMpvAvailable(): boolean {
   if (mpvAvailable !== null) return mpvAvailable;
   try {
-    const start = performance.now();
     mpvAvailable = ipcRenderer.sendSync("mpv:available");
-    const elapsed = performance.now() - start;
-    if (elapsed > 20) {
-      console.warn(`[preload] mpv:available sendSync took ${elapsed.toFixed(1)}ms`);
-    }
   } catch {
     mpvAvailable = false;
   }
@@ -99,6 +94,10 @@ function isMpvAvailable(): boolean {
 const mpvRenderers = new Map<string, WebGLVideoRenderer>();
 const mpvLatestFrame = new Map<string, { width: number; height: number; timestampMs: number }>();
 const mpvPendingEvents = new Map<string, string>();
+// When a decoder is paused, frames with timestamps earlier than the threshold
+// are dropped. This prevents the video from continuing to play for several
+// seconds after the user pauses (frames already in the IPC pipeline).
+const mpvPauseFrameThreshold = new Map<string, number>();
 
 ipcRenderer.on("mpv:event", (_e, payload: { id: string; event: string }) => {
   mpvPendingEvents.set(payload.id, payload.event);
@@ -107,6 +106,11 @@ ipcRenderer.on("mpv:event", (_e, payload: { id: string; event: string }) => {
 ipcRenderer.on("mpv:frame", (_e, payload: { id: string; width: number; height: number; data: any; timestampMs: number }) => {
   const renderer = mpvRenderers.get(payload.id);
   if (renderer) {
+    const threshold = mpvPauseFrameThreshold.get(payload.id);
+    if (threshold !== undefined && payload.timestampMs < threshold - 100) {
+      // Frame belongs to the pre-pause playback; drop it.
+      return;
+    }
     const data = payload.data instanceof Uint8Array ? payload.data : new Uint8Array(payload.data);
     const expected = payload.width * payload.height * 4;
     if (data.length === expected) {
@@ -181,11 +185,12 @@ const videoDecoderApi = {
     return ffmpegVideoDecoder.attachCanvas(id, canvasId);
   },
   resizeCanvas(id: string, width: number, height: number): void {
+    const { width: pixelW, height: pixelH } = computeRenderSize(width, height);
+    if (pixelW <= 0 || pixelH <= 0) return;
     if (isMpvAvailable()) {
       const renderer = mpvRenderers.get(id);
-      if (renderer) renderer.resize(width, height);
-      const dpr = window.devicePixelRatio || 1;
-      ipcRenderer.invoke("mpv:setRenderSize", id, Math.floor(width * dpr), Math.floor(height * dpr));
+      if (renderer) renderer.resize(pixelW, pixelH);
+      ipcRenderer.invoke("mpv:setRenderSize", id, pixelW, pixelH);
     } else {
       ffmpegVideoDecoder.resizeCanvas(id, width, height);
     }
@@ -207,6 +212,10 @@ const videoDecoderApi = {
   },
   async seek(id: string, timestampMs: number): Promise<void> {
     if (isMpvAvailable()) {
+      // If paused, allow the seeked frame to render by updating threshold.
+      if (mpvPauseFrameThreshold.has(id)) {
+        mpvPauseFrameThreshold.set(id, timestampMs);
+      }
       await ipcRenderer.invoke("mpv:seek", id, timestampMs);
     } else {
       ffmpegVideoDecoder.seek(id, timestampMs);
@@ -214,13 +223,25 @@ const videoDecoderApi = {
   },
   async pause(id: string): Promise<void> {
     if (isMpvAvailable()) {
-      await ipcRenderer.invoke("mpv:pause", id);
+      // Drop all frames until the pause command is confirmed and the current
+      // position is known. This stops the video from continuing to play while
+      // frames in the IPC pipeline are flushed.
+      mpvPauseFrameThreshold.set(id, Number.MAX_SAFE_INTEGER);
+      try {
+        const currentTime = await ipcRenderer.invoke("mpv:getTimePosMs", id);
+        await ipcRenderer.invoke("mpv:pause", id);
+        mpvPauseFrameThreshold.set(id, currentTime);
+      } catch (err) {
+        mpvPauseFrameThreshold.delete(id);
+        throw err;
+      }
     } else {
       ffmpegVideoDecoder.pause(id);
     }
   },
   async resume(id: string): Promise<void> {
     if (isMpvAvailable()) {
+      mpvPauseFrameThreshold.delete(id);
       await ipcRenderer.invoke("mpv:play", id);
     } else {
       ffmpegVideoDecoder.resume(id);
@@ -259,6 +280,7 @@ const videoDecoderApi = {
       await ipcRenderer.invoke("mpv:destroy", id);
       mpvRenderers.delete(id);
       mpvLatestFrame.delete(id);
+      mpvPauseFrameThreshold.delete(id);
     } else {
       ffmpegVideoDecoder.destroy(id);
     }

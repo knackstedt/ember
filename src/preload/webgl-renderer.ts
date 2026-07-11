@@ -53,6 +53,33 @@ function createProgram(gl: WebGLRenderingContext, vert: string, frag: string): W
 
 const RENDERER_BUILD_ID = "webgl-2025-06-12-letterbox";
 
+// Cap software-rendered video output to 1080p. The canvas is then upscaled
+// by the browser, which saves a huge amount of CPU/GPU time in the decoder
+// worker for 4K displays and high-DPI screens.
+const MAX_RENDER_WIDTH = 1920;
+const MAX_RENDER_HEIGHT = 1080;
+
+export function computeRenderSize(
+  cssWidth: number,
+  cssHeight: number,
+): { width: number; height: number } {
+  const dpr = window.devicePixelRatio || 1;
+  let width = Math.floor(cssWidth * dpr);
+  let height = Math.floor(cssHeight * dpr);
+
+  if (width > 0 && height > 0) {
+    const scale = Math.min(
+      1,
+      MAX_RENDER_WIDTH / width,
+      MAX_RENDER_HEIGHT / height,
+    );
+    width = Math.floor(width * scale);
+    height = Math.floor(height * scale);
+  }
+
+  return { width, height };
+}
+
 export class WebGLVideoRenderer {
   private gl: WebGLRenderingContext;
   private program: WebGLProgram;
@@ -109,9 +136,9 @@ export class WebGLVideoRenderer {
 
   resize(width: number, height: number) {
     const { canvas, gl } = this;
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = Math.floor(width * dpr);
-    canvas.height = Math.floor(height * dpr);
+    if (width <= 0 || height <= 0) return;
+    canvas.width = Math.floor(width);
+    canvas.height = Math.floor(height);
     gl.viewport(0, 0, canvas.width, canvas.height);
   }
 

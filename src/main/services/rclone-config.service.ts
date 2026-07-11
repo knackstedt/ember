@@ -142,6 +142,10 @@ export async function buildRcloneConfig(
     }
     case "smb": {
       if (resolvedHost) lines.push(`host = ${resolvedHost}`);
+      if (source.port) lines.push(`port = ${source.port}`);
+      // Keep SMB connections open longer; reconnecting is expensive and
+      // contributes to the i/o timeouts seen during 4K streaming.
+      lines.push(`idle_timeout = 10m`);
       break;
     }
     case "googledrive":

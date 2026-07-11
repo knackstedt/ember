@@ -119,6 +119,10 @@ function startPump(decoderId: string) {
     const s = decoders.get(decoderId);
     if (!s || s.pumpGeneration !== myGen || s.paused) return;
 
+    const tickStart = performance.now();
+    let width = 0;
+    let height = 0;
+
     try {
       const meta = s.decoder.renderFrame();
       if (!meta) {
@@ -129,11 +133,11 @@ function startPump(decoderId: string) {
 
       const view = new DataView(s.ab);
       const readySlot = readU32(view, OFF_READY_SLOT);
-      const width = readU32(view, OFF_WIDTH);
-      const height = readU32(view, OFF_HEIGHT);
+      width = readU32(view, OFF_WIDTH);
+      height = readU32(view, OFF_HEIGHT);
 
       if (readySlot === 0 || width === 0 || height === 0) {
-        scheduleNext();
+        scheduleNext(Math.max(0, frameInterval - (performance.now() - tickStart)));
         return;
       }
 
@@ -143,7 +147,7 @@ function startPump(decoderId: string) {
       const frameLen = width * height * 4;
 
       if (slotOffset + frameLen > s.ab.byteLength) {
-        scheduleNext();
+        scheduleNext(Math.max(0, frameInterval - (performance.now() - tickStart)));
         return;
       }
 
@@ -165,18 +169,19 @@ function startPump(decoderId: string) {
         timestampMs: s.currentTimeMs,
       });
       writeFrameToPipe(decoderId, width, height, frameBuf);
+
+      const delay = Math.max(0, frameInterval - (performance.now() - tickStart));
+      scheduleNext(delay);
     } catch (err: any) {
       process.send!({ type: "event", decoderId, event: "error", message: err?.message ?? String(err) });
       return;
     }
-
-    scheduleNext();
   }
 
-  function scheduleNext() {
+  function scheduleNext(delay: number) {
     const s = decoders.get(decoderId);
     if (!s || s.pumpGeneration !== myGen || s.paused) return;
-    s.pumpTimer = setTimeout(tick, frameInterval);
+    s.pumpTimer = setTimeout(tick, delay);
   }
 
   tick();

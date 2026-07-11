@@ -1,5 +1,5 @@
 import { spawn, ChildProcess } from "child_process";
-import { WebGLVideoRenderer } from "./webgl-renderer";
+import { WebGLVideoRenderer, computeRenderSize } from "./webgl-renderer";
 
 export interface VideoMetadata {
   width: number;
@@ -7,6 +7,8 @@ export interface VideoMetadata {
   durationMs: number;
   frameRate: number;
   codecName: string;
+  colorSpace?: string;
+  colorTransfer?: string;
 }
 
 interface FfmpegDecoderState {
@@ -92,10 +94,8 @@ async function ffprobe(path: string): Promise<VideoMetadata> {
   return new Promise((resolve, reject) => {
     const probe = spawn("ffprobe", [
       "-v", "error",
-      "-probesize", "32",
-      "-analyzeduration", "0",
       "-select_streams", "v:0",
-      "-show_entries", "stream=width,height,r_frame_rate,duration,codec_name",
+      "-show_entries", "stream=width,height,r_frame_rate,duration,codec_name,color_space,color_transfer",
       "-of", "json",
       path,
     ]);
@@ -124,6 +124,8 @@ async function ffprobe(path: string): Promise<VideoMetadata> {
           durationMs: Math.round((parseFloat(stream.duration) || 0) * 1000),
           frameRate: fps || 30,
           codecName: stream.codec_name || "unknown",
+          colorSpace: stream.color_space,
+          colorTransfer: stream.color_transfer,
         });
       } catch (e) {
         reject(new Error(`ffprobe parse error: ${e}`));
@@ -132,12 +134,23 @@ async function ffprobe(path: string): Promise<VideoMetadata> {
   });
 }
 
-/** Cap output resolution to avoid huge RGBA frames over the pipe. */
+/** Cap output resolution to avoid huge RGBA frames over the pipe.
+ *  Round to even dimensions because CUDA/NVENC filters require chroma-aligned sizes.
+ */
 function computeOutputSize(metaWidth: number, metaHeight: number): { w: number; h: number } {
   const MAX_W = 1920;
-  if (metaWidth <= MAX_W) return { w: metaWidth, h: metaHeight };
-  const scale = MAX_W / metaWidth;
-  return { w: MAX_W, h: Math.round(metaHeight * scale) };
+  let w: number;
+  let h: number;
+  if (metaWidth <= MAX_W) {
+    w = metaWidth;
+    h = metaHeight;
+  } else {
+    const scale = MAX_W / metaWidth;
+    w = MAX_W;
+    h = Math.round(metaHeight * scale);
+  }
+  // scale_cuda and other HW filters require even width/height.
+  return { w: Math.floor(w / 2) * 2, h: Math.floor(h / 2) * 2 };
 }
 
 /** Create/resume the Web Audio context and ScriptProcessorNode. */
@@ -217,7 +230,8 @@ function startFfmpeg(id: string, path: string, seekMs: number = 0) {
 
   const nvdec = getNvdecDecoder(meta.codecName);
   if (nvdec) {
-    args.push("-hwaccel", "cuda", "-c:v", nvdec);
+    // Keep frames in GPU memory so scale_cuda can resize and download directly.
+    args.push("-hwaccel", "cuda", "-hwaccel_output_format", "cuda", "-c:v", nvdec);
   } else {
     args.push("-threads", "4");
   }
@@ -229,15 +243,26 @@ function startFfmpeg(id: string, path: string, seekMs: number = 0) {
   args.push("-re");
 
   // HDR tone-mapping: PQ BT.2020 -> gamma BT.709 so colors look correct on SDR.
-  const isHdr = meta.codecName === "hevc" && (meta.width >= 1920 || meta.height >= 1080);
-  const colorspace = isHdr
-    ? `zscale=t=linear,tonemap=hable,zscale=t=bt709:m=bt709,scale=${out.w}:${out.h}:flags=fast_bilinear,format=pix_fmts=rgba`
-    : `scale=${out.w}:${out.h}:flags=fast_bilinear,format=pix_fmts=rgba`;
+  const isHdr = meta.colorTransfer === "smpte2084" || meta.colorTransfer === "arib-std-b67";
+  let videoFilter: string;
+  if (nvdec) {
+    if (isHdr) {
+      // Decode + scale to 10-bit on GPU, download, then tonemap and convert to RGBA.
+      videoFilter = `scale_cuda=${out.w}:${out.h}:format=p010,hwdownload,format=p010,tonemap=hable,format=rgba`;
+    } else {
+      // Decode + scale to NV12 on GPU, download, then convert to RGBA.
+      videoFilter = `scale_cuda=${out.w}:${out.h}:format=nv12,hwdownload,format=nv12,format=rgba`;
+    }
+  } else {
+    videoFilter = isHdr
+      ? `scale=${out.w}:${out.h}:flags=fast_bilinear,format=p010,tonemap=hable,format=rgba`
+      : `scale=${out.w}:${out.h}:flags=fast_bilinear,format=pix_fmts=rgba`;
+  }
 
   args.push(
     "-i", path,
     "-map", "0:v",
-    "-vf", colorspace,
+    "-vf", videoFilter,
     "-f", "rawvideo",
     "-pix_fmt", "rgba",
     "-vsync", "cfr",
@@ -399,7 +424,10 @@ export const ffmpegVideoDecoder = {
 
   resizeCanvas(id: string, width: number, height: number) {
     const state = getState(id);
-    if (state.renderer) state.renderer.resize(width, height);
+    if (state.renderer) {
+      const { width: pixelW, height: pixelH } = computeRenderSize(width, height);
+      state.renderer.resize(pixelW, pixelH);
+    }
   },
 
   play(id: string, path: string) {

@@ -36,7 +36,58 @@ const FRAME_MAGIC = 0x4652414d;
 const FRAME_HEADER_SIZE = 20;
 
 let pendingFrameMeta: { decoderId: string; timestampMs: number } | null = null;
-let framePipeBuf: Buffer = Buffer.alloc(0);
+let framePipeChunks: Buffer[] = [];
+let framePipeLen = 0;
+let framePipeHeadOffset = 0;
+
+function appendFramePipeChunk(chunk: Buffer) {
+  framePipeChunks.push(chunk);
+  framePipeLen += chunk.length;
+}
+
+// Peek the first `n` unconsumed bytes without removing them.
+// Returns a fresh Buffer of exactly `n` bytes copied from the chunks.
+function peekFramePipe(n: number): Buffer | null {
+  if (framePipeLen < n) return null;
+
+  const head = framePipeChunks[0];
+  if (head.length - framePipeHeadOffset >= n && framePipeChunks.length === 1) {
+    // Fast path: everything is in the single head chunk.
+    return head.subarray(framePipeHeadOffset, framePipeHeadOffset + n);
+  }
+
+  const parts: Buffer[] = [];
+  let needed = n;
+  let i = 0;
+  while (needed > 0 && i < framePipeChunks.length) {
+    const chunk = framePipeChunks[i];
+    const start = i === 0 ? framePipeHeadOffset : 0;
+    const avail = chunk.length - start;
+    const take = Math.min(avail, needed);
+    parts.push(chunk.subarray(start, start + take));
+    needed -= take;
+    i++;
+  }
+  return Buffer.concat(parts, n);
+}
+
+// Remove the first `n` unconsumed bytes from the chunk list.
+function consumeFramePipe(n: number) {
+  let remaining = n;
+  while (remaining > 0 && framePipeChunks.length > 0) {
+    const head = framePipeChunks[0];
+    const available = head.length - framePipeHeadOffset;
+    if (available <= remaining) {
+      remaining -= available;
+      framePipeChunks.shift();
+      framePipeHeadOffset = 0;
+    } else {
+      framePipeHeadOffset += remaining;
+      remaining = 0;
+    }
+  }
+  framePipeLen -= n;
+}
 
 const log = createLogger("info");
 
@@ -174,27 +225,38 @@ function ensureWorker(): ChildProcess {
   const framePipe = w.stdio[4];
   if (framePipe) {
     framePipe.on("data", (chunk: Buffer) => {
-      framePipeBuf = Buffer.concat([framePipeBuf, chunk]);
-      while (framePipeBuf.length >= FRAME_HEADER_SIZE) {
-        const magic = framePipeBuf.readUInt32LE(0);
+      appendFramePipeChunk(chunk);
+      while (framePipeLen >= FRAME_HEADER_SIZE) {
+        const header = peekFramePipe(FRAME_HEADER_SIZE);
+        if (!header) break;
+
+        const magic = header.readUInt32LE(0);
         if (magic !== FRAME_MAGIC) {
-          // Out of sync — find next magic
-          const idx = framePipeBuf.indexOf(Buffer.from("FRAM"), 1);
-          if (idx === -1) { framePipeBuf = Buffer.alloc(0); break; }
-          framePipeBuf = framePipeBuf.subarray(idx);
+          // Out of sync — discard bytes until the next FRAM magic.
+          const probe = peekFramePipe(framePipeLen);
+          if (!probe) { consumeFramePipe(1); continue; }
+          const idx = probe.indexOf(Buffer.from("FRAM"), 1);
+          if (idx === -1) {
+            consumeFramePipe(framePipeLen);
+            break;
+          }
+          consumeFramePipe(idx);
           continue;
         }
-        const idLen = framePipeBuf.readUInt32LE(4);
-        const width = framePipeBuf.readUInt32LE(8);
-        const height = framePipeBuf.readUInt32LE(12);
-        const frameLen = framePipeBuf.readUInt32LE(16);
-        const totalLen = FRAME_HEADER_SIZE + idLen + frameLen;
-        if (framePipeBuf.length < totalLen) break; // need more data
 
-        const decoderId = framePipeBuf.subarray(FRAME_HEADER_SIZE, FRAME_HEADER_SIZE + idLen).toString("utf8");
-        const frameData = Buffer.allocUnsafe(frameLen);
-        framePipeBuf.copy(frameData, 0, FRAME_HEADER_SIZE + idLen, totalLen);
-        framePipeBuf = framePipeBuf.subarray(totalLen);
+        const idLen = header.readUInt32LE(4);
+        const width = header.readUInt32LE(8);
+        const height = header.readUInt32LE(12);
+        const frameLen = header.readUInt32LE(16);
+        const totalLen = FRAME_HEADER_SIZE + idLen + frameLen;
+        if (framePipeLen < totalLen) break;
+
+        const frameBuf = peekFramePipe(totalLen);
+        if (!frameBuf) break;
+
+        const decoderId = frameBuf.subarray(FRAME_HEADER_SIZE, FRAME_HEADER_SIZE + idLen).toString("utf8");
+        const frameData = frameBuf.subarray(FRAME_HEADER_SIZE + idLen, totalLen);
+        consumeFramePipe(totalLen);
 
         const meta = pendingFrameMeta;
         pendingFrameMeta = null;
@@ -271,6 +333,9 @@ export async function mpvPlay(id: string): Promise<void> {
 }
 
 export async function mpvPause(id: string): Promise<void> {
+  // Stop buffering frames for this decoder so already-queued frames don't keep
+  // playing after the user pauses.
+  frameQueues.delete(id);
   await sendCommand("pause", id);
 }
 

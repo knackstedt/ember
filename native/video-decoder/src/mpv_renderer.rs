@@ -54,14 +54,15 @@ impl MpvRenderer {
         }
 
         // vo=libmpv is required for the SW render API to work.
-        // hwdec=auto lets mpv use NVDEC/VAAPI/DXVA — whatever the GPU
-        // supports — then the SW render API reads the composited frame
-        // back to CPU memory for WebGL upload.
+        // hwdec=auto-copy selects the best available hardware decoder in
+        // copy-back mode, which is compatible with the SW render API and
+        // avoids expensive 4K software decode in the worker.
         // config=no prevents mpv from reading the user's ~/.config/mpv/mpv.conf,
         // which could set an unexpectedly low volume, unwanted filters, etc.
         unsafe {
             (mpv_api.mpv_set_option_string)(mpv, c"vo".as_ptr(), c"libmpv".as_ptr());
-            (mpv_api.mpv_set_option_string)(mpv, c"hwdec".as_ptr(), c"auto".as_ptr());
+            (mpv_api.mpv_set_option_string)(mpv, c"hwdec".as_ptr(), c"auto-copy".as_ptr());
+            (mpv_api.mpv_set_option_string)(mpv, c"hwdec-codecs".as_ptr(), c"all".as_ptr());
             (mpv_api.mpv_set_option_string)(mpv, c"loop-file".as_ptr(), c"no".as_ptr());
             (mpv_api.mpv_set_option_string)(mpv, c"terminal".as_ptr(), c"no".as_ptr());
             (mpv_api.mpv_set_option_string)(mpv, c"msg-level".as_ptr(), c"all=warn".as_ptr());
@@ -72,6 +73,20 @@ impl MpvRenderer {
             (mpv_api.mpv_set_option_string)(mpv, c"replaygain".as_ptr(), c"no".as_ptr());
             // Raise ceiling so we have headroom for quiet files.
             (mpv_api.mpv_set_option_string)(mpv, c"volume-max".as_ptr(), c"200".as_ptr());
+            // Cache configuration for network streams (SMB served over HTTP).
+            // Enables stream read-ahead and raises demuxer cache limits so
+            // high-bitrate 4K files don't stall due to SMB latency.
+            (mpv_api.mpv_set_option_string)(mpv, c"cache".as_ptr(), c"yes".as_ptr());
+            (mpv_api.mpv_set_option_string)(mpv, c"cache-secs".as_ptr(), c"60".as_ptr());
+            (mpv_api.mpv_set_option_string)(mpv, c"cache-pause".as_ptr(), c"no".as_ptr());
+            (mpv_api.mpv_set_option_string)(mpv, c"demuxer-max-bytes".as_ptr(), c"150M".as_ptr());
+            (mpv_api.mpv_set_option_string)(mpv, c"demuxer-readahead-packets".as_ptr(), c"50000".as_ptr());
+            // Fast software scaling — the SW render API scales on CPU, so use
+            // the fastest scaler to avoid 4K→1080p downscaling bottlenecks.
+            (mpv_api.mpv_set_option_string)(mpv, c"sws-fast".as_ptr(), c"yes".as_ptr());
+            (mpv_api.mpv_set_option_string)(mpv, c"sws-scaler".as_ptr(), c"fast_bilinear".as_ptr());
+            // Skip non-reference deblocking for faster decoding.
+            (mpv_api.mpv_set_option_string)(mpv, c"vd-lavc-skiploopfilter".as_ptr(), c"nonref".as_ptr());
         }
 
         mpv_err(unsafe { (mpv_api.mpv_initialize)(mpv) })
@@ -253,6 +268,7 @@ impl MpvRenderer {
 
             let size = [render_w as i32, render_h as i32];
             let format = c"rgb0";
+            let block_for_target_time: c_int = 0;
 
             let mut params = [
                 api::mpv_render_param {
@@ -270,6 +286,10 @@ impl MpvRenderer {
                 api::mpv_render_param {
                     type_: api::MPV_RENDER_PARAM_SW_POINTER,
                     data: slot.as_mut_ptr() as *mut c_void,
+                },
+                api::mpv_render_param {
+                    type_: api::MPV_RENDER_PARAM_BLOCK_FOR_TARGET_TIME,
+                    data: &block_for_target_time as *const _ as *mut c_void,
                 },
                 api::mpv_render_param {
                     type_: api::MPV_RENDER_PARAM_INVALID,
@@ -552,19 +572,6 @@ impl MpvRenderer {
         };
         if ret < 0 {
             return Err(format!("mpv set volume failed: {}", ret));
-        }
-        // Verify the change took effect.
-        let mut check: f64 = 0.0;
-        let ret2 = unsafe {
-            (mpv_api.mpv_get_property)(
-                self.mpv,
-                name_c.as_ptr(),
-                api::MPV_FORMAT_DOUBLE,
-                &mut check as *mut _ as *mut c_void,
-            )
-        };
-        if ret2 == 0 {
-            eprintln!("[mpv_renderer] volume set -> requested {} actual {}", vol, check);
         }
         Ok(())
     }

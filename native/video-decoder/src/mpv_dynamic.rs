@@ -34,6 +34,7 @@ pub const MPV_RENDER_PARAM_SW_SIZE: mpv_render_param_type = 17;
 pub const MPV_RENDER_PARAM_SW_FORMAT: mpv_render_param_type = 18;
 pub const MPV_RENDER_PARAM_SW_STRIDE: mpv_render_param_type = 19;
 pub const MPV_RENDER_PARAM_SW_POINTER: mpv_render_param_type = 20;
+pub const MPV_RENDER_PARAM_BLOCK_FOR_TARGET_TIME: mpv_render_param_type = 12;
 
 pub const MPV_EVENT_SHUTDOWN: mpv_event_id = 1;
 pub const MPV_EVENT_END_FILE: mpv_event_id = 7;

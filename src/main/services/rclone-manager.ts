@@ -19,6 +19,9 @@ import { createLogger } from "../util/logger";
 import { spawn, ChildProcess, spawnSync } from "child_process";
 import { lookup } from "dns";
 import { promisify } from "util";
+import { join } from "path";
+import { mkdirSync, existsSync } from "fs";
+import { homedir } from "os";
 
 const log = createLogger("info");
 const dnsLookup = promisify(lookup);
@@ -67,7 +70,14 @@ function runRcloneLsjson(
 const serveProcesses = new Map<string, ChildProcess>();
 const servePorts = new Map<string, number>();
 const serveConfigs = new Map<string, string>();
+const serveStartPromises = new Map<string, Promise<number | null>>();
 let nextPort = 20000;
+
+function getVfsCacheDir(): string {
+  const dir = join(homedir(), ".cache", "ember-rclone-vfs");
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  return dir;
+}
 
 function allocatePort(): number {
   return nextPort++;
@@ -202,76 +212,105 @@ export async function getRemoteFileList(
 }
 
 export async function startServe(source: RemoteSource): Promise<number | null> {
+  const existingPromise = serveStartPromises.get(source.id);
+  if (existingPromise) return existingPromise;
+
   if (servePorts.has(source.id)) {
     return servePorts.get(source.id)!;
   }
 
-  const binary = resolveRcloneBinary();
-  if (!binary) return null;
+  const promise = (async () => {
+    const binary = resolveRcloneBinary();
+    if (!binary) return null;
 
-  const creds = await retrieveCredentials(source);
-  if (!creds) {
-    log.warn("rclone:manager", `no credentials for ${source.id}, cannot start serve`);
-    return null;
-  }
-
-  const { remoteName, configPath } = await buildRcloneConfig(source, creds);
-  const port = allocatePort();
-
-  const proc = spawn(binary, [
-    "serve", "http",
-    "--config", configPath,
-    "--addr", `localhost:${port}`,
-    "--read-only",
-    `${remoteName}:${source.remotePath || "/"}`,
-  ], {
-    detached: false,
-    stdio: ["ignore", "ignore", "pipe"],
-  });
-
-  proc.stderr?.on("data", (data: Buffer) => {
-    const line = data.toString().trim();
-    if (line.includes("ERROR")) {
-      log.error("rclone:serve", line);
-    } else {
-      log.debug("rclone:serve", line);
+    const creds = await retrieveCredentials(source);
+    if (!creds) {
+      log.warn("rclone:manager", `no credentials for ${source.id}, cannot start serve`);
+      return null;
     }
-  });
 
-  proc.on("error", (err) => {
-    log.error("rclone:serve", `failed for ${source.id}: ${err.message}`);
-    serveProcesses.delete(source.id);
-    servePorts.delete(source.id);
-    serveConfigs.delete(source.id);
-  });
+    const { remoteName, configPath } = await buildRcloneConfig(source, creds);
+    const port = allocatePort();
 
-  proc.on("exit", (code) => {
-    if (code !== 0 && code !== null) {
-      log.error("rclone:serve", `${source.id} exited with code ${code}`);
+    const proc = spawn(binary, [
+      "serve", "http",
+      "--config", configPath,
+      "--addr", `localhost:${port}`,
+      "--read-only",
+      // Buffer/VFS cache: read ahead from SMB and keep files on local disk so
+      // high-bitrate 4K streams and re-seeks don't constantly hit the network.
+      "--buffer-size", "256M",
+      "--cache-dir", getVfsCacheDir(),
+      "--vfs-cache-mode", "full",
+      "--vfs-cache-max-size", "100G",
+      "--vfs-cache-max-age", "7d",
+      "--vfs-write-back", "5s",
+      // Retry and timeout tuning to survive flaky SMB links.
+      "--timeout", "10m",
+      "--contimeout", "5m",
+      "--retries", "10",
+      "--retries-sleep", "1s",
+      "--low-level-retries", "20",
+      `${remoteName}:${source.remotePath || "/"}`,
+    ], {
+      detached: false,
+      stdio: ["ignore", "ignore", "pipe"],
+    });
+
+    proc.stderr?.on("data", (data: Buffer) => {
+      const line = data.toString().trim();
+      if (line.includes("ERROR")) {
+        log.error("rclone:serve", line);
+      } else {
+        log.debug("rclone:serve", line);
+      }
+    });
+
+    proc.on("error", (err) => {
+      log.error("rclone:serve", `failed for ${source.id}: ${err.message}`);
+      serveProcesses.delete(source.id);
+      servePorts.delete(source.id);
+      serveConfigs.delete(source.id);
+    });
+
+    proc.on("exit", (code) => {
+      if (code !== 0 && code !== null) {
+        log.error("rclone:serve", `${source.id} exited with code ${code}`);
+      }
+      serveProcesses.delete(source.id);
+      servePorts.delete(source.id);
+      const exitedConfig = serveConfigs.get(source.id);
+      if (exitedConfig) cleanupRcloneConfig(exitedConfig);
+      serveConfigs.delete(source.id);
+    });
+
+    serveProcesses.set(source.id, proc);
+    serveConfigs.set(source.id, configPath);
+
+    // Wait and verify the server is actually accepting connections
+    const healthy = await waitForServe(port, 8000);
+    if (!healthy) {
+      log.error("rclone:serve", `serve for ${source.id} on port ${port} failed health check`);
+      proc.kill("SIGTERM");
+      serveProcesses.delete(source.id);
+      serveConfigs.delete(source.id);
+      return null;
     }
-    serveProcesses.delete(source.id);
-    servePorts.delete(source.id);
-    const exitedConfig = serveConfigs.get(source.id);
-    if (exitedConfig) cleanupRcloneConfig(exitedConfig);
-    serveConfigs.delete(source.id);
+
+    // Only publish the port once the server is actually ready so callers
+    // don't get a port before it can accept HTTP requests.
+    servePorts.set(source.id, port);
+
+    log.info("rclone:manager", `started serve for ${source.id} on port ${port}`);
+    return port;
+  })();
+
+  serveStartPromises.set(source.id, promise);
+  promise.catch(() => {}).finally(() => {
+    serveStartPromises.delete(source.id);
   });
 
-  serveProcesses.set(source.id, proc);
-  servePorts.set(source.id, port);
-  serveConfigs.set(source.id, configPath);
-
-  // Wait and verify the server is actually accepting connections
-  const healthy = await waitForServe(port, 8000);
-  if (!healthy) {
-    log.error("rclone:serve", `serve for ${source.id} on port ${port} failed health check`);
-    proc.kill("SIGTERM");
-    serveProcesses.delete(source.id);
-    servePorts.delete(source.id);
-    return null;
-  }
-
-  log.info("rclone:manager", `started serve for ${source.id} on port ${port}`);
-  return port;
+  return promise;
 }
 
 export function stopServe(sourceId: string): void {
@@ -288,39 +327,33 @@ export function stopServe(sourceId: string): void {
 }
 
 export async function getServePort(sourceId: string): Promise<number | undefined> {
-  const port = servePorts.get(sourceId);
-  if (!port) return undefined;
+  // If a start is already in progress, wait for it to finish.
+  const pending = serveStartPromises.get(sourceId);
+  if (pending) return pending.then((p) => p ?? undefined);
 
+  let port = servePorts.get(sourceId);
   const proc = serveProcesses.get(sourceId);
-  if (!proc || proc.killed || proc.exitCode !== null) {
-    // Process died, clean up stale entries
+
+  // Clean up and start fresh if the process has died.
+  if (port && (!proc || proc.killed || proc.exitCode !== null)) {
     serveProcesses.delete(sourceId);
     servePorts.delete(sourceId);
     const configPath = serveConfigs.get(sourceId);
     if (configPath) cleanupRcloneConfig(configPath);
     serveConfigs.delete(sourceId);
     log.warn("rclone:manager", `serve for ${sourceId} has died, cleaned up stale port ${port}`);
-    return undefined;
+    port = undefined;
   }
 
-  // Verify the HTTP server is actually responding
-  try {
-    await fetch(`http://localhost:${port}/`, {
-      method: "HEAD",
-      signal: AbortSignal.timeout(1000),
-    });
-  } catch {
-    log.warn("rclone:manager", `serve for ${sourceId} on port ${port} not responding, cleaning up`);
-    proc.kill("SIGTERM");
-    serveProcesses.delete(sourceId);
-    servePorts.delete(sourceId);
-    const configPath = serveConfigs.get(sourceId);
-    if (configPath) cleanupRcloneConfig(configPath);
-    serveConfigs.delete(sourceId);
-    return undefined;
-  }
+  if (port) return port;
 
-  return port;
+  // No serve is running yet. Try to start it so resolveUrl doesn't fail
+  // just because the user clicked a video before the scan queue got there.
+  const sources = await RemoteSourceRepo.list();
+  const source = sources.find((s) => s.id === sourceId);
+  if (!source) return undefined;
+
+  return startServe(source).then((p) => p ?? undefined);
 }
 
 export async function restartServe(source: RemoteSource): Promise<number | null> {
