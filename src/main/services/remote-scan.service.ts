@@ -3,7 +3,7 @@ import { extname, basename } from "path";
 import { promisify } from "util";
 import { exec } from "child_process";
 import { RemoteSource } from "../../shared/types";
-import { Movie, MusicTrack, Game, GamePlatform } from "../../shared/types";
+import { Movie, MusicTrack, Game, GamePlatform, AudioTrackInfo, SubtitleTrackInfo, ChapterInfo } from "../../shared/types";
 import { createLogger } from "../util/logger";
 import { getRemoteFileList, startServe, getServePort, restartServe, listRemotes } from "./rclone-manager";
 import { MovieRepo, MusicRepo, GameRepo } from "../db/repository";
@@ -145,21 +145,69 @@ async function probVideoHttp(url: string, source?: RemoteSource): Promise<{
   resolution?: string;
   codec?: string;
   title?: string;
+  hdr?: boolean;
+  container?: string;
+  audioCodec?: string;
+  audioChannels?: number;
+  audioChannelLayout?: string;
+  audioTracks?: AudioTrackInfo[];
+  subtitleTracks?: SubtitleTrackInfo[];
+  chapters?: ChapterInfo[];
 } | null> {
   try {
     const { stdout } = await execAsync(
-      `ffprobe -hide_banner -loglevel error -v quiet -print_format json -show_streams -show_format "${url.replace(/"/g, '\\"')}"`,
+      `ffprobe -hide_banner -loglevel error -v quiet -print_format json -show_streams -show_format -show_chapters "${url.replace(/"/g, '\\"')}"`,
       { timeout: 30000 },
     );
     const data = JSON.parse(stdout);
     const video = data.streams?.find(
       (s: any) => s.codec_type === "video" && s.disposition?.attached_pic !== 1,
     );
+
+    const audioStreams = (data.streams ?? []).filter((s: any) => s.codec_type === "audio");
+    const audioTracks: AudioTrackInfo[] = audioStreams.map((s: any, i: number) => ({
+      id: i,
+      codec: s.codec_name,
+      channels: s.channels,
+      channelLayout: s.channel_layout || (s.channels === 1 ? "mono" : s.channels === 2 ? "stereo" : s.channels === 6 ? "5.1" : s.channels === 8 ? "7.1" : String(s.channels ?? "unknown")),
+      language: s.tags?.language,
+      title: s.tags?.title,
+      default: s.disposition?.default === 1,
+    }));
+    const primaryAudio = audioStreams[0];
+
+    const subStreams = (data.streams ?? []).filter((s: any) => s.codec_type === "subtitle");
+    const subtitleTracks: SubtitleTrackInfo[] = subStreams.map((s: any, i: number) => ({
+      id: i,
+      codec: s.codec_name,
+      language: s.tags?.language,
+      title: s.tags?.title,
+      default: s.disposition?.default === 1,
+    }));
+
+    const chapters: ChapterInfo[] = (data.chapters ?? []).map((ch: any, i: number) => ({
+      index: i,
+      title: ch.tags?.title ?? `Chapter ${i + 1}`,
+      timeMs: Math.round(parseFloat(ch.start_time) * 1000),
+    }));
+
+    const transfer = video?.color_transfer?.toLowerCase() ?? "";
+    const primaries = video?.color_primaries?.toLowerCase() ?? "";
+    const hdr = video ? (transfer === "smpte2084" || transfer === "arib-std-b67" || primaries === "bt2020" || primaries === "smpte2084") : undefined;
+
     return {
       duration: data.format?.duration ? parseFloat(data.format.duration) : undefined,
       resolution: video ? `${video.width}x${video.height}` : undefined,
       codec: video?.codec_name,
       title: data.format?.tags?.title,
+      hdr,
+      container: data.format?.format_name,
+      audioCodec: primaryAudio?.codec_name,
+      audioChannels: primaryAudio?.channels,
+      audioChannelLayout: primaryAudio ? (primaryAudio.channel_layout || (primaryAudio.channels === 1 ? "mono" : primaryAudio.channels === 2 ? "stereo" : primaryAudio.channels === 6 ? "5.1" : primaryAudio.channels === 8 ? "7.1" : String(primaryAudio.channels ?? "unknown"))) : undefined,
+      audioTracks: audioTracks.length > 0 ? audioTracks : undefined,
+      subtitleTracks: subtitleTracks.length > 0 ? subtitleTracks : undefined,
+      chapters: chapters.length > 0 ? chapters : undefined,
     };
   } catch (err) {
     if (source && isConnectionError(err)) {
@@ -218,9 +266,10 @@ export async function scanRemoteMovies(
       .replace(/[._]/g, " ")
       .trim();
 
-    // Check cache first — skip probe if metadata already exists
+    // Check cache first — skip probe if metadata already exists AND new fields are present
     const cachedMovie = cached.get(emberPath);
-    if (cachedMovie && !cachedMovie.pendingMetadata && (cachedMovie.resolution || cachedMovie.runtime)) {
+    const hasBadChapters = cachedMovie?.chapters?.some((ch) => ch.timeMs > 100_000_000_000);
+    if (cachedMovie && !cachedMovie.pendingMetadata && (cachedMovie.resolution || cachedMovie.runtime) && cachedMovie.container !== undefined && !hasBadChapters) {
       const movie: Movie = {
         ...cachedMovie,
         id,
@@ -283,6 +332,14 @@ export async function scanRemoteMovies(
         runtime: probe?.duration ? Math.round(probe.duration) : undefined,
         resolution: probe?.resolution,
         codec: probe?.codec,
+        hdr: probe?.hdr,
+        container: probe?.container,
+        audioCodec: probe?.audioCodec,
+        audioChannels: probe?.audioChannels,
+        audioChannelLayout: probe?.audioChannelLayout,
+        audioTracks: probe?.audioTracks,
+        subtitleTracks: probe?.subtitleTracks,
+        chapters: probe?.chapters,
         tags: [],
         hidden: false,
         sourceLocation: `rclone:${source.protocol}`,

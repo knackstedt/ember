@@ -5,7 +5,7 @@ import { exec, execSync, spawn } from "child_process";
 import { promisify } from "util";
 import { app } from "electron";
 import { getXdgVideosDir } from "./xdg";
-import { Movie, TVShow, TVSeason, TVEpisode } from "../../shared/types";
+import { Movie, TVShow, TVSeason, TVEpisode, AudioTrackInfo, SubtitleTrackInfo, ChapterInfo } from "../../shared/types";
 import { resolveSourceLocation } from "../../shared/path-utils";
 import { createLogger } from "../util/logger";
 
@@ -70,14 +70,51 @@ function findNodeExecutable(): string {
 interface FfprobeStream {
   codec_type: string;
   codec_name: string;
+  codec_long_name?: string;
   width?: number;
   height?: number;
-  disposition?: { attached_pic?: number };
+  disposition?: { attached_pic?: number; default?: number };
+  color_transfer?: string;
+  color_space?: string;
+  color_primaries?: string;
+  channels?: number;
+  channel_layout?: string;
+  tags?: { language?: string; title?: string };
+}
+
+interface FfprobeChapter {
+  id: number;
+  time_base: string;
+  start: number;
+  start_time: string;
+  end: number;
+  tags?: { title?: string };
 }
 
 interface FfprobeData {
   streams?: FfprobeStream[];
-  format?: { duration?: string; tags?: Record<string, string> };
+  format?: { duration?: string; format_name?: string; tags?: Record<string, string> };
+  chapters?: FfprobeChapter[];
+}
+
+function isHdrStream(s: FfprobeStream): boolean {
+  const transfer = s.color_transfer?.toLowerCase() ?? "";
+  const primaries = s.color_primaries?.toLowerCase() ?? "";
+  // smpte2084 = HDR10/PQ, arib-std-b67 = HLG
+  return transfer === "smpte2084" || transfer === "arib-std-b67" ||
+    primaries === "bt2020" || primaries === "smpte2084";
+}
+
+function formatChannelLayout(channels?: number, layout?: string): string {
+  if (layout) return layout;
+  if (channels) {
+    if (channels === 1) return "mono";
+    if (channels === 2) return "stereo";
+    if (channels === 6) return "5.1";
+    if (channels === 8) return "7.1";
+    return String(channels);
+  }
+  return "unknown";
 }
 
 async function probVideo(filePath: string): Promise<{
@@ -85,17 +122,56 @@ async function probVideo(filePath: string): Promise<{
   resolution?: string;
   codec?: string;
   title?: string;
+  hdr?: boolean;
+  container?: string;
+  audioCodec?: string;
+  audioChannels?: number;
+  audioChannelLayout?: string;
+  audioTracks?: AudioTrackInfo[];
+  subtitleTracks?: SubtitleTrackInfo[];
+  chapters?: ChapterInfo[];
 } | null> {
   if (!(await checkFfmpeg())) return null;
   try {
     const { stdout } = await execAsync(
-      `ffprobe -hide_banner -loglevel error -v quiet -print_format json -show_streams -show_format "${filePath.replace(/"/g, '\\"')}"`,
+      `ffprobe -hide_banner -loglevel error -v quiet -print_format json -show_streams -show_format -show_chapters "${filePath.replace(/"/g, '\\"')}"`,
       { timeout: 30000 },
     );
     const data: FfprobeData = JSON.parse(stdout);
     const video = data.streams?.find(
       (s) => s.codec_type === "video" && s.disposition?.attached_pic !== 1,
     );
+
+    // Audio tracks
+    const audioStreams = (data.streams ?? []).filter((s) => s.codec_type === "audio");
+    const audioTracks: AudioTrackInfo[] = audioStreams.map((s, i) => ({
+      id: i,
+      codec: s.codec_name,
+      channels: s.channels,
+      channelLayout: formatChannelLayout(s.channels, s.channel_layout),
+      language: s.tags?.language,
+      title: s.tags?.title,
+      default: s.disposition?.default === 1,
+    }));
+    const primaryAudio = audioStreams[0];
+
+    // Subtitle tracks
+    const subStreams = (data.streams ?? []).filter((s) => s.codec_type === "subtitle");
+    const subtitleTracks: SubtitleTrackInfo[] = subStreams.map((s, i) => ({
+      id: i,
+      codec: s.codec_name,
+      language: s.tags?.language,
+      title: s.tags?.title,
+      default: s.disposition?.default === 1,
+    }));
+
+    // Chapters
+    const chapters: ChapterInfo[] = (data.chapters ?? []).map((ch, i) => ({
+      index: i,
+      title: ch.tags?.title ?? `Chapter ${i + 1}`,
+      timeMs: Math.round(parseFloat(ch.start_time) * 1000),
+    }));
+
     return {
       duration: data.format?.duration
         ? parseFloat(data.format.duration)
@@ -103,6 +179,14 @@ async function probVideo(filePath: string): Promise<{
       resolution: video ? `${video.width}x${video.height}` : undefined,
       codec: video?.codec_name,
       title: data.format?.tags?.title,
+      hdr: video ? isHdrStream(video) : undefined,
+      container: data.format?.format_name,
+      audioCodec: primaryAudio?.codec_name,
+      audioChannels: primaryAudio?.channels,
+      audioChannelLayout: primaryAudio ? formatChannelLayout(primaryAudio.channels, primaryAudio.channel_layout) : undefined,
+      audioTracks: audioTracks.length > 0 ? audioTracks : undefined,
+      subtitleTracks: subtitleTracks.length > 0 ? subtitleTracks : undefined,
+      chapters: chapters.length > 0 ? chapters : undefined,
     };
   } catch (err) {
     log.error("video.scanner", `ffprobe failed for ${filePath}: ${err}`);
@@ -144,7 +228,7 @@ function summarizeExecError(err: unknown): string {
   return msg.slice(0, 200);
 }
 
-async function resolveThumbnailPath(filePath: string): Promise<string> {
+export async function resolveThumbnailPath(filePath: string): Promise<string> {
   if (!filePath.startsWith("ember://remote/")) return filePath;
   const url = new URL(filePath);
   const segments = url.pathname.split("/").filter(Boolean).map(decodeURIComponent);
@@ -489,6 +573,14 @@ export async function scanMovieFiles(
         runtime: probe?.duration ? Math.round(probe.duration) : undefined,
         resolution: probe?.resolution,
         codec: probe?.codec,
+        hdr: probe?.hdr,
+        container: probe?.container,
+        audioCodec: probe?.audioCodec,
+        audioChannels: probe?.audioChannels,
+        audioChannelLayout: probe?.audioChannelLayout,
+        audioTracks: probe?.audioTracks,
+        subtitleTracks: probe?.subtitleTracks,
+        chapters: probe?.chapters,
         tags: [],
         hidden: false,
         sourceLocation: resolveSourceLocation(filePath),

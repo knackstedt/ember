@@ -292,6 +292,17 @@ async function runMigrations(db: Surreal): Promise<void> {
     DEFINE FIELD IF NOT EXISTS corrupt ON movie TYPE option<bool>;
     DEFINE FIELD IF NOT EXISTS pendingMetadata ON movie TYPE option<bool>;
     DEFINE FIELD IF NOT EXISTS remoteSourceId ON movie TYPE option<string>;
+    DEFINE FIELD IF NOT EXISTS hdr ON movie TYPE option<bool>;
+    DEFINE FIELD IF NOT EXISTS container ON movie TYPE option<string>;
+    DEFINE FIELD IF NOT EXISTS audioCodec ON movie TYPE option<string>;
+    DEFINE FIELD IF NOT EXISTS audioChannels ON movie TYPE option<int>;
+    DEFINE FIELD IF NOT EXISTS audioChannelLayout ON movie TYPE option<string>;
+    DEFINE FIELD IF NOT EXISTS audioTracks ON movie TYPE any;
+    DEFINE FIELD IF NOT EXISTS audioTracks.* ON movie TYPE any;
+    DEFINE FIELD IF NOT EXISTS subtitleTracks ON movie TYPE any;
+    DEFINE FIELD IF NOT EXISTS subtitleTracks.* ON movie TYPE any;
+    DEFINE FIELD IF NOT EXISTS chapters ON movie TYPE any;
+    DEFINE FIELD IF NOT EXISTS chapters.* ON movie TYPE any;
 
     DEFINE TABLE IF NOT EXISTS music_track SCHEMAFULL;
     DEFINE FIELD IF NOT EXISTS id ON music_track TYPE string;

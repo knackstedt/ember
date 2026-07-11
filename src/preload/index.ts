@@ -690,6 +690,8 @@ const htpc = {
       ipcRenderer.invoke("movies:regenerateThumbnail", movie),
     setCustomCover: (movie: Movie): Promise<string | null> =>
       ipcRenderer.invoke("movies:generateProceduralCover", movie),
+    chapterThumbnail: (movieId: string, filePath: string, timeMs: number, chapterIndex: number): Promise<string | null> =>
+      ipcRenderer.invoke("movies:chapterThumbnail", movieId, filePath, timeMs, chapterIndex),
   },
 
   music: {

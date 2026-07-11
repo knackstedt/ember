@@ -1907,6 +1907,14 @@ export function registerIpcHandlers(window: BrowserWindow): void {
         sourceLocation,
         remoteSourceId,
         pendingMetadata,
+        hdr,
+        container,
+        audioCodec,
+        audioChannels,
+        audioChannelLayout,
+        audioTracks,
+        subtitleTracks,
+        chapters,
       } = movie as any;
       const clean = {
         id,
@@ -1929,6 +1937,14 @@ export function registerIpcHandlers(window: BrowserWindow): void {
         sourceLocation,
         remoteSourceId,
         pendingMetadata,
+        hdr,
+        container,
+        audioCodec,
+        audioChannels,
+        audioChannelLayout,
+        audioTracks,
+        subtitleTracks,
+        chapters,
       };
       const defined: any = {};
       for (const [k, v] of Object.entries(clean)) {
@@ -2100,6 +2116,48 @@ export function registerIpcHandlers(window: BrowserWindow): void {
       await MovieRepo.setCoverUrl(movie.id, coverUrl);
     }
     return coverUrl ?? null;
+  });
+
+  ipcMain.handle("movies:chapterThumbnail", async (_e, movieId: string, filePath: string, timeMs: number, chapterIndex: number) => {
+    const { promisify } = await import("util");
+    const { exec } = await import("child_process");
+    const execA = promisify(exec);
+
+    // Resolve ember:// paths to local or HTTP URLs
+    let resolvedPath = filePath;
+    if (resolvedPath.startsWith("ember://remote/") || resolvedPath.startsWith("ember://media/")) {
+      try {
+        const { resolveThumbnailPath } = await import("../scanners/video.scanner.js");
+        resolvedPath = await resolveThumbnailPath(filePath);
+      } catch { /* fall back to raw path */ }
+    }
+
+    const thumbDir = join(app.getPath("userData"), "thumbnails", "movies", "chapters", movieId);
+    try { mkdirSync(thumbDir, { recursive: true }); } catch { /* ignore */ }
+    const dest = join(thumbDir, `${chapterIndex}.jpg`);
+
+    if (existsSync(dest) && statSync(dest).size > 0) {
+      return `ember://thumbnails/movies/chapters/${movieId}/${chapterIndex}.jpg`;
+    }
+
+    const seekSec = timeMs / 1000;
+    if (seekSec < 0 || seekSec > 86400) {
+      log.warn("ipc", `chapter thumbnail skip unreasonable seek time for ${movieId} ch${chapterIndex}: ${seekSec}s`);
+      return null;
+    }
+
+    try {
+      await execA(
+        `ffmpeg -hide_banner -loglevel error -ss ${seekSec} -i "${resolvedPath.replace(/"/g, '\\"')}" -frames:v 1 -q:v 2 -vf "scale=320:-1" -pix_fmt yuvj420p -y "${dest}"`,
+        { timeout: 15000 },
+      );
+      if (existsSync(dest) && statSync(dest).size > 0) {
+        return `ember://thumbnails/movies/chapters/${movieId}/${chapterIndex}.jpg`;
+      }
+    } catch (err) {
+      log.warn("ipc", `chapter thumbnail failed for ${movieId} ch${chapterIndex}: ${err}`);
+    }
+    return null;
   });
 
   ipcMain.handle("music:scan", async (_e, extraPaths?: string[]) => {

@@ -128,7 +128,7 @@ export const useMoviesStore = create<MoviesState>((set, get) => ({
     set({ loading: true });
     try {
       const odata =
-        "$select=id,title,filePath,coverUrl,backdropUrl,description,genres,releaseYear,director,runtime,resolution,codec,tmdbId,isFavorite,tags,lastPlayed,rating,watchProgress,hidden,sourceLocation,missing,corrupt,pendingMetadata,remoteSourceId&$orderby=title asc";
+        "$select=id,title,filePath,coverUrl,backdropUrl,description,genres,releaseYear,director,runtime,resolution,codec,tmdbId,isFavorite,tags,lastPlayed,rating,watchProgress,hidden,sourceLocation,missing,corrupt,pendingMetadata,remoteSourceId,hdr,container,audioCodec,audioChannels,audioChannelLayout,audioTracks,subtitleTracks,chapters&$orderby=title asc";
       const result = await window.htpc.db.query<Movie>("movie", odata);
       set((state) => ({
         movies: mergeMovies(state.movies, result.results),

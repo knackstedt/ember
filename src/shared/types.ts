@@ -350,6 +350,30 @@ export interface TaintManifest {
   taints: TaintEntry[];
 }
 
+export interface AudioTrackInfo {
+  id: number;
+  codec?: string;
+  channels?: number;
+  channelLayout?: string;
+  language?: string;
+  title?: string;
+  default?: boolean;
+}
+
+export interface SubtitleTrackInfo {
+  id: number;
+  codec?: string;
+  language?: string;
+  title?: string;
+  default?: boolean;
+}
+
+export interface ChapterInfo {
+  index: number;
+  title: string;
+  timeMs: number;
+}
+
 export interface Movie {
   id: string;
   title: string;
@@ -383,6 +407,22 @@ export interface Movie {
   pendingMetadata?: boolean;
   /** ID of the remote source this item was discovered from */
   remoteSourceId?: string;
+  /** HDR (High Dynamic Range) detected in video stream */
+  hdr?: boolean;
+  /** Container format (e.g. matroska,mp4,mov) */
+  container?: string;
+  /** Primary audio codec name */
+  audioCodec?: string;
+  /** Number of audio channels in primary audio track */
+  audioChannels?: number;
+  /** Channel layout string (e.g. "5.1", "stereo", "mono") */
+  audioChannelLayout?: string;
+  /** All audio tracks found in the file */
+  audioTracks?: AudioTrackInfo[];
+  /** All subtitle tracks found in the file */
+  subtitleTracks?: SubtitleTrackInfo[];
+  /** Chapter markers embedded in the file */
+  chapters?: ChapterInfo[];
 }
 
 export interface MusicTrack {

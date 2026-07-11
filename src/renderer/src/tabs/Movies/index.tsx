@@ -20,6 +20,7 @@ import {
 import { MediaCard } from "../../components/MediaCard/MediaCard";
 import { scaledImageUrl } from "../../lib/image-url";
 import { DetailPanel } from "../../components/DetailPanel/DetailPanel";
+import { VideoFileDetails } from "../../components/DetailPanel/VideoFileDetails";
 import { OskInput } from "../../components/OnScreenKeyboard/OnScreenKeyboard";
 import { RecentlyPlayedRow } from "../../components/RecentlyPlayedRow/RecentlyPlayedRow";
 import { Movie } from "../../../../shared/types";
@@ -1562,12 +1563,6 @@ export const MoviesTab: React.FC = () => {
                         value: `${Math.round(selected.runtime / 60)}min`,
                       }
                     : null,
-                  selected.resolution
-                    ? { label: "Resolution", value: selected.resolution }
-                    : null,
-                  selected.codec
-                    ? { label: "Codec", value: selected.codec }
-                    : null,
                   selected.sourceLocation
                     ? { label: "Source", value: getSourceBadge(selected.sourceLocation).badge ?? selected.sourceLocation }
                     : null,
@@ -1620,7 +1615,22 @@ export const MoviesTab: React.FC = () => {
               </>
             )
           }
-        />
+        >
+          {selected && (
+            <VideoFileDetails
+              movie={selected}
+              onPlayChapter={(progress) => {
+                openVideo(
+                  resolveMediaUrl(selected.filePath)!,
+                  selected.title,
+                  selected.id,
+                  progress,
+                );
+                setSelected(null);
+              }}
+            />
+          )}
+        </DetailPanel>
       </div>
     </div>
   );
