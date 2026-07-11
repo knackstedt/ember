@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.6.3](https://github.com/knackstedt/ember/compare/v0.6.2...v0.6.3) (2026-07-11)
+
+
+### Features
+
+* **games:** add abort launch functionality with 30-second timeout UI ([93ab06a](https://github.com/knackstedt/ember/commit/93ab06a93eedb68a35d02bde151cbaa491542cd2))
+* **gaming:** move collection filter to toolbar and add scrollRef to all gallery views ([8deca41](https://github.com/knackstedt/ember/commit/8deca413d6285607e94ea9ea4f305865c2ae1dbf))
+* **remote-scan:** add real-time item updates with pendingMetadata state and DB caching ([de81483](https://github.com/knackstedt/ember/commit/de814839b859ca96e6c03a1245d790dab215a1ad))
+* **ui:** add Switch component and replace checkboxes across settings tabs ([ed12bfc](https://github.com/knackstedt/ember/commit/ed12bfcadd028283b5ad06b741363def58b36bcc))
+* **video:** optimize mpv hardware decoding, caching, and frame pipeline for 4K streaming ([6a2355f](https://github.com/knackstedt/ember/commit/6a2355f5ed5636029014bbf7c09432db741c5f08))
+
 ### [0.6.2](https://github.com/knackstedt/ember/compare/v0.6.1...v0.6.2) (2026-07-01)
 
 
