@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.6.4](https://github.com/knackstedt/ember/compare/v0.6.3...v0.6.4) (2026-07-11)
+
+
+### Features
+
+* **movies:** add detailed video metadata fields and chapter thumbnail generation ([521f8f0](https://github.com/knackstedt/ember/commit/521f8f04e8f90992b6988b0b3569cadc86e794cc))
+
 ### [0.6.3](https://github.com/knackstedt/ember/compare/v0.6.2...v0.6.3) (2026-07-11)
 
 
