@@ -225,12 +225,17 @@ export const MusicTagEditor: React.FC<MusicTagEditorProps> = React.memo(({
               >
                 {field.label}
               </label>
-              <div
-                className="text-sm font-medium truncate"
+              <input
+                type={field.type === "number" ? "number" : "text"}
+                className="text-sm font-medium w-full bg-transparent outline-none"
                 style={{ color: "var(--text-primary)" }}
-              >
-                {values[field.key] || "—"}
-              </div>
+                value={values[field.key] ?? ""}
+                placeholder="—"
+                onChange={(e) => {
+                  setValues((prev) => ({ ...prev, [field.key]: e.target.value }));
+                }}
+                onFocus={() => setFocusedIndex(index)}
+              />
             </div>
           ))}
 

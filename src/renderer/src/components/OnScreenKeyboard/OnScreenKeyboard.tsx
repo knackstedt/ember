@@ -68,6 +68,7 @@ export const OnScreenKeyboard: React.FC<OnScreenKeyboardProps> = ({
       if (key === "DEL") {
         onChange(value.slice(0, -1));
       } else if (key === "OK") {
+        onSubmitRef.current?.(valueRef.current);
         onClose();
       } else if (key === " ") {
         onChange(value + " ");
