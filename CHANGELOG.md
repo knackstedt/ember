@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.6.5](https://github.com/knackstedt/ember/compare/v0.6.4...v0.6.5) (2026-07-28)
+
+
+### Features
+
+* **music:** enable keyboard input for tag editor fields and trigger onSubmit on OSK OK ([6a6b3b0](https://github.com/knackstedt/ember/commit/6a6b3b0206669bd0f99077e3e6e97bb26127ae8f))
+
 ### [0.6.4](https://github.com/knackstedt/ember/compare/v0.6.3...v0.6.4) (2026-07-11)
 
 
