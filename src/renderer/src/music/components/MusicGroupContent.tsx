@@ -6,7 +6,9 @@ import {
 import { ListView } from "../../components/GalleryView";
 import { MediaCard } from "../../components/MediaCard/MediaCard";
 import { scaledImageUrl } from "../../lib/image-url";
-import type { MusicViewMode } from "../types";
+import { useMusicPlayerStore } from "../../store/musicPlayer.store";
+import { SpinningDisc } from "./SpinningDisc";
+import type { MusicViewMode, MusicNavItem } from "../types";
 
 export interface MusicGroup {
   id: string;
@@ -25,6 +27,7 @@ interface MusicGroupContentProps {
   onColumnCountChange?: (count: number) => void;
   scrollRef?: React.RefObject<HTMLElement>;
   bindItem?: (item: MusicGroup, index: number) => React.HTMLAttributes<HTMLElement>;
+  activeNav?: MusicNavItem;
 }
 
 const LazyGroupCard: React.FC<{
@@ -32,9 +35,17 @@ const LazyGroupCard: React.FC<{
   index: number;
   focusedIndex: number;
   onSelect: () => void;
-}> = React.memo(({ group, index, focusedIndex, onSelect }) => {
+  activeNav?: MusicNavItem;
+}> = React.memo(({ group, index, focusedIndex, onSelect, activeNav }) => {
+  const currentTrack = useMusicPlayerStore((s) => s.queue[s.currentIndex]);
+  const isPlaying = useMusicPlayerStore((s) => s.playing);
+  const isNowPlaying =
+    activeNav === "albums" &&
+    currentTrack?.album &&
+    group.id.toLowerCase() === currentTrack.album.toLowerCase();
+
   return (
-    <div className="p-1.5 w-full h-full flex flex-col min-w-0">
+    <div className="p-1.5 w-full h-full flex flex-col min-w-0 relative">
       <MediaCard
         id={group.id}
         title={group.name}
@@ -44,6 +55,11 @@ const LazyGroupCard: React.FC<{
         isFocused={index === focusedIndex}
         onSelect={onSelect}
       />
+      {isNowPlaying && (
+        <div className="absolute top-2 right-2 z-30 pointer-events-none flex items-center justify-center rounded-full" style={{ width: 32, height: 32, background: "rgba(0,0,0,0.45)", backdropFilter: "blur(4px)" }}>
+          <SpinningDisc spinning={isPlaying} size={24} />
+        </div>
+      )}
     </div>
   );
 });
@@ -53,7 +69,14 @@ const GroupListItem: React.FC<{
   index: number;
   focusedIndex: number;
   onSelect: () => void;
-}> = React.memo(({ group, index, focusedIndex, onSelect }) => {
+  activeNav?: MusicNavItem;
+}> = React.memo(({ group, index, focusedIndex, onSelect, activeNav }) => {
+  const currentTrack = useMusicPlayerStore((s) => s.queue[s.currentIndex]);
+  const isPlaying = useMusicPlayerStore((s) => s.playing);
+  const isNowPlaying =
+    activeNav === "albums" &&
+    currentTrack?.album &&
+    group.id.toLowerCase() === currentTrack.album.toLowerCase();
   const isFocused = index === focusedIndex;
   return (
     <div
@@ -89,6 +112,7 @@ const GroupListItem: React.FC<{
           {group.subtitle ? ` · ${group.subtitle}` : ""}
         </div>
       </div>
+      {isNowPlaying && <SpinningDisc spinning={isPlaying} size={20} />}
     </div>
   );
 });
@@ -102,6 +126,7 @@ export const MusicGroupContent: React.FC<MusicGroupContentProps> = React.memo(({
   onColumnCountChange,
   scrollRef,
   bindItem,
+  activeNav,
 }) => {
   const gridRef = useRef<VirtualGridHandle>(null);
 
@@ -121,6 +146,7 @@ export const MusicGroupContent: React.FC<MusicGroupContentProps> = React.memo(({
           index={index}
           focusedIndex={focusedIndex}
           onSelect={() => onSelect(group, index)}
+          activeNav={activeNav}
         />
       </div>
     ),
@@ -135,6 +161,7 @@ export const MusicGroupContent: React.FC<MusicGroupContentProps> = React.memo(({
           index={index}
           focusedIndex={focusedIndex}
           onSelect={() => onSelect(group, index)}
+          activeNav={activeNav}
         />
       </div>
     ),

@@ -42,14 +42,23 @@ audio.crossOrigin = "anonymous";
 
 function loadAndPlay(track: MusicTrack, autoplay: boolean): void {
   const url = resolveMediaUrl(track.filePath);
-  audio.src = url ?? "";
+  if (!url) {
+    console.warn(`[musicPlayer] Skipping track with no URL: ${track.title}`);
+    audio.dispatchEvent(new Event("error"));
+    return;
+  }
+  audio.src = url;
   audio.load();
   if (autoplay) void audio.play();
 }
 
 function loadTrack(track: MusicTrack): void {
   const url = resolveMediaUrl(track.filePath);
-  audio.src = url ?? "";
+  if (!url) {
+    console.warn(`[musicPlayer] Could not resolve URL for persisted track: ${track.title}`);
+    return;
+  }
+  audio.src = url;
   audio.load();
 }
 
@@ -87,8 +96,20 @@ export const useMusicPlayerStore = create<MusicPlayerStore>((set, get) => {
   audio.ontimeupdate = () => set({ position: audio.currentTime });
   audio.ondurationchange = () =>
     set({ duration: isFinite(audio.duration) ? audio.duration : 0 });
-  let errorCount = 0;
-  audio.onplay = () => { errorCount = 0; set({ playing: true }); };
+  let autoSkipCount = 0;
+  let lastAutoSkipTime = 0;
+  function shouldAutoSkip(): boolean {
+    const now = Date.now();
+    if (now - lastAutoSkipTime > 5000) autoSkipCount = 0;
+    autoSkipCount++;
+    lastAutoSkipTime = now;
+    if (autoSkipCount > 5) {
+      console.error("[musicPlayer] Stopped after 5 rapid auto-skips");
+      return false;
+    }
+    return true;
+  }
+  audio.onplay = () => { autoSkipCount = 0; set({ playing: true }); };
   audio.onpause = () => set({ playing: false });
   audio.onended = () => {
     const { repeat } = get();
@@ -96,16 +117,12 @@ export const useMusicPlayerStore = create<MusicPlayerStore>((set, get) => {
       audio.currentTime = 0;
       void audio.play();
     } else {
+      if (!shouldAutoSkip()) { set({ playing: false }); return; }
       get().next();
     }
   };
   audio.onerror = () => {
-    errorCount++;
-    if (errorCount >= 3) {
-      console.error("[musicPlayer] Stopped after 3 consecutive load errors");
-      set({ playing: false });
-      return;
-    }
+    if (!shouldAutoSkip()) { set({ playing: false }); return; }
     get().next();
   };
 

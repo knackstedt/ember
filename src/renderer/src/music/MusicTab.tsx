@@ -800,6 +800,7 @@ export const MusicTab: React.FC = () => {
                 onColumnCountChange={setColumnCount}
                 scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
                 bindItem={groupBindItem}
+                activeNav={activeNav}
               />
             ) : (
               <MusicContent

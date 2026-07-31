@@ -10,9 +10,11 @@ import type { MusicTrack } from "../../../../shared/types";
 import type { MusicViewMode, MusicNavItem } from "../types";
 import { useCoverCacheStore } from "../../store/coverCache.store";
 import { useMusicStore } from "../../store/media.store";
+import { useMusicPlayerStore } from "../../store/musicPlayer.store";
 import { getSourceBadge } from "../../lib/source-badge";
 import { getTrackDisplayName } from "../lib/track-title";
 import { scaledImageUrl } from "../../lib/image-url";
+import { SpinningDisc } from "./SpinningDisc";
 
 interface MusicContentProps {
   items: MusicTrack[];
@@ -33,7 +35,8 @@ const LazyMusicCard: React.FC<{
   focusedIndex: number;
   onSelect: () => void;
   onFavorite: () => void;
-}> = React.memo(({ track, index, focusedIndex, onSelect, onFavorite }) => {
+  activeNav: MusicNavItem;
+}> = React.memo(({ track, index, focusedIndex, onSelect, onFavorite, activeNav }) => {
   const loadThumbnail = useMusicStore((s) => s.loadThumbnail);
   const cachedUrl = useCoverCacheStore((s) => s.urls[track.id]);
   const coverUrl = track.albumArtUrl ?? cachedUrl;
@@ -46,21 +49,36 @@ const LazyMusicCard: React.FC<{
     }
   }, [track.id, coverUrl, loadThumbnail]);
 
+  const currentTrack = useMusicPlayerStore((s) => s.queue[s.currentIndex]);
+  const isPlaying = useMusicPlayerStore((s) => s.playing);
+  const isNowPlaying = currentTrack
+    ? (activeNav === "albums" && track.album && currentTrack.album
+        ? track.album.toLowerCase() === currentTrack.album.toLowerCase()
+        : false) || track.id === currentTrack.id
+    : false;
+
   return (
-    <MediaCard
-      id={track.id}
-      title={title}
-      subtitle={track.artist ?? track.album}
-      coverUrl={coverUrl}
-      badge={source.badge}
-      badgeColor={source.badgeColor}
-      aspectRatio="1/1"
-      isFavorite={track.isFavorite}
-      isFocused={index === focusedIndex}
-      missing={track.missing}
-      onSelect={onSelect}
-      onFavorite={onFavorite}
-    />
+    <div className="relative w-full h-full flex flex-col min-w-0">
+      <MediaCard
+        id={track.id}
+        title={title}
+        subtitle={track.artist ?? track.album}
+        coverUrl={coverUrl}
+        badge={source.badge}
+        badgeColor={source.badgeColor}
+        aspectRatio="1/1"
+        isFavorite={track.isFavorite}
+        isFocused={index === focusedIndex}
+        missing={track.missing}
+        onSelect={onSelect}
+        onFavorite={onFavorite}
+      />
+      {isNowPlaying && (
+        <div className="absolute top-2 right-2 z-30 pointer-events-none flex items-center justify-center rounded-full" style={{ width: 32, height: 32, background: "rgba(0,0,0,0.45)", backdropFilter: "blur(4px)" }}>
+          <SpinningDisc spinning={isPlaying} size={24} />
+        </div>
+      )}
+    </div>
   );
 });
 
@@ -70,7 +88,8 @@ const MusicListItem: React.FC<{
   focusedIndex: number;
   onSelect: () => void;
   onFavorite: () => void;
-}> = React.memo(({ track, index, focusedIndex, onSelect, onFavorite }) => {
+  activeNav: MusicNavItem;
+}> = React.memo(({ track, index, focusedIndex, onSelect, onFavorite, activeNav }) => {
   const loadThumbnail = useMusicStore((s) => s.loadThumbnail);
   const cachedUrl = useCoverCacheStore((s) => s.urls[track.id]);
   const coverUrl = track.albumArtUrl ?? cachedUrl;
@@ -82,6 +101,14 @@ const MusicListItem: React.FC<{
       loadThumbnail(track.id);
     }
   }, [track.id, coverUrl, loadThumbnail]);
+
+  const currentTrack = useMusicPlayerStore((s) => s.queue[s.currentIndex]);
+  const isPlaying = useMusicPlayerStore((s) => s.playing);
+  const isNowPlaying = currentTrack
+    ? (activeNav === "albums" && track.album && currentTrack.album
+        ? track.album.toLowerCase() === currentTrack.album.toLowerCase()
+        : false) || track.id === currentTrack.id
+    : false;
 
   return (
     <div
@@ -126,6 +153,7 @@ const MusicListItem: React.FC<{
           {Math.floor(track.duration / 60)}:{String(Math.round(track.duration % 60)).padStart(2, "0")}
         </span>
       )}
+      {isNowPlaying && <SpinningDisc spinning={isPlaying} size={20} />}
       {track.isFavorite && (
         <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="var(--accent)">
           <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
@@ -166,10 +194,11 @@ export const MusicContent: React.FC<MusicContentProps> = React.memo(({
           focusedIndex={focusedIndex}
           onSelect={() => onSelect(track, index)}
           onFavorite={() => onFavorite(track)}
+          activeNav={activeNav}
         />
       </div>
     ),
-    [focusedIndex, onSelect, onFavorite, bindItem]
+    [focusedIndex, onSelect, onFavorite, bindItem, activeNav]
   );
 
   const renderListItem = useCallback(
@@ -181,10 +210,11 @@ export const MusicContent: React.FC<MusicContentProps> = React.memo(({
           focusedIndex={focusedIndex}
           onSelect={() => onSelect(track, index)}
           onFavorite={() => onFavorite(track)}
+          activeNav={activeNav}
         />
       </div>
     ),
-    [focusedIndex, onSelect, onFavorite, bindItem]
+    [focusedIndex, onSelect, onFavorite, bindItem, activeNav]
   );
 
   const skeletonItems = useMemo(() => Array.from({ length: 6 }), []);

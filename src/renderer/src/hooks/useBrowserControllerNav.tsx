@@ -68,6 +68,12 @@ export function useBrowserControllerNav({
       visible: boolean;
       hoverStyle: CursorStyle;
       expanded: boolean;
+      webviewUnderCursor: Electron.WebviewTag | null;
+      lastWebviewX: number;
+      lastWebviewY: number;
+      lastHitTestX: number;
+      lastHitTestY: number;
+      lastHitTestTarget: Element | null;
     }
 
     const deviceMap = new Map<string, DeviceState>();
@@ -102,12 +108,24 @@ export function useBrowserControllerNav({
       };
     };
 
+    // Cache webview elements + bounds to avoid querySelectorAll + getBoundingClientRect every frame.
+    // getBoundingClientRect forces the browser to flush pending style recalcs and layout.
+    let webviewElements: Electron.WebviewTag[] = [];
+    let webviewBounds: DOMRect[] = [];
+    let lastWebviewRefresh = 0;
+    const WEBVIEW_REFRESH_INTERVAL = 500;
+
+    const refreshWebviews = () => {
+      webviewElements = Array.from(document.querySelectorAll("webview")) as Electron.WebviewTag[];
+      webviewBounds = webviewElements.map((wv) => wv.getBoundingClientRect());
+      lastWebviewRefresh = performance.now();
+    };
+
     const findWebviewAt = (x: number, y: number): Electron.WebviewTag | null => {
-      const webviews = document.querySelectorAll("webview");
-      for (const wv of webviews) {
-        const rect = wv.getBoundingClientRect();
+      for (let i = 0; i < webviewElements.length; i++) {
+        const rect = webviewBounds[i];
         if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
-          return wv as Electron.WebviewTag;
+          return webviewElements[i];
         }
       }
       return null;
@@ -134,6 +152,12 @@ export function useBrowserControllerNav({
           visible: Date.now() - lastInputTime <= CURSOR_FADE_DELAY_MS,
           hoverStyle: "default",
           expanded: false,
+          webviewUnderCursor: null,
+          lastWebviewX: -1,
+          lastWebviewY: -1,
+          lastHitTestX: -1,
+          lastHitTestY: -1,
+          lastHitTestTarget: null,
         };
         deviceMap.set(deviceId, state);
       }
@@ -148,11 +172,13 @@ export function useBrowserControllerNav({
       return false;
     };
 
-    const sendMouseEvent = (type: string, x: number, y: number, button?: string, deviceId?: string) => {
+    const HIT_TEST_THRESHOLD = 5;
+    const sendMouseEvent = (type: string, x: number, y: number, button?: string, deviceId?: string, dev?: DeviceState) => {
       const webview = findWebviewAt(x, y);
       if (webview) {
         try {
-          const bounds = webview.getBoundingClientRect();
+          const wvIdx = webviewElements.indexOf(webview);
+          const bounds = wvIdx >= 0 ? webviewBounds[wvIdx] : webview.getBoundingClientRect();
           const relX = x - bounds.left;
           const relY = y - bounds.top;
           webview.sendInputEvent({
@@ -222,7 +248,28 @@ export function useBrowserControllerNav({
 
       // Main mode: dispatch real DOM events to the element under the cursor
       try {
-        const target = document.elementFromPoint(x, y);
+        // For mouseMove, use cached hit-test result to avoid forcing layout every frame.
+        // Only re-hit-test when the cursor has moved beyond the threshold.
+        let target: Element | null;
+        if (type === "mouseMove" && dev) {
+          const dx = x - dev.lastHitTestX;
+          const dy = y - dev.lastHitTestY;
+          if (Math.abs(dx) <= HIT_TEST_THRESHOLD && Math.abs(dy) <= HIT_TEST_THRESHOLD && dev.lastHitTestTarget) {
+            target = dev.lastHitTestTarget;
+          } else {
+            target = document.elementFromPoint(x, y);
+            dev.lastHitTestX = x;
+            dev.lastHitTestY = y;
+            dev.lastHitTestTarget = target;
+          }
+        } else {
+          target = document.elementFromPoint(x, y);
+          if (dev) {
+            dev.lastHitTestX = x;
+            dev.lastHitTestY = y;
+            dev.lastHitTestTarget = target;
+          }
+        }
         if (!target) return;
 
         // Check for input element on left mouseUp before dispatching click
@@ -459,6 +506,11 @@ export function useBrowserControllerNav({
       const mouseSpeedPx = BASE_MOUSE_SPEED * mouseSpeed * 60 * dt;
       const scrollSpeedPx = BASE_SCROLL_SPEED * 60 * dt;
 
+      // Refresh webview cache periodically (bounds may change due to layout)
+      if (now - lastWebviewRefresh > WEBVIEW_REFRESH_INTERVAL) {
+        refreshWebviews();
+      }
+
       const liveStates = getLiveStates();
       const activeIds = Object.keys(liveStates);
 
@@ -487,8 +539,14 @@ export function useBrowserControllerNav({
         let anyInput = false;
         const prevVisible = dev.visible;
 
-        // Cache webview under this device's cursor for the entire frame
-        const webviewUnderCursor = findWebviewAt(dev.posRef.current.x, dev.posRef.current.y);
+        // Only re-check which webview is under the cursor when the cursor has actually moved.
+        // This avoids forcing style recalc + layout via getBoundingClientRect every frame.
+        if (dev.posRef.current.x !== dev.lastWebviewX || dev.posRef.current.y !== dev.lastWebviewY) {
+          dev.webviewUnderCursor = findWebviewAt(dev.posRef.current.x, dev.posRef.current.y);
+          dev.lastWebviewX = dev.posRef.current.x;
+          dev.lastWebviewY = dev.posRef.current.y;
+        }
+        const webviewUnderCursor = dev.webviewUnderCursor;
 
         const oskOpen = useControllerOskStore.getState().isOpen(deviceId);
 
@@ -525,7 +583,7 @@ export function useBrowserControllerNav({
           dev.posRef.current.x = clamped.x;
           dev.posRef.current.y = clamped.y;
 
-          sendMouseEvent("mouseMove", dev.posRef.current.x, dev.posRef.current.y);
+          sendMouseEvent("mouseMove", dev.posRef.current.x, dev.posRef.current.y, undefined, undefined, dev);
           dev.expanded = Date.now() < dev.wiggleEndTime;
         } else {
           dev.wiggleSamples.length = 0;
@@ -559,7 +617,7 @@ export function useBrowserControllerNav({
         const scheduleMouseUp = (x: number, y: number, button: string, devId: string) => {
           const t = setTimeout(() => {
             pendingTimeouts.delete(t);
-            sendMouseEvent("mouseUp", x, y, button, devId);
+            sendMouseEvent("mouseUp", x, y, button, devId, dev);
           }, 80);
           pendingTimeouts.add(t);
         };
@@ -578,11 +636,11 @@ export function useBrowserControllerNav({
               y = clamped.y;
               dev.posRef.current.x = x;
               dev.posRef.current.y = y;
-              sendMouseEvent("mouseMove", x, y);
+              sendMouseEvent("mouseMove", x, y, undefined, undefined, dev);
             }
           }
           dev.clickRef.current = (dev.clickRef.current || 0) + 1;
-          sendMouseEvent("mouseDown", x, y, "left", deviceId);
+          sendMouseEvent("mouseDown", x, y, "left", deviceId, dev);
           scheduleMouseUp(x, y, "left", deviceId);
         };
 
@@ -605,7 +663,7 @@ export function useBrowserControllerNav({
             if (check("west")) {
               anyInput = true;
               dev.clickRef.current = (dev.clickRef.current || 0) + 1;
-              sendMouseEvent("mouseDown", dev.posRef.current.x, dev.posRef.current.y, "right", deviceId);
+              sendMouseEvent("mouseDown", dev.posRef.current.x, dev.posRef.current.y, "right", deviceId, dev);
               scheduleMouseUp(dev.posRef.current.x, dev.posRef.current.y, "right", deviceId);
             }
             if (check("north")) {
@@ -655,7 +713,7 @@ export function useBrowserControllerNav({
           if (ltPressed && !wasLtPressed) {
             anyInput = true;
             dev.clickRef.current = (dev.clickRef.current || 0) + 1;
-            sendMouseEvent("mouseDown", dev.posRef.current.x, dev.posRef.current.y, "right", deviceId);
+            sendMouseEvent("mouseDown", dev.posRef.current.x, dev.posRef.current.y, "right", deviceId, dev);
             scheduleMouseUp(dev.posRef.current.x, dev.posRef.current.y, "right", deviceId);
           }
 
@@ -683,7 +741,8 @@ export function useBrowserControllerNav({
           if (now - dev.lastCursorCheck > CURSOR_CHECK_INTERVAL_MS) {
             dev.lastCursorCheck = now;
             try {
-              const bounds = webviewUnderCursor.getBoundingClientRect();
+              const wvIdx = webviewElements.indexOf(webviewUnderCursor);
+              const bounds = wvIdx >= 0 ? webviewBounds[wvIdx] : webviewUnderCursor.getBoundingClientRect();
               const relX = Math.round(dev.posRef.current.x - bounds.left);
               const relY = Math.round(dev.posRef.current.y - bounds.top);
               webviewUnderCursor.executeJavaScript(
@@ -721,9 +780,15 @@ export function useBrowserControllerNav({
       animationFrameId = requestAnimationFrame(poll);
     };
 
+    const onLayoutChange = () => { refreshWebviews(); };
+    window.addEventListener("resize", onLayoutChange);
+    window.addEventListener("scroll", onLayoutChange, true);
+
     animationFrameId = requestAnimationFrame(poll);
     return () => {
       cancelAnimationFrame(animationFrameId);
+      window.removeEventListener("resize", onLayoutChange);
+      window.removeEventListener("scroll", onLayoutChange, true);
       for (const t of pendingTimeouts) {
         clearTimeout(t);
       }
