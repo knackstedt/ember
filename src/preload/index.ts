@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer, shell, webFrame } from "electron";
 import { join } from "path";
-import { existsSync, readdirSync, statSync } from "fs";
+import { existsSync } from "fs";
 import { homedir } from "os";
 import {
   AppSettings,
@@ -50,29 +50,7 @@ import { IPC_CHANNELS } from "../shared/ipc";
 import { libretroApi } from "./libretro";
 import { WebGLVideoRenderer, computeRenderSize } from "./webgl-renderer";
 import { ffmpegVideoDecoder } from "./ffmpeg-decoder";
-
-function findFileRecursive(dir: string, targetName: string): string | null {
-  try {
-    const entries = readdirSync(dir);
-    for (const entry of entries) {
-      const full = join(dir, entry);
-      try {
-        const st = statSync(full);
-        if (st.isDirectory()) {
-          const found = findFileRecursive(full, targetName);
-          if (found) return found;
-        } else if (entry === targetName) {
-          return full;
-        }
-      } catch {
-        continue;
-      }
-    }
-  } catch {
-    // ignore unreadable dirs
-  }
-  return null;
-}
+import { findFileRecursive } from "../shared/file-utils";
 
 // ---------------------------------------------------------------------------
 // Video decoder — mpv worker (child process) when available, otherwise

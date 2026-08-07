@@ -2,88 +2,15 @@ import { create } from "zustand";
 import { Movie, MusicTrack, TVShow, AudioTags } from "../../../shared/types";
 import { useMusicPlayerStore } from "./musicPlayer.store";
 import { useCoverCacheStore } from "./coverCache.store";
+import { upsertById, mergeById } from "./store-utils";
 
-function upsertMovie(existing: Movie[], incoming: Movie): Movie[] {
-  const idx = existing.findIndex((m) => m.id === incoming.id);
-  if (idx === -1) return [...existing, incoming];
-  const next = [...existing];
-  next[idx] = incoming;
-  return next;
-}
+const MOVIE_JSON_KEYS = new Set<keyof Movie>(["tags", "genres"]);
+const TRACK_JSON_KEYS = new Set<keyof MusicTrack>(["tags"]);
 
-function upsertTrack(existing: MusicTrack[], incoming: MusicTrack): MusicTrack[] {
-  const idx = existing.findIndex((t) => t.id === incoming.id);
-  if (idx === -1) return [...existing, incoming];
-  const next = [...existing];
-  next[idx] = incoming;
-  return next;
-}
-
-function shallowEqualMovie(a: Movie, b: Movie): boolean {
-  const keys = Object.keys(a) as (keyof Movie)[];
-  for (const key of keys) {
-    if (key === "tags" || key === "genres") {
-      if (JSON.stringify(a[key]) !== JSON.stringify(b[key])) return false;
-    } else if (a[key] !== b[key]) {
-      return false;
-    }
-  }
-  return true;
-}
-
-function mergeMovies(existing: Movie[], incoming: Movie[]): Movie[] {
-  if (existing.length === 0) return incoming;
-  const existingMap = new Map(existing.map((m) => [m.id, m]));
-  const nextMovies: Movie[] = [];
-  let changed = false;
-  for (const incomingMovie of incoming) {
-    const existingMovie = existingMap.get(incomingMovie.id);
-    if (!existingMovie) {
-      nextMovies.push(incomingMovie);
-      changed = true;
-    } else if (!shallowEqualMovie(existingMovie, incomingMovie)) {
-      nextMovies.push(incomingMovie);
-      changed = true;
-    } else {
-      nextMovies.push(existingMovie);
-    }
-  }
-  if (!changed && nextMovies.length === existing.length) return existing;
-  return nextMovies;
-}
-
-function shallowEqualTrack(a: MusicTrack, b: MusicTrack): boolean {
-  const keys = Object.keys(a) as (keyof MusicTrack)[];
-  for (const key of keys) {
-    if (key === "tags") {
-      if (JSON.stringify(a[key]) !== JSON.stringify(b[key])) return false;
-    } else if (a[key] !== b[key]) {
-      return false;
-    }
-  }
-  return true;
-}
-
-function mergeTracks(existing: MusicTrack[], incoming: MusicTrack[]): MusicTrack[] {
-  if (existing.length === 0) return incoming;
-  const existingMap = new Map(existing.map((t) => [t.id, t]));
-  const nextTracks: MusicTrack[] = [];
-  let changed = false;
-  for (const incomingTrack of incoming) {
-    const existingTrack = existingMap.get(incomingTrack.id);
-    if (!existingTrack) {
-      nextTracks.push(incomingTrack);
-      changed = true;
-    } else if (!shallowEqualTrack(existingTrack, incomingTrack)) {
-      nextTracks.push(incomingTrack);
-      changed = true;
-    } else {
-      nextTracks.push(existingTrack);
-    }
-  }
-  if (!changed && nextTracks.length === existing.length) return existing;
-  return nextTracks;
-}
+const upsertMovie = (existing: Movie[], incoming: Movie): Movie[] => upsertById(existing, incoming);
+const upsertTrack = (existing: MusicTrack[], incoming: MusicTrack): MusicTrack[] => upsertById(existing, incoming);
+const mergeMovies = (existing: Movie[], incoming: Movie[]): Movie[] => mergeById(existing, incoming, MOVIE_JSON_KEYS);
+const mergeTracks = (existing: MusicTrack[], incoming: MusicTrack[]): MusicTrack[] => mergeById(existing, incoming, TRACK_JSON_KEYS);
 
 interface MoviesState {
   movies: Movie[];

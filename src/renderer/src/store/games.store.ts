@@ -9,14 +9,11 @@ import {
   type GamingCompletionFilter,
   NAV_PLATFORM_GROUPS,
 } from "../tabs/Gaming/types";
+import { upsertById, mergeById } from "./store-utils";
 
-function upsertGame(existing: Game[], incoming: Game): Game[] {
-  const idx = existing.findIndex((g) => g.id === incoming.id);
-  if (idx === -1) return [...existing, incoming];
-  const next = [...existing];
-  next[idx] = incoming;
-  return next;
-}
+const GAME_JSON_KEYS = new Set<keyof Game>(["tags", "sessionHooks"]);
+
+const upsertGame = (existing: Game[], incoming: Game): Game[] => upsertById(existing, incoming);
 
 interface GamesState {
   games: Game[];
@@ -113,38 +110,7 @@ const PLATFORM_TO_NAV: Partial<Record<GamePlatform, GamingNavItem>> = {
   desktop: "other",
 };
 
-function shallowEqualGame(a: Game, b: Game): boolean {
-  const keys = Object.keys(a) as (keyof Game)[];
-  for (const key of keys) {
-    if (key === "tags" || key === "sessionHooks") {
-      if (JSON.stringify(a[key]) !== JSON.stringify(b[key])) return false;
-    } else if (a[key] !== b[key]) {
-      return false;
-    }
-  }
-  return true;
-}
-
-function mergeGames(existing: Game[], incoming: Game[]): Game[] {
-  if (existing.length === 0) return incoming;
-  const existingMap = new Map(existing.map((g) => [g.id, g]));
-  const nextGames: Game[] = [];
-  let changed = false;
-  for (const incomingGame of incoming) {
-    const existingGame = existingMap.get(incomingGame.id);
-    if (!existingGame) {
-      nextGames.push(incomingGame);
-      changed = true;
-    } else if (!shallowEqualGame(existingGame, incomingGame)) {
-      nextGames.push(incomingGame);
-      changed = true;
-    } else {
-      nextGames.push(existingGame);
-    }
-  }
-  if (!changed && nextGames.length === existing.length) return existing;
-  return nextGames;
-}
+const mergeGames = (existing: Game[], incoming: Game[]): Game[] => mergeById(existing, incoming, GAME_JSON_KEYS);
 
 export const useGamesStore = create<GamesState>((set, get) => ({
   games: [],

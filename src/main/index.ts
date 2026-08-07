@@ -1,7 +1,7 @@
 import { app, BrowserWindow, shell, protocol, Menu, powerMonitor, nativeImage, ipcMain } from "electron";
 import { EventEmitter } from "events";
 import path, { join } from "path";
-import { readFileSync, createReadStream, statSync, lstatSync, readlinkSync, unlinkSync, writeFileSync, existsSync, mkdirSync, readdirSync } from "fs";
+import { readFileSync, createReadStream, statSync, lstatSync, readlinkSync, unlinkSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { createHash } from "crypto";
 import { initDb, terminateDbWorker } from "./db";
 import { registerIpcHandlers, destroyWorker as destroyLibretroWorker } from "./ipc";
@@ -18,6 +18,8 @@ import { launchGame } from "./services/launcher.service";
 import { initOverlayService } from "./services/overlay.service";
 import { cleanupStaleTaints, cleanupUserSettingsPy, cleanupStaleLaunchOptions } from "./services/shader-injection.service";
 import { ensureReShadeShaders, ensureReShadeDll } from "./services/reshade.service";
+import { findFileRecursive } from "../shared/file-utils";
+import { getContentType, getVideoFallbackContentType } from "../shared/mime-types";
 import { getServePort, shutdownRcloneManager } from "./services/rclone-manager";
 import { startRemoteAvailabilityWorker, stopRemoteAvailabilityWorker } from "./services/remote-availability.service";
 import { bootPlugins, shutdownPlugins } from "./plugins/loader";
@@ -284,43 +286,20 @@ app.commandLine.appendSwitch("js-flags", "--expose-gc");
 if (isDev) {
   app.commandLine.appendSwitch("remote-debugging-port", "9222");
 } else {
-  app.commandLine.appendSwitch("enable-gpu-rasterization");
-  app.commandLine.appendSwitch("enable-zero-copy");
-  app.commandLine.appendSwitch("enable-accelerated-video-decode");
-  app.commandLine.appendSwitch("ignore-gpu-blocklist");
-  app.commandLine.appendSwitch(
-    "enable-features",
-    "VaapiVideoDecoder,VaapiVideoEncoder",
-  );
+  // app.commandLine.appendSwitch("enable-gpu-rasterization");
+  // app.commandLine.appendSwitch("enable-zero-copy");
+  // app.commandLine.appendSwitch("enable-accelerated-video-decode");
+  // app.commandLine.appendSwitch("ignore-gpu-blocklist");
+  // app.commandLine.appendSwitch(
+  //   "enable-features",
+  //   "VaapiVideoDecoder,VaapiVideoEncoder",
+  // );
 }
 
 let mainWindow: BrowserWindow | null = null;
 
 export function getMainWindow(): BrowserWindow | null {
   return mainWindow;
-}
-
-function findFileRecursive(dir: string, targetName: string): string | null {
-  try {
-    const entries = readdirSync(dir);
-    for (const entry of entries) {
-      const full = join(dir, entry);
-      try {
-        const st = statSync(full);
-        if (st.isDirectory()) {
-          const found = findFileRecursive(full, targetName);
-          if (found) return found;
-        } else if (entry === targetName) {
-          return full;
-        }
-      } catch {
-        continue;
-      }
-    }
-  } catch {
-    // ignore unreadable dirs
-  }
-  return null;
 }
 
 async function createWindow(): Promise<void> {
@@ -736,21 +715,13 @@ app.whenReady().then(async () => {
         // Ensure video files have a proper Content-Type so the browser demuxer works
         const contentType = respHeaders.get("content-type");
         const ext = proxyPath.split("/").pop()?.toLowerCase();
-        const FALLBACK_TYPES: Record<string, string> = {
-          ".mkv": "video/x-matroska",
-          ".mp4": "video/mp4",
-          ".m4v": "video/mp4",
-          ".webm": "video/webm",
-          ".avi": "video/x-msvideo",
-          ".mov": "video/quicktime",
-          ".wmv": "video/x-ms-wmv",
-          ".ts": "video/mp2t",
-          ".m2ts": "video/mp2t",
-        };
         if (!contentType || contentType.includes("text/plain") || contentType.includes("application/octet-stream")) {
-          if (ext && FALLBACK_TYPES[ext]) {
-            log.info("ember:protocol", `overriding Content-Type ${contentType} -> ${FALLBACK_TYPES[ext]} for ${ext}`);
-            respHeaders.set("content-type", FALLBACK_TYPES[ext]);
+          if (ext) {
+            const fallback = getVideoFallbackContentType(ext);
+            if (fallback) {
+              log.info("ember:protocol", `overriding Content-Type ${contentType} -> ${fallback} for ${ext}`);
+              respHeaders.set("content-type", fallback);
+            }
           }
         }
         return new Response(response.body, {
@@ -779,10 +750,7 @@ app.whenReady().then(async () => {
         try {
           const data = readFileSync(rufflePath);
           const ext = rufflePath.toLowerCase().slice(rufflePath.lastIndexOf("."));
-          let contentType = "application/octet-stream";
-          if (ext === ".js") contentType = "application/javascript";
-          else if (ext === ".wasm") contentType = "application/wasm";
-          else if (ext === ".map") contentType = "application/json";
+          const contentType = getContentType(ext);
           return new Response(data, {
             status: 200,
             headers: { "Content-Type": contentType },
@@ -959,23 +927,7 @@ document.addEventListener("keydown", function(e) {
         return new Response("Not Found", { status: 404 });
       }
       const ext = filePath.toLowerCase().slice(filePath.lastIndexOf("."));
-      let contentType = "application/octet-stream";
-      if (ext === ".html" || ext === ".htm") contentType = "text/html";
-      else if (ext === ".js" || ext === ".mjs") contentType = "application/javascript";
-      else if (ext === ".css") contentType = "text/css";
-      else if (ext === ".json") contentType = "application/json";
-      else if (ext === ".wasm") contentType = "application/wasm";
-      else if (ext === ".jpg" || ext === ".jpeg") contentType = "image/jpeg";
-      else if (ext === ".png") contentType = "image/png";
-      else if (ext === ".svg") contentType = "image/svg+xml";
-      else if (ext === ".webp") contentType = "image/webp";
-      else if (ext === ".gif") contentType = "image/gif";
-      else if (ext === ".ico") contentType = "image/x-icon";
-      else if (ext === ".mp3") contentType = "audio/mpeg";
-      else if (ext === ".ogg") contentType = "audio/ogg";
-      else if (ext === ".wav") contentType = "audio/wav";
-      else if (ext === ".bin") contentType = "application/octet-stream";
-      else if (ext === ".data") contentType = "application/octet-stream";
+      const contentType = getContentType(ext);
       const range = request.headers.get("Range") || "";
       if (range) {
         const match = range.match(/bytes=(\d+)-(\d*)/);
@@ -1052,28 +1004,7 @@ document.addEventListener("keydown", function(e) {
       }
     }
 
-    let contentType = "application/octet-stream";
-    if (ext === ".jpg" || ext === ".jpeg") contentType = "image/jpeg";
-    else if (ext === ".png") contentType = "image/png";
-    else if (ext === ".svg") contentType = "image/svg+xml";
-    else if (ext === ".webp") contentType = "image/webp";
-    else if (ext === ".swf") contentType = "application/x-shockwave-flash";
-    else if (ext === ".mp3") contentType = "audio/mpeg";
-    else if (ext === ".flac") contentType = "audio/flac";
-    else if (ext === ".ogg") contentType = "audio/ogg";
-    else if (ext === ".wav") contentType = "audio/wav";
-    else if (ext === ".m4a" || ext === ".aac") contentType = "audio/aac";
-    else if (ext === ".opus") contentType = "audio/opus";
-    else if (ext === ".wma") contentType = "audio/x-ms-wma";
-    else if (ext === ".mp4" || ext === ".m4v") contentType = "video/mp4";
-    else if (ext === ".webm") contentType = "video/webm";
-    else if (ext === ".mkv") contentType = "video/x-matroska";
-    else if (ext === ".mov") contentType = "video/quicktime";
-    else if (ext === ".avi") contentType = "video/x-msvideo";
-    else if (ext === ".ogv") contentType = "video/ogg";
-    else if (ext === ".ts") contentType = "video/mp2t";
-    else if (ext === ".vtt") contentType = "text/vtt";
-    else if (ext === ".srt") contentType = "text/plain";
+    const contentType = getContentType(ext);
 
     const range = request.headers.get("Range") || "";
     if (range) {
