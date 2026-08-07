@@ -30,6 +30,20 @@
   user-select: none;
 }
 
+/* CSS-based hover/tap transitions (replaces framer-motion) */
+.gc-interactive {
+  transition: transform 0.15s ease;
+  will-change: transform;
+}
+
+.gc-interactive:hover {
+  transform: scale(1.03) translateY(-2px);
+}
+
+.gc-interactive:active {
+  transform: scale(0.96);
+}
+
 .gc-card-wrapper.focused {
   --card-opacity: 1;
 }
@@ -135,6 +149,8 @@
   object-fit: cover;
   border-radius: var(--card-radius);
   backface-visibility: hidden;
+  position: relative;
+  z-index: 1;
 }
 
 .gc-placeholder {
@@ -144,6 +160,9 @@
   align-items: center;
   justify-content: center;
   border-radius: var(--card-radius);
+  position: absolute;
+  inset: 0;
+  z-index: 0;
 }
 
 .gc-placeholder-text {

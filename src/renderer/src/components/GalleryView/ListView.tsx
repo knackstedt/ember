@@ -1,4 +1,4 @@
-import React, { useRef, CSSProperties, RefObject } from "react";
+import React, { CSSProperties, RefObject, useMemo, useRef } from "react";
 import { Virtualizer, VirtualizerHandle } from "virtua";
 
 interface ListViewProps<T> {
@@ -46,7 +46,7 @@ export const ListView = React.forwardRef(function ListViewInner<T>(
     borderBottom: "1px solid var(--border-default)",
   };
 
-  const itemData = Array.from({ length: items.length }, (_, i) => i);
+  const itemData = useMemo(() => Array.from({ length: items.length }, (_, i) => i), [items.length]);
 
   if (scrollRef) {
     return (

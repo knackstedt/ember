@@ -1,69 +1,81 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { useMoviesStore } from "../../store/media.store";
+import {
+    ArrowLeft,
+    EyeOff,
+    Folder,
+    FolderOpen,
+    Globe,
+    ImageIcon,
+    Loader,
+    Play,
+    RotateCw,
+    Sparkles,
+    Star,
+    StarOff,
+    Tag,
+    Trash2,
+    X,
+} from "lucide-react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { resolveMediaUrl } from "../../../../shared/path-utils";
+import { AiGroup, Movie } from "../../../../shared/types";
 import { ChipFilters } from "../../components/ChipFilters/ChipFilters";
-import {
-  VirtualGrid,
-  VirtualGridHandle,
-} from "../../components/VirtualGrid/VirtualGrid";
-import {
-  ListView,
-  HexGridView,
-  BookshelfView,
-  BookshelfSpine,
-  SpreadDeckView,
-  NeonGridView,
-  GalleryImage,
-  useGalleryView,
-  useIsNeonGrid,
-} from "../../components/GalleryView";
-import { MediaCard } from "../../components/MediaCard/MediaCard";
-import { scaledImageUrl } from "../../lib/image-url";
+import { CollectionManager } from "../../components/CollectionManager/CollectionManager";
+import { CollectionsBar } from "../../components/CollectionsBar/CollectionsBar";
+import { ConfirmDialog } from "../../components/ConfirmDialog/ConfirmDialog";
+import { ContextMenuOption } from "../../components/ContextMenu/ContextMenu";
 import { DetailPanel } from "../../components/DetailPanel/DetailPanel";
 import { VideoFileDetails } from "../../components/DetailPanel/VideoFileDetails";
+import { DynamicFacetFilters, FacetField } from "../../components/DynamicFacetFilters/DynamicFacetFilters";
+import { ErrorDisplay } from "../../components/ErrorDisplay/ErrorDisplay";
+import {
+    BookshelfSpine,
+    BookshelfView,
+    GalleryImage,
+    HexGridView,
+    ListView,
+    NeonGridView,
+    SpreadDeckView,
+    useGalleryView,
+    useIsNeonGrid,
+} from "../../components/GalleryView";
+import { HexCellData } from "../../components/GalleryView/HexGridView";
+import { MediaCard } from "../../components/MediaCard/MediaCard";
 import { OskInput } from "../../components/OnScreenKeyboard/OnScreenKeyboard";
 import { RecentlyPlayedRow } from "../../components/RecentlyPlayedRow/RecentlyPlayedRow";
-import { Movie } from "../../../../shared/types";
-import { resolveMediaUrl } from "../../../../shared/path-utils";
-import { useVideoPlayerStore } from "../../store/videoPlayer.store";
-import { useGridFocus, NavAction } from "../../hooks/useGridFocus";
-import { useDetailController } from "../../hooks/useDetailController";
-import { useContextMenu } from "../../hooks/useContextMenu";
-import { ContextMenuOption } from "../../components/ContextMenu/ContextMenu";
-import { ConfirmDialog } from "../../components/ConfirmDialog/ConfirmDialog";
 import {
-  Star,
-  StarOff,
-  EyeOff,
-  Tag,
-  FolderOpen,
-  Folder,
-  Loader,
-  RotateCw,
-  Sparkles,
-  Play,
-  X,
-  Globe,
-  Trash2,
-  ArrowLeft,
-  ImageIcon,
-} from "lucide-react";
-import { useCollectionsStore, evaluateSmartFilter, sortByCollection } from "../../store/collections.store";
-import { CollectionsBar } from "../../components/CollectionsBar/CollectionsBar";
-import { CollectionManager } from "../../components/CollectionManager/CollectionManager";
-import { HexCellData } from "../../components/GalleryView/HexGridView";
-import { MoviesNavRail } from "./components/MoviesNavRail";
-import type { MoviesNavItem, MovieGroup } from "./types";
-import { ErrorDisplay } from "../../components/ErrorDisplay/ErrorDisplay";
-import { useToastStore } from "../../store/toast.store";
-import { AiGroup } from "../../../../shared/types";
-import { DynamicFacetFilters, FacetField } from "../../components/DynamicFacetFilters/DynamicFacetFilters";
-import { getSourceBadge } from "../../lib/source-badge";
+    VirtualGrid,
+    VirtualGridHandle,
+} from "../../components/VirtualGrid/VirtualGrid";
+import { useContextMenu } from "../../hooks/useContextMenu";
+import { useDetailController } from "../../hooks/useDetailController";
+import { NavAction, useGridFocus } from "../../hooks/useGridFocus";
+import { FocusContext, useIsFocused } from "../../lib/grid-focus-store";
+import { scaledImageUrl } from "../../lib/image-url";
 import { coerceResolution } from "../../lib/resolution-badge";
+import { getSourceBadge } from "../../lib/source-badge";
+import { evaluateSmartFilter, sortByCollection, useCollectionsStore } from "../../store/collections.store";
+import { useMoviesStore } from "../../store/media.store";
+import { useToastStore } from "../../store/toast.store";
+import { useVideoPlayerStore } from "../../store/videoPlayer.store";
+import { MoviesNavRail } from "./components/MoviesNavRail";
+import type { MovieGroup, MoviesNavItem } from "./types";
 
 function canDeleteMovie(movie: Movie): boolean {
   return !movie.sourceLocation || movie.sourceLocation === "local";
 }
+
+/** Render-prop wrapper that subscribes to focus — only the old + new focused cells re-render. */
+function FocusAware({ index, children }: { index: number; children: (isFocused: boolean) => React.ReactNode }) {
+  const isFocused = useIsFocused(index);
+  return <>{children(isFocused)}</>;
+}
+
+/** MediaCard wrapper that subscribes to focus store — avoids re-rendering all cards on focus change. */
+const FocusedMediaCard = React.memo(({ index, ...rest }: React.ComponentProps<typeof MediaCard> & { index: number }) => {
+  const isFocused = useIsFocused(index);
+  return <MediaCard {...rest} isFocused={isFocused} />;
+});
 
 export const MoviesTab: React.FC = () => {
   const movies = useMoviesStore((s) => s.movies);
@@ -416,7 +428,7 @@ export const MoviesTab: React.FC = () => {
   const showingFolderGroups = activeNav === "folders"
     ? folderHasSubdirs(moviesWithPath, selectedGroupId ?? "", movieRoots)
     : false;
-  const { focusedIndex, setFocusedIndex } = useGridFocus({
+  const { setFocusedIndex, focusStore } = useGridFocus({
     items: gridItems,
     columnCount: isRowBasedView ? viewColumnCount : columnCount,
     gridRef,
@@ -442,7 +454,7 @@ export const MoviesTab: React.FC = () => {
 
   const { menu, bindItem } = useContextMenu({
     items: gridItems,
-    focusedIndex,
+    getFocusedIndex: () => focusStore.getSnapshot(),
     getOptions: (movie): ContextMenuOption[] => {
       const opts: ContextMenuOption[] = [
         {
@@ -546,8 +558,9 @@ export const MoviesTab: React.FC = () => {
       const resolution = coerceResolution(movie.resolution);
       return (
         <div className="p-1.5 w-full h-full flex flex-col min-w-0" {...bindItem(movie, index)}>
-          <MediaCard
+          <FocusedMediaCard
             key={movie.id}
+            index={index}
             id={movie.id}
             title={movie.title}
             subtitle={movie.releaseYear ? String(movie.releaseYear) : undefined}
@@ -556,7 +569,6 @@ export const MoviesTab: React.FC = () => {
             badgeColor={source.badgeColor}
             resolution={resolution}
             isFavorite={movie.isFavorite}
-            isFocused={index === focusedIndex}
             isLoading={regeneratingIds.has(movie.id)}
             progress={movie.watchProgress}
             missing={movie.missing}
@@ -567,7 +579,7 @@ export const MoviesTab: React.FC = () => {
         </div>
       );
     },
-    [bindItem, focusedIndex, setFocusedIndex, regeneratingIds, toggleFavorite],
+    [bindItem, setFocusedIndex, regeneratingIds, toggleFavorite],
   );
 
   const renderHex = useCallback(
@@ -598,44 +610,48 @@ export const MoviesTab: React.FC = () => {
       const source = getSourceBadge(movie.sourceLocation);
       const resolution = coerceResolution(movie.resolution);
       return (
-        <div className="flex items-center gap-3 w-full h-full px-3" {...bindItem(movie, index)}>
-          <div
-            className="w-12 h-[72px] flex-shrink-0 rounded overflow-hidden bg-cover bg-center"
-            style={{
-              backgroundImage: movie.coverUrl ? `url(${scaledImageUrl(movie.coverUrl, 48, 72)})` : undefined,
-              backgroundColor: !movie.coverUrl ? "#1a1a2e" : undefined,
-              filter: movie.missing ? "grayscale(80%)" : undefined,
-              opacity: movie.missing ? 0.6 : undefined,
-            }}
-          />
-          <div className="flex-1 min-w-0 flex flex-col justify-center">
-            <div
-              className={`font-medium truncate text-sm ${index === focusedIndex ? "text-accent" : ""}`}
-              style={{ color: index === focusedIndex ? "var(--accent)" : "var(--text-primary)" }}
-            >
-              {movie.title}
+        <FocusAware key={movie.id} index={index}>
+          {(isFocused) => (
+            <div className="flex items-center gap-3 w-full h-full px-3" {...bindItem(movie, index)}>
+              <div
+                className="w-12 h-[72px] flex-shrink-0 rounded overflow-hidden bg-cover bg-center"
+                style={{
+                  backgroundImage: movie.coverUrl ? `url(${scaledImageUrl(movie.coverUrl, 48, 72)})` : undefined,
+                  backgroundColor: !movie.coverUrl ? "#1a1a2e" : undefined,
+                  filter: movie.missing ? "grayscale(80%)" : undefined,
+                  opacity: movie.missing ? 0.6 : undefined,
+                }}
+              />
+              <div className="flex-1 min-w-0 flex flex-col justify-center">
+                <div
+                  className={`font-medium truncate text-sm ${isFocused ? "text-accent" : ""}`}
+                  style={{ color: isFocused ? "var(--accent)" : "var(--text-primary)" }}
+                >
+                  {movie.title}
+                </div>
+                <div className="text-xs truncate" style={{ color: "var(--text-secondary)" }}>
+                  {movie.releaseYear ? `${movie.releaseYear}` : ""}
+                  {movie.releaseYear && movie.director ? " · " : ""}
+                  {movie.director ? movie.director : ""}
+                  {movie.runtime ? ` · ${Math.round(movie.runtime / 60)}min` : ""}
+                  {resolution ? ` · ${resolution}` : ""}
+                </div>
+                {source.badge && (
+                  <span
+                    className="text-[12px] mt-0.5 w-fit px-1.5 py-0.5 rounded"
+                    style={{ background: source.badgeColor ?? "var(--surface-1)", color: "#fff" }}
+                  >
+                    {source.badge}
+                  </span>
+                )}
+              </div>
+              {movie.isFavorite && <Star size={14} style={{ color: "var(--accent)" }} />}
             </div>
-            <div className="text-xs truncate" style={{ color: "var(--text-secondary)" }}>
-              {movie.releaseYear ? `${movie.releaseYear}` : ""}
-              {movie.releaseYear && movie.director ? " · " : ""}
-              {movie.director ? movie.director : ""}
-              {movie.runtime ? ` · ${Math.round(movie.runtime / 60)}min` : ""}
-              {resolution ? ` · ${resolution}` : ""}
-            </div>
-            {source.badge && (
-              <span
-                className="text-[12px] mt-0.5 w-fit px-1.5 py-0.5 rounded"
-                style={{ background: source.badgeColor ?? "var(--surface-1)", color: "#fff" }}
-              >
-                {source.badge}
-              </span>
-            )}
-          </div>
-          {movie.isFavorite && <Star size={14} style={{ color: "var(--accent)" }} />}
-        </div>
+          )}
+        </FocusAware>
       );
     },
-    [bindItem, focusedIndex],
+    [bindItem],
   );
 
   const renderSpine = useCallback(
@@ -702,69 +718,73 @@ export const MoviesTab: React.FC = () => {
       const source = getSourceBadge(movie.sourceLocation);
       const resolution = coerceResolution(movie.resolution);
       return (
-        <div className="p-1 w-full h-full flex flex-col min-w-0" {...bindItem(movie, index)}>
-          <div
-            className="flex-1 relative overflow-hidden"
-            style={{
-              background: `linear-gradient(135deg, rgba(14,20,40,0.8), rgba(6,10,24,0.95))`,
-              borderBottom: "1px solid rgba(24,30,46,0.8)",
-            }}
-          >
-            {movie.coverUrl ? (
-              <img
-                src={scaledImageUrl(movie.coverUrl, 600, 400)}
-                alt={movie.title}
-                className="w-full h-full object-cover opacity-80"
-                loading="lazy"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center">
-                <span className="text-white/20 text-2xl font-bold">
-                  {movie.title.slice(0, 2).toUpperCase()}
-                </span>
-              </div>
-            )}
-            <div
-              className="absolute inset-0 pointer-events-none"
-              style={{
-                backgroundImage: "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.02) 2px, rgba(255,255,255,0.02) 4px)",
-              }}
-            />
-            {movie.pendingMetadata && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-10">
-                <div className="w-6 h-6 rounded-full border-[2px] border-white/30 border-t-white animate-spin" />
-              </div>
-            )}
-          </div>
-          <div className="px-1.5 py-1">
-            <div
-              className="text-[12px] font-bold truncate"
-              style={{ color: index === focusedIndex ? "var(--accent)" : "var(--text-primary)" }}
-            >
-              {movie.title}
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-[12px]" style={{ color: "var(--accent)" }}>
-                {movie.releaseYear}
-              </span>
-              <div className="flex items-center gap-1">
-                {resolution && (
-                  <span className="text-[12px] px-1 rounded" style={{ background: "rgba(0,0,0,0.5)", color: "#fff" }}>
-                    {resolution}
-                  </span>
+        <FocusAware key={movie.id} index={index}>
+          {(isFocused) => (
+            <div className="p-1 w-full h-full flex flex-col min-w-0" {...bindItem(movie, index)}>
+              <div
+                className="flex-1 relative overflow-hidden"
+                style={{
+                  background: `linear-gradient(135deg, rgba(14,20,40,0.8), rgba(6,10,24,0.95))`,
+                  borderBottom: "1px solid rgba(24,30,46,0.8)",
+                }}
+              >
+                {movie.coverUrl ? (
+                  <img
+                    src={scaledImageUrl(movie.coverUrl, 600, 400)}
+                    alt={movie.title}
+                    className="w-full h-full object-cover opacity-80"
+                    loading="lazy"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <span className="text-white/20 text-2xl font-bold">
+                      {movie.title.slice(0, 2).toUpperCase()}
+                    </span>
+                  </div>
                 )}
-                {source.badge && (
-                  <span className="text-[12px] px-1 rounded" style={{ background: source.badgeColor, color: "#fff" }}>
-                    {source.badge}
-                  </span>
+                <div
+                  className="absolute inset-0 pointer-events-none"
+                  style={{
+                    backgroundImage: "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.02) 2px, rgba(255,255,255,0.02) 4px)",
+                  }}
+                />
+                {movie.pendingMetadata && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-10">
+                    <div className="w-6 h-6 rounded-full border-[2px] border-white/30 border-t-white animate-spin" />
+                  </div>
                 )}
               </div>
+              <div className="px-1.5 py-1">
+                <div
+                  className="text-[12px] font-bold truncate"
+                  style={{ color: isFocused ? "var(--accent)" : "var(--text-primary)" }}
+                >
+                  {movie.title}
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-[12px]" style={{ color: "var(--accent)" }}>
+                    {movie.releaseYear}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    {resolution && (
+                      <span className="text-[12px] px-1 rounded" style={{ background: "rgba(0,0,0,0.5)", color: "#fff" }}>
+                        {resolution}
+                      </span>
+                    )}
+                    {source.badge && (
+                      <span className="text-[12px] px-1 rounded" style={{ background: source.badgeColor, color: "#fff" }}>
+                        {source.badge}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
+          )}
+        </FocusAware>
       );
     },
-    [bindItem, focusedIndex],
+    [bindItem],
   );
 
   const renderSkeletonItem = useCallback(
@@ -847,7 +867,6 @@ export const MoviesTab: React.FC = () => {
               minItemWidth={200}
               onColumnCountChange={setColumnCount}
               renderHex={renderHex}
-              focusedIndex={focusedIndex}
               bindItem={bindItem}
               scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
             />
@@ -858,7 +877,6 @@ export const MoviesTab: React.FC = () => {
               ref={gridRef}
               items={itemsToRender}
               renderSpine={renderSpine}
-              focusedIndex={focusedIndex}
               onItemsPerRowChange={(count) => setViewColumnCount(count)}
               onItemClick={(movie, index) => { setFocusedIndex(index); setSelected(movie); }}
               bindItem={bindItem}
@@ -871,7 +889,6 @@ export const MoviesTab: React.FC = () => {
               ref={gridRef}
               items={itemsToRender}
               renderCard={renderDeckCard}
-              focusedIndex={focusedIndex}
               onItemsPerRowChange={(count) => setViewColumnCount(count)}
               onItemClick={(movie, index) => { setFocusedIndex(index); setSelected(movie); }}
               bindItem={bindItem}
@@ -905,13 +922,17 @@ export const MoviesTab: React.FC = () => {
           );
       }
     },
-    [galleryView, isNeonGrid, focusedIndex, gridRef, renderListItem, renderItem, renderSpine, renderDeckCard, renderNeonCard, scrollContainerRef, setFocusedIndex, setSelected, bindItem],
+    [galleryView, isNeonGrid, gridRef, renderListItem, renderItem, renderSpine, renderDeckCard, renderNeonCard, scrollContainerRef, setFocusedIndex, setSelected, bindItem],
   );
 
-  const recentlyPlayed = [...movies]
-    .filter((m) => m.lastPlayed && m.lastPlayed > 0)
-    .sort((a, b) => (b.lastPlayed ?? 0) - (a.lastPlayed ?? 0))
-    .slice(0, 8);
+  const recentlyPlayed = useMemo(
+    () =>
+      [...movies]
+        .filter((m) => m.lastPlayed && m.lastPlayed > 0)
+        .sort((a, b) => (b.lastPlayed ?? 0) - (a.lastPlayed ?? 0))
+        .slice(0, 8),
+    [movies],
+  );
 
   useDetailController({
     enabled: !!selected,
@@ -945,6 +966,7 @@ export const MoviesTab: React.FC = () => {
           }}
         />
         <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
+        <FocusContext.Provider value={focusStore}>
           <div className="flex-shrink-0 overflow-y-auto" style={{ padding: 16, paddingBottom: 0 }}>
         {/* Collapsible content — scrolls out of view */}
         {activeNav !== "groups" && (
@@ -1342,7 +1364,6 @@ export const MoviesTab: React.FC = () => {
                         minItemWidth={200}
                         onColumnCountChange={setColumnCount}
                         renderHex={renderSkeletonHex}
-                        focusedIndex={focusedIndex}
                         bindItem={bindItem as any}
                         scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
                       />
@@ -1353,7 +1374,6 @@ export const MoviesTab: React.FC = () => {
                         ref={gridRef}
                         items={Array.from({ length: viewColumnCount * 2 })}
                         renderSpine={renderSkeletonSpine}
-                        focusedIndex={focusedIndex}
                         onItemsPerRowChange={(count) => setViewColumnCount(count)}
                         scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
                       />
@@ -1364,7 +1384,6 @@ export const MoviesTab: React.FC = () => {
                         ref={gridRef}
                         items={Array.from({ length: viewColumnCount * 2 })}
                         renderCard={renderSkeletonDeckCard}
-                        focusedIndex={focusedIndex}
                         onItemsPerRowChange={(count) => setViewColumnCount(count)}
                         scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
                       />
@@ -1443,7 +1462,6 @@ export const MoviesTab: React.FC = () => {
                         minItemWidth={200}
                         onColumnCountChange={setColumnCount}
                         renderHex={renderSkeletonHex}
-                        focusedIndex={focusedIndex}
                         bindItem={bindItem as any}
                         scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
                       />
@@ -1454,7 +1472,6 @@ export const MoviesTab: React.FC = () => {
                         ref={gridRef}
                         items={Array.from({ length: viewColumnCount * 2 })}
                         renderSpine={renderSkeletonSpine}
-                        focusedIndex={focusedIndex}
                         onItemsPerRowChange={(count) => setViewColumnCount(count)}
                         scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
                       />
@@ -1465,7 +1482,6 @@ export const MoviesTab: React.FC = () => {
                         ref={gridRef}
                         items={Array.from({ length: viewColumnCount * 2 })}
                         renderCard={renderSkeletonDeckCard}
-                        focusedIndex={focusedIndex}
                         onItemsPerRowChange={(count) => setViewColumnCount(count)}
                         scrollRef={scrollContainerRef as React.RefObject<HTMLElement>}
                       />
@@ -1508,6 +1524,7 @@ export const MoviesTab: React.FC = () => {
         )}
 
       </div>
+      </FocusContext.Provider>
       {menu}
       <ConfirmDialog
         isOpen={confirmDelete.open}

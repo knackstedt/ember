@@ -1,7 +1,7 @@
-import React, { useRef, useCallback, useLayoutEffect, useEffect, CSSProperties, RefObject } from "react";
-import { scaledImageUrl } from "../../lib/image-url";
+import React, { CSSProperties, RefObject, useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import { Virtualizer, VirtualizerHandle } from "virtua";
 import { NavAction } from "../../hooks/useGridFocus";
+import { scaledImageUrl } from "../../lib/image-url";
 import { PLATFORM_ICONS } from "../GameCard/icons";
 
 export interface HexCellData {
@@ -28,7 +28,6 @@ export interface HexGridViewProps<T> {
   renderHex: (item: T, index: number) => HexCellData;
   minItemWidth?: number;
   onColumnCountChange?: (count: number) => void;
-  focusedIndex?: number;
   className?: string;
   style?: CSSProperties;
   scrollRef?: RefObject<HTMLElement>;
@@ -418,6 +417,26 @@ const HexCell = React.memo(function HexCellInner({ hex, isFocused, cellWidth, he
   );
 });
 
+/** Wrapper that subscribes to the focus store so only the old + new focused cells re-render. */
+const FocusedHexCell = React.memo(function FocusedHexCell({
+  index,
+  hex,
+  cellWidth,
+  hexHeight,
+  itemProps,
+}: Omit<HexCellProps, "isFocused"> & { index: number }) {
+  const isFocused = useIsFocused(index);
+  return (
+    <HexCell
+      hex={hex}
+      isFocused={isFocused}
+      cellWidth={cellWidth}
+      hexHeight={hexHeight}
+      itemProps={itemProps}
+    />
+  );
+});
+
 const HexGridItem = React.forwardRef<
   HTMLDivElement,
   { style: CSSProperties; index: number; children: React.ReactNode }
@@ -466,7 +485,6 @@ export const HexGridView = React.forwardRef(function HexGridViewInner<T>(
     renderHex,
     minItemWidth = 200,
     onColumnCountChange,
-    focusedIndex = -1,
     className,
     style,
     scrollRef,
@@ -613,13 +631,12 @@ export const HexGridView = React.forwardRef(function HexGridViewInner<T>(
         >
           {rowItems.map(({ item, index }) => {
             const hex = renderHexRef.current(item, index);
-            const isFocused = index === focusedIndex;
             const itemProps = bindItemRef.current ? bindItemRef.current(item, index) : {};
             return (
-              <HexCell
+              <FocusedHexCell
                 key={index}
+                index={index}
                 hex={hex}
-                isFocused={isFocused}
                 cellWidth={cellWidth}
                 hexHeight={hexHeight}
                 itemProps={itemProps}
@@ -629,7 +646,7 @@ export const HexGridView = React.forwardRef(function HexGridViewInner<T>(
         </div>
       );
     },
-    [cellWidth, hexHeight, rowHeight, focusedIndex, getRowItems, cols],
+    [cellWidth, hexHeight, rowHeight, getRowItems, cols],
   );
 
   const wrapperStyle: CSSProperties = {
@@ -639,7 +656,7 @@ export const HexGridView = React.forwardRef(function HexGridViewInner<T>(
     paddingRight: 12,
   };
 
-  const rowData = Array.from({ length: rowCount }, (_, i) => i);
+  const rowData = React.useMemo(() => Array.from({ length: rowCount }, (_, i) => i), [rowCount]);
 
   if (scrollRef) {
     return (

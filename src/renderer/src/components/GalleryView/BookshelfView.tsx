@@ -1,5 +1,6 @@
-import React, { useRef, useState, useCallback, useLayoutEffect, useEffect, CSSProperties, RefObject } from "react";
+import React, { CSSProperties, RefObject, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Virtualizer, VirtualizerHandle } from "virtua";
+import { useIsFocused } from "../../lib/grid-focus-store";
 
 export interface BookshelfViewProps<T> {
   items: T[];
@@ -12,8 +13,6 @@ export interface BookshelfViewProps<T> {
   style?: CSSProperties;
   scrollRef?: RefObject<HTMLElement>;
   overscan?: number;
-  /** Index of the currently focused item (controller navigation) */
-  focusedIndex?: number;
   /** Called when the computed items-per-shelf changes (e.g. on resize) */
   onItemsPerRowChange?: (count: number) => void;
   /** Called when a spine is clicked by mouse or virtual cursor. */
@@ -34,6 +33,47 @@ function computeItemsPerShelf(width: number): number {
   return Math.max(4, n);
 }
 
+/** Individual spine — manages its own hover state and subscribes to focus
+ *  so only the old + new focused spines re-render on navigation. */
+const BookshelfSpineItem = React.memo(function BookshelfSpineItem<T>({
+  item,
+  globalIndex,
+  renderSpine,
+  onItemClick,
+  bindItem,
+}: {
+  item: T;
+  globalIndex: number;
+  renderSpine: (item: T, index: number, state: { isHovered: boolean; isFocused: boolean }) => React.ReactNode;
+  onItemClick?: (item: T, index: number) => void;
+  bindItem?: (item: T, index: number) => Record<string, unknown>;
+}) {
+  const [isHovered, setIsHovered] = useState(false);
+  const isFocused = useIsFocused(globalIndex);
+  const isActive = isHovered || isFocused;
+  const itemProps = bindItem ? bindItem(item, globalIndex) : {};
+
+  return (
+    <div
+      className="flex-shrink-0 cursor-pointer transition-all duration-200"
+      style={{
+        width: isActive ? SPINE_EXPANDED : SPINE_COLLAPSED,
+        height: isActive ? 212 : 198,
+        borderRadius: isActive ? "7px 7px 0 0" : "3px 3px 0 0",
+        overflow: "hidden",
+        position: "relative",
+        zIndex: isActive ? 5 : 1,
+      }}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      onClick={() => onItemClick?.(item, globalIndex)}
+      {...itemProps}
+    >
+      {renderSpine(item, globalIndex, { isHovered, isFocused })}
+    </div>
+  );
+});
+
 export const BookshelfView = React.forwardRef(function BookshelfViewInner<T>(
   {
     items,
@@ -44,7 +84,6 @@ export const BookshelfView = React.forwardRef(function BookshelfViewInner<T>(
     style,
     scrollRef,
     overscan = 2,
-    focusedIndex = -1,
     onItemsPerRowChange,
     onItemClick,
     bindItem,
@@ -54,7 +93,6 @@ export const BookshelfView = React.forwardRef(function BookshelfViewInner<T>(
   const virtualizerRef = useRef<VirtualizerHandle>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
-  const [hoveredGlobalIndex, setHoveredGlobalIndex] = useState<number | null>(null);
   const renderSpineRef = useRef(renderSpine);
   renderSpineRef.current = renderSpine;
   const onItemsPerRowChangeRef = useRef(onItemsPerRowChange);
@@ -133,29 +171,15 @@ export const BookshelfView = React.forwardRef(function BookshelfViewInner<T>(
           >
             {shelfItems.map((item, i) => {
               const globalIndex = start + i;
-              const isHovered = hoveredGlobalIndex === globalIndex;
-              const isFocused = focusedIndex === globalIndex;
-              const isActive = isHovered || isFocused;
-              const itemProps = bindItemRef.current ? bindItemRef.current(item, globalIndex) : {};
               return (
-                <div
+                <BookshelfSpineItem
                   key={globalIndex}
-                  className="flex-shrink-0 cursor-pointer transition-all duration-200"
-                  style={{
-                    width: isActive ? SPINE_EXPANDED : SPINE_COLLAPSED,
-                    height: isActive ? 212 : 198,
-                    borderRadius: isActive ? "7px 7px 0 0" : "3px 3px 0 0",
-                    overflow: "hidden",
-                    position: "relative",
-                    zIndex: isActive ? 5 : 1,
-                  }}
-                  onMouseEnter={() => setHoveredGlobalIndex(globalIndex)}
-                  onMouseLeave={() => setHoveredGlobalIndex((prev) => (prev === globalIndex ? null : prev))}
-                  onClick={() => onItemClickRef.current?.(item, globalIndex)}
-                  {...itemProps}
-                >
-                  {renderSpineRef.current(item, globalIndex, { isHovered, isFocused })}
-                </div>
+                  item={item}
+                  globalIndex={globalIndex}
+                  renderSpine={renderSpineRef.current}
+                  onItemClick={onItemClickRef.current}
+                  bindItem={bindItemRef.current}
+                />
               );
             })}
           </div>
@@ -171,10 +195,10 @@ export const BookshelfView = React.forwardRef(function BookshelfViewInner<T>(
         </div>
       );
     },
-    [items, itemsPerShelf, shelfHeight, hoveredGlobalIndex, focusedIndex],
+    [items, itemsPerShelf, shelfHeight],
   );
 
-  const shelfData = Array.from({ length: shelfCount }, (_, i) => i);
+  const shelfData = useMemo(() => Array.from({ length: shelfCount }, (_, i) => i), [shelfCount]);
 
   if (scrollRef) {
     return (

@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from "react";
-import { motion } from "framer-motion";
+import React from "react";
 import { scaledImageUrl } from "../../lib/image-url";
+import "./MediaCard.css";
 
 export interface MediaCardProps {
   id: string;
@@ -65,12 +65,6 @@ export const MediaCard: React.FC<MediaCardProps> = React.memo(({
   skeleton,
   pendingMetadata,
 }) => {
-  const [imgError, setImgError] = useState(false);
-  useEffect(() => {
-    setImgError(false);
-  }, [coverUrl]);
-  const showPlaceholder = !coverUrl || imgError;
-
   if (skeleton) {
     return (
       <div
@@ -87,10 +81,10 @@ export const MediaCard: React.FC<MediaCardProps> = React.memo(({
   }
 
   return (
-    <motion.div
+    <div
       className={`
         relative flex flex-col cursor-pointer select-none rounded-card
-        overflow-hidden flex-1
+        overflow-hidden flex-1 media-card
         ${
           isFocused
             ? "ring-2 ring-accent shadow-glow"
@@ -103,19 +97,40 @@ export const MediaCard: React.FC<MediaCardProps> = React.memo(({
       style={{
         backgroundColor: "var(--surface-0)",
       }}
-      whileHover={{ scale: 1.03, y: -2 }}
-      whileTap={{ scale: 0.98 }}
       onClick={onSelect}
     >
       <div className="relative w-full flex-1 min-h-0 overflow-hidden">
         <div
-          className="w-full h-full"
+          className="w-full h-full relative"
           style={{
             filter: missing ? "grayscale(80%)" : undefined,
             opacity: missing ? 0.6 : undefined,
           }}
         >
-          {showPlaceholder ? (
+          {coverUrl ? (
+            <>
+              {/* Placeholder behind the image — revealed when img fails */}
+              <div
+                className="absolute inset-0 flex items-center justify-center"
+                style={{ backgroundColor: placeholderColor(title) }}
+              >
+                <span className="text-2xl font-bold text-white/40">
+                  {initials(title)}
+                </span>
+              </div>
+              <img
+                key={coverUrl}
+                src={scaledImageUrl(coverUrl, 400, 600)}
+                alt={title}
+                className="w-full h-full object-cover relative"
+                loading="lazy"
+                decoding="async"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).style.display = "none";
+                }}
+              />
+            </>
+          ) : (
             <div
               className="w-full h-full flex items-center justify-center"
               style={{ backgroundColor: placeholderColor(title) }}
@@ -124,15 +139,6 @@ export const MediaCard: React.FC<MediaCardProps> = React.memo(({
                 {initials(title)}
               </span>
             </div>
-          ) : (
-            <img
-              src={scaledImageUrl(coverUrl, 400, 600)}
-              alt={title}
-              className="w-full h-full object-cover"
-              loading="lazy"
-              decoding="async"
-              onError={() => setImgError(true)}
-            />
           )}
         </div>
         {isLoading && (
@@ -252,6 +258,6 @@ export const MediaCard: React.FC<MediaCardProps> = React.memo(({
           {subtitle || "\u00A0"}
         </span>
       </div>
-    </motion.div>
+    </div>
   );
 });

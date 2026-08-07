@@ -1,5 +1,6 @@
-import React, { useRef, useState, useCallback, useLayoutEffect, useEffect, CSSProperties, RefObject } from "react";
+import React, { CSSProperties, RefObject, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Virtualizer, VirtualizerHandle } from "virtua";
+import { useIsFocused } from "../../lib/grid-focus-store";
 
 export interface SpreadDeckViewProps<T> {
   items: T[];
@@ -12,8 +13,6 @@ export interface SpreadDeckViewProps<T> {
   style?: CSSProperties;
   scrollRef?: RefObject<HTMLElement>;
   overscan?: number;
-  /** Index of the currently focused item (controller navigation) */
-  focusedIndex?: number;
   /** Called when the computed items-per-deck changes (e.g. on resize) */
   onItemsPerRowChange?: (count: number) => void;
   /** Called when a card is clicked by mouse or virtual cursor. */
@@ -32,6 +31,53 @@ function computeItemsPerDeck(width: number): number {
   return Math.max(4, n);
 }
 
+/** Individual deck card — manages its own hover state and subscribes to focus
+ *  so only the old + new focused cards re-render on navigation. */
+const SpreadDeckCardItem = React.memo(function SpreadDeckCardItem<T>({
+  item,
+  globalIndex,
+  left,
+  renderCard,
+  onItemClick,
+  bindItem,
+}: {
+  item: T;
+  globalIndex: number;
+  left: number;
+  renderCard: (item: T, index: number, state: { isHovered: boolean; isFocused: boolean }) => React.ReactNode;
+  onItemClick?: (item: T, index: number) => void;
+  bindItem?: (item: T, index: number) => Record<string, unknown>;
+}) {
+  const [isHovered, setIsHovered] = useState(false);
+  const isFocused = useIsFocused(globalIndex);
+  const isActive = isHovered || isFocused;
+  const itemProps = bindItem ? bindItem(item, globalIndex) : {};
+
+  return (
+    <div
+      className="absolute bottom-0 cursor-pointer transition-all duration-200"
+      style={{
+        left,
+        width: CARD_WIDTH,
+        height: 224,
+        borderRadius: 7,
+        overflow: "hidden",
+        zIndex: isActive ? 50 : globalIndex,
+        transform: isActive ? "translateY(-30px) scale(1.05)" : "none",
+        boxShadow: isActive
+          ? "0 24px 44px rgba(0,0,0,.85)"
+          : "0 4px 16px rgba(0,0,0,.55)",
+      }}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      onClick={() => onItemClick?.(item, globalIndex)}
+      {...itemProps}
+    >
+      {renderCard(item, globalIndex, { isHovered, isFocused })}
+    </div>
+  );
+});
+
 export const SpreadDeckView = React.forwardRef(function SpreadDeckViewInner<T>(
   {
     items,
@@ -42,7 +88,6 @@ export const SpreadDeckView = React.forwardRef(function SpreadDeckViewInner<T>(
     style,
     scrollRef,
     overscan = 2,
-    focusedIndex = -1,
     onItemsPerRowChange,
     onItemClick,
     bindItem,
@@ -52,7 +97,6 @@ export const SpreadDeckView = React.forwardRef(function SpreadDeckViewInner<T>(
   const virtualizerRef = useRef<VirtualizerHandle>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
-  const [hoveredGlobalIndex, setHoveredGlobalIndex] = useState<number | null>(null);
   const renderCardRef = useRef(renderCard);
   renderCardRef.current = renderCard;
   const onItemsPerRowChangeRef = useRef(onItemsPerRowChange);
@@ -133,33 +177,16 @@ export const SpreadDeckView = React.forwardRef(function SpreadDeckViewInner<T>(
             >
               {deckItems.map((item, i) => {
                 const globalIndex = start + i;
-                const isHovered = hoveredGlobalIndex === globalIndex;
-                const isFocused = focusedIndex === globalIndex;
-                const isActive = isHovered || isFocused;
-                const itemProps = bindItemRef.current ? bindItemRef.current(item, globalIndex) : {};
                 return (
-                  <div
+                  <SpreadDeckCardItem
                     key={globalIndex}
-                    className="absolute bottom-0 cursor-pointer transition-all duration-200"
-                    style={{
-                      left: i * CARD_OVERLAP,
-                      width: CARD_WIDTH,
-                      height: 224,
-                      borderRadius: 7,
-                      overflow: "hidden",
-                      zIndex: isActive ? 50 : i,
-                      transform: isActive ? "translateY(-30px) scale(1.05)" : "none",
-                      boxShadow: isActive
-                        ? "0 24px 44px rgba(0,0,0,.85)"
-                        : "0 4px 16px rgba(0,0,0,.55)",
-                    }}
-                    onMouseEnter={() => setHoveredGlobalIndex(globalIndex)}
-                    onMouseLeave={() => setHoveredGlobalIndex((prev) => (prev === globalIndex ? null : prev))}
-                    onClick={() => onItemClickRef.current?.(item, globalIndex)}
-                    {...itemProps}
-                  >
-                    {renderCardRef.current(item, globalIndex, { isHovered, isFocused })}
-                  </div>
+                    item={item}
+                    globalIndex={globalIndex}
+                    left={i * CARD_OVERLAP}
+                    renderCard={renderCardRef.current}
+                    onItemClick={onItemClickRef.current}
+                    bindItem={bindItemRef.current}
+                  />
                 );
               })}
             </div>
@@ -167,10 +194,10 @@ export const SpreadDeckView = React.forwardRef(function SpreadDeckViewInner<T>(
         </div>
       );
     },
-    [items, itemsPerDeck, deckHeight, hoveredGlobalIndex, focusedIndex],
+    [items, itemsPerDeck, deckHeight],
   );
 
-  const deckData = Array.from({ length: deckCount }, (_, i) => i);
+  const deckData = useMemo(() => Array.from({ length: deckCount }, (_, i) => i), [deckCount]);
 
   if (scrollRef) {
     return (

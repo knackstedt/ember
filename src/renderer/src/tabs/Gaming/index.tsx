@@ -1,81 +1,78 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Game, GameEmulatorConfig, GameInjectionConfig, GamePlatform, ReShadeConfig, WineRunner } from "@shared/types";
 import { motion } from "framer-motion";
-import { useGamesStore } from "../../store/games.store";
 import {
-  VirtualGrid,
-  VirtualGridHandle,
-} from "../../components/VirtualGrid/VirtualGrid";
-import {
-  ListView,
-  HexGridView,
-  BookshelfView,
-  BookshelfSpine,
-  SpreadDeckView,
-  NeonGridView,
-  GalleryImage,
-  useGalleryView,
-  useIsNeonGrid,
-} from "../../components/GalleryView";
-import { GameCard } from "../../components/GameCard/GameCard";
-import { scaledImageUrl } from "../../lib/image-url";
-import { DetailPanel } from "../../components/DetailPanel/DetailPanel";
-import { ImageLightbox } from "../../components/ImageLightbox/ImageLightbox";
-import { CoreSelector } from "../../components/CoreSelector/CoreSelector";
-import { Game, GamePlatform, GameEmulatorConfig, GameInjectionConfig, VulkanShaderConfig, DllInjectionConfig, ReShadeConfig, WineRunner } from "@shared/types";
-import { useGridFocus, NavAction } from "../../hooks/useGridFocus";
-import { useDetailController } from "../../hooks/useDetailController";
-import { useContextMenu } from "../../hooks/useContextMenu";
-import { ContextMenuOption } from "../../components/ContextMenu/ContextMenu";
-import { ConfirmDialog } from "../../components/ConfirmDialog/ConfirmDialog";
-import { Dropdown } from "../../components/Dropdown/Dropdown";
-import { ChipFilter } from "../../components/ChipFilters/ChipFilters";
-import { useFlashPlayerStore } from "../../store/flashPlayer.store";
-import { useJsnesPlayerStore } from "../../store/jsnesPlayer.store";
-import { usePluginPlayerStore } from "../../store/pluginPlayer.store";
-import { useLibretroPlayerStore } from "../../store/libretroPlayer.store";
-import { SHADER_PRESETS } from "../../components/LibretroPlayer/shaders";
-import { useToastStore } from "../../store/toast.store";
-import { useGameLaunchStore } from "../../store/gameLaunch.store";
-import { useSettingsStore } from "../../store/settings.store";
-import { useCollectionsStore, evaluateSmartFilter, sortByCollection } from "../../store/collections.store";
-import { CollectionManager } from "../../components/CollectionManager/CollectionManager";
-import { HexCellData } from "../../components/GalleryView/HexGridView";
-import { Tooltip } from "../../components/Tooltip/Tooltip";
-import { Switch } from "../../components/Switch/Switch";
-import {
-  Star,
-  StarOff,
-  EyeOff,
-  Tag,
-  RotateCw,
-  FolderOpen,
-  Gamepad2,
-  Bug,
-  Trash2,
-  Folder,
-  Loader,
-  Play,
-  X,
-  Archive,
-  Settings,
-  Plus,
-  Globe,
-  Monitor,
-  Columns,
-  FlaskConical,
-  Cpu,
-  Box,
-  Terminal,
-  Wrench,
-  ImageIcon,
+    Archive,
+    Box,
+    Bug,
+    Columns,
+    Cpu,
+    EyeOff,
+    FlaskConical,
+    Folder,
+    FolderOpen,
+    Gamepad2,
+    ImageIcon,
+    Loader,
+    Monitor,
+    Play,
+    Plus,
+    RotateCw,
+    Settings,
+    Star,
+    StarOff,
+    Tag,
+    Terminal,
+    Trash2,
+    Wrench,
+    X
 } from "lucide-react";
-import { DynamicFacetFilters, FacetField } from "../../components/DynamicFacetFilters/DynamicFacetFilters";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { GameVideo } from "../../../../shared/metadata";
+import { ChipFilter } from "../../components/ChipFilters/ChipFilters";
+import { CollectionManager } from "../../components/CollectionManager/CollectionManager";
+import { ConfirmDialog } from "../../components/ConfirmDialog/ConfirmDialog";
+import { ContextMenuOption } from "../../components/ContextMenu/ContextMenu";
+import { CoreSelector } from "../../components/CoreSelector/CoreSelector";
+import { DetailPanel } from "../../components/DetailPanel/DetailPanel";
+import { Dropdown } from "../../components/Dropdown/Dropdown";
+import { DynamicFacetFilters, FacetField } from "../../components/DynamicFacetFilters/DynamicFacetFilters";
+import {
+    BookshelfSpine,
+    BookshelfView,
+    GalleryImage,
+    HexGridView,
+    ListView,
+    NeonGridView,
+    SpreadDeckView,
+    useGalleryView,
+    useIsNeonGrid,
+} from "../../components/GalleryView";
+import { HexCellData } from "../../components/GalleryView/HexGridView";
+import { GameCard } from "../../components/GameCard/GameCard";
+import { ImageLightbox } from "../../components/ImageLightbox/ImageLightbox";
+import { SHADER_PRESETS } from "../../components/LibretroPlayer/shaders";
+import { SplitscreenConfigModal } from "../../components/Splitscreen/SplitscreenConfigModal";
+import { Switch } from "../../components/Switch/Switch";
+import { Tooltip } from "../../components/Tooltip/Tooltip";
+import {
+    VirtualGrid,
+    VirtualGridHandle,
+} from "../../components/VirtualGrid/VirtualGrid";
+import { useContextMenu } from "../../hooks/useContextMenu";
+import { useDetailController } from "../../hooks/useDetailController";
+import { NavAction, useGridFocus } from "../../hooks/useGridFocus";
+import { FocusContext, useIsFocused } from "../../lib/grid-focus-store";
+import { scaledImageUrl } from "../../lib/image-url";
+import { evaluateSmartFilter, sortByCollection, useCollectionsStore } from "../../store/collections.store";
+import { useFlashPlayerStore } from "../../store/flashPlayer.store";
+import { useGameLaunchStore } from "../../store/gameLaunch.store";
+import { useGamesStore } from "../../store/games.store";
+import { useLibretroPlayerStore } from "../../store/libretroPlayer.store";
+import { usePluginPlayerStore } from "../../store/pluginPlayer.store";
+import { useSettingsStore } from "../../store/settings.store";
+import { useToastStore } from "../../store/toast.store";
 import { GamingNavRail } from "./components/GamingNavRail";
 import { GamingToolbar } from "./components/GamingToolbar";
-import type { GamingNavItem } from "./types";
-import { useSplitscreenStore } from "../../store/splitscreen.store";
-import { SplitscreenConfigModal } from "../../components/Splitscreen/SplitscreenConfigModal";
 
 // Extended game type that includes lazy-loaded metadata properties
 type GameWithMetadata = Game & Partial<{
@@ -161,16 +158,16 @@ const WEB_THUMB_PLATFORMS = new Set<string>(["flash", "html5", "unity"]);
 const LazyGameCard: React.FC<{
   game: Game;
   index: number;
-  focusedIndex: number;
   onSelect: () => void;
   onFavorite: () => void;
-}> = React.memo(({ game, index, focusedIndex, onSelect, onFavorite }) => {
+}> = React.memo(({ game, index, onSelect, onFavorite }) => {
   const loadThumbnail = useGamesStore((s) => s.loadThumbnail);
   const isThumbnailPending = useGamesStore(
     (s) => s.pendingThumbnailIds.has(game.id) || s.regeneratingIds.has(game.id)
   );
   const coreVersion = useGamesStore((s) => s.coreVersion);
   const [missingCoreTooltip, setMissingCoreTooltip] = useState<string | undefined>(undefined);
+  const isFocused = useIsFocused(index);
 
   useEffect(() => {
     const isLibretro = LIBRETRO_THUMB_PLATFORMS.has(game.platform);
@@ -203,7 +200,7 @@ const LazyGameCard: React.FC<{
       badge={b?.label}
       badgeColor={b?.color}
       isFavorite={game.isFavorite}
-      isFocused={index === focusedIndex}
+      isFocused={isFocused}
       isThumbnailPending={isThumbnailPending}
       corrupt={game.corrupt}
       missingCoreTooltip={missingCoreTooltip}
@@ -310,6 +307,12 @@ function IniOverrideEditor({ onAdd }: { onAdd: (section: string, key: string, va
       </div>
     </div>
   );
+}
+
+/** Render-prop wrapper that subscribes to focus — only the old + new focused cells re-render. */
+function FocusAware({ index, children }: { index: number; children: (isFocused: boolean) => React.ReactNode }) {
+  const isFocused = useIsFocused(index);
+  return <>{children(isFocused)}</>;
 }
 
 export const GamingTab: React.FC = () => {
@@ -554,7 +557,7 @@ export const GamingTab: React.FC = () => {
   ], []);
 
   const isRowBasedView = galleryView === "bookshelf" || galleryView === "spread-deck";
-  const { focusedIndex, setFocusedIndex } = useGridFocus({
+  const { setFocusedIndex, focusStore } = useGridFocus({
     items: gridItems,
     columnCount: isRowBasedView ? viewColumnCount : columnCount,
     gridRef,
@@ -568,8 +571,6 @@ export const GamingTab: React.FC = () => {
       : undefined,
   });
 
-  const focusedRow = Math.floor(focusedIndex / Math.max(1, columnCount));
-
   const gameCollections = useMemo(
     () => collections.filter((c) => c.itemType === "game" || c.itemType === "mixed"),
     [collections],
@@ -577,7 +578,7 @@ export const GamingTab: React.FC = () => {
 
   const { menu, bindItem } = useContextMenu({
     items,
-    focusedIndex,
+    getFocusedIndex: () => focusStore.getSnapshot(),
     getOptions: (game): ContextMenuOption[] => {
       const opts: ContextMenuOption[] = [
         {
@@ -809,13 +810,12 @@ export const GamingTab: React.FC = () => {
         <LazyGameCard
           game={game}
           index={index}
-          focusedIndex={focusedIndex}
           onSelect={() => { setFocusedIndex(index); setSelected(game); }}
           onFavorite={() => toggleFavorite(game.id)}
         />
       </div>
     ),
-    [bindItem, focusedIndex, setFocusedIndex, toggleFavorite],
+    [bindItem, setFocusedIndex, toggleFavorite],
   );
 
   const renderSkeletonItem = useCallback(
@@ -897,36 +897,40 @@ export const GamingTab: React.FC = () => {
 
   const renderListItem = useCallback(
     (game: Game, index: number) => (
-      <div className="flex items-center gap-3 w-full h-full px-3" {...bindItem(game, index)}>
-        <LazyGameThumbnail game={game} />
-        <div
-          className="w-12 h-[72px] flex-shrink-0 rounded overflow-hidden bg-cover bg-center"
-          style={{
-            backgroundImage: game.coverUrl ? `url(${scaledImageUrl(game.coverUrl, 48, 72)})` : undefined,
-            backgroundColor: !game.coverUrl ? "#1a1a2e" : undefined,
-            filter: game.missing ? "grayscale(80%)" : undefined,
-            opacity: game.missing ? 0.6 : undefined,
-          }}
-        />
-        <div className="flex-1 min-w-0 flex flex-col justify-center">
-          <div className="flex items-center gap-2 min-w-0">
+      <FocusAware key={game.id} index={index}>
+        {(isFocused) => (
+          <div className="flex items-center gap-3 w-full h-full px-3" {...bindItem(game, index)}>
+            <LazyGameThumbnail game={game} />
             <div
-              className="font-medium truncate text-sm"
-              style={{ color: index === focusedIndex ? "var(--accent)" : "var(--text-primary)" }}
-            >
-              {game.title}
+              className="w-12 h-[72px] flex-shrink-0 rounded overflow-hidden bg-cover bg-center"
+              style={{
+                backgroundImage: game.coverUrl ? `url(${scaledImageUrl(game.coverUrl, 48, 72)})` : undefined,
+                backgroundColor: !game.coverUrl ? "#1a1a2e" : undefined,
+                filter: game.missing ? "grayscale(80%)" : undefined,
+                opacity: game.missing ? 0.6 : undefined,
+              }}
+            />
+            <div className="flex-1 min-w-0 flex flex-col justify-center">
+              <div className="flex items-center gap-2 min-w-0">
+                <div
+                  className="font-medium truncate text-sm"
+                  style={{ color: isFocused ? "var(--accent)" : "var(--text-primary)" }}
+                >
+                  {game.title}
+                </div>
+                          </div>
+              <div className="text-xs truncate" style={{ color: "var(--text-secondary)" }}>
+                {game.platform}
+                {game.releaseYear ? ` · ${game.releaseYear}` : ""}
+                {game.playTime ? ` · ${Math.round(game.playTime / 3600)}h` : ""}
+              </div>
             </div>
-                      </div>
-          <div className="text-xs truncate" style={{ color: "var(--text-secondary)" }}>
-            {game.platform}
-            {game.releaseYear ? ` · ${game.releaseYear}` : ""}
-            {game.playTime ? ` · ${Math.round(game.playTime / 3600)}h` : ""}
+            {game.isFavorite && <Star size={14} style={{ color: "var(--accent)" }} />}
           </div>
-        </div>
-        {game.isFavorite && <Star size={14} style={{ color: "var(--accent)" }} />}
-      </div>
+        )}
+      </FocusAware>
     ),
-    [bindItem, focusedIndex],
+    [bindItem],
   );
 
   const renderSpine = useCallback(
@@ -982,63 +986,67 @@ export const GamingTab: React.FC = () => {
     (game: Game, index: number) => {
       const b = gameBadge(game);
       return (
-        <div className="p-1 w-full h-full flex flex-col min-w-0" {...bindItem(game, index)}>
-          <LazyGameThumbnail game={game} />
-          <div
-            className="flex-1 relative overflow-hidden"
-            style={{
-              background: `linear-gradient(135deg, rgba(14,20,40,0.8), rgba(6,10,24,0.95))`,
-              borderBottom: "1px solid rgba(24,30,46,0.8)",
-            }}
-          >
-            {game.coverUrl ? (
-              <img
-                src={scaledImageUrl(game.coverUrl, 600, 400)}
-                alt={game.title}
-                className="w-full h-full object-cover opacity-80"
-                loading="lazy"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center">
-                <span className="text-white/20 text-2xl font-bold">
-                  {game.title.slice(0, 2).toUpperCase()}
-                </span>
+        <FocusAware key={game.id} index={index}>
+          {(isFocused) => (
+            <div className="p-1 w-full h-full flex flex-col min-w-0" {...bindItem(game, index)}>
+              <LazyGameThumbnail game={game} />
+              <div
+                className="flex-1 relative overflow-hidden"
+                style={{
+                  background: `linear-gradient(135deg, rgba(14,20,40,0.8), rgba(6,10,24,0.95))`,
+                  borderBottom: "1px solid rgba(24,30,46,0.8)",
+                }}
+              >
+                {game.coverUrl ? (
+                  <img
+                    src={scaledImageUrl(game.coverUrl, 600, 400)}
+                    alt={game.title}
+                    className="w-full h-full object-cover opacity-80"
+                    loading="lazy"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <span className="text-white/20 text-2xl font-bold">
+                      {game.title.slice(0, 2).toUpperCase()}
+                    </span>
+                  </div>
+                )}
+                <div
+                  className="absolute inset-0 pointer-events-none"
+                  style={{
+                    backgroundImage: "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.02) 2px, rgba(255,255,255,0.02) 4px)",
+                  }}
+                />
+                {game.pendingMetadata && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-10">
+                    <div className="w-6 h-6 rounded-full border-[2px] border-white/30 border-t-white animate-spin" />
+                  </div>
+                )}
               </div>
-            )}
-            <div
-              className="absolute inset-0 pointer-events-none"
-              style={{
-                backgroundImage: "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.02) 2px, rgba(255,255,255,0.02) 4px)",
-              }}
-            />
-            {game.pendingMetadata && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-10">
-                <div className="w-6 h-6 rounded-full border-[2px] border-white/30 border-t-white animate-spin" />
+              <div className="px-1.5 py-1">
+                <div
+                  className="text-[12px] font-bold truncate"
+                  style={{ color: isFocused ? "var(--accent)" : "var(--text-primary)" }}
+                >
+                  {game.title}
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-[12px]" style={{ color: "var(--accent)" }}>
+                    {game.platform}
+                  </span>
+                                {b && (
+                    <span className="text-[12px] px-1 rounded" style={{ background: b.color, color: "#fff" }}>
+                      {b.label}
+                    </span>
+                  )}
+                </div>
               </div>
-            )}
-          </div>
-          <div className="px-1.5 py-1">
-            <div
-              className="text-[12px] font-bold truncate"
-              style={{ color: index === focusedIndex ? "var(--accent)" : "var(--text-primary)" }}
-            >
-              {game.title}
             </div>
-            <div className="flex justify-between items-center">
-              <span className="text-[12px]" style={{ color: "var(--accent)" }}>
-                {game.platform}
-              </span>
-                            {b && (
-                <span className="text-[12px] px-1 rounded" style={{ background: b.color, color: "#fff" }}>
-                  {b.label}
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
+          )}
+        </FocusAware>
       );
     },
-    [bindItem, focusedIndex],
+    [bindItem],
   );
 
   useEffect(() => {
@@ -1171,6 +1179,7 @@ export const GamingTab: React.FC = () => {
             onCollectionChange={setActiveCollectionId}
             onManageCollections={() => setShowCollectionManager(true)}
           />
+          <FocusContext.Provider value={focusStore}>
           <div
             ref={scrollContainerRef}
             className="flex-1 min-h-0 overflow-auto relative"
@@ -1300,7 +1309,6 @@ export const GamingTab: React.FC = () => {
                         minItemWidth={200}
                         onColumnCountChange={setColumnCount}
                         renderHex={renderHex}
-                        focusedIndex={focusedIndex}
                         bindItem={bindItem}
                         scrollRef={scrollContainerRef}
                       />
@@ -1311,7 +1319,6 @@ export const GamingTab: React.FC = () => {
                         ref={gridRef}
                         items={gridItems}
                         renderSpine={renderSpine}
-                        focusedIndex={focusedIndex}
                         onItemsPerRowChange={(count) => setViewColumnCount(count)}
                         onItemClick={(game, index) => { setFocusedIndex(index); setSelected(game); }}
                         bindItem={bindItem}
@@ -1324,7 +1331,6 @@ export const GamingTab: React.FC = () => {
                         ref={gridRef}
                         items={gridItems}
                         renderCard={renderDeckCard}
-                        focusedIndex={focusedIndex}
                         onItemsPerRowChange={(count) => setViewColumnCount(count)}
                         onItemClick={(game, index) => { setFocusedIndex(index); setSelected(game); }}
                         bindItem={bindItem}
@@ -1360,6 +1366,7 @@ export const GamingTab: React.FC = () => {
               })()
             )}
           </div>
+          </FocusContext.Provider>
         </div>
 
 

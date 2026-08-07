@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { VirtualGridHandle } from "../components/VirtualGrid/VirtualGrid";
+import { FocusStore } from "../lib/grid-focus-store";
 
 export type NavAction = "up" | "down" | "left" | "right" | "confirm" | "cancel";
 
@@ -22,13 +23,12 @@ export function useGridFocus<T>({
   onEdge,
   getNextIndex,
 }: UseGridFocusOptions<T>): {
-  focusedIndex: number;
   setFocusedIndex: (i: number) => void;
+  focusStore: FocusStore;
 } {
-  const [focusedIndex, setFocusedIndex] = useState(0);
-
-  const focusedIndexRef = useRef(focusedIndex);
-  focusedIndexRef.current = focusedIndex;
+  const focusStoreRef = useRef<FocusStore | null>(null);
+  if (!focusStoreRef.current) focusStoreRef.current = new FocusStore();
+  const focusStore = focusStoreRef.current;
 
   const itemsRef = useRef(items);
   itemsRef.current = items;
@@ -41,9 +41,9 @@ export function useGridFocus<T>({
 
   useEffect(() => {
     if (enabled && items.length > 0) {
-      setFocusedIndex((prev) => (prev >= items.length ? items.length - 1 : prev));
+      focusStore.updateIndex((prev) => (prev >= items.length ? items.length - 1 : prev));
     }
-  }, [items.length, enabled]);
+  }, [items.length, enabled, focusStore]);
 
   const onEdgeRef = useRef(onEdge);
   onEdgeRef.current = onEdge;
@@ -56,12 +56,12 @@ export function useGridFocus<T>({
       if (!enabledRef.current || itemsRef.current.length === 0) return;
 
       if (action === "confirm") {
-        const idx = focusedIndexRef.current;
+        const idx = focusStore.getSnapshot();
         onConfirmRef.current(itemsRef.current[idx], idx);
         return;
       }
 
-      setFocusedIndex((prev) => {
+      focusStore.updateIndex((prev) => {
         const itemCount = itemsRef.current.length;
 
         if (getNextIndexRef.current) {
@@ -119,7 +119,7 @@ export function useGridFocus<T>({
         return nextIndex;
       });
     },
-    [columnCount, gridRef],
+    [columnCount, gridRef, focusStore],
   );
 
   useEffect(() => {
@@ -131,5 +131,5 @@ export function useGridFocus<T>({
     return () => window.removeEventListener("htpc:nav", listener);
   }, [handleNav]);
 
-  return { focusedIndex, setFocusedIndex };
+  return { setFocusedIndex: focusStore.setIndex, focusStore };
 }

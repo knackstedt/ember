@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect, useLayoutEffect, useMemo, CSSProperties, RefObject } from "react";
+import React, { CSSProperties, RefObject, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Virtualizer, VirtualizerHandle } from "virtua";
 
 export interface VirtualGridHandle {
@@ -133,30 +133,33 @@ export const VirtualGrid = React.forwardRef(function VirtualGridInner<T>(
       : 0;
 
   const rowCount = Math.max(1, Math.ceil(items.length / effectiveColCount));
-  const rowData = Array.from({ length: rowCount }, (_, i) => i);
+  const rowData = useMemo(() => Array.from({ length: rowCount }, (_, i) => i), [rowCount]);
 
-  const renderRow = (rowIndex: number) => (
-    <div
-      key={rowIndex}
-      style={{
-        display: "flex",
-        height: rowHeight,
-        paddingLeft: offset,
-        paddingRight: offset,
-      }}
-    >
-      {Array.from({ length: effectiveColCount }, (_, colIndex) => {
-        const index = rowIndex * effectiveColCount + colIndex;
-        if (index >= items.length) {
-          return <div key={colIndex} style={{ width: cellWidth, flexShrink: 0 }} />;
-        }
-        return (
-          <div key={colIndex} style={{ width: cellWidth, flexShrink: 0 }} className="min-w-0">
-            {renderItemRef.current(items[index], index)}
-          </div>
-        );
-      })}
-    </div>
+  const renderRow = useCallback(
+    (rowIndex: number) => (
+      <div
+        key={rowIndex}
+        style={{
+          display: "flex",
+          height: rowHeight,
+          paddingLeft: offset,
+          paddingRight: offset,
+        }}
+      >
+        {Array.from({ length: effectiveColCount }, (_, colIndex) => {
+          const index = rowIndex * effectiveColCount + colIndex;
+          if (index >= items.length) {
+            return <div key={colIndex} style={{ width: cellWidth, flexShrink: 0 }} />;
+          }
+          return (
+            <div key={colIndex} style={{ width: cellWidth, flexShrink: 0 }} className="min-w-0">
+              {renderItemRef.current(items[index], index)}
+            </div>
+          );
+        })}
+      </div>
+    ),
+    [items, effectiveColCount, rowHeight, cellWidth, offset],
   );
 
   if (scrollRef) {

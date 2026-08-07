@@ -1,10 +1,9 @@
-import React, { useEffect, useState } from "react";
-import { motion } from "framer-motion";
+import React from "react";
 import { GamePlatform } from "../../../../shared/types";
-import { PLATFORM_ICONS } from "./icons";
-import { Tooltip } from "../Tooltip/Tooltip";
 import { scaledImageUrl } from "../../lib/image-url";
+import { Tooltip } from "../Tooltip/Tooltip";
 import "./GameCard.css";
+import { PLATFORM_ICONS } from "./icons";
 
 export interface GameCardProps {
   id: string;
@@ -93,12 +92,6 @@ export const GameCard: React.FC<GameCardProps> = React.memo(({
   skeleton,
   pendingMetadata,
 }) => {
-  const [imgError, setImgError] = useState(false);
-  useEffect(() => {
-    setImgError(false);
-  }, [coverUrl]);
-  const showPlaceholder = !coverUrl || imgError;
-
   const platformIconUrl = platformSvg(platform);
 
   const cardStyle: React.CSSProperties = {
@@ -126,10 +119,9 @@ export const GameCard: React.FC<GameCardProps> = React.memo(({
   }
 
   return (
-    <motion.div
-      className={`gc-card-wrapper ${isFocused ? "focused" : ""} ${missing ? "gc-missing" : ""}`}
+    <div
+      className={`gc-card-wrapper gc-interactive ${isFocused ? "focused" : ""} ${missing ? "gc-missing" : ""}`}
       style={cardStyle}
-      whileTap={{ scale: 0.96 }}
       onClick={onSelect}
     >
       {/* <div className="gc-behind" /> */}
@@ -156,7 +148,32 @@ export const GameCard: React.FC<GameCardProps> = React.memo(({
                 opacity: missing ? 0.6 : undefined,
               }}
             >
-              {showPlaceholder ? (
+              {coverUrl ? (
+                <>
+                  {/* Placeholder behind image — revealed on error */}
+                  <div
+                    className="gc-placeholder"
+                    style={{ backgroundColor: placeholderColor(title) }}
+                  >
+                    {isThumbnailPending ? (
+                      <div className="gc-spinner" />
+                    ) : (
+                      <span className="gc-placeholder-text">{initials(title)}</span>
+                    )}
+                  </div>
+                  <img
+                    key={coverUrl}
+                    className="gc-cover-img"
+                    src={scaledImageUrl(coverUrl, 400, 600)}
+                    alt={title}
+                    loading="lazy"
+                    decoding="async"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).style.display = "none";
+                    }}
+                  />
+                </>
+              ) : (
                 <div
                   className="gc-placeholder"
                   style={{ backgroundColor: placeholderColor(title) }}
@@ -167,15 +184,6 @@ export const GameCard: React.FC<GameCardProps> = React.memo(({
                     <span className="gc-placeholder-text">{initials(title)}</span>
                   )}
                 </div>
-              ) : (
-                <img
-                  className="gc-cover-img"
-                  src={scaledImageUrl(coverUrl, 400, 600)}
-                  alt={title}
-                  loading="lazy"
-                  decoding="async"
-                  onError={() => setImgError(true)}
-                />
               )}
 
               {/* Gradient overlay for readability */}
@@ -286,7 +294,7 @@ export const GameCard: React.FC<GameCardProps> = React.memo(({
           </div>
         </section>
       </div>
-    </motion.div>
+    </div>
   );
 });
 

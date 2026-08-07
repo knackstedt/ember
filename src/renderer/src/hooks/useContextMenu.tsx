@@ -1,10 +1,14 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ContextMenu, ContextMenuOption } from "../components/ContextMenu/ContextMenu";
 import { useContextMenuStore } from "../store/contextMenu.store";
 
 export interface UseContextMenuOptions<T> {
   items: T[];
-  focusedIndex: number;
+  /** Current focused index. Ignored when getFocusedIndex is provided. */
+  focusedIndex?: number;
+  /** Stable getter for the current focused index (e.g. from a FocusStore).
+   *  Preferred over focusedIndex because it does not cause re-renders. */
+  getFocusedIndex?: () => number;
   getOptions: (item: T) => ContextMenuOption[];
   onAction: (item: T, optionId: string) => void;
   enabled?: boolean;
@@ -13,6 +17,7 @@ export interface UseContextMenuOptions<T> {
 export function useContextMenu<T>({
   items,
   focusedIndex,
+  getFocusedIndex,
   getOptions,
   onAction,
   enabled = true,
@@ -34,6 +39,8 @@ export function useContextMenu<T>({
   itemsRef.current = items;
   const focusedIndexRef = useRef(focusedIndex);
   focusedIndexRef.current = focusedIndex;
+  const getFocusedIndexRef = useRef(getFocusedIndex);
+  getFocusedIndexRef.current = getFocusedIndex;
   const getOptionsRef = useRef(getOptions);
   getOptionsRef.current = getOptions;
   const onActionRef = useRef(onAction);
@@ -84,7 +91,10 @@ export function useContextMenu<T>({
         | { source: "gamepad" | "keyboard" }
         | undefined;
       if (!detail) return;
-      const item = itemsRef.current[focusedIndexRef.current];
+      const idx = getFocusedIndexRef.current
+        ? getFocusedIndexRef.current()
+        : focusedIndexRef.current;
+      const item = itemsRef.current[idx];
       if (!item) return;
       const el = itemElementsRef.current.get(item as object);
       if (el) {
