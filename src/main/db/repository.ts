@@ -1,23 +1,23 @@
-import { getDb } from "./index";
-import {
-  Game,
-  Movie,
-  MusicTrack,
-  TVShow,
-  AppSettings,
-  GameEmulatorConfig,
-  GameInjectionConfig,
-  ButtonMapping,
-  Collection,
-  CollectionItem,
-  SmartFilterGroup,
-  StreamingService,
-  StreamingFrontpageItem,
-  SessionHook,
-  RemoteSource,
-  Playlist,
-} from "../../shared/types";
 import { SCAN_SOURCE_ID_PREFIXES, ScanSourceId } from "../../shared/scan-sources";
+import {
+    AppSettings,
+    ButtonMapping,
+    Collection,
+    CollectionItem,
+    Game,
+    GameEmulatorConfig,
+    GameInjectionConfig,
+    Movie,
+    MusicTrack,
+    Playlist,
+    RemoteSource,
+    SessionHook,
+    SmartFilterGroup,
+    StreamingFrontpageItem,
+    StreamingService,
+    TVShow,
+} from "../../shared/types";
+import { getDb } from "./index";
 
 export function escapeId(id: string): string {
   // SurrealDB record IDs must not contain angle brackets or backticks
@@ -729,12 +729,19 @@ export const CollectionRepo = {
     let paramCounter = 0;
     const params: Record<string, unknown> = {};
 
+    const VALID_LOGIC = new Set(["and", "or"]);
+    const FIELD_RE = /^[a-zA-Z_][a-zA-Z0-9_.]*$/;
+
     const buildWhere = (group: SmartFilterGroup): string => {
+      const logic = VALID_LOGIC.has(String(group.logic).toLowerCase())
+        ? String(group.logic).toUpperCase()
+        : "AND";
       const parts = group.rules.map((rule) => {
         if ("logic" in rule) {
           return `(${buildWhere(rule as SmartFilterGroup)})`;
         }
         const r = rule as { field: string; operator: string; value?: unknown };
+        if (!FIELD_RE.test(r.field)) return "true";
         if (r.operator === "exists") {
           return `${r.field} != NONE`;
         }
@@ -765,7 +772,7 @@ export const CollectionRepo = {
             return "true";
         }
       });
-      return parts.join(` ${group.logic.toUpperCase()} `);
+      return parts.join(` ${logic} `);
     };
 
     const where = buildWhere(filter);
