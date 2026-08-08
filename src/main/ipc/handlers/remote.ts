@@ -1,42 +1,39 @@
 import { ipcMain, session } from "electron";
-import { join, homedir } from "os";
 import { existsSync, mkdirSync } from "fs";
-import { join as pathJoin } from "path";
 import { homedir as osHomedir } from "os";
+import { join as pathJoin } from "path";
+import type { RemoteSource } from "../../../shared/types";
+import { GameRepo, MovieRepo, MusicRepo } from "../../db/repository";
 import {
-  listRemotes,
-  addRemote,
-  updateRemote,
-  removeRemote,
-  getRemoteFileList,
-  startServe,
-  stopServe,
-  getServePort,
-  getAllServePorts,
-  checkRemoteNeedsAuth,
-  testRemoteConnection,
-  testRemoteCredentials,
-  testRemotePath,
-} from "../../services/rclone-manager";
-import { isRcloneAvailable } from "../../services/rclone.service";
-import {
-  queueRemoteSourceScan,
-  scanAllRemoteSources,
-  deleteMissingFromSource,
-} from "../../services/remote-scan.service";
-import { checkRemoteAvailability } from "../../services/remote-availability.service";
+    clearMasterPassword,
+    hasMasterPassword,
+    needsMasterPassword,
+    needsSessionReauth,
+    setMasterPassword,
+} from "../../services/credential-store.service";
 import { discoverNetworkDevices } from "../../services/network-discovery";
 import { startOAuthFlow } from "../../services/oauth-webview";
 import {
-  setMasterPassword,
-  clearMasterPassword,
-  hasMasterPassword,
-  needsMasterPassword,
-  needsSessionReauth,
-} from "../../services/credential-store.service";
-import { RemoteSourceRepo, GameRepo, MovieRepo, MusicRepo } from "../../db/repository";
+    addRemote,
+    checkRemoteNeedsAuth,
+    getAllServePorts,
+    getRemoteFileList,
+    getServePort,
+    listRemotes,
+    removeRemote,
+    startServe,
+    stopServe,
+    testRemoteConnection,
+    testRemoteCredentials,
+    testRemotePath,
+    updateRemote,
+} from "../../services/rclone-manager";
+import { isRcloneAvailable } from "../../services/rclone.service";
+import { checkRemoteAvailability } from "../../services/remote-availability.service";
+import {
+    queueRemoteSourceScan
+} from "../../services/remote-scan.service";
 import { getSettings } from "../../services/settings.service";
-import type { RemoteSource } from "../../../shared/types";
 import type { IpcContext } from "../types";
 
 export function registerRemoteHandlers(ctx: IpcContext): void {
@@ -107,17 +104,17 @@ export function registerRemoteHandlers(ctx: IpcContext): void {
 
   session.defaultSession.on("will-download", (_event, item, _webContents) => {
     const url = item.getURL();
-    const filename = item.getFilename();
+    const rawFilename = item.getFilename();
     const isItchDownload =
       url.includes("itch.io") ||
       url.includes("itch.zone") ||
       url.includes("hwcdn.net") ||
       url.includes("amazonaws.com") ||
-      filename.endsWith(".zip") ||
-      filename.endsWith(".tar.gz") ||
-      filename.endsWith(".tar.bz2") ||
-      filename.endsWith(".rar") ||
-      filename.endsWith(".7z");
+      rawFilename.endsWith(".zip") ||
+      rawFilename.endsWith(".tar.gz") ||
+      rawFilename.endsWith(".tar.bz2") ||
+      rawFilename.endsWith(".rar") ||
+      rawFilename.endsWith(".7z");
 
     if (isItchDownload) {
       const basePath = cachedGamePaths[0] ?? pathJoin(osHomedir(), "Games");
@@ -125,7 +122,38 @@ export function registerRemoteHandlers(ctx: IpcContext): void {
       try {
         if (!existsSync(itchDir)) mkdirSync(itchDir, { recursive: true });
       } catch {}
-      item.setSavePath(pathJoin(itchDir, filename));
+      // Sanitize the server-supplied filename: Content-Disposition values can
+      // contain path separators or ".." components that would let a malicious
+      // server escape itchDir via pathJoin. Normalize separators and take only
+      // the basename, then reject any remaining traversal fragments.
+      const safeName = sanitizeDownloadFilename(rawFilename);
+      item.setSavePath(pathJoin(itchDir, safeName));
     }
   });
+}
+
+/**
+ * Sanitize a filename received from an HTTP server's Content-Disposition
+ * header so it cannot escape the target directory via path traversal.
+ *
+ * `item.getFilename()` returns the value verbatim, which may contain embedded
+ * path separators (both `/` and `\`) or `..` components. `path.join` would
+ * resolve those, allowing a malicious server to overwrite arbitrary files
+ * outside the intended download directory.
+ *
+ * This normalizes both separator styles, takes the basename, and rejects any
+ * remaining traversal fragments, falling back to a safe default name.
+ */
+function sanitizeDownloadFilename(filename: string): string {
+  if (!filename || typeof filename !== "string") return "download";
+  // Normalize Windows-style backslashes to forward slashes so basename()
+  // strips them on every platform, then take only the final path component.
+  const normalized = filename.replace(/\\/g, "/");
+  let base = normalized.slice(normalized.lastIndexOf("/") + 1);
+  // Drop any residual traversal / relative-reference fragments and trim.
+  base = base.replace(/\.\./g, "").replace(/^\.+/, "").trim();
+  // Reject empty results, control characters, and NUL bytes.
+  base = base.replace(/[\x00-\x1f]/g, "");
+  if (!base || base === "." || base === "..") return "download";
+  return base;
 }
