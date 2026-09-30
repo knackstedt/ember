@@ -1,17 +1,17 @@
-import { ipcMain, app } from "electron";
-import { join } from "path";
-import { readFileSync } from "fs";
-import { listPlugins, reloadPlugins, callPluginHook } from "../../plugins/loader";
-import { discoverPlugins, discoverAllReleases, discoverDevPlugins } from "../../services/plugin-discovery.service";
+import { app, ipcMain } from "electron";
+import { readFile } from "fs/promises";
+import { join, resolve } from "path";
+import type { DiscoveredPlugin, Game, ThemeRegistration } from "../../../shared/types";
+import { callPluginHook, listPlugins, reloadPlugins } from "../../plugins/loader";
+import { getTheme, listThemes } from "../../plugins/theme-registry";
+import { discoverAllReleases, discoverDevPlugins, discoverPlugins } from "../../services/plugin-discovery.service";
 import {
-  installPlugin,
-  uninstallPlugin,
-  updatePlugin,
-  setPluginEnabled,
-  listManagedPlugins,
+    installPlugin,
+    listManagedPlugins,
+    setPluginEnabled,
+    uninstallPlugin,
+    updatePlugin,
 } from "../../services/plugin-manager.service";
-import { listThemes, getTheme } from "../../plugins/theme-registry";
-import type { Game, DiscoveredPlugin, ThemeRegistration } from "../../../shared/types";
 import type { IpcContext } from "../types";
 
 export function registerPluginsHandlers(_ctx: IpcContext): void {
@@ -73,9 +73,10 @@ export function registerPluginsHandlers(_ctx: IpcContext): void {
         "plugins",
         pluginId,
       );
-      const filePath = join(pluginDir, "assets", assetPath);
-      if (filePath.includes("..")) return null;
-      return readFileSync(filePath, "utf-8");
+      const assetsRoot = join(pluginDir, "assets");
+      const filePath = resolve(assetsRoot, assetPath);
+      if (filePath !== assetsRoot && !filePath.startsWith(assetsRoot + "/")) return null;
+      return await readFile(filePath, "utf-8");
     } catch {
       return null;
     }

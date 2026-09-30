@@ -1,10 +1,10 @@
-import { join } from "path";
-import { existsSync } from "fs";
-import { BrowserWindow, ipcMain } from "electron";
 import { ChildProcess } from "child_process";
+import { BrowserWindow, ipcMain } from "electron";
+import { existsSync } from "fs";
+import { join } from "path";
 import {
-  registerMpvIpcHandlers,
-  mpvWorkerAvailable,
+    mpvWorkerAvailable,
+    registerMpvIpcHandlers,
 } from "../services/mpv-worker.service";
 import type { ScanItemEvent } from "../services/remote-scan.service";
 import { createLogger } from "../util/logger";
@@ -12,21 +12,21 @@ import type { IpcContext } from "./types";
 
 // Handler module imports
 import { registerAppHandlers } from "./handlers/app";
-import { registerSplitscreenHandlers } from "./handlers/splitscreen";
-import { registerGamesHandlers } from "./handlers/games";
-import { registerMoviesHandlers } from "./handlers/movies";
-import { registerMusicHandlers } from "./handlers/music";
-import { registerTvHandlers } from "./handlers/tv";
-import { registerInputHandlers } from "./handlers/input";
 import { registerBluetoothHandlers } from "./handlers/bluetooth";
-import { registerPluginsHandlers } from "./handlers/plugins";
-import { registerStreamingHandlers } from "./handlers/streaming";
-import { registerPackagesHandlers } from "./handlers/packages";
 import { registerCollectionsHandlers } from "./handlers/collections";
 import { registerDbHandlers } from "./handlers/db";
-import { registerStoreHandlers } from "./handlers/store";
+import { registerGamesHandlers } from "./handlers/games";
+import { registerInputHandlers } from "./handlers/input";
+import { registerMoviesHandlers } from "./handlers/movies";
+import { registerMusicHandlers } from "./handlers/music";
+import { registerPackagesHandlers } from "./handlers/packages";
+import { registerPluginsHandlers } from "./handlers/plugins";
 import { registerRemoteHandlers } from "./handlers/remote";
+import { registerSplitscreenHandlers } from "./handlers/splitscreen";
+import { registerStoreHandlers } from "./handlers/store";
+import { registerStreamingHandlers } from "./handlers/streaming";
 import { registerSystemHandlers } from "./handlers/system";
+import { registerTvHandlers } from "./handlers/tv";
 
 const log = createLogger("info");
 
@@ -51,6 +51,9 @@ function ensureLibretroWorker(): ChildProcess {
   const worker = require("child_process").spawn(process.execPath, [workerScript], {
     env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
     stdio: ["pipe", "pipe", "pipe", "ipc"],
+    // V8 structured clone over the IPC channel — lets Buffers/TypedArrays
+    // cross the process boundary natively instead of base64 or JSON arrays.
+    serialization: "advanced",
   });
 
   worker.on("message", (msg: any) => {
@@ -220,6 +223,8 @@ export function registerIpcHandlers(window: BrowserWindow): void {
   if (mpvWorkerAvailable()) {
     registerMpvIpcHandlers();
   }
+  registerFfmpegIpcHandlers();
+  registerLibretroCoresIpcHandlers();
 
   ipcMain.on("mpv:available", (event) => {
     const start = performance.now();

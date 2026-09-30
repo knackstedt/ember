@@ -1,61 +1,62 @@
-import { contextBridge, ipcRenderer, shell, webFrame } from "electron";
-import { join } from "path";
-import { existsSync } from "fs";
-import { homedir } from "os";
-import {
-  AppSettings,
-  Game,
-  GameEmulatorConfig,
-  GameInjectionConfig,
-  VulkanShaderConfig,
-  WineRunner,
-  GamePlatform,
-  Movie,
-  MusicTrack,
-  TVShow,
-  NormalizedInputEvent,
-  ControllerDevice,
-  ButtonMapping,
-  ScanProgress,
-  Collection,
-  CollectionItem,
-  Playlist,
-  SmartFilterGroup,
-  StreamingService,
-  ExtensionInstallResult,
-  StreamingExtension,
-  ManagedPackage,
-  PackageOperationProgress,
-  AudioTags,
-  ReorganizeResult,
-  StreamingAdapterConfig,
-  StreamingSearchResult,
-  StreamingTrack,
-  StreamingAlbum,
-  StreamingPlaylist,
-  StreamingDevice,
-  CurrentlyPlaying,
-  RemoteTestResult,
-  DiscoveredDevice,
-  UpdaterState,
-  GitHubRelease,
-  OAuthResult,
-  BluetoothDevice,
-  BluetoothAdapterState,
-  ReShadeRuntimeState,
-} from "../shared/types";
-import { GameMetadata } from "../shared/metadata";
+import { contextBridge, ipcRenderer, webFrame } from "electron";
 import { IPC_CHANNELS } from "../shared/ipc";
+import { GameMetadata } from "../shared/metadata";
+import {
+    AppSettings,
+    AudioTags,
+    BluetoothAdapterState,
+    BluetoothDevice,
+    ButtonMapping,
+    Collection,
+    CollectionItem,
+    ControllerDevice,
+    CurrentlyPlaying,
+    DiscoveredDevice,
+    ExtensionInstallResult,
+    Game,
+    GameEmulatorConfig,
+    GameInjectionConfig,
+    GamePlatform,
+    GitHubRelease,
+    ManagedPackage,
+    Movie,
+    MusicTrack,
+    NormalizedInputEvent,
+    OAuthResult,
+    PackageOperationProgress,
+    Playlist,
+    ReShadeRuntimeState,
+    RemoteTestResult,
+    ReorganizeResult,
+    ScanProgress,
+    SmartFilterGroup,
+    StreamingAdapterConfig,
+    StreamingAlbum,
+    StreamingDevice,
+    StreamingExtension,
+    StreamingPlaylist,
+    StreamingSearchResult,
+    StreamingService,
+    StreamingTrack,
+    TVShow,
+    UpdaterState,
+    VulkanShaderConfig,
+    WineRunner,
+} from "../shared/types";
 
+import { ffmpegVideoDecoder } from "./ffmpeg-decoder";
 import { libretroApi } from "./libretro";
 import { WebGLVideoRenderer, computeRenderSize } from "./webgl-renderer";
-import { ffmpegVideoDecoder } from "./ffmpeg-decoder";
-import { findFileRecursive } from "../shared/file-utils";
 
 // ---------------------------------------------------------------------------
 // Video decoder — mpv worker (child process) when available, otherwise
 // ffmpeg child-process fallback.
 // ---------------------------------------------------------------------------
+
+// Preloads run in every frame, including plugin <iframe>s. Never expose the
+// privileged htpc API to subframes — third-party plugin content must not be
+// able to reach ipcRenderer-backed functionality.
+const isMainFrame = window.self === window.top;
 
 let mpvAvailable: boolean | null = null;
 function isMpvAvailable(): boolean {
@@ -77,55 +78,36 @@ const mpvPendingEvents = new Map<string, string>();
 // seconds after the user pauses (frames already in the IPC pipeline).
 const mpvPauseFrameThreshold = new Map<string, number>();
 
-ipcRenderer.on("mpv:event", (_e, payload: { id: string; event: string }) => {
-  mpvPendingEvents.set(payload.id, payload.event);
-});
+if (isMainFrame) {
+  ipcRenderer.on("mpv:event", (_e, payload: { id: string; event: string }) => {
+    mpvPendingEvents.set(payload.id, payload.event);
+  });
 
-ipcRenderer.on("mpv:frame", (_e, payload: { id: string; width: number; height: number; data: any; timestampMs: number }) => {
-  const renderer = mpvRenderers.get(payload.id);
-  if (renderer) {
-    const threshold = mpvPauseFrameThreshold.get(payload.id);
-    if (threshold !== undefined && payload.timestampMs < threshold - 100) {
-      // Frame belongs to the pre-pause playback; drop it.
-      return;
+  ipcRenderer.on("mpv:frame", (_e, payload: { id: string; width: number; height: number; data: any; timestampMs: number }) => {
+    const renderer = mpvRenderers.get(payload.id);
+    if (renderer) {
+      const threshold = mpvPauseFrameThreshold.get(payload.id);
+      if (threshold !== undefined && payload.timestampMs < threshold - 100) {
+        // Frame belongs to the pre-pause playback; drop it.
+        return;
+      }
+      const data = payload.data instanceof Uint8Array ? payload.data : new Uint8Array(payload.data);
+      const expected = payload.width * payload.height * 4;
+      if (data.length === expected) {
+        renderer.render(data, payload.width, payload.height);
+      }
+      mpvLatestFrame.set(payload.id, {
+        width: payload.width,
+        height: payload.height,
+        timestampMs: payload.timestampMs,
+      });
     }
-    const data = payload.data instanceof Uint8Array ? payload.data : new Uint8Array(payload.data);
-    const expected = payload.width * payload.height * 4;
-    if (data.length === expected) {
-      renderer.render(data, payload.width, payload.height);
-    }
-    mpvLatestFrame.set(payload.id, {
-      width: payload.width,
-      height: payload.height,
-      timestampMs: payload.timestampMs,
-    });
-  }
-});
+  });
+}
 
 async function resolveVideoPath(path: string): Promise<string> {
-  if (path.startsWith("ember://remote/")) {
-    throw new Error(`Unresolved remote URL passed to decoder: ${path}.`);
-  }
-  if (
-    path &&
-    !path.startsWith("/") &&
-    !path.startsWith("http://") &&
-    !path.startsWith("https://") &&
-    !path.startsWith("file://") &&
-    !path.startsWith("ember://")
-  ) {
-    if (existsSync(path)) return path;
-    const videosDir = join(
-      process.env.XDG_VIDEOS_DIR ?? join(homedir(), "Videos"),
-    );
-    const candidate = join(videosDir, path);
-    if (existsSync(candidate)) return candidate;
-    const basename = path.split("/").pop() || path;
-    const found = findFileRecursive(videosDir, basename);
-    if (found) return found;
-    throw new Error(`Video file not found: ${path}.`);
-  }
-  return path;
+  // Path resolution moved to the main process (sandboxed preload has no fs).
+  return ipcRenderer.invoke("videos:resolve", path);
 }
 
 const videoDecoderApi = {
@@ -236,7 +218,7 @@ const videoDecoderApi = {
       if (!meta) throw new Error("Decoder not opened");
       return meta;
     }
-    const meta = ffmpegVideoDecoder.getMetadata(id);
+    const meta = await ffmpegVideoDecoder.getMetadata(id);
     if (!meta) throw new Error("Decoder not opened");
     return meta;
   },
@@ -830,10 +812,10 @@ const htpc = {
     ipcRenderer.invoke("dialog:open-file", opts),
 
   shell: {
-    openExternal: (url: string): Promise<void> => shell.openExternal(url),
-    openPath: (path: string): Promise<string> => shell.openPath(path),
+    openExternal: (url: string): Promise<void> => ipcRenderer.invoke("shell:openExternal", url),
+    openPath: (path: string): Promise<string> => ipcRenderer.invoke("shell:openPath", path),
     showItemInFolder: (path: string): Promise<void> =>
-      Promise.resolve(shell.showItemInFolder(path)),
+      ipcRenderer.invoke("shell:showItemInFolder", path),
   },
 
   files: {
@@ -1326,7 +1308,9 @@ const htpc = {
   },
 };
 
-contextBridge.exposeInMainWorld("htpc", htpc);
+if (isMainFrame) {
+  contextBridge.exposeInMainWorld("htpc", htpc);
+}
 
 declare global {
   interface Window {

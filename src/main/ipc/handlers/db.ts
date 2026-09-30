@@ -1,11 +1,13 @@
-import { ipcMain, app, dialog, shell } from "electron";
-import { readFileSync, rmSync, mkdirSync, readdirSync, existsSync } from "fs";
+import { app, dialog, ipcMain, shell } from "electron";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from "fs";
+import { readFile } from "fs/promises";
 import { join } from "path";
 import { getDb } from "../../db";
 import { GameRepo, MovieRepo, MusicRepo } from "../../db/repository";
+import { isMediaAccessAllowed, registerAllowedPath } from "../../services/media-access.service";
 import { executeODataQuery } from "../../services/query.service";
-import type { IpcContext } from "../types";
 import { createLogger } from "../../util/logger";
+import type { IpcContext } from "../types";
 
 const log = createLogger("info");
 
@@ -148,7 +150,10 @@ export function registerDbHandlers(ctx: IpcContext): void {
     const { canceled, filePaths } = await dialog.showOpenDialog({
       properties: ["openDirectory"],
     });
-    return canceled ? null : filePaths[0];
+    if (canceled) return null;
+    // The user explicitly picked this directory — allow media reads from it.
+    registerAllowedPath(filePaths[0], true);
+    return filePaths[0];
   });
 
   ipcMain.handle("dialog:open-file", async (_e, opts?: { filters?: Electron.FileFilter[]; title?: string }) => {
@@ -157,15 +162,30 @@ export function registerDbHandlers(ctx: IpcContext): void {
       properties: ["openFile"],
       filters: opts?.filters ?? [{ name: "All Files", extensions: ["*"] }],
     });
-    return canceled ? null : filePaths[0];
+    if (canceled) return null;
+    // The user explicitly picked this file — allow media reads of it.
+    registerAllowedPath(filePaths[0], false);
+    return filePaths[0];
   });
 
+  ipcMain.handle("shell:openExternal", async (_e, url: string) => {
+    // Only browser-style schemes — never execute local file paths.
+    if (!/^https?:\/\//i.test(url) && !/^mailto:/i.test(url)) {
+      log.warn("shell:openExternal", `blocked non-http(s) url: ${url}`);
+      return;
+    }
+    return shell.openExternal(url);
+  });
   ipcMain.handle("shell:openPath", async (_e, path: string) => shell.openPath(path));
   ipcMain.handle("shell:showItemInFolder", async (_e, path: string) => { shell.showItemInFolder(path); });
 
   ipcMain.handle("files:read", async (_e, filePath: string) => {
+    if (!(await isMediaAccessAllowed(filePath))) {
+      log.warn("files:read", `denied by media allowlist: ${filePath}`);
+      return null;
+    }
     try {
-      return readFileSync(filePath);
+      return await readFile(filePath);
     } catch (err) {
       log.warn("files:read", `failed: ${filePath} ${err}`);
       return null;

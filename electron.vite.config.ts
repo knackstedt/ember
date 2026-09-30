@@ -1,17 +1,17 @@
 import { resolve } from "path";
 // @ts-expect-error electron-vite is ESM-only; Node 20.19+ supports require(esm) at runtime
-import { defineConfig, externalizeDepsPlugin } from "electron-vite";
 import react from "@vitejs/plugin-react";
+import { defineConfig, externalizeDepsPlugin } from "electron-vite";
 import {
-  copyFileSync,
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-  readlinkSync,
-  statSync,
-  symlinkSync,
-  unlinkSync,
+    copyFileSync,
+    existsSync,
+    mkdirSync,
+    readdirSync,
+    readFileSync,
+    readlinkSync,
+    statSync,
+    symlinkSync,
+    unlinkSync,
 } from "fs";
 
 function getMimeType(fileName: string): string {
@@ -217,6 +217,7 @@ export default defineConfig({
             "src/main/workers/game-scan.worker.ts",
           ),
           "workers/db.worker": resolve("src/main/workers/db.worker.ts"),
+          "workers/plugin.worker": resolve("src/main/plugins/plugin.worker.ts"),
           "libretro-worker": resolve("src/main/libretro-worker.ts"),
           "mpv-worker": resolve("src/main/mpv-worker.ts"),
           "thumbnail-worker": resolve("src/main/thumbnail-worker.ts"),
@@ -242,6 +243,7 @@ export default defineConfig({
           index: resolve("src/preload/index.ts"),
           "streaming-preload": resolve("src/preload/streaming-preload.ts"),
           "splitscreen-preload": resolve("src/preload/splitscreen-preload.ts"),
+          "flash-capture-preload": resolve("src/preload/flash-capture-preload.ts"),
         },
         output: {
           entryFileNames: "[name].js",

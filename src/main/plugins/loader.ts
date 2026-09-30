@@ -1,24 +1,24 @@
-import { existsSync, readdirSync, readFileSync, mkdirSync } from "fs";
-import { join, dirname } from "path";
 import { app } from "electron";
 import * as esbuild from "esbuild";
+import { existsSync, mkdirSync, readdirSync, readFileSync } from "fs";
+import { join } from "path";
 import { SourceMapConsumer } from "source-map";
 import { PluginManifest } from "../../shared/types";
+import { createLogger } from "../util/logger";
 import {
-  registeredPlugins,
-  RegisteredPlugin,
-  createPluginApi,
-  PluginModule,
+    PluginModule,
+    RegisteredPlugin,
+    registeredPlugins,
 } from "./api";
+import { PluginHost } from "./host";
 import {
-  registerInstalledPlugin,
-  unregisterInstalledPlugin,
-  setPluginActive,
-  setPluginInactive,
-  clearRegistry,
+    clearRegistry,
+    registerInstalledPlugin,
+    setPluginActive,
+    setPluginInactive,
+    unregisterInstalledPlugin,
 } from "./plugin-registry";
 import { clearThemes } from "./theme-registry";
-import { createLogger } from "../util/logger";
 
 const log = createLogger("info");
 
@@ -41,6 +41,9 @@ interface PluginState {
   enabled: boolean;
   installedAt: string;
 }
+
+/** Live hosts keyed by plugin id, for teardown on unload/reload/shutdown. */
+const pluginHosts = new Map<string, PluginHost>();
 
 function readPluginState(id: string): PluginState | null {
   const path = join(PLUGINS_DIR, `.${id}.state.json`);
@@ -143,23 +146,17 @@ async function loadPluginFromDir(
     };
   }
 
+  // Run the bundled plugin inside an isolated worker thread.
+  const host = new PluginHost(manifest, pluginDir, buildResult.code);
+  pluginHosts.set(manifest.id, host);
+
   let pluginModule: PluginModule = {};
   let errorMsg: string | undefined;
+  let exportNames: string[] = [];
 
   try {
-    const fn = new Function(
-      "require",
-      "module",
-      "exports",
-      "__dirname",
-      "__filename",
-      buildResult.code,
-    );
-    const mod = { exports: {} as PluginModule };
-    fn(require, mod, mod.exports, pluginDir, entryPath);
-    pluginModule =
-      (mod.exports as unknown as { default?: PluginModule }).default ??
-      mod.exports;
+    exportNames = await host.init();
+    pluginModule = host.createModuleProxy(exportNames);
   } catch (err) {
     const resolved = await resolveSourceMappedStack(
       err as Error,
@@ -167,6 +164,8 @@ async function loadPluginFromDir(
     );
     errorMsg = resolved;
     log.error("plugins", `Runtime error in ${manifest.id}:\n${resolved}`);
+    pluginHosts.delete(manifest.id);
+    await host.terminate();
   }
 
   const plugin: RegisteredPlugin = {
@@ -180,7 +179,7 @@ async function loadPluginFromDir(
 
   if (!errorMsg && pluginModule.activate) {
     try {
-      pluginModule.activate(createPluginApi(manifest));
+      await pluginModule.activate();
     } catch (err) {
       const resolved = await resolveSourceMappedStack(
         err as Error,
@@ -194,7 +193,7 @@ async function loadPluginFromDir(
   // Call onPluginStart if available
   if (!errorMsg && pluginModule.onPluginStart) {
     try {
-      await pluginModule.onPluginStart(createPluginApi(manifest));
+      await pluginModule.onPluginStart();
       setPluginActive(manifest.id, plugin);
     } catch (err) {
       const resolved = await resolveSourceMappedStack(
@@ -209,6 +208,14 @@ async function loadPluginFromDir(
   return plugin;
 }
 
+async function stopPluginWorker(id: string): Promise<void> {
+  const host = pluginHosts.get(id);
+  if (host) {
+    pluginHosts.delete(id);
+    await host.terminate();
+  }
+}
+
 export async function listPlugins(): Promise<RegisteredPlugin[]> {
   return registeredPlugins;
 }
@@ -217,7 +224,7 @@ export async function reloadPlugins(): Promise<RegisteredPlugin[]> {
   for (const plugin of registeredPlugins) {
     if (plugin.module.deactivate) {
       try {
-        plugin.module.deactivate();
+        await plugin.module.deactivate();
       } catch {
         /* */
       }
@@ -229,6 +236,7 @@ export async function reloadPlugins(): Promise<RegisteredPlugin[]> {
         /* */
       }
     }
+    await stopPluginWorker(plugin.manifest.id);
     setPluginInactive(plugin.manifest.id);
   }
   registeredPlugins.length = 0;
@@ -283,7 +291,7 @@ export async function unloadPlugin(id: string): Promise<void> {
     }
     if (plugin.module.deactivate) {
       try {
-        plugin.module.deactivate();
+        await plugin.module.deactivate();
       } catch {
         /* */
       }
@@ -291,6 +299,7 @@ export async function unloadPlugin(id: string): Promise<void> {
     setPluginInactive(id);
     registeredPlugins.splice(idx, 1);
   }
+  await stopPluginWorker(id);
   unregisterInstalledPlugin(id);
 }
 
@@ -303,7 +312,8 @@ export async function callPluginHook<T>(
     const hook = plugin.module[hookName] as (...args: unknown[]) => Promise<T | undefined> | T | undefined;
     if (typeof hook === "function") {
       try {
-        const result = await hook(createPluginApi(plugin.manifest), ...args);
+        // The worker injects the plugin api itself — don't pass one here.
+        const result = await hook(...args);
         if (result !== null && result !== undefined) {
           return result;
         }
@@ -321,7 +331,7 @@ export async function bootPlugins(): Promise<void> {
     if (!plugin.enabled) continue;
     if (plugin.module.onApplicationBoot) {
       try {
-        await plugin.module.onApplicationBoot(createPluginApi(plugin.manifest));
+        await plugin.module.onApplicationBoot();
       } catch (err) {
         log.error("plugins", `onApplicationBoot failed in ${plugin.manifest.id}: ${err}`);
       }
@@ -341,7 +351,7 @@ export async function shutdownPlugins(): Promise<void> {
     }
     if (plugin.module.deactivate) {
       try {
-        plugin.module.deactivate();
+        await plugin.module.deactivate();
       } catch {
         /* ignore */
       }
@@ -349,4 +359,8 @@ export async function shutdownPlugins(): Promise<void> {
   }
   registeredPlugins.length = 0;
   clearRegistry();
+
+  for (const id of [...pluginHosts.keys()]) {
+    await stopPluginWorker(id);
+  }
 }

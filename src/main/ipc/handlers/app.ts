@@ -1,14 +1,15 @@
-import { ipcMain, app } from "electron";
 import { spawn } from "child_process";
+import { app, ipcMain } from "electron";
 import { readFileSync } from "fs";
-import { getSettings, setSettings, setSetting } from "../../services/settings.service";
-import { getDefaultScanSourcesAsync } from "../../scanners/defaults";
-import { getXdgVideosDir, getXdgMusicDir } from "../../scanners/xdg";
 import { getMainWindow } from "../..";
-import { setFlashThumbnailConcurrency } from "../../services/flash-thumbnail.service";
 import type { AppSettings } from "../../../shared/types";
-import type { IpcContext } from "../types";
+import { getDefaultScanSourcesAsync } from "../../scanners/defaults";
+import { getXdgMusicDir, getXdgVideosDir } from "../../scanners/xdg";
+import { setFlashThumbnailConcurrency } from "../../services/flash-thumbnail.service";
+import { invalidateMediaAccessCache } from "../../services/media-access.service";
+import { getSettings, setSetting, setSettings } from "../../services/settings.service";
 import { createLogger } from "../../util/logger";
+import type { IpcContext } from "../types";
 
 const log = createLogger("info");
 
@@ -19,6 +20,8 @@ export function registerAppHandlers(ctx: IpcContext): void {
 
   ipcMain.handle("settings:set", async (_e, partial: Partial<AppSettings>) => {
     await setSettings(partial);
+    // Scan-root changes alter which paths the renderer may read.
+    invalidateMediaAccessCache();
     if ("fullscreen" in partial) {
       window.setFullScreen(partial.fullscreen ?? false);
     }

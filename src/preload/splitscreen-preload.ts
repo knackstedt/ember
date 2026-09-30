@@ -30,4 +30,7 @@ const api = {
   },
 };
 
-contextBridge.exposeInMainWorld("htpc", api);
+// Only expose the API in the top frame — never inside subframes/iframes.
+if (window.self === window.top) {
+  contextBridge.exposeInMainWorld("htpc", api);
+}

@@ -1,20 +1,20 @@
 import { app, BrowserWindow, ipcMain, NativeImage } from "electron";
-import { join, dirname, basename, extname } from "path";
 import {
-  existsSync,
-  readFileSync,
-  writeFileSync,
-  mkdirSync,
+    existsSync,
+    mkdirSync,
+    readFileSync,
+    writeFileSync,
 } from "fs";
+import { basename, dirname, extname, join } from "path";
 import { Game } from "../../shared/types";
 import { getDb } from "../db";
-import { searchGame } from "./rawg.service";
-import { getSettings, applyCorruptPolicy } from "./settings.service";
 import { createLogger } from "../util/logger";
+import { searchGame } from "./rawg.service";
+import { applyCorruptPolicy, getSettings } from "./settings.service";
 import {
-  hashFileHead,
-  byteHue,
-  bytePct,
+    byteHue,
+    bytePct,
+    hashFileHead,
 } from "./thumbnailer.service";
 
 const log = createLogger("info");
@@ -29,6 +29,21 @@ mkdirSync(generatedDir, { recursive: true });
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
+
+// The sandboxed capture window requests SWF bytes through this handler
+// (gated by the media allowlist — it replaced fs reads in the page).
+ipcMain.handle("flash-capture:swf", async (_e, swfPath: string) => {
+  if (!(await isMediaAccessAllowed(swfPath))) {
+    log.warn("flash", `swf read denied: ${swfPath}`);
+    return null;
+  }
+  try {
+    return readFileSync(swfPath);
+  } catch (err) {
+    log.warn("flash", `swf read failed: ${swfPath}: ${err}`);
+    return null;
+  }
+});
 
 function getRuffleBaseUrl(): string {
   const isDev = !app.isPackaged;
@@ -267,8 +282,7 @@ html,body{margin:0;padding:0;width:${config.width}px;height:${config.height}px;b
 <body>
 <div id="player"></div>
 <script>
-const fs = require('fs');
-const { ipcRenderer } = require('electron');
+const capture = window.__flashCapture;
 
 async function run() {
   try {
@@ -278,13 +292,14 @@ async function run() {
     player.style.width = '100%';
     player.style.height = '100%';
     document.getElementById('player').appendChild(player);
-    const data = fs.readFileSync('${escapedSwf}');
+    const data = await capture.readSwf('${escapedSwf}');
+    if (!data) throw new Error('SWF read denied or failed');
     await player.load({ data });
     setTimeout(() => {
-      ipcRenderer.send('flash-capture:ready');
+      capture.ready();
     }, ${config.waitMs});
   } catch (err) {
-    ipcRenderer.send('flash-capture:error', String(err));
+    capture.error(String(err));
   }
 }
 
@@ -302,8 +317,8 @@ function startWhenReady() {
     }, 50);
     setTimeout(() => {
       clearInterval(poll);
-      ipcRenderer.send('flash-capture:log', '[flash:run] RufflePlayer never appeared, sending error');
-      ipcRenderer.send('flash-capture:error', 'RufflePlayer not available');
+      capture.log('[flash:run] RufflePlayer never appeared, sending error');
+      capture.error('RufflePlayer not available');
     }, 15000);
   }
 }
@@ -376,8 +391,10 @@ class ScreenshotQueue {
         frame: false,
         skipTaskbar: true,
         webPreferences: {
-          nodeIntegration: true,
-          contextIsolation: false,
+          preload: join(__dirname, "../preload/flash-capture-preload.js"),
+          nodeIntegration: false,
+          contextIsolation: true,
+          sandbox: true,
           webSecurity: false,          
         },
       });

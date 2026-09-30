@@ -1,6 +1,10 @@
 import { ipcRenderer } from "electron";
 
+// Only wire IPC relays in the top frame — never inside subframes/iframes.
+const isMainFrame = window.self === window.top;
+
 document.addEventListener("ember:frontpage", (event) => {
+  if (!isMainFrame) return;
   const detail = (event as CustomEvent).detail;
   if (detail && Array.isArray(detail.items) && detail.serviceId) {
     ipcRenderer.send("streaming:frontpage:report", detail.serviceId, detail.items);
@@ -8,6 +12,7 @@ document.addEventListener("ember:frontpage", (event) => {
 });
 
 window.addEventListener("message", (event) => {
+  if (!isMainFrame) return;
   if (event.data && event.data.type === "ember:frontpage") {
     const { serviceId, items } = event.data;
     if (serviceId && Array.isArray(items)) {

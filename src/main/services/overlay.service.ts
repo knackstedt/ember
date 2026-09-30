@@ -1,15 +1,15 @@
-import { BrowserWindow, globalShortcut, screen, app, ipcMain } from "electron";
-import { join } from "path";
 import { execFile } from "child_process";
+import { app, BrowserWindow, globalShortcut, ipcMain, screen } from "electron";
 import { readFileSync } from "fs";
+import { join } from "path";
 import { promisify } from "util";
-import { Game } from "../../shared/types";
 import { IPC_CHANNELS } from "../../shared/ipc";
-import { getSettings } from "./settings.service";
-import { setOverlayWindow, setControllerButtonHandler } from "../input/evdev";
+import { Game } from "../../shared/types";
+import { setControllerButtonHandler, setOverlayWindow } from "../input/evdev";
 import { createLogger } from "../util/logger";
 import { getDescendantPids, getSiblingPids } from "../util/process-tree";
-import { grabOverlayInputs, ungrabOverlayInputs, setToggleOverlayCallback, getWindowGeometryX11, isWindowFocusedX11, isWindowViewableX11, isWindowActiveX11, refocusWindowX11, getX11WindowId } from "./x11-input-grab.service";
+import { getSettings } from "./settings.service";
+import { getWindowGeometryX11, getX11WindowId, grabOverlayInputs, isWindowActiveX11, isWindowFocusedX11, isWindowViewableX11, refocusWindowX11, setToggleOverlayCallback, ungrabOverlayInputs } from "./x11-input-grab.service";
 
 const log = createLogger("info");
 const execFileAsync = promisify(execFile);
@@ -317,7 +317,7 @@ async function createOverlayWindow(): Promise<BrowserWindow | null> {
     autoHideMenuBar: true,
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),
-      sandbox: false,
+      sandbox: true,
       webviewTag: true,
       contextIsolation: true,
       devTools: true,
@@ -1101,6 +1101,56 @@ export function getOverlayGame(): Game | null {
   return activeGame;
 }
 
+/** SIGTERM (then SIGKILL) the active game's whole process tree. */
+export async function stopActiveGameProcess(): Promise<void> {
+  if (!activeGamePid || activeGamePid <= 0) return;
+
+  const pid = activeGamePid;
+
+  // Gather the full process tree: descendants first (bottom-up so they
+  // can't be respawned by the parent), then the parent PID itself.
+  const descendants = getDescendantPids(pid);
+  const allPids = [...descendants, pid];
+
+  // Phase 1: SIGTERM everything gracefully
+  for (const p of allPids) {
+    try {
+      process.kill(p, "SIGTERM");
+    } catch {
+      // already dead or inaccessible
+    }
+  }
+  log.info("overlay", `stopGame: SIGTERM sent to ${allPids.length} processes (tree of ${pid})`);
+
+  // Phase 2: escalate to SIGKILL after 2s for any survivors
+  setTimeout(() => {
+    for (const p of allPids) {
+      try {
+        process.kill(p, 0); // check if still alive
+      } catch {
+        continue; // process is gone
+      }
+      try {
+        process.kill(p, "SIGKILL");
+        log.info("overlay", `SIGKILL escalated for pid ${p}`);
+      } catch {
+        // race: exited between check and kill
+      }
+    }
+  }, 2000);
+
+  // Wait for the root PID to actually exit (poll every 200ms, max 5s)
+  const deadline = Date.now() + 5000;
+  while (Date.now() < deadline) {
+    try {
+      process.kill(pid, 0); // still alive
+    } catch {
+      break; // process is gone
+    }
+    await new Promise((r) => setTimeout(r, 200));
+  }
+}
+
 export function initOverlayService(parent: BrowserWindow): void {
   mainWindow = parent;
 
@@ -1133,52 +1183,7 @@ export function initOverlayService(parent: BrowserWindow): void {
   });
 
   ipcMain.handle(IPC_CHANNELS.overlay.stopGame, async () => {
-    if (!activeGamePid || activeGamePid <= 0) return;
-
-    const pid = activeGamePid;
-
-    // Gather the full process tree: descendants first (bottom-up so they
-    // can't be respawned by the parent), then the parent PID itself.
-    const descendants = getDescendantPids(pid);
-    const allPids = [...descendants, pid];
-
-    // Phase 1: SIGTERM everything gracefully
-    for (const p of allPids) {
-      try {
-        process.kill(p, "SIGTERM");
-      } catch {
-        // already dead or inaccessible
-      }
-    }
-    log.info("overlay", `stopGame: SIGTERM sent to ${allPids.length} processes (tree of ${pid})`);
-
-    // Phase 2: escalate to SIGKILL after 2s for any survivors
-    setTimeout(() => {
-      for (const p of allPids) {
-        try {
-          process.kill(p, 0); // check if still alive
-        } catch {
-          continue; // process is gone
-        }
-        try {
-          process.kill(p, "SIGKILL");
-          log.info("overlay", `SIGKILL escalated for pid ${p}`);
-        } catch {
-          // race: exited between check and kill
-        }
-      }
-    }, 2000);
-
-    // Wait for the root PID to actually exit (poll every 200ms, max 5s)
-    const deadline = Date.now() + 5000;
-    while (Date.now() < deadline) {
-      try {
-        process.kill(pid, 0); // still alive
-      } catch {
-        break; // process is gone
-      }
-      await new Promise((r) => setTimeout(r, 200));
-    }
+    await stopActiveGameProcess();
   });
 
   ipcMain.handle(IPC_CHANNELS.overlay.pauseGame, () => {

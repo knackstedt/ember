@@ -28,6 +28,7 @@ import {
     quickMetadataLookup,
     searchGameMetadata,
 } from "../../services/metadata";
+import { stopActiveGameProcess } from "../../services/overlay.service";
 import { getProtonRating } from "../../services/protondb.service";
 import { searchGame } from "../../services/rawg.service";
 import { scanAllRemoteSources } from "../../services/remote-scan.service";
@@ -55,7 +56,7 @@ export function registerGamesHandlers(ctx: IpcContext): void {
   ipcMain.handle("games:abort", async () => {
     abortLaunch();
     try {
-      await window.webContents.executeJavaScript("window.htpc.overlay.stopGame()");
+      await stopActiveGameProcess();
     } catch {}
   });
 

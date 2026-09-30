@@ -1,9 +1,9 @@
-import React, { useEffect, useRef, useCallback, useState } from "react";
 import { motion } from "framer-motion";
-import { useLibretroPlayerStore } from "../../store/libretroPlayer.store";
-import { VERTEX_SHADER, wrapFragmentBody, getShaderPreset } from "./shaders";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { GamePlatform } from "../../../../shared/types";
 import { subscribeControllerEvents } from "../../hooks/useControllerWorker";
+import { useLibretroPlayerStore } from "../../store/libretroPlayer.store";
+import { getShaderPreset, VERTEX_SHADER, wrapFragmentBody } from "./shaders";
 
 function platformToButtonMap(platform: GamePlatform): Record<string, number> {
   const common: Record<string, number> = {
@@ -223,8 +223,9 @@ export const LibretroPlayer: React.FC = () => {
           gl.activeTexture(gl.TEXTURE0);
           gl.bindTexture(gl.TEXTURE_2D, textureRef.current);
 
-          // Worker sends frame data as base64 to survive IPC serialization.
-          const pixelData = Uint8Array.from(atob(frame.data as unknown as string), (c) => c.charCodeAt(0));
+          // Frame data crosses IPC as a structured-cloned Uint8Array
+          // (advanced serialization on the worker channel) — no decode step.
+          const pixelData = frame.data;
 
           gl.texImage2D(
             gl.TEXTURE_2D,

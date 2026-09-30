@@ -7,8 +7,8 @@
  * Communication with the parent is via Node.js built-in IPC (process.send/on('message')).
  */
 
-import { join } from "path";
 import { existsSync } from "fs";
+import { join } from "path";
 
 const arch = process.arch === "arm64" ? "arm64" : "x64";
 const addonName = `libretro-frontend.linux-${arch}-gnu.node`;
@@ -65,14 +65,13 @@ process.on("message", (req: any) => {
       case "getFrame": {
         const frame = Frontend.getFrame(args[0]);
         if (frame && frame.data) {
-          // napi-rs returns Vec<u8> as a Node.js Buffer.  Structured clone of
-          // TypedArrays across child_process IPC is unreliable (frames arrive
-          // truncated), so encode as base64 for a single string copy.
-          const buf = Buffer.from(frame.data);
+          // The parent channel uses serialization: "advanced" (V8 structured
+          // clone), so the napi Buffer crosses the process boundary directly —
+          // no base64 round-trip.
           result = {
             width: frame.width,
             height: frame.height,
-            data: buf.toString("base64"),
+            data: Buffer.from(frame.data),
           };
         } else {
           result = frame;
@@ -82,13 +81,12 @@ process.on("message", (req: any) => {
       case "getFrameBuffer": {
         const frame = Frontend.getFrameBuffer(args[0]);
         if (frame && frame.data) {
-          const buf = Buffer.from(frame.data);
           result = {
             width: frame.width,
             height: frame.height,
             pitch: frame.pitch,
             format: frame.format,
-            data: buf.toString("base64"),
+            data: Buffer.from(frame.data),
           };
         } else {
           result = frame;

@@ -1,11 +1,26 @@
 # Agent Notes
 
+## Process Topology
+
+- **Main process** (`src/main/index.ts`): windows, `ember://` protocol, IPC, services.
+- **Worker threads**: `workers/db.worker.ts` (SurrealDB), `workers/game-scan.worker.ts` (scanners), `workers/plugin.worker.ts` (one per plugin).
+- **Child processes**: `libretro-worker.ts` (dynarec/V8 signal-handler isolation), `mpv-worker.ts` (libmpv/libffmpeg symbol isolation — spawns system Node on purpose), `thumbnail-worker.ts`, rclone daemons.
+- **Renderers**: main window, overlay window, streaming webviews, splitscreen windows. All `sandbox: true` + `contextIsolation: true` + `nodeIntegration: false`.
+
+## Media Access Policy
+
+Renderer-initiated local file reads go through `src/main/services/media-access.service.ts`
+— a canonical-path allowlist seeded from DB-recorded media/cover paths and
+dialog selections. It gates `ember://media`, `files:read`, `ffmpeg:open`,
+`mpv:open`, `flash-capture:swf`, and CHD sniffing. Use `registerAllowedPath` /
+`isMediaAccessAllowed` when adding a new file-read surface.
+
 ## Shared Frame Buffer Architecture
 
 ### What it is
 A modular zero-copy frame delivery pipeline using `SharedArrayBuffer` (SAB) that lets native Rust code write decoded video frames directly into renderer-visible memory. The ABI is process-agnostic and can be consumed by any renderer component.
 
-**IMPORTANT**: `SharedArrayBuffer` cannot be shared across `child_process` boundaries (only `worker_threads` or same-process contexts). The libretro addon runs in an isolated `child_process` for V8 signal-handler safety, so the SAB cannot be used directly between the worker and the renderer. The SAB code is kept for future use when the addon runs in-process (e.g. libmpv in the main process).
+**IMPORTANT**: `SharedArrayBuffer` cannot be shared across `child_process` boundaries (only `worker_threads` or same-process contexts). The libretro addon runs in an isolated `child_process` for V8 signal-handler safety, so the SAB cannot be used directly between the worker and the renderer. The SAB code is kept for future use when the addon runs in-process.
 
 ### Layout (ABI version 1)
 All offsets are little-endian, 4-byte aligned.
@@ -35,62 +50,65 @@ All offsets are little-endian, 4-byte aligned.
 - **Renderer reader**: `src/renderer/src/shared-frame-buffer.ts` (JS-side SAB wrapper)
 
 ### Current IPC path (libretro worker)
-The libretro addon runs in an isolated `child_process` (`src/main/libretro-worker.ts`) to avoid V8 signal-handler conflicts with dynarec cores. Because `child_process` IPC does not share memory, frames travel via Node.js structured clone:
+The libretro addon runs in an isolated `child_process` (`src/main/libretro-worker.ts`) to avoid V8 signal-handler conflicts with dynarec cores. The worker is spawned with `serialization: "advanced"`, so frames travel via V8 structured clone:
 
 1. Rust `getFrame()` converts to RGBA and returns a `Vec<u8>`
-2. Worker receives it as a Node.js `Buffer` (no `Array.from` serialization)
-3. `process.send()` copies via structured clone to main process
+2. Worker receives it as a Node.js `Buffer` and returns it directly (no base64)
+3. `process.send()` transfers it via structured clone to main process
 4. `ipcMain.handle` returns to renderer
-5. Renderer creates `Uint8Array` and uploads to WebGL
-
-This is 3 copies total (Rust conversion + 2 IPC hops), but avoids the catastrophic `Array.from()` JSON-serialization path that previously converted every byte to a JSON number.
+5. Renderer wraps it in a `Uint8Array` and uploads to WebGL
 
 ### Why this is modular
 The SAB format is independent of libretro. If a future native module (e.g. libmpv) runs in the main process, it can use the same `SharedFrameBuffer` ABI and the renderer can consume it with zero copies.
 
-### Build verification
-- Rust: `cd native/libretro-frontend && cargo check` (passes)
-- TypeScript: `npx tsc --noEmit` (passes)
-
 ## Video Decoder Module
 
 ### What it is
-A dual-backend native Rust video decoding module (`native/video-decoder/`) with zero-copy frame delivery into a `SharedArrayBuffer`.
+A native Rust video decoding module (`native/video-decoder/`) built on
+**mpv/libmpv** (`mpv_dynamic.rs` loads libmpv at runtime; `mpv_renderer.rs`
+pulls RGBA frames). There is no FFmpeg/GStreamer backend in the addon —
+software `ffmpeg` subprocess decoding exists separately as the JS-level
+fallback in `src/main/services/ffmpeg-decoder.service.ts`.
 
-### Backends
-- **FFmpeg** (preferred): uses `ffmpeg-next` crate. Tries hardware-accelerated NVDEC decoders (`h264_cuvid`, `hevc_cuvid`, etc.) before falling back to software decode.
-- **GStreamer** (fallback): uses `gstreamer`/`gstreamer-app` crates with an `uridecodebin → videoconvert → appsink` pipeline.
+### Process model
+`src/main/services/mpv-worker.service.ts` spawns `src/main/mpv-worker.ts` as a
+child process using **system Node.js** (not `ELECTRON_RUN_AS_NODE`) because
+Electron's bundled `libffmpeg.so` exports libavutil 59 symbols that heap-
+corrupt libmpv's libavutil 58.
 
-Backend selection happens at runtime in `decoder.rs::VideoDecoderState::open()`:
-1. Try FFmpeg first.
-2. If it fails, try GStreamer.
-3. Return the name of the backend that succeeded (`ffmpeg`, `ffmpeg-nvdec`, or `gstreamer`).
-
-### Why two separate `.node` files
-FFmpeg and GStreamer link against different C libraries. If both were linked into the same `.node`, missing runtime libraries would prevent the addon from loading at all. By building two variants (`video-decoder-ffmpeg.node`, `video-decoder-gstreamer.node`) and trying them at runtime, the app gracefully degrades if only one set of libraries is present.
-
-### Build
-Two separate cargo builds with different `CARGO_TARGET_DIR` and `--features`:
-- `CARGO_TARGET_DIR=target/ffmpeg cargo build --release --features ffmpeg`
-- `CARGO_TARGET_DIR=target/gstreamer cargo build --release --features gstreamer`
-
-Both produce `libvideo_decoder.so` which is renamed to `.node` and copied into `resources/`.
+### Frame transport
+- The worker allocates an `ArrayBuffer` sized to the **actual decoded
+  dimensions** (`HEADER_SIZE + w*h*4*2` slots), reallocating only if the
+  decoder reports a larger size. `attach_shared_buffer` re-initializes the
+  slot layout from decoder metadata on each attach.
+- Frame pixels travel over a dedicated binary pipe (fd 4) with a 20-byte
+  `FRAM` header (`magic, idLen, width, height, frameLen`). Timestamps go over
+  IPC as `frame-meta` messages and are matched with pipe data in the service.
+- Frames are pushed to the renderer via `webContents.send("mpv:frame", ...)`.
+- The FFmpeg fallback mirrors this push model via `ffmpeg:frame` /
+  `ffmpeg:audio` events from `ffmpeg-decoder.service.ts`.
 
 ### Renderer integration
-- `src/renderer/src/components/VideoPlayer/useNativeVideo.ts` — React hook that manages decoder lifecycle, SharedArrayBuffer, WebGL renderer, and rAF frame pump.
-- `src/renderer/src/components/VideoPlayer/webgl-renderer.ts` — WebGL texture renderer for RGBA frames (zero-copy from SAB).
-- `src/renderer/src/components/VideoPlayer/VideoPlayer.tsx` — Dual-mode player: uses `<video>` element for MP4/WebM/H.264, and the native decoder + WebGL canvas for MKV/HEVC/etc.
-- `src/main/services/video-decoder.service.ts` — Main-process service that loads the correct `.node` backend at runtime.
-- `src/main/ipc/index.ts` — IPC handlers bridge renderer → main process → Rust decoder.
+- `src/renderer/src/components/VideoPlayer/useNativeVideo.ts` — React hook managing decoder lifecycle, WebGL renderer, rAF pump.
+- `src/renderer/src/components/VideoPlayer/webgl-renderer.ts` — WebGL texture renderer for RGBA frames.
+- `src/renderer/src/components/VideoPlayer/VideoPlayer.tsx` — dual-mode player: `<video>` element for MP4/WebM/H.264, native decoder + WebGL for MKV/HEVC/etc.
+- `src/preload/index.ts` — `videoDecoder` API; chooses mpv worker vs ffmpeg service per `mpv:available`.
+- `src/preload/ffmpeg-decoder.ts` — renderer-side client (WebGL render + WebAudio drain) for the ffmpeg fallback.
 
 ### URL resolution
-`ember://media/<path>` is resolved to a local filesystem path before being passed to FFmpeg.
-`ember://remote/<sourceId>/<path>` is resolved to `http://localhost:<port>/<path>` (same proxy logic as the protocol handler).
+`videos:resolve` in the ffmpeg service resolves renderer-supplied paths in the
+main process (the sandboxed preload has no fs). Absolute paths are additionally
+gated by the media allowlist before decoding.
 
-### Build verification (when dev libraries are installed)
-- Rust: `cd native/video-decoder && cargo check --features ffmpeg` (requires `libavcodec-dev`, `libavformat-dev`, `libavutil-dev`, `libswscale-dev`)
-- Rust: `cd native/video-decoder && cargo check --features gstreamer` (requires `libgstreamer1.0-dev`, `libgstreamer-plugins-base1.0-dev`)
-- TypeScript: `npx tsc --noEmit` (passes)
+## Plugin System
+
+Each plugin runs in a dedicated `worker_threads` isolate
+(`src/main/plugins/plugin.worker.ts`), inside a `vm` context with a
+permission-gated `require()` shim — no `process`, no Electron, no Node
+`fs`/`child_process`/`net` unless the manifest declares the matching
+`permissions` entry (`filesystem`, `network`, `subprocess`, `system`).
+`src/main/plugins/host.ts` is the main-process bridge; `loader.ts` builds a
+`PluginModule` proxy from the bundle's exports. See `PLUGIN-SYSTEM.md`.
 
 ## Git / Commits
 

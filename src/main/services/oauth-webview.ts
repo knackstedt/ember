@@ -21,6 +21,7 @@ export async function startOAuthFlow(
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
+        sandbox: true,
       },
       show: false,
       title: "Authenticate",

@@ -1156,7 +1156,18 @@ export interface PluginManifest {
   hooks?: PluginHookName[];
   platforms?: string[];
   type?: PluginType;
+  /**
+   * Node capabilities the plugin requests. Without the matching permission,
+   * the plugin worker's require() shim denies the module.
+   */
+  permissions?: PluginPermission[];
 }
+
+export type PluginPermission =
+  | "filesystem"
+  | "network"
+  | "subprocess"
+  | "system";
 
 export interface ThemeConfigOption {
   key: string;

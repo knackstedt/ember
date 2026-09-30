@@ -1,37 +1,40 @@
-import { app, BrowserWindow, shell, protocol, Menu, powerMonitor, nativeImage, ipcMain } from "electron";
-import { EventEmitter } from "events";
-import path, { join } from "path";
-import { readFileSync, createReadStream, statSync, lstatSync, readlinkSync, unlinkSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { createHash } from "crypto";
-import { initDb, terminateDbWorker } from "./db";
-import { registerIpcHandlers, destroyWorker as destroyLibretroWorker } from "./ipc";
-import { destroyMpvWorker } from "./services/mpv-worker.service";
-import { initInputSystem, destroyInputSystem, forceRescanAll } from "./input/evdev";
-import { getSettings, setSetting } from "./services/settings.service";
-import type { TabId } from "../shared/types";
-import { setFlashThumbnailConcurrency } from "./services/flash-thumbnail.service";
-import { getWindowState, saveWindowState } from "./services/window-state.service";
-import { createLogger } from "./util/logger";
-import { getXdgVideosDir } from "./scanners/xdg";
-import { GameRepo, MovieRepo, RemoteSourceRepo } from "./db/repository";
-import { launchGame } from "./services/launcher.service";
-import { initOverlayService } from "./services/overlay.service";
-import { cleanupStaleTaints, cleanupUserSettingsPy, cleanupStaleLaunchOptions } from "./services/shader-injection.service";
-import { ensureReShadeShaders, ensureReShadeDll } from "./services/reshade.service";
+import { app, BrowserWindow, ipcMain, Menu, nativeImage, powerMonitor, protocol, shell } from "electron";
+import { EventEmitter } from "events";
+import { createReadStream, existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, statSync, unlinkSync, writeFileSync } from "fs";
+import { access as accessAsync, mkdir as mkdirAsync, stat as statAsync, writeFile as writeFileAsync } from "fs/promises";
+import path, { join } from "path";
 import { findFileRecursive } from "../shared/file-utils";
 import { getContentType, getVideoFallbackContentType } from "../shared/mime-types";
+import type { TabId } from "../shared/types";
+import { initDb, terminateDbWorker } from "./db";
+import { GameRepo, MovieRepo, RemoteSourceRepo } from "./db/repository";
+import { destroyInputSystem, forceRescanAll, initInputSystem } from "./input/evdev";
+import { destroyWorker as destroyLibretroWorker, registerIpcHandlers } from "./ipc";
+import { bootPlugins, shutdownPlugins } from "./plugins/loader";
+import { getXdgVideosDir } from "./scanners/xdg";
+import { destroyAllFfmpegDecoders } from "./services/ffmpeg-decoder.service";
+import { setFlashThumbnailConcurrency } from "./services/flash-thumbnail.service";
+import { launchGame } from "./services/launcher.service";
+import { isMediaAccessAllowed } from "./services/media-access.service";
+import { destroyMpvWorker } from "./services/mpv-worker.service";
+import { initOverlayService } from "./services/overlay.service";
+import { installBundledPlugins } from "./services/plugin-manager.service";
 import { getServePort, shutdownRcloneManager } from "./services/rclone-manager";
 import { startRemoteAvailabilityWorker, stopRemoteAvailabilityWorker } from "./services/remote-availability.service";
-import { bootPlugins, shutdownPlugins } from "./plugins/loader";
-import { installBundledPlugins } from "./services/plugin-manager.service";
+import { ensureReShadeDll, ensureReShadeShaders } from "./services/reshade.service";
+import { getSettings, setSetting } from "./services/settings.service";
+import { cleanupStaleLaunchOptions, cleanupStaleTaints, cleanupUserSettingsPy } from "./services/shader-injection.service";
 import { cleanupSplitscreen } from "./services/splitscreen.service";
 import {
-  initUpdater,
-  checkPostUpdateCrash,
-  markCleanShutdown,
-  rollbackToPrevious,
-  getUpdaterState,
+    checkPostUpdateCrash,
+    initUpdater,
+    markCleanShutdown,
+    rollbackToPrevious
 } from "./services/updater.service";
+import { getWindowState, saveWindowState } from "./services/window-state.service";
+import { resolveEmberLocalPath } from "./util/ember-protocol";
+import { createLogger } from "./util/logger";
 
 // Suppress MaxListenersExceededWarning from Electron internals (webviews, extensions)
 EventEmitter.defaultMaxListeners = 30;
@@ -159,6 +162,7 @@ function showErrorDialog(title: string, detail: string): void {
     webPreferences: {
       contextIsolation: false,
       nodeIntegration: false,
+      sandbox: true,
       devTools: false,
     },
   });
@@ -193,13 +197,19 @@ function isProcessRunning(pid: number): boolean {
   }
 }
 
-function killOldInstance(pid: number) {
+async function waitForProcessExit(pid: number, timeoutMs: number): Promise<void> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    if (!isProcessRunning(pid)) return;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+}
+
+async function killOldInstance(pid: number): Promise<void> {
   try {
     process.kill(pid, "SIGTERM");
-    const start = Date.now();
-    while (Date.now() - start < 3000) {
-      if (!isProcessRunning(pid)) return;
-    }
+    // Poll asynchronously — never busy-spin the event loop.
+    await waitForProcessExit(pid, 3000);
     try {
       process.kill(pid, "SIGKILL");
     } catch {
@@ -230,7 +240,7 @@ function clearStaleSingletonLock() {
   }
 }
 
-function acquireInstanceLock(): boolean {
+async function acquireInstanceLock(): Promise<boolean> {
   try {
     const userData = app.getPath("userData");
     const pidFile = path.join(userData, "ember.pid");
@@ -242,7 +252,7 @@ function acquireInstanceLock(): boolean {
       const oldPid = parseInt(readFileSync(pidFile, "utf8").trim(), 10);
       if (!isNaN(oldPid) && oldPid !== process.pid && isProcessRunning(oldPid)) {
         log.info("lock", `Killing existing instance (PID ${oldPid})`);
-        killOldInstance(oldPid);
+        await killOldInstance(oldPid);
       }
     }
 
@@ -266,19 +276,6 @@ function releaseInstanceLock() {
   } catch {
     // Ignore cleanup errors
   }
-}
-
-if (!isDev) {
-  if (!acquireInstanceLock()) {
-    log.info("lock", "Failed to acquire instance lock, exiting");
-    app.exit(0);
-  }
-
-  // Clean up any stale Electron SingletonLock left by a crashed previous run.
-  clearStaleSingletonLock();
-
-  app.on("quit", releaseInstanceLock);
-  app.on("before-quit", releaseInstanceLock);
 }
 
 app.commandLine.appendSwitch("js-flags", "--expose-gc");
@@ -371,7 +368,7 @@ async function createWindow(): Promise<void> {
     autoHideMenuBar: true,
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),
-      sandbox: false,
+      sandbox: true,
       webviewTag: true,
       contextIsolation: true,
       nodeIntegration: false,
@@ -565,23 +562,24 @@ async function createWindow(): Promise<void> {
   });
 }
 
-function getCachedScaledPath(originalPath: string, targetWidth: number, targetHeight: number): string | undefined {
-  const ext = originalPath.toLowerCase().slice(originalPath.lastIndexOf("."));
-  if (ext === ".svg") return undefined;
+// Background image-scale jobs, deduplicated by cache path. Resizing runs
+// nativeImage on the main thread, so we kick it off asynchronously rather
+// than blocking a protocol request on it.
+const scaleJobs = new Map<string, Promise<void>>();
 
-  const cacheDir = join(app.getPath("userData"), "cache", "images");
-  const hash = createHash("sha256").update(`${originalPath}:${targetWidth}:${targetHeight}`).digest("hex");
-  const cacheExt = ext === ".png" ? ".png" : ".jpg";
-  const cachePath = join(cacheDir, `${hash}${cacheExt}`);
-
-  if (existsSync(cachePath)) return cachePath;
-
+async function generateScaledImage(
+  originalPath: string,
+  targetWidth: number,
+  targetHeight: number,
+  cachePath: string,
+  cacheExt: string,
+): Promise<void> {
   try {
     const image = nativeImage.createFromPath(originalPath);
     const size = image.getSize();
 
     if (size.width <= targetWidth && size.height <= targetHeight) {
-      return undefined;
+      return;
     }
 
     const scale = Math.min(targetWidth / size.width, targetHeight / size.height);
@@ -590,16 +588,39 @@ function getCachedScaledPath(originalPath: string, targetWidth: number, targetHe
 
     const resized = image.resize({ width: newWidth, height: newHeight, quality: "best" });
 
-    mkdirSync(cacheDir, { recursive: true });
+    await mkdirAsync(path.dirname(cachePath), { recursive: true });
     if (cacheExt === ".png") {
-      writeFileSync(cachePath, resized.toPNG());
+      await writeFileAsync(cachePath, resized.toPNG());
     } else {
-      writeFileSync(cachePath, resized.toJPEG(90));
+      await writeFileAsync(cachePath, resized.toJPEG(90));
     }
-
-    return cachePath;
   } catch (err) {
     log.error("ember:scale", `Failed to scale ${originalPath}: ${err}`);
+  }
+}
+
+async function getCachedScaledPath(originalPath: string, targetWidth: number, targetHeight: number): Promise<string | undefined> {
+  const ext = originalPath.toLowerCase().slice(originalPath.lastIndexOf("."));
+  if (ext === ".svg") return undefined;
+
+  const cacheDir = join(app.getPath("userData"), "cache", "images");
+  const hash = createHash("sha256").update(`${originalPath}:${targetWidth}:${targetHeight}`).digest("hex");
+  const cacheExt = ext === ".png" ? ".png" : ".jpg";
+  const cachePath = join(cacheDir, `${hash}${cacheExt}`);
+
+  try {
+    await accessAsync(cachePath);
+    return cachePath;
+  } catch {
+    // Not cached yet — serve the original now and generate the scaled
+    // version in the background for subsequent requests.
+    if (!scaleJobs.has(cachePath)) {
+      scaleJobs.set(
+        cachePath,
+        generateScaledImage(originalPath, targetWidth, targetHeight, cachePath, cacheExt)
+          .finally(() => scaleJobs.delete(cachePath)),
+      );
+    }
     return undefined;
   }
 }
@@ -618,6 +639,20 @@ protocol.registerSchemesAsPrivileged([
 
 app.whenReady().then(async () => {
   app.setAppUserModelId("com.ember.app");
+
+  if (!isDev) {
+    if (!(await acquireInstanceLock())) {
+      log.info("lock", "Failed to acquire instance lock, exiting");
+      app.exit(0);
+      return;
+    }
+
+    // Clean up any stale Electron SingletonLock left by a crashed previous run.
+    clearStaleSingletonLock();
+
+    app.on("quit", releaseInstanceLock);
+    app.on("before-quit", releaseInstanceLock);
+  }
 
   // Clean up stale shader injection side-effects from crashed/killed sessions.
   // These are safe to remove unconditionally — user_settings.py and launch
@@ -648,7 +683,6 @@ app.whenReady().then(async () => {
 
   protocol.handle("ember", async (request) => {
     const url = new URL(request.url);
-    let filePath: string;
 
     // Remote source proxy: ember://remote/<sourceId>/<path...>
     if (url.hostname === "remote") {
@@ -907,82 +941,27 @@ document.addEventListener("keydown", function(e) {
       return new Response("Not Found", { status: 404 });
     }
 
-    // Plugin asset serving: ember://plugin/<id>/<path>
-    if (url.hostname === "plugin") {
-      const segments = url.pathname.split("/").filter(Boolean);
-      const pluginId = segments[0];
-      const assetPath = segments.slice(1).join("/");
-      if (!pluginId) {
-        return new Response("Bad Request", { status: 400 });
-      }
-      const pluginDir = join(app.getPath("home") || process.cwd(), ".config", "htpc", "plugins", pluginId);
-      filePath = join(pluginDir, "assets", assetPath);
-      if (!filePath || filePath.includes("..")) {
-        return new Response("Forbidden", { status: 403 });
-      }
-      let stats;
-      try {
-        stats = statSync(filePath);
-      } catch {
-        return new Response("Not Found", { status: 404 });
-      }
-      const ext = filePath.toLowerCase().slice(filePath.lastIndexOf("."));
-      const contentType = getContentType(ext);
-      const range = request.headers.get("Range") || "";
-      if (range) {
-        const match = range.match(/bytes=(\d+)-(\d*)/);
-        if (match) {
-          const start = parseInt(match[1], 10);
-          const end = match[2] ? parseInt(match[2], 10) : stats.size - 1;
-          const length = end - start + 1;
-          const stream = createReadStream(filePath, { start, end });
-          if (request.signal) {
-            request.signal.addEventListener("abort", () => stream.destroy(), { once: true });
-          }
-          return new Response(stream as any, {
-            status: 206,
-            headers: {
-              "Content-Type": contentType,
-              "Content-Length": String(length),
-              "Accept-Ranges": "bytes",
-              "Content-Range": `bytes ${start}-${end}/${stats.size}`,
-              "Cache-Control": "no-store, must-revalidate",
-            },
-          });
-        }
-      }
-      const stream = createReadStream(filePath);
-      if (request.signal) {
-        request.signal.addEventListener("abort", () => stream.destroy(), { once: true });
-      }
-      return new Response(stream as any, {
-        status: 200,
-        headers: {
-          "Content-Type": contentType,
-          "Content-Length": String(stats.size),
-          "Accept-Ranges": "bytes",
-          "Cache-Control": "no-store, must-revalidate",
-        },
-      });
+    // Local file serving: plugin assets, userData caches, and media files.
+    const resolved = resolveEmberLocalPath(url, {
+      userData: app.getPath("userData"),
+      home: app.getPath("home"),
+    });
+    if (resolved.scope === "denied" || !resolved.filePath) {
+      return new Response(resolved.message ?? "Forbidden", { status: resolved.status ?? 403 });
     }
 
-    if (url.hostname === "media") {
-      filePath = decodeURIComponent(url.pathname.slice(1));
-    } else if (url.hostname === "thumbnails" || url.hostname === "covers") {
-      let rel = decodeURIComponent(url.hostname + url.pathname);
-      if (rel.startsWith("/")) rel = rel.slice(1);
-      filePath = join(app.getPath("userData"), rel);
-    } else {
-      filePath = decodeURIComponent(url.pathname);
-    }
+    let filePath = resolved.filePath;
 
-    if (!filePath || filePath.includes("..")) {
+    // "plugin" and "userdata" scopes are already contained to their roots by
+    // the resolver; "media" must additionally pass the allowlist.
+    if (resolved.scope === "media" && !(await isMediaAccessAllowed(filePath))) {
+      log.warn("ember:protocol", `denied media read: ${filePath}`);
       return new Response("Forbidden", { status: 403 });
     }
 
     let stats;
     try {
-      stats = statSync(filePath);
+      stats = await statAsync(filePath);
     } catch {
       return new Response("Not Found", { status: 404 });
     }
@@ -993,11 +972,11 @@ document.addEventListener("keydown", function(e) {
     const targetW = parseInt(url.searchParams.get("w") ?? "0", 10);
     const targetH = parseInt(url.searchParams.get("h") ?? "0", 10);
     if (targetW > 0 && targetH > 0 && (ext === ".jpg" || ext === ".jpeg" || ext === ".png" || ext === ".webp")) {
-      const scaled = getCachedScaledPath(filePath, targetW, targetH);
+      const scaled = await getCachedScaledPath(filePath, targetW, targetH);
       if (scaled) {
         servePath = scaled;
         try {
-          stats = statSync(servePath);
+          stats = await statAsync(servePath);
         } catch {
           return new Response("Not Found", { status: 404 });
         }
@@ -1110,6 +1089,7 @@ app.on("before-quit", (e) => {
       await terminateDbWorker();
       log.info("shutdown", "destroying mpv worker...");
       destroyMpvWorker();
+      destroyAllFfmpegDecoders();
       log.info("shutdown", "shutting down rclone manager...");
       await shutdownRcloneManager();
       log.info("shutdown", "destroying libretro worker...");

@@ -3,10 +3,10 @@
  * frames/commands between renderer and worker.
  */
 
-import { join } from "path";
-import { existsSync, statSync } from "fs";
+import { ChildProcess, execSync, spawn } from "child_process";
 import { BrowserWindow, ipcMain } from "electron";
-import { spawn, ChildProcess, execSync } from "child_process";
+import { existsSync, statSync } from "fs";
+import { join } from "path";
 import { createLogger } from "../util/logger";
 
 function findNodeExecutable(): string {
@@ -321,6 +321,10 @@ export async function mpvCreate(id: string): Promise<void> {
 }
 
 export async function mpvOpen(id: string, path: string): Promise<any> {
+  // Local files must be allowlisted media; remote/http streams pass through.
+  if (path.startsWith("/") && !(await isMediaAccessAllowed(path))) {
+    throw new Error(`mpv: access denied for path: ${path}`);
+  }
   return await sendCommand("open", id, [path]);
 }
 

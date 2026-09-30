@@ -7,9 +7,9 @@
  * parent via Node.js IPC.
  */
 
-import { join } from "path";
 import { existsSync } from "fs";
 import { Socket } from "net";
+import { join } from "path";
 
 const arch = process.arch === "arm64" ? "arm64" : "x64";
 const addonName = `video-decoder.linux-${arch}-gnu.node`;
@@ -19,17 +19,19 @@ const framePipe = new Socket({ fd: 4, writable: true, readable: false });
 const FRAME_MAGIC = 0x4652414d;
 const FRAME_HEADER_SIZE = 20;
 
-function writeFrameToPipe(decoderId: string, width: number, height: number, frameBuf: Buffer) {
+function writeFrameToPipe(decoderId: string, width: number, height: number, frameData: Uint8Array) {
   const idBuf = Buffer.from(decoderId, "utf8");
   const header = Buffer.allocUnsafe(FRAME_HEADER_SIZE);
   header.writeUInt32LE(FRAME_MAGIC, 0);
   header.writeUInt32LE(idBuf.length, 4);
   header.writeUInt32LE(width, 8);
   header.writeUInt32LE(height, 12);
-  header.writeUInt32LE(frameBuf.length, 16);
+  header.writeUInt32LE(frameData.byteLength, 16);
   framePipe.write(header);
   framePipe.write(idBuf);
-  framePipe.write(frameBuf);
+  // Writing a Uint8Array view over the shared buffer avoids the per-frame
+  // allocUnsafe+copy — the socket copies straight to the kernel.
+  framePipe.write(frameData);
 }
 
 function findAddon(): string | null {
@@ -84,7 +86,9 @@ function readU32(view: DataView, offset: number): number {
 
 function createState(id: string): DecoderState {
   const decoder = new NativeAddon.VideoDecoder();
-  const ab = new ArrayBuffer(HEADER_SIZE + 4096 * 4096 * 4 * 2);
+  // Placeholder only — the real buffer is allocated on "open" once the
+  // video's actual dimensions are known (a 640x480 clip doesn't need 128MB).
+  const ab = new ArrayBuffer(HEADER_SIZE);
   return {
     decoder,
     ab,
@@ -147,13 +151,12 @@ function startPump(decoderId: string) {
       const frameLen = width * height * 4;
 
       if (slotOffset + frameLen > s.ab.byteLength) {
+        // Frame doesn't fit (e.g. mid-stream resolution change) — grow the
+        // shared buffer and re-attach so the next render uses the new layout.
+        growBufferForFrame(s, width, height);
         scheduleNext(Math.max(0, frameInterval - (performance.now() - tickStart)));
         return;
       }
-
-      // Copy the frame slice into a standalone Buffer for the binary pipe.
-      const frameBuf = Buffer.allocUnsafe(frameLen);
-      frameBuf.set(new Uint8Array(s.ab, slotOffset, frameLen));
 
       // Send frame metadata (timestamp) via IPC, and pixel data via the
       // binary pipe (fd 4). This avoids V8 structured clone version
@@ -168,7 +171,7 @@ function startPump(decoderId: string) {
         decoderId,
         timestampMs: s.currentTimeMs,
       });
-      writeFrameToPipe(decoderId, width, height, frameBuf);
+      writeFrameToPipe(decoderId, width, height, new Uint8Array(s.ab, slotOffset, frameLen));
 
       const delay = Math.max(0, frameInterval - (performance.now() - tickStart));
       scheduleNext(delay);
@@ -185,6 +188,22 @@ function startPump(decoderId: string) {
   }
 
   tick();
+}
+
+const MAX_SAB_BYTES = 1024 * 1024 * 1024; // 1GB sanity cap
+
+function growBufferForFrame(s: DecoderState, width: number, height: number): void {
+  const needed = HEADER_SIZE + width * height * 4 * 2;
+  if (needed <= s.ab.byteLength || needed > MAX_SAB_BYTES) return;
+  try {
+    const ab = new ArrayBuffer(needed);
+    s.ab = ab;
+    s.abView = new Uint8Array(ab);
+    s.decoder.attachSharedBuffer(ab);
+    console.log(`[mpv-worker] decoder buffer grew to ${(needed / 1024 / 1024).toFixed(1)}MB for ${width}x${height}`);
+  } catch (err) {
+    console.error(`[mpv-worker] failed to grow shared buffer: ${err}`);
+  }
 }
 
 function stopPump(decoderId: string) {
@@ -234,10 +253,12 @@ function handleCommand(req: any) {
         state.path = path;
         state.currentTimeMs = 0;
 
-        // Recreate ArrayBuffer sized for this video.
-        const maxW = Math.max(meta.width, 4096);
-        const maxH = Math.max(meta.height, 4096);
-        const bufSize = HEADER_SIZE + maxW * maxH * 4 * 2;
+        // Size the shared buffer for the actual video dimensions
+        // (2 slots of w*h*4). The native side re-inits the slot layout from
+        // the stream metadata on attach.
+        const w = Math.max(meta.width, 1);
+        const h = Math.max(meta.height, 1);
+        const bufSize = HEADER_SIZE + w * h * 4 * 2;
         state.ab = new ArrayBuffer(bufSize);
         state.abView = new Uint8Array(state.ab);
         state.decoder.attachSharedBuffer(state.ab);
@@ -287,29 +308,30 @@ function handleCommand(req: any) {
         state.decoder.seek(ms);
         if (state.paused) {
           try {
-            const meta = state.decoder.renderFrame();
-            if (meta) {
+            for (let attempt = 0; attempt < 2; attempt++) {
+              const meta = state.decoder.renderFrame();
+              if (!meta) break;
               const view = new DataView(state.ab);
               const readySlot = readU32(view, OFF_READY_SLOT);
               const width = readU32(view, OFF_WIDTH);
               const height = readU32(view, OFF_HEIGHT);
-              if (readySlot > 0 && width > 0 && height > 0) {
-                const slotIdx = readySlot - 1;
-                const slotSize = readU32(view, OFF_SLOT_SIZE);
-                const slotOffset = HEADER_SIZE + slotIdx * slotSize;
-                const frameLen = width * height * 4;
-                if (slotOffset + frameLen <= state.ab.byteLength) {
-                  const frameBuf = Buffer.alloc(frameLen);
-                  const frameView = new Uint8Array(state.ab, slotOffset, frameLen);
-                  frameBuf.set(frameView);
-                  process.send!({
-                    type: "frame-meta",
-                    decoderId,
-                    timestampMs: ms,
-                  });
-                  writeFrameToPipe(decoderId, width, height, frameBuf);
-                }
+              if (!(readySlot > 0 && width > 0 && height > 0)) break;
+              const slotIdx = readySlot - 1;
+              const slotSize = readU32(view, OFF_SLOT_SIZE);
+              const slotOffset = HEADER_SIZE + slotIdx * slotSize;
+              const frameLen = width * height * 4;
+              if (slotOffset + frameLen > state.ab.byteLength) {
+                // Grow and retry once so the seeked frame isn't dropped.
+                growBufferForFrame(state, width, height);
+                continue;
               }
+              process.send!({
+                type: "frame-meta",
+                decoderId,
+                timestampMs: ms,
+              });
+              writeFrameToPipe(decoderId, width, height, new Uint8Array(state.ab, slotOffset, frameLen));
+              break;
             }
           } catch { /* ignore */ }
         }

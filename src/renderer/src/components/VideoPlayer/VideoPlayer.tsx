@@ -1,21 +1,21 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import {
-  Play,
-  Pause,
-  VolumeX,
-  Volume1,
-  Volume2,
-  Maximize,
-  X,
+    Maximize,
+    Pause,
+    Play,
+    Volume1,
+    Volume2,
+    VolumeX,
+    X,
 } from "lucide-react";
-import { useVideoPlayerStore } from "../../store/videoPlayer.store";
-import { useInputStore } from "../../store/input.store";
-import { useSettingsStore } from "../../store/settings.store";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { shouldClearProgress } from "../../../../shared/progress";
+import { useInputStore } from "../../store/input.store";
 import { useMoviesStore } from "../../store/media.store";
-import { useNativeVideo, shouldUseNativeDecoder } from "./useNativeVideo";
+import { useSettingsStore } from "../../store/settings.store";
+import { useVideoPlayerStore } from "../../store/videoPlayer.store";
 import { DependencyErrorPanel } from "./DependencyErrorPanel";
+import { shouldUseNativeDecoder, useNativeVideo } from "./useNativeVideo";
 
 const INACTIVITY_MS = 3000;
 const PROGRESS_SAVE_INTERVAL_MS = 180000; // 3 minutes
@@ -53,6 +53,7 @@ export const VideoPlayer: React.FC = () => {
   const lastProgressRef = useRef<{ movieId: string; pct: number } | null>(null);
 
   const useNative = !!src && shouldUseNativeDecoder(src);
+  const [retryCount, setRetryCount] = useState(0);
   const native = useNativeVideo(src, nativeCanvasRef, watchProgress ?? undefined, retryCount);
 
   const [playing, setPlaying] = useState(false);
@@ -66,7 +67,6 @@ export const VideoPlayer: React.FC = () => {
   const [activeSubtitle, setActiveSubtitle] = useState<number>(-1);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [seeking, setSeeking] = useState(false);
-  const [retryCount, setRetryCount] = useState(0);
 
   // Unified state from either backend
   const isPlaying = useNative ? native.state.playing : playing;

@@ -134,6 +134,7 @@ async function launchFlashInstance(
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      sandbox: true,
       preload: join(__dirname, "../preload/splitscreen-preload.js"),
     },
   });
@@ -209,6 +210,7 @@ async function launchLibretroInstance(
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      sandbox: true,
       preload: join(__dirname, "../preload/splitscreen-preload.js"),
     },
   });
@@ -281,6 +283,7 @@ async function launchVideoInstance(
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      sandbox: true,
       preload: join(__dirname, "../preload/splitscreen-preload.js"),
     },
   });
