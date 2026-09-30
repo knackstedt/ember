@@ -1,15 +1,15 @@
 import { create } from "zustand";
-import { Game, GamePlatform, GameEmulatorConfig, WineRunner } from "../../../shared/types";
+import { Game, GameEmulatorConfig, GamePlatform, WineRunner } from "../../../shared/types";
 import {
-  type GamingNavItem,
-  type GamingLibraryFilter,
-  type GamingPlayerCountFilter,
-  type GamingMultiplayerTypeFilter,
-  type GamingPlayStatusFilter,
-  type GamingCompletionFilter,
-  NAV_PLATFORM_GROUPS,
+    type GamingCompletionFilter,
+    type GamingLibraryFilter,
+    type GamingMultiplayerTypeFilter,
+    type GamingNavItem,
+    type GamingPlayerCountFilter,
+    type GamingPlayStatusFilter,
+    NAV_PLATFORM_GROUPS,
 } from "../tabs/Gaming/types";
-import { upsertById, mergeById } from "./store-utils";
+import { mergeById, upsertById } from "./store-utils";
 
 const GAME_JSON_KEYS = new Set<keyof Game>(["tags", "sessionHooks"]);
 
@@ -31,6 +31,13 @@ interface GamesState {
   completionFilter: GamingCompletionFilter;
   regeneratingIds: Set<string>;
   pendingThumbnailIds: Set<string>;
+  /**
+   * Session-level cover updates (thumbnail generation/regeneration/custom covers).
+   * Kept OUT of `games` deliberately: writing covers into the games array gives it a
+   * new reference on every thumbnail load, which re-runs the grid's filter memos and
+   * re-renders the whole tab. Cards subscribe to their own entry via `useCoverUrl`.
+   */
+  coverOverrides: Record<string, { coverUrl: string; corrupt: boolean }>;
   coreVersion: number;
   load: () => Promise<void>;
   query: (odataQuery: string) => Promise<{ results: Game[]; count?: number }>;
@@ -128,6 +135,7 @@ export const useGamesStore = create<GamesState>((set, get) => ({
   completionFilter: "all",
   regeneratingIds: new Set(),
   pendingThumbnailIds: new Set(),
+  coverOverrides: {},
   coreVersion: 0,
 
   load: async () => {
@@ -236,7 +244,8 @@ export const useGamesStore = create<GamesState>((set, get) => ({
       "gamegear", "pce", "psx", "dreamcast", "nds", "dos",
     ]);
     const isLibretro = libretroPlatforms.has(game?.platform as GamePlatform);
-    if (!game || game.coverUrl || (game.platform !== "flash" && !isLibretro)) return;
+    const existingCover = get().coverOverrides[id]?.coverUrl ?? game?.coverUrl;
+    if (!game || existingCover || (game.platform !== "flash" && !isLibretro)) return;
     if (get().pendingThumbnailIds.has(id)) return;
     set((s) => {
       const next = new Set(s.pendingThumbnailIds);
@@ -248,9 +257,10 @@ export const useGamesStore = create<GamesState>((set, get) => ({
       if (url) {
         const isBroken = url.includes("-broken.svg");
         set((s) => ({
-          games: s.games.map((g) =>
-            g.id === id ? { ...g, coverUrl: url, corrupt: isBroken } : g,
-          ),
+          coverOverrides: {
+            ...s.coverOverrides,
+            [id]: { coverUrl: url, corrupt: isBroken },
+          },
         }));
       }
     } finally {
@@ -276,9 +286,10 @@ export const useGamesStore = create<GamesState>((set, get) => ({
         const busted = `${url}#t=${Date.now()}`;
         const isBroken = url.includes("-broken.svg");
         set((s) => ({
-          games: s.games.map((g) =>
-            g.id === id ? { ...g, coverUrl: busted, corrupt: isBroken } : g,
-          ),
+          coverOverrides: {
+            ...s.coverOverrides,
+            [id]: { coverUrl: busted, corrupt: isBroken },
+          },
         }));
       }
     } finally {
@@ -297,9 +308,10 @@ export const useGamesStore = create<GamesState>((set, get) => ({
     if (url) {
       const busted = `${url}#t=${Date.now()}`;
       set((s) => ({
-        games: s.games.map((g) =>
-          g.id === id ? { ...g, coverUrl: busted } : g,
-        ),
+        coverOverrides: {
+          ...s.coverOverrides,
+          [id]: { coverUrl: busted, corrupt: game.corrupt ?? false },
+        },
       }));
     }
   },

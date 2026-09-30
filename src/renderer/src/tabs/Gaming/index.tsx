@@ -28,7 +28,6 @@ import {
 } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { GameVideo } from "../../../../shared/metadata";
-import { ChipFilter } from "../../components/ChipFilters/ChipFilters";
 import { CollectionManager } from "../../components/CollectionManager/CollectionManager";
 import { ConfirmDialog } from "../../components/ConfirmDialog/ConfirmDialog";
 import { ContextMenuOption } from "../../components/ContextMenu/ContextMenu";
@@ -49,6 +48,7 @@ import {
 } from "../../components/GalleryView";
 import { HexCellData } from "../../components/GalleryView/HexGridView";
 import { GameCard } from "../../components/GameCard/GameCard";
+import { FocusAware, GameCover, LazyGameCard, LazyGameThumbnail } from "../../components/GameCard/LazyGameCard";
 import { ImageLightbox } from "../../components/ImageLightbox/ImageLightbox";
 import { SHADER_PRESETS } from "../../components/LibretroPlayer/shaders";
 import { SplitscreenConfigModal } from "../../components/Splitscreen/SplitscreenConfigModal";
@@ -61,9 +61,9 @@ import {
 import { useContextMenu } from "../../hooks/useContextMenu";
 import { useDetailController } from "../../hooks/useDetailController";
 import { NavAction, useGridFocus } from "../../hooks/useGridFocus";
-import { FocusContext, useIsFocused } from "../../lib/grid-focus-store";
+import { FocusContext } from "../../lib/grid-focus-store";
 import { scaledImageUrl } from "../../lib/image-url";
-import { evaluateSmartFilter, sortByCollection, useCollectionsStore } from "../../store/collections.store";
+import { evaluateSmartFilter, useCollectionsStore } from "../../store/collections.store";
 import { useFlashPlayerStore } from "../../store/flashPlayer.store";
 import { useGameLaunchStore } from "../../store/gameLaunch.store";
 import { useGamesStore } from "../../store/games.store";
@@ -73,6 +73,9 @@ import { useSettingsStore } from "../../store/settings.store";
 import { useToastStore } from "../../store/toast.store";
 import { GamingNavRail } from "./components/GamingNavRail";
 import { GamingToolbar } from "./components/GamingToolbar";
+import { gameBadge, getMissingCoreTooltip, LIBRETRO_PLATFORMS } from "./game-utils";
+import { GamesHexGrid } from "./GamesHexGrid";
+import { useGridItems } from "./useGridItems";
 
 // Extended game type that includes lazy-loaded metadata properties
 type GameWithMetadata = Game & Partial<{
@@ -93,147 +96,6 @@ window.htpc.devtools
   .then((open) => { devToolsOpen = open; })
   .catch(() => { /* ignore */ });
 window.htpc.devtools?.onChange?.((open) => { devToolsOpen = open; });
-
-const PLATFORM_FILTERS: ChipFilter<
-  GamePlatform | "all" | "couch-coop" | "favorites"
->[] = [
-  { id: "all", label: "All" },
-  { id: "favorites", label: <><Star size={14} /> Favorites</> },
-  { id: "couch-coop", label: <><Gamepad2 size={14} /> Couch Co-op</> },
-  { id: "steam", label: "Steam" },
-  { id: "gog", label: "GOG" },
-  { id: "heroic", label: "Heroic/Epic" },
-  { id: "lutris", label: "Lutris" },
-  { id: "itch", label: "itch.io" },
-  { id: "dolphin-gc", label: "GameCube" },
-  { id: "dolphin-wii", label: "Wii" },
-  { id: "nes", label: "NES" },
-  { id: "snes", label: "SNES" },
-  { id: "gb", label: "Game Boy" },
-  { id: "gba", label: "GBA" },
-  { id: "n64", label: "N64" },
-  { id: "genesis", label: "Genesis" },
-  { id: "sms", label: "SMS" },
-  { id: "gamegear", label: "Game Gear" },
-  { id: "pce", label: "PC Engine" },
-  { id: "psx", label: "PlayStation" },
-  { id: "nds", label: "DS" },
-  { id: "dreamcast", label: "Dreamcast" },
-  { id: "flash", label: "Flash" },
-  { id: "html5", label: "HTML5" },
-  { id: "unity", label: "Unity" },
-  { id: "dos", label: "DOS/PC" },
-  { id: "windows", label: "Windows" },
-  { id: "desktop", label: "Other" },
-];
-
-const LIBRETRO_PLATFORMS: GamePlatform[] = [
-  "nes", "n64", "genesis", "sms", "gamegear", "pce", "psx", "nds", "dreamcast"
-];
-
-const PROTON_COLORS: Record<string, string> = {
-  platinum: "#b5e3ff",
-  gold: "#ffd700",
-  silver: "#c0c0c0",
-  bronze: "#cd7f32",
-  borked: "#ff4444",
-};
-
-async function getMissingCoreTooltip(game: Game): Promise<string | undefined> {
-  if (!LIBRETRO_PLATFORMS.includes(game.platform)) return undefined;
-  if (!game.romPath) return undefined;
-  const detected = await window.htpc.libretro.detectCore(game.romPath);
-  if (detected !== null) return undefined;
-  const platformLabel = PLATFORM_FILTERS.find((f) => f.id === game.platform)?.label ?? game.platform;
-  return `No ${platformLabel} emulator cores are installed. Install it in settings.`;
-}
-
-const LIBRETRO_THUMB_PLATFORMS = new Set<string>([
-  "nes", "snes", "gb", "gba", "n64", "genesis", "sms",
-  "gamegear", "pce", "psx", "dreamcast", "nds", "dos",
-]);
-
-const WEB_THUMB_PLATFORMS = new Set<string>(["flash", "html5", "unity"]);
-
-const LazyGameCard: React.FC<{
-  game: Game;
-  index: number;
-  onSelect: () => void;
-  onFavorite: () => void;
-}> = React.memo(({ game, index, onSelect, onFavorite }) => {
-  const loadThumbnail = useGamesStore((s) => s.loadThumbnail);
-  const isThumbnailPending = useGamesStore(
-    (s) => s.pendingThumbnailIds.has(game.id) || s.regeneratingIds.has(game.id)
-  );
-  const coreVersion = useGamesStore((s) => s.coreVersion);
-  const [missingCoreTooltip, setMissingCoreTooltip] = useState<string | undefined>(undefined);
-  const isFocused = useIsFocused(index);
-
-  useEffect(() => {
-    const isLibretro = LIBRETRO_THUMB_PLATFORMS.has(game.platform);
-    if ((WEB_THUMB_PLATFORMS.has(game.platform) || isLibretro) && !game.coverUrl) {
-      loadThumbnail(game.id);
-    }
-  }, [game.id, game.platform, game.coverUrl, loadThumbnail]);
-
-  useEffect(() => {
-    let cancelled = false;
-    getMissingCoreTooltip(game)
-      .then((tooltip) => {
-        if (!cancelled) setMissingCoreTooltip(tooltip);
-      })
-      .catch(() => {
-        if (!cancelled) setMissingCoreTooltip(undefined);
-      });
-    return () => { cancelled = true; };
-  }, [game, coreVersion]);
-
-  const b = gameBadge(game);
-  return (
-    <GameCard
-      key={game.id}
-      id={game.id}
-      title={game.title}
-      subtitle={game.developer}
-      coverUrl={game.coverUrl}
-      platform={game.platform}
-      badge={b?.label}
-      badgeColor={b?.color}
-      isFavorite={game.isFavorite}
-      isFocused={isFocused}
-      isThumbnailPending={isThumbnailPending}
-      corrupt={game.corrupt}
-      missingCoreTooltip={missingCoreTooltip}
-      playTime={game.playTime}
-      lastPlayed={game.lastPlayed}
-      missing={game.missing}
-      pendingMetadata={game.pendingMetadata}
-      onSelect={onSelect}
-      onFavorite={onFavorite}
-    />
-  );
-});
-
-const LazyGameThumbnail: React.FC<{ game: Game }> = React.memo(({ game }) => {
-  const loadThumbnail = useGamesStore((s) => s.loadThumbnail);
-  useEffect(() => {
-    const isLibretro = LIBRETRO_THUMB_PLATFORMS.has(game.platform);
-    if ((WEB_THUMB_PLATFORMS.has(game.platform) || isLibretro) && !game.coverUrl) {
-      loadThumbnail(game.id);
-    }
-  }, [game.id, game.platform, game.coverUrl, loadThumbnail]);
-  return null;
-});
-
-function gameBadge(game: Game): { label: string; color: string } | undefined {
-  if (game.protonRating && game.protonRating !== "unknown") {
-    return {
-      label: game.protonRating,
-      color: PROTON_COLORS[game.protonRating],
-    };
-  }
-  return undefined;
-}
 
 function uninstallLabelForGame(game: Game): string {
   if (game.id.startsWith("steam_")) return "Uninstall";
@@ -309,12 +171,6 @@ function IniOverrideEditor({ onAdd }: { onAdd: (section: string, key: string, va
   );
 }
 
-/** Render-prop wrapper that subscribes to focus — only the old + new focused cells re-render. */
-function FocusAware({ index, children }: { index: number; children: (isFocused: boolean) => React.ReactNode }) {
-  const isFocused = useIsFocused(index);
-  return <>{children(isFocused)}</>;
-}
-
 export const GamingTab: React.FC = () => {
   const games = useGamesStore((s) => s.games);
   const loading = useGamesStore((s) => s.loading);
@@ -326,7 +182,6 @@ export const GamingTab: React.FC = () => {
   const load = useGamesStore((s) => s.load);
   const scan = useGamesStore((s) => s.scan);
   const setSearch = useGamesStore((s) => s.setSearch);
-  const filtered = useGamesStore((s) => s.filtered);
   const libraryFilter = useGamesStore((s) => s.libraryFilter);
   const setLibraryFilter = useGamesStore((s) => s.setLibraryFilter);
   const playerCountFilter = useGamesStore((s) => s.playerCountFilter);
@@ -346,10 +201,16 @@ export const GamingTab: React.FC = () => {
   const setCustomCover = useGamesStore((s) => s.setCustomCover);
   const updateLastPlayed = useGamesStore((s) => s.updateLastPlayed);
   const loadThumbnail = useGamesStore((s) => s.loadThumbnail);
-  const pendingThumbnailIds = useGamesStore((s) => s.pendingThumbnailIds);
-  const regeneratingIds = useGamesStore((s) => s.regeneratingIds);
   useGamesStore((s) => s.coreVersion); // forces re-render when cores change
   const [selected, setSelected] = useState<Game | null>(null);
+  // Scoped to the selected game only — the Sets themselves are NOT subscribed
+  // at tab level, so a thumbnail finishing anywhere doesn't re-render the tab.
+  const isSelectedThumbPending = useGamesStore(
+    (s) => selected != null && (s.pendingThumbnailIds.has(selected.id) || s.regeneratingIds.has(selected.id))
+  );
+  const selectedCoverOverride = useGamesStore(
+    (s) => (selected ? s.coverOverrides[selected.id]?.coverUrl : undefined)
+  );
   const [selectedMissingCoreTooltip, setSelectedMissingCoreTooltip] = useState<string | undefined>(undefined);
   const [columnCount, setColumnCount] = useState(6);
   const [viewColumnCount, setViewColumnCount] = useState(6);
@@ -526,28 +387,12 @@ export const GamingTab: React.FC = () => {
     [collections, activeCollectionId],
   );
 
-  const items = useMemo(() => {
-    const base = filtered();
-    if (!activeCollectionId) return base;
-    const result = base.filter((g) => collectionItemIds.has(g.id));
-    return sortByCollection<Game>(result, activeCollection);
-  }, [filtered, games, activeNav, searchQuery, libraryFilter, playerCountFilter, multiplayerTypeFilter, playStatusFilter, completionFilter, activeCollectionId, collectionItemIds, activeCollection]);
-
-  const facetSourceItems = items;
-
-  const gridItems = useMemo(() => {
-    let r = facetSourceItems;
-    for (const [field, value] of Object.entries(facetFilters)) {
-      if (!value) continue;
-      r = r.filter((game) => {
-        const raw = game[field as keyof Game];
-        if (raw === undefined || raw === null) return false;
-        if (Array.isArray(raw)) return raw.some((v) => String(v).toLowerCase() === value.toLowerCase());
-        return String(raw).toLowerCase() === value.toLowerCase();
-      });
-    }
-    return r;
-  }, [facetSourceItems, facetFilters]);
+  const { items, gridItems } = useGridItems({
+    activeCollectionId,
+    collectionItemIds,
+    activeCollection,
+    facetFilters,
+  });
 
   const gameFacetFields: FacetField[] = useMemo(() => [
     { key: "genres", label: "Genre", accessor: (g) => (g as Record<string, unknown>).genres as string[] | undefined, sort: "count", maxValues: 8 },
@@ -804,18 +649,27 @@ export const GamingTab: React.FC = () => {
     },
   });
 
+  const handleCardSelect = useCallback(
+    (game: Game, index: number) => { setFocusedIndex(index); setSelected(game); },
+    [setFocusedIndex],
+  );
+  const handleCardFavorite = useCallback(
+    (gameId: string) => { void toggleFavorite(gameId); },
+    [toggleFavorite],
+  );
+
   const renderItem = useCallback(
     (game: Game, index: number) => (
       <div key={game.id} className="p-1.5 w-full h-full flex flex-col min-w-0" {...bindItem(game, index)}>
         <LazyGameCard
           game={game}
           index={index}
-          onSelect={() => { setFocusedIndex(index); setSelected(game); }}
-          onFavorite={() => toggleFavorite(game.id)}
+          onSelect={handleCardSelect}
+          onFavorite={handleCardFavorite}
         />
       </div>
     ),
-    [bindItem, setFocusedIndex, toggleFavorite],
+    [bindItem, handleCardSelect, handleCardFavorite],
   );
 
   const renderSkeletonItem = useCallback(
@@ -868,48 +722,25 @@ export const GamingTab: React.FC = () => {
     [],
   );
 
-  const renderHex = useCallback(
-    (game: Game, index: number) => {
-      const b = gameBadge(game);
-      return {
-        coverUrl: game.coverUrl,
-        title: game.title,
-        subtitle: game.developer,
-        badge: b?.label,
-        badgeColor: b?.color,
-        isFavorite: game.isFavorite,
-        isLoading: pendingThumbnailIds.has(game.id) || regeneratingIds.has(game.id),
-        missing: game.missing,
-        platform: game.platform,
-        pendingMetadata: game.pendingMetadata,
-        onClick: () => { setFocusedIndex(index); setSelected(game); },
-        onFavorite: () => toggleFavorite(game.id),
-        onVisible: () => {
-          const isLibretro = LIBRETRO_THUMB_PLATFORMS.has(game.platform);
-          if ((WEB_THUMB_PLATFORMS.has(game.platform) || isLibretro) && !game.coverUrl) {
-            loadThumbnail(game.id);
-          }
-        },
-      };
-    },
-    [pendingThumbnailIds, regeneratingIds, toggleFavorite, loadThumbnail],
-  );
-
   const renderListItem = useCallback(
     (game: Game, index: number) => (
       <FocusAware key={game.id} index={index}>
         {(isFocused) => (
           <div className="flex items-center gap-3 w-full h-full px-3" {...bindItem(game, index)}>
             <LazyGameThumbnail game={game} />
-            <div
-              className="w-12 h-[72px] flex-shrink-0 rounded overflow-hidden bg-cover bg-center"
-              style={{
-                backgroundImage: game.coverUrl ? `url(${scaledImageUrl(game.coverUrl, 48, 72)})` : undefined,
-                backgroundColor: !game.coverUrl ? "#1a1a2e" : undefined,
-                filter: game.missing ? "grayscale(80%)" : undefined,
-                opacity: game.missing ? 0.6 : undefined,
-              }}
-            />
+            <GameCover game={game}>
+              {(coverUrl) => (
+                <div
+                  className="w-12 h-[72px] flex-shrink-0 rounded overflow-hidden bg-cover bg-center"
+                  style={{
+                    backgroundImage: coverUrl ? `url(${scaledImageUrl(coverUrl, 48, 72)})` : undefined,
+                    backgroundColor: !coverUrl ? "#1a1a2e" : undefined,
+                    filter: game.missing ? "grayscale(80%)" : undefined,
+                    opacity: game.missing ? 0.6 : undefined,
+                  }}
+                />
+              )}
+            </GameCover>
             <div className="flex-1 min-w-0 flex flex-col justify-center">
               <div className="flex items-center gap-2 min-w-0">
                 <div
@@ -936,13 +767,17 @@ export const GamingTab: React.FC = () => {
   const renderSpine = useCallback(
     (game: Game, _index: number, { isHovered, isFocused }: { isHovered: boolean; isFocused: boolean }) => {
       return (
-        <BookshelfSpine
-          coverUrl={game.coverUrl}
-          title={game.title}
-          subtitle={game.platform}
-          isHovered={isHovered}
-          isFocused={isFocused}
-        />
+        <GameCover game={game}>
+          {(coverUrl) => (
+            <BookshelfSpine
+              coverUrl={coverUrl}
+              title={game.title}
+              subtitle={game.platform}
+              isHovered={isHovered}
+              isFocused={isFocused}
+            />
+          )}
+        </GameCover>
       );
     },
     [],
@@ -953,11 +788,15 @@ export const GamingTab: React.FC = () => {
       return (
         <div className="w-full h-full relative">
           <LazyGameThumbnail game={game} />
-          <GalleryImage
-            src={game.coverUrl}
-            alt={game.title}
-            style={{ width: "100%", height: "100%" }}
-          />
+          <GameCover game={game}>
+            {(coverUrl) => (
+              <GalleryImage
+                src={coverUrl}
+                alt={game.title}
+                style={{ width: "100%", height: "100%" }}
+              />
+            )}
+          </GameCover>
           {!isHovered && <div className="absolute inset-0 bg-black/30 pointer-events-none" />}
           {isHovered && (
             <div
@@ -997,20 +836,22 @@ export const GamingTab: React.FC = () => {
                   borderBottom: "1px solid rgba(24,30,46,0.8)",
                 }}
               >
-                {game.coverUrl ? (
-                  <img
-                    src={scaledImageUrl(game.coverUrl, 600, 400)}
-                    alt={game.title}
-                    className="w-full h-full object-cover opacity-80"
-                    loading="lazy"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <span className="text-white/20 text-2xl font-bold">
-                      {game.title.slice(0, 2).toUpperCase()}
-                    </span>
-                  </div>
-                )}
+                <GameCover game={game}>
+                  {(coverUrl) => coverUrl ? (
+                    <img
+                      src={scaledImageUrl(coverUrl, 600, 400)}
+                      alt={game.title}
+                      className="w-full h-full object-cover opacity-80"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <span className="text-white/20 text-2xl font-bold">
+                        {game.title.slice(0, 2).toUpperCase()}
+                      </span>
+                    </div>
+                  )}
+                </GameCover>
                 <div
                   className="absolute inset-0 pointer-events-none"
                   style={{
@@ -1189,7 +1030,7 @@ export const GamingTab: React.FC = () => {
             {gridItems.length > 0 && (
               <div className="mb-3">
                 <DynamicFacetFilters
-                  items={facetSourceItems}
+                  items={items}
                   fields={gameFacetFields}
                   activeFilters={facetFilters}
                   onFilter={applyFacetFilter}
@@ -1303,12 +1144,11 @@ export const GamingTab: React.FC = () => {
                     );
                   case "hex-grid":
                     return (
-                      <HexGridView
+                      <GamesHexGrid
                         ref={gridRef}
                         items={gridItems}
-                        minItemWidth={200}
                         onColumnCountChange={setColumnCount}
-                        renderHex={renderHex}
+                        onSelectGame={handleCardSelect}
                         bindItem={bindItem}
                         scrollRef={scrollContainerRef}
                       />
@@ -1374,7 +1214,7 @@ export const GamingTab: React.FC = () => {
         open={!!selected}
         onClose={() => setSelected(null)}
         title={detailGameData?.title ?? selected?.title ?? ""}
-        coverUrl={detailGameData?.coverUrl ?? selected?.coverUrl}
+        coverUrl={selectedCoverOverride ?? detailGameData?.coverUrl ?? selected?.coverUrl}
         backdropUrl={detailGameData?.bannerUrl}
         description={detailGameData?.description ?? selected?.description}
         metadata={
@@ -1621,7 +1461,7 @@ export const GamingTab: React.FC = () => {
                 )}
 
                 {/* Thumbnailing status */}
-                {(pendingThumbnailIds.has(selected.id) || regeneratingIds.has(selected.id)) && (
+                {isSelectedThumbPending && (
                   <div className="flex items-center gap-2 text-sm">
                     <Loader size={14} className="animate-spin" style={{ color: "var(--accent)" }} />
                     <span style={{ color: "var(--text-secondary)" }}>Generating thumbnail...</span>

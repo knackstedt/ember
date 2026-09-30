@@ -1,2 +1,3 @@
 [test]
 pathIgnorePatterns = ["out/**", "node_modules/**", "website/node_modules/**"]
+preload = ["./test/setup.ts"]

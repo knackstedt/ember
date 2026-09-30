@@ -82,7 +82,7 @@ function useGridLayout(
   return { containerWidth, effectiveColCount };
 }
 
-export const VirtualGrid = React.forwardRef(function VirtualGridInner<T>(
+export const VirtualGrid = React.memo(React.forwardRef(function VirtualGridInner<T>(
   {
     items,
     columnCount: columnCountProp = 4,
@@ -194,6 +194,6 @@ export const VirtualGrid = React.forwardRef(function VirtualGridInner<T>(
       </Virtualizer>
     </div>
   );
-}) as <T>(
+})) as <T>(
   props: VirtualGridProps<T> & { ref?: React.Ref<VirtualGridHandle> },
 ) => React.ReactElement;
